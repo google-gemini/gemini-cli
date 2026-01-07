@@ -47,6 +47,7 @@ import {
   type HookEventName,
   type ResolvedExtensionSetting,
   coreEvents,
+  ExtensionScope,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -565,6 +566,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const extension: GeminiCLIExtension = {
         name: config.name,
+        description: config.description,
         version: config.version,
         path: effectiveExtensionPath,
         contextFiles,
@@ -572,10 +574,14 @@ Would you like to attempt to install via "git clone" instead?`,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
         hooks,
-        isActive: this.extensionEnablementManager.isEnabled(
-          config.name,
-          this.workspaceDir,
-        ),
+        isActive:
+          this.settings.experimental?.extensionReloading &&
+          this.settings.experimental?.dynamicExtensionLoading
+            ? false
+            : this.extensionEnablementManager.isEnabled(
+                config.name,
+                this.workspaceDir,
+              ),
         id: getExtensionId(config, installMetadata),
         settings: config.settings,
         resolvedSettings,
@@ -632,6 +638,24 @@ Would you like to attempt to install via "git clone" instead?`,
       ) as unknown as ExtensionConfig;
 
       validateName(config.name);
+
+      // Attempt to load description from package.json if not present
+      if (!config.description) {
+        try {
+          const packageJsonPath = path.join(extensionDir, 'package.json');
+          const packageJsonContent = await fs.promises.readFile(
+            packageJsonPath,
+            'utf-8',
+          );
+          const packageJson = JSON.parse(packageJsonContent);
+          if (packageJson.description) {
+            config.description = packageJson.description;
+          }
+        } catch {
+          // Ignore errors reading package.json (file might not exist)
+        }
+      }
+
       return config;
     } catch (e) {
       throw new Error(
@@ -750,10 +774,12 @@ Would you like to attempt to install via "git clone" instead?`,
     return output;
   }
 
-  async disableExtension(name: string, scope: SettingScope) {
+  async disableExtension(name: string, scope: SettingScope | ExtensionScope) {
     if (
       scope === SettingScope.System ||
-      scope === SettingScope.SystemDefaults
+      scope === SettingScope.SystemDefaults ||
+      scope === ExtensionScope.System ||
+      scope === ExtensionScope.SystemDefaults
     ) {
       throw new Error('System and SystemDefaults scopes are not supported.');
     }
@@ -764,14 +790,21 @@ Would you like to attempt to install via "git clone" instead?`,
       throw new Error(`Extension with name ${name} does not exist.`);
     }
 
-    if (scope !== SettingScope.Session) {
+    if (scope !== SettingScope.Session && scope !== ExtensionScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace || scope === ExtensionScope.Workspace
+          ? this.workspaceDir
+          : homedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
       this.telemetryConfig,
-      new ExtensionDisableEvent(name, hashValue(name), extension.id, scope),
+      new ExtensionDisableEvent(
+        name,
+        hashValue(name),
+        extension.id,
+        scope as SettingScope,
+      ),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it
@@ -785,10 +818,12 @@ Would you like to attempt to install via "git clone" instead?`,
    * Enables an existing extension for a given scope, and starts it if
    * appropriate.
    */
-  async enableExtension(name: string, scope: SettingScope) {
+  async enableExtension(name: string, scope: SettingScope | ExtensionScope) {
     if (
       scope === SettingScope.System ||
-      scope === SettingScope.SystemDefaults
+      scope === SettingScope.SystemDefaults ||
+      scope === ExtensionScope.System ||
+      scope === ExtensionScope.SystemDefaults
     ) {
       throw new Error('System and SystemDefaults scopes are not supported.');
     }
@@ -799,14 +834,21 @@ Would you like to attempt to install via "git clone" instead?`,
       throw new Error(`Extension with name ${name} does not exist.`);
     }
 
-    if (scope !== SettingScope.Session) {
+    if (scope !== SettingScope.Session && scope !== ExtensionScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace || scope === ExtensionScope.Workspace
+          ? this.workspaceDir
+          : homedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(
       this.telemetryConfig,
-      new ExtensionEnableEvent(name, hashValue(name), extension.id, scope),
+      new ExtensionEnableEvent(
+        name,
+        hashValue(name),
+        extension.id,
+        scope as SettingScope,
+      ),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it

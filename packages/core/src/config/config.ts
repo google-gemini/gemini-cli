@@ -25,6 +25,7 @@ import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
+import { ActivateExtensionTool } from '../tools/activate-extension.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
@@ -163,6 +164,7 @@ export interface IntrospectionAgentSettings {
  */
 export interface GeminiCLIExtension {
   name: string;
+  description?: string;
   version: string;
   isActive: boolean;
   path: string;
@@ -303,6 +305,7 @@ export interface ConfigParameters {
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
   enableExtensionReloading?: boolean;
+  dynamicExtensionLoading?: boolean;
   allowedMcpServers?: string[];
   blockedMcpServers?: string[];
   allowedEnvironmentVariables?: string[];
@@ -430,6 +433,7 @@ export class Config {
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
+  private readonly dynamicExtensionLoading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
@@ -601,6 +605,8 @@ export class Config {
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
+    this.enableExtensionReloading = params.enableExtensionReloading ?? false;
+    this.dynamicExtensionLoading = params.dynamicExtensionLoading ?? false;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
@@ -741,6 +747,13 @@ export class Config {
       await this.getExtensionLoader().start(this),
     ]);
     initMcpHandle?.end();
+
+    // Register ActivateExtensionTool
+    if (this.extensionManagement) {
+      this.getToolRegistry().registerTool(
+        new ActivateExtensionTool(this, this.messageBus),
+      );
+    }
 
     // Discover skills if enabled
     if (this.skillsSupport) {
@@ -1410,6 +1423,10 @@ export class Config {
 
   getEnableExtensionReloading(): boolean {
     return this.enableExtensionReloading;
+  }
+
+  getDynamicExtensionLoading(): boolean {
+    return this.dynamicExtensionLoading;
   }
 
   isAgentsEnabled(): boolean {

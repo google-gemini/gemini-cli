@@ -75,6 +75,10 @@ describe('Core System Prompt (prompts.ts)', () => {
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
+      getExtensionLoader: vi.fn().mockReturnValue({
+        getExtensions: vi.fn().mockReturnValue([]),
+      }),
+      getDynamicExtensionLoading: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -106,6 +110,65 @@ describe('Core System Prompt (prompts.ts)', () => {
     );
     expect(prompt).toContain('</skill>');
     expect(prompt).toContain('</available_skills>');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include available_extensions when dynamicExtensionLoading is enabled', () => {
+    const extensions = [
+      {
+        name: 'test-extension',
+        id: 'test-extension-id',
+        description: 'A test extension description',
+        path: '/path/to/test-extension',
+        isActive: false,
+        version: '1.0.0',
+        contextFiles: [],
+        installMetadata: {
+          type: 'local' as const,
+          source: '/path/to/test-extension',
+        },
+        resolvedSettings: [],
+        skills: [],
+      },
+    ];
+    vi.mocked(mockConfig.getExtensionLoader().getExtensions).mockReturnValue(
+      extensions,
+    );
+    vi.mocked(mockConfig.getDynamicExtensionLoading).mockReturnValue(true);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Extensions');
+    expect(prompt).toContain('<available_extensions>');
+    expect(prompt).toContain('<name>test-extension</name>');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should NOT include available_extensions when dynamicExtensionLoading is disabled', () => {
+    const extensions = [
+      {
+        name: 'test-extension',
+        id: 'test-extension-id',
+        description: 'A test extension description',
+        path: '/path/to/test-extension',
+        isActive: false,
+        version: '1.0.0',
+        contextFiles: [],
+        installMetadata: {
+          type: 'local' as const,
+          source: '/path/to/test-extension',
+        },
+        resolvedSettings: [],
+        skills: [],
+      },
+    ];
+    vi.mocked(mockConfig.getExtensionLoader().getExtensions).mockReturnValue(
+      extensions,
+    );
+    vi.mocked(mockConfig.getDynamicExtensionLoading).mockReturnValue(false);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Available Extensions');
+    expect(prompt).not.toContain('<available_extensions>');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -223,6 +286,10 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
         }),
+        getExtensionLoader: vi.fn().mockReturnValue({
+          getExtensions: vi.fn().mockReturnValue([]),
+        }),
+        getDynamicExtensionLoading: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);

@@ -1365,6 +1365,16 @@ const SETTINGS_SCHEMA = {
           'Enables extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
+      dynamicExtensionLoading: {
+        type: 'boolean',
+        label: 'Dynamic Extension Loading',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enables the model to dynamically activate extensions (requires extensionReloading).',
+        showInDialog: false,
+      },
       jitContext: {
         type: 'boolean',
         label: 'JIT Context Loading',
