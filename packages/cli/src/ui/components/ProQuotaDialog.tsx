@@ -92,6 +92,11 @@ export function ProQuotaDialog({
         key: 'retry_once',
       },
       {
+        label: `Switch to ${fallbackModel}`,
+        value: 'retry_always' as const,
+        key: 'retry_always',
+      },
+      {
         label: 'Stop',
         value: 'retry_later' as const,
         key: 'retry_later',
