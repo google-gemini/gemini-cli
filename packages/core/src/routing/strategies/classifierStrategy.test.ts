@@ -281,4 +281,30 @@ describe('ClassifierStrategy', () => {
     );
     consoleWarnSpy.mockRestore();
   });
+
+  it('should respect requestedModel from context in resolveClassifierModel', async () => {
+    const requestedModel = DEFAULT_GEMINI_MODEL; // Pro model
+    const mockApiResponse = {
+      reasoning: 'Choice is flash',
+      model_choice: 'flash',
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const contextWithRequestedModel = {
+      ...mockContext,
+      requestedModel,
+    } as RoutingContext;
+
+    const decision = await strategy.route(
+      contextWithRequestedModel,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    // Since requestedModel is Pro, and choice is flash, it should resolve to Flash
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+  });
 });

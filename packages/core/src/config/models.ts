@@ -147,6 +147,20 @@ export function isGemini2Model(model: string): boolean {
 }
 
 /**
+ * Checks if the model is an auto model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is an auto model.
+ */
+export function isAutoModel(model: string): boolean {
+  return (
+    model === GEMINI_MODEL_ALIAS_AUTO ||
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === DEFAULT_GEMINI_MODEL_AUTO
+  );
+}
+
+/**
  * Checks if the model supports multimodal function responses (multimodal data nested within function response).
  * This is supported in Gemini 3.
  *
