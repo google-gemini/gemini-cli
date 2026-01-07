@@ -51,7 +51,7 @@ jobs:
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     env:
-      GEMINI_LINT_TEMP_DIR: ${{ github.workspace }}/.gemini-linters
+      GEMINI_LINT_TEMP_DIR: '${{ github.workspace }}/.gemini-linters'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
