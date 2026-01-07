@@ -9,13 +9,11 @@ import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 
-// TODO: Enable these tests once we figure out why they are flaky in CI.
-describe.skip('JSON output', () => {
+describe('JSON output', () => {
   let rig: TestRig;
 
-  beforeEach(async (context) => {
+  beforeEach(async () => {
     rig = new TestRig();
-    await rig.setup(context.task.name);
   });
 
   afterEach(async () => {
@@ -115,7 +113,7 @@ describe.skip('JSON output', () => {
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
-    rig.setup('json-output-error', {
+    await rig.setup('json-output-error', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'json-output.error.responses',
