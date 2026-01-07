@@ -226,13 +226,13 @@ key. The value will be saved to a `.env` file in the extension's directory
 You can view a list of an extension's settings by running:
 
 ```
-gemini extensions settings list <extension name>
+gemini extensions list
 ```
 
 and you can update a given setting using:
 
 ```
-gemini extensions settings set <extension name> <setting name> [--scope <scope>]
+gemini extensions config <extension name> [setting name] [--scope <scope>]
 ```
 
 - `--scope`: The scope to set the setting in (`user` or `workspace`). This is
