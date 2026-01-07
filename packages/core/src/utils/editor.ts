@@ -187,7 +187,7 @@ export function getDiffCommand(
     case 'hx':
       return {
         command: 'hx',
-        args: ['--vsplit', oldPath, newPath],
+        args: ['--vsplit', '--', oldPath, newPath],
       };
     default:
       return null;

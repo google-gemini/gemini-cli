@@ -323,7 +323,7 @@ describe('editor utils', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'hx');
       expect(command).toEqual({
         command: 'hx',
-        args: ['--vsplit', 'old.txt', 'new.txt'],
+        args: ['--vsplit', '--', 'old.txt', 'new.txt'],
       });
     });
 
@@ -522,9 +522,9 @@ describe('editor utils', () => {
     });
 
     it('should return true for hx when installed and in sandbox mode', () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/hx'));
       vi.stubEnv('SANDBOX', 'sandbox');
-      expect(isEditorAvailable('emacs')).toBe(true);
+      expect(isEditorAvailable('hx')).toBe(true);
     });
 
     it('should return true for neovim when installed and in sandbox mode', () => {
