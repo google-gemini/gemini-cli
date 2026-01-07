@@ -7,111 +7,136 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Command } from './types.js';
 
-describe('CommandRegistry', () => {
-  const mockListExtensionsCommandInstance: Command = {
+const {
+  mockExtensionsCommand,
+  mockListExtensionsCommand,
+  mockExtensionsCommandInstance,
+  mockListExtensionsCommandInstance,
+  mockSpawnWorkerCommand,
+  mockListWorkersCommand,
+  mockGetWorkerCommand,
+  mockCancelWorkerCommand,
+  mockInitCommand,
+  mockRestoreCommand,
+} = vi.hoisted(() => {
+  const listInstance: Command = {
     name: 'extensions list',
     description: 'Lists all installed extensions.',
     execute: vi.fn(),
   };
-  const mockListExtensionsCommand = vi.fn(
-    () => mockListExtensionsCommandInstance,
-  );
 
-  const mockExtensionsCommandInstance: Command = {
+  const extInstance: Command = {
     name: 'extensions',
     description: 'Manage extensions.',
     execute: vi.fn(),
-    subCommands: [mockListExtensionsCommandInstance],
+    subCommands: [listInstance],
   };
-  const mockExtensionsCommand = vi.fn(() => mockExtensionsCommandInstance);
 
-  // Mock spawn-worker commands to prevent interference
-  const mockSpawnWorkerCommandInstance: Command = {
+  const spawnWorkerInstance: Command = {
     name: 'spawn-worker',
-    description: 'Mock spawn worker',
-    execute: vi.fn(),
-  };
-  const mockListWorkersCommandInstance: Command = {
-    name: 'list-workers',
-    description: 'Mock list workers',
-    execute: vi.fn(),
-  };
-  const mockGetWorkerCommandInstance: Command = {
-    name: 'get-worker',
-    description: 'Mock get worker',
-    execute: vi.fn(),
-  };
-  const mockCancelWorkerCommandInstance: Command = {
-    name: 'cancel-worker',
-    description: 'Mock cancel worker',
+    description: 'Spawn a background worker task.',
     execute: vi.fn(),
   };
 
-  // Mock init and restore commands
-  const mockInitCommandInstance: Command = {
+  const listWorkersInstance: Command = {
+    name: 'list-workers',
+    description: 'List active background workers.',
+    execute: vi.fn(),
+  };
+
+  const getWorkerInstance: Command = {
+    name: 'get-worker',
+    description: 'Get details of a specific worker.',
+    execute: vi.fn(),
+  };
+
+  const cancelWorkerInstance: Command = {
+    name: 'cancel-worker',
+    description: 'Cancel a running worker.',
+    execute: vi.fn(),
+  };
+
+  const initInstance: Command = {
     name: 'init',
-    description: 'Mock init',
+    description: 'Initializes the server.',
     execute: vi.fn(),
   };
-  const mockRestoreCommandInstance: Command = {
+
+  const restoreInstance: Command = {
     name: 'restore',
-    description: 'Mock restore',
+    description: 'Restores server state.',
     execute: vi.fn(),
   };
+
+  return {
+    mockListExtensionsCommandInstance: listInstance,
+    mockExtensionsCommandInstance: extInstance,
+    mockExtensionsCommand: vi.fn(() => extInstance),
+    mockListExtensionsCommand: vi.fn(() => listInstance),
+    mockSpawnWorkerCommand: vi.fn(() => spawnWorkerInstance),
+    mockListWorkersCommand: vi.fn(() => listWorkersInstance),
+    mockGetWorkerCommand: vi.fn(() => getWorkerInstance),
+    mockCancelWorkerCommand: vi.fn(() => cancelWorkerInstance),
+    mockInitCommand: vi.fn(() => initInstance),
+    mockRestoreCommand: vi.fn(() => restoreInstance),
+  };
+});
+
+vi.mock('./extensions.js', () => ({
+  ExtensionsCommand: mockExtensionsCommand,
+  ListExtensionsCommand: mockListExtensionsCommand,
+}));
+
+vi.mock('./init.js', () => ({
+  InitCommand: mockInitCommand,
+}));
+
+vi.mock('./restore.js', () => ({
+  RestoreCommand: mockRestoreCommand,
+}));
+
+vi.mock('./spawn-worker.js', () => ({
+  SpawnWorkerCommand: mockSpawnWorkerCommand,
+  ListWorkersCommand: mockListWorkersCommand,
+  GetWorkerCommand: mockGetWorkerCommand,
+  CancelWorkerCommand: mockCancelWorkerCommand,
+}));
+
+describe('CommandRegistry', () => {
+  let commandRegistry: Awaited<
+    typeof import('./command-registry.js')
+  >['commandRegistry'];
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock('./extensions.js', () => ({
-      ExtensionsCommand: mockExtensionsCommand,
-      ListExtensionsCommand: mockListExtensionsCommand,
-    }));
-    vi.doMock('./init.js', () => ({
-      InitCommand: vi.fn(() => mockInitCommandInstance),
-    }));
-    vi.doMock('./restore.js', () => ({
-      RestoreCommand: vi.fn(() => mockRestoreCommandInstance),
-    }));
-    vi.doMock('./spawn-worker.js', () => ({
-      SpawnWorkerCommand: vi.fn(() => mockSpawnWorkerCommandInstance),
-      ListWorkersCommand: vi.fn(() => mockListWorkersCommandInstance),
-      GetWorkerCommand: vi.fn(() => mockGetWorkerCommandInstance),
-      CancelWorkerCommand: vi.fn(() => mockCancelWorkerCommandInstance),
-    }));
+    commandRegistry = (await import('./command-registry.js')).commandRegistry;
   });
 
-  it('should register ExtensionsCommand on initialization', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
-    expect(mockExtensionsCommand).toHaveBeenCalled();
-    const command = commandRegistry.get('extensions');
-    expect(command).toBe(mockExtensionsCommandInstance);
-  });
-
-  it('should register sub commands on initialization', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
-    const command = commandRegistry.get('extensions list');
-    expect(command).toBe(mockListExtensionsCommandInstance);
-  });
-
-  it('get() should return undefined for a non-existent command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
-    const command = commandRegistry.get('non-existent');
-    expect(command).toBeUndefined();
-  });
-
-  it('register() should register a new command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
+  it('register() should register a command', async () => {
     const mockCommand: Command = {
       name: 'test-command',
-      description: '',
+      description: 'A test command',
       execute: vi.fn(),
     };
     commandRegistry.register(mockCommand);
-    const command = commandRegistry.get('test-command');
-    expect(command).toBe(mockCommand);
+
+    expect(commandRegistry.get('test-command')).toBe(mockCommand);
   });
 
-  it('register() should register a nested command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
+  it('get() should return undefined for an unregistered command', async () => {
+    expect(commandRegistry.get('unregistered-command')).toBeUndefined();
+  });
+
+  it('getAllCommands() should return all registered commands', async () => {
+    const commands = commandRegistry.getAllCommands();
+
+    // Should have extensions, init, restore, and spawn-worker commands
+    expect(commands.length).toBeGreaterThanOrEqual(2);
+    expect(commands).toContain(mockExtensionsCommandInstance);
+    expect(commands).toContain(mockListExtensionsCommandInstance);
+  });
+
+  it('register() should register nested sub commands for a newly registered command', async () => {
     const mockSubSubCommand: Command = {
       name: 'test-command-sub-sub',
       description: '',
@@ -141,8 +166,8 @@ describe('CommandRegistry', () => {
   });
 
   it('register() should not enter an infinite loop with a cyclic command', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { commandRegistry } = await import('./command-registry.js');
+    const { debugLogger } = await import('@google/gemini-cli-core');
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     const mockCommand: Command = {
       name: 'cyclic-command',
       description: '',
@@ -158,7 +183,6 @@ describe('CommandRegistry', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       'Command cyclic-command already registered. Skipping.',
     );
-    // If the test finishes, it means we didn't get into an infinite loop.
     warnSpy.mockRestore();
   });
 });
