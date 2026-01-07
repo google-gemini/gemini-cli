@@ -84,10 +84,11 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import type { PolicyEngineConfig } from '../policy/types.js';
+import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
+import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -99,8 +100,6 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
-
-import { ApprovalMode } from '../policy/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -356,6 +355,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  mcpEnabled?: boolean;
   onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
@@ -389,6 +389,7 @@ export class Config {
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
+  private readonly mcpEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
@@ -491,6 +492,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
+  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -512,6 +514,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.mcpEnabled = params.mcpEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
@@ -753,7 +756,7 @@ export class Config {
     }
 
     // Initialize hook system if enabled
-    if (this.enableHooks) {
+    if (this.getEnableHooks()) {
       this.hookSystem = new HookSystem(this);
       await this.hookSystem.initialize();
     }
@@ -892,6 +895,14 @@ export class Config {
 
   getTerminalBackground(): string | undefined {
     return this.terminalBackground;
+  }
+
+  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+    return this.remoteAdminSettings;
+  }
+
+  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+    this.remoteAdminSettings = settings;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -1123,6 +1134,10 @@ export class Config {
    */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getMcpEnabled(): boolean {
+    return this.mcpEnabled;
   }
 
   getMcpClientManager(): McpClientManager | undefined {
@@ -1725,7 +1740,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool, this);
+      registerCoreTool(WriteTodosTool);
     }
 
     // Register Subagents as Tools
