@@ -185,7 +185,8 @@ export function runYamllint() {
 
 export function runPrettier() {
   console.log('\nRunning Prettier...');
-  if (!runCommand('prettier --check .')) {
+  const command = process.env.CI ? 'prettier --write .' : 'prettier --check .';
+  if (!runCommand(command)) {
     process.exit(1);
   }
 }
