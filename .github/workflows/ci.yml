@@ -69,7 +69,7 @@ jobs:
         uses: 'actions/cache@v4'
         with:
           path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
-          key: '${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles(''scripts/lint.js'') }}'
+          key: "${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles('scripts/lint.js') }}"
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -78,7 +78,7 @@ jobs:
         uses: 'actions/cache@v4'
         with:
           path: '.eslintcache'
-          key: '${{ runner.os }}-eslint-${{ hashFiles(''package-lock.json'', ''eslint.config.js'') }}'
+          key: "${{ runner.os }}-eslint-${{ hashFiles('package-lock.json', 'eslint.config.js') }}"
 
       - name: 'Validate NOTICES.txt'
         run: 'git diff --exit-code packages/vscode-ide-companion/NOTICES.txt'
