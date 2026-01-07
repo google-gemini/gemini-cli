@@ -873,7 +873,7 @@ export class Config {
   }
 
   activateFallbackMode(model: string): void {
-    this.setModel(model, true);
+    this.setModel(model);
     const authType = this.getContentGeneratorConfig()?.authType;
     if (authType) {
       logFlashFallback(this, new FlashFallbackEvent(authType));
