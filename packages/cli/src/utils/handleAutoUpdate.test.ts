@@ -52,7 +52,11 @@ describe('handleAutoUpdate', () => {
 
     const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
-      merged: defaultMergedSettings,
+      merged: {
+        general: {
+          enableAutoUpdate: true,
+        },
+      },
     } as LoadedSettings;
 
     mockChildProcess = Object.assign(new EventEmitter(), {
@@ -79,8 +83,8 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it('should do nothing if update nag is disabled', () => {
-    mockSettings.merged.general.disableUpdateNag = true;
+  it('should do nothing if update prompts are disabled', () => {
+    mockSettings.merged.general.enableUpdatePrompts = false;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
@@ -88,7 +92,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should emit "update-received" but not update if auto-updates are disabled', () => {
-    mockSettings.merged.general.disableAutoUpdate = true;
+    mockSettings.merged.general.enableAutoUpdate = false;
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'Please update manually.',
