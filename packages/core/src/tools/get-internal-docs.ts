@@ -36,7 +36,7 @@ export interface GetInternalDocsParams {
  */
 async function getDocsRoot(): Promise<string> {
   const currentFile = fileURLToPath(import.meta.url);
-  const currentDir = path.dirname(currentFile);
+  let searchDir = path.dirname(currentFile);
 
   const isDocsDir = async (dir: string) => {
     try {
@@ -52,25 +52,17 @@ async function getDocsRoot(): Promise<string> {
     return false;
   };
 
-  // 1. Check for documentation in the distributed package (dist/docs)
-  // Path: dist/src/tools/get-internal-docs.js -> dist/docs
-  const distDocsPath = path.resolve(currentDir, '..', '..', 'docs');
-  if (await isDocsDir(distDocsPath)) {
-    return distDocsPath;
-  }
+  while (true) {
+    const candidate = path.join(searchDir, 'docs');
+    if (await isDocsDir(candidate)) {
+      return candidate;
+    }
 
-  // 2. Check for documentation in the repository root (development)
-  // Path: packages/core/src/tools/get-internal-docs.ts -> docs/
-  const repoDocsPath = path.resolve(currentDir, '..', '..', '..', '..', 'docs');
-  if (await isDocsDir(repoDocsPath)) {
-    return repoDocsPath;
-  }
-
-  // 3. Check for documentation in the bundle directory (bundle/docs)
-  // Path: bundle/gemini.js -> bundle/docs
-  const bundleDocsPath = path.join(currentDir, 'docs');
-  if (await isDocsDir(bundleDocsPath)) {
-    return bundleDocsPath;
+    const parent = path.dirname(searchDir);
+    if (parent === searchDir) {
+      break;
+    }
+    searchDir = parent;
   }
 
   throw new Error('Could not find Gemini CLI documentation directory.');
