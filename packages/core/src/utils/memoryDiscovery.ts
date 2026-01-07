@@ -540,9 +540,12 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     importFormat,
   );
+  const validContents = contentsWithPaths.filter(
+    (item) => item.content !== null,
+  );
   // Pass CWD for relative path display in concatenated content
   const combinedInstructions = concatenateInstructions(
-    contentsWithPaths,
+    validContents,
     currentWorkingDirectory,
   );
   if (debugMode)
@@ -555,8 +558,8 @@ export async function loadServerHierarchicalMemory(
     );
   return {
     memoryContent: combinedInstructions,
-    fileCount: contentsWithPaths.length,
-    filePaths,
+    fileCount: validContents.length,
+    filePaths: validContents.map((item) => item.filePath),
   };
 }
 
