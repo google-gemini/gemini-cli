@@ -2136,8 +2136,10 @@ type InferSettings<T extends SettingsSchema> = {
 
 export type Settings = InferSettings<SettingsSchemaType>;
 
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
 export function getEnableHooks(settings: Settings): boolean {
-  return (
-    (settings.tools?.enableHooks ?? true) && (settings.hooks?.enabled ?? false)
-  );
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
 }
