@@ -45,6 +45,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     outputs:
       duplicate_issues_csv: '${{ env.DUPLICATE_ISSUES_CSV }}'
+      is_off_topic: '${{ env.IS_OFF_TOPIC }}'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -117,28 +118,41 @@ jobs:
             }
           prompt: |-
             ## Role
-            You are an issue de-duplication assistant. Your goal is to find
-            duplicate issues for a given issue.
+            You are an issue de-duplication and relevance-checking assistant.
+            Your two goals are:
+            1. Find duplicate issues for a given issue.
+            2. Determine if the issue is relevant to the Gemini CLI project.
             ## Steps
             1.  **Find Potential Duplicates:**
                 - The repository is ${{ github.repository }} and the issue number is ${{ github.event.issue.number }}.
                 - Use the `duplicates` tool with the `repo` and `issue_number` to find potential duplicates for the current issue. Do not use the `threshold` parameter.
-                - If no duplicates are found, you are done.
+                - If no duplicates are found, you are done with this part.
                 - Print the JSON output from the `duplicates` tool to the logs.
-            2.  **Refine Duplicates List (if necessary):**
+            2.  **Refine Duplicates List (if necessary): באמצעות
                 - If the `duplicates` tool returns between 1 and 14 results, you must refine the list.
                 - For each potential duplicate issue, run `gh issue view <issue-number> --json title,body,comments` to fetch its content.
                 - Also fetch the content of the original issue: `gh issue view "${ISSUE_NUMBER}" --json title,body,comments`.
                 - Carefully analyze the content (title, body, comments) of the original issue and all potential duplicates.
                 - It is very important if the comments on either issue mention that they are not duplicates of each other, to treat them as not duplicates.
                 - Based on your analysis, create a final list containing only the issues you are highly confident are actual duplicates.
-                - If your final list is empty, you are done.
+                - If your final list is empty, you are done with this part.
                 - Print to the logs if you omitted any potential duplicates based on your analysis.
                 - If the `duplicates` tool returned 15+ results, use the top 15 matches (based on descending similarity score value) to perform this step.
             3.  **Output final duplicates list as CSV:**
                 - Convert the list of appropriate duplicate issue numbers into a comma-separated list (CSV). If there are no appropriate duplicates, use the empty string.
                 - Use the "echo" shell command to append the CSV of issue numbers into the filepath referenced by the environment variable "${GITHUB_ENV}":
                   echo "DUPLICATE_ISSUES_CSV=[DUPLICATE_ISSUES_AS_CSV]" >> "${GITHUB_ENV}"
+            4.  **Relevance Check:**
+                - Analyze the issue content (title and body).
+                - Determine if the issue is about "Gemini CLI" or its related features (like the CLI tool itself or agent functionalities).
+                - The issue is **NOT** related if it is primarily about:
+                  - Gemini API (the backend API, not the CLI)
+                  - Gemini Code Assist (the IDE extension)
+                  - Gemini Antigravity (a fictional product)
+                  - Any other Google product (e.g., Google Search, Android)
+                  - A product from another company.
+                - If you determine the issue is not related to Gemini CLI, use the `echo` command to set an environment variable:
+                  `echo "IS_OFF_TOPIC=true" >> "${GITHUB_ENV}"`
             ## Guidelines
             - Only use the `duplicates` and `run_shell_command` tools.
             - The `run_shell_command` tool can be used with `gh issue view`.
@@ -260,3 +274,66 @@ jobs:
                 labels: ['status/possible-duplicate'],
               });
             }
+  add-off-topic-comment:
+    needs: 'find-duplicates'
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      vars.TRIAGE_DEDUPLICATE_ISSUES != '' &&
+      needs.find-duplicates.outputs.is_off_topic == 'true' &&
+      (
+       github.event_name == 'issues' ||
+       github.event_name == 'workflow_dispatch' ||
+       (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
+        (
+         github.event.comment.author_association == 'OWNER' ||
+         github.event.comment.author_association == 'MEMBER' ||
+         github.event.comment.author_association == 'COLLABORATOR'
+        )
+       )
+      )
+    permissions:
+      issues: 'write'
+    timeout-minutes: 5
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+
+      - name: 'Comment on Off-Topic Issue'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |
+            const issueNumber = ${{ github.event.issue.number }};
+            const commentBody = `
+            Hello! Thank you for filing this issue.
+
+            Based on the information provided, it seems this issue may not be directly related to the Gemini CLI, but rather to another Gemini product or service (like the API, Code Assist, or another Google product).
+
+            This issue tracker is specifically for the Gemini CLI open-source project. For issues with other products, please use the appropriate support channels for that product.
+
+            If you believe this issue is indeed for the Gemini CLI, please provide more details to help us understand the connection.
+
+            Thank you!
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: commentBody,
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              labels: ['status/off-topic'],
+            });
