@@ -25,6 +25,15 @@ export interface FileChangeStats {
   details?: FileChangeDetail[];
 }
 
+/**
+ * Calculates file change statistics for a single turn.
+ * A turn is defined as the sequence of messages starting after the given user message
+ * and continuing until the next user message or the end of the conversation.
+ *
+ * @param conversation The full conversation record.
+ * @param userMessage The starting user message for the turn.
+ * @returns Statistics about lines added/removed and files touched, or null if no edits occurred.
+ */
 export function calculateTurnStats(
   conversation: ConversationRecord,
   userMessage: MessageRecord,
@@ -73,6 +82,14 @@ export function calculateTurnStats(
   };
 }
 
+/**
+ * Calculates the cumulative file change statistics from a specific message
+ * to the end of the conversation.
+ *
+ * @param conversation The full conversation record.
+ * @param userMessage The message to start calculating impact from (exclusive).
+ * @returns Aggregate statistics about lines added/removed and files touched, or null if no edits occurred.
+ */
 export function calculateRewindImpact(
   conversation: ConversationRecord,
   userMessage: MessageRecord,
@@ -129,6 +146,17 @@ export function calculateRewindImpact(
   };
 }
 
+/**
+ * Reverts file changes made by the model from the end of the conversation
+ * back to a specific target message.
+ *
+ * It iterates backwards through the conversation history and attempts to undo
+ * any file modifications. It handles cases where the user might have subsequently
+ * modified the file by attempting a smart patch (using the `diff` library).
+ *
+ * @param conversation The full conversation record.
+ * @param targetMessageId The ID of the message to revert back to. Changes *after* this message will be undone.
+ */
 export async function revertFileChanges(
   conversation: ConversationRecord,
   targetMessageId: string,
