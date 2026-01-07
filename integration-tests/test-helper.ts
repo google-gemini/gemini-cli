@@ -320,9 +320,6 @@ export class TestRig {
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
-    // Ensure the CLI uses our separate home directory for global state
-    process.env['GEMINI_CLI_HOME'] = this.homeDir!;
-
     const settings = {
       general: {
         // Nightly releases sometimes becomes out of sync with local code and
@@ -404,6 +401,7 @@ export class TestRig {
     stdinDoesNotEnd?: boolean;
     yolo?: boolean;
     timeout?: number;
+    env?: Record<string, string | undefined>;
   }): Promise<string> {
     const yolo = options.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
@@ -434,7 +432,11 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: env,
+      env: {
+        ...process.env,
+        GEMINI_CLI_HOME: this.homeDir!,
+        ...options.env,
+      },
     });
     this._spawnedProcesses.push(child);
 
@@ -450,14 +452,16 @@ export class TestRig {
       child.stdin!.end();
     }
 
-    child.stdout!.on('data', (data: Buffer) => {
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (data: string) => {
       stdout += data;
       if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stdout.write(data);
       }
     });
 
-    child.stderr!.on('data', (data: Buffer) => {
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (data: string) => {
       stderr += data;
       if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stderr.write(data);
@@ -487,7 +491,6 @@ export class TestRig {
           this._lastRunStdout = stdout;
 
           // Filter out telemetry output when running with Podman
-          // Podman seems to output telemetry to stdout even when writing to file
           const result = this._filterPodmanTelemetry(stdout);
 
           // Check if this is a JSON output test - if so, don't include stderr
@@ -553,7 +556,11 @@ export class TestRig {
 
   runCommand(
     args: string[],
-    options: { stdin?: string; timeout?: number } = {},
+    options: {
+      stdin?: string;
+      timeout?: number;
+      env?: Record<string, string | undefined>;
+    } = {},
   ): Promise<string> {
     const { command, initialArgs } = this._getCommandAndArgs();
     const commandArgs = [...initialArgs, ...args];
@@ -561,7 +568,11 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: env,
+      env: {
+        ...process.env,
+        GEMINI_CLI_HOME: this.homeDir!,
+        ...options.env,
+      },
     });
     this._spawnedProcesses.push(child);
 
@@ -573,14 +584,16 @@ export class TestRig {
       child.stdin!.end();
     }
 
-    child.stdout!.on('data', (data: Buffer) => {
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (data: string) => {
       stdout += data;
       if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stdout.write(data);
       }
     });
 
-    child.stderr!.on('data', (data: Buffer) => {
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (data: string) => {
       stderr += data;
       if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stderr.write(data);
@@ -608,9 +621,17 @@ export class TestRig {
         if (code === 0) {
           this._lastRunStdout = stdout;
           const result = this._filterPodmanTelemetry(stdout);
-          const finalResult = stderr
-            ? `${result}\n\nStdErr:\n${stderr}`
-            : result;
+
+          // Check if this is a JSON output test - if so, don't include stderr
+          // as it would corrupt the JSON
+          const isJsonOutput =
+            commandArgs.includes('--output-format') &&
+            commandArgs.includes('json');
+
+          const finalResult =
+            stderr && !isJsonOutput
+              ? `${result}\n\nStdErr:\n${stderr}`
+              : result;
           resolve(finalResult);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
@@ -798,7 +819,6 @@ export class TestRig {
   }
 
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
-    // Use environment-specific timeout
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
@@ -1046,7 +1066,7 @@ export class TestRig {
     const apiRequests = logs.filter(
       (logData) =>
         logData.attributes &&
-        logData.attributes['event.name'] === 'gemini_cli.api_request',
+        logData.attributes['event.name'] === `gemini_cli.api_request`,
     );
     return apiRequests;
   }
@@ -1056,7 +1076,7 @@ export class TestRig {
     const apiRequests = logs.filter(
       (logData) =>
         logData.attributes &&
-        logData.attributes['event.name'] === 'gemini_cli.api_request',
+        logData.attributes['event.name'] === `gemini_cli.api_request`,
     );
     return apiRequests.pop() || null;
   }
@@ -1108,6 +1128,7 @@ export class TestRig {
   async runInteractive(options?: {
     args?: string | string[];
     yolo?: boolean;
+    env?: Record<string, string | undefined>;
   }): Promise<InteractiveRun> {
     const yolo = options?.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
@@ -1115,13 +1136,11 @@ export class TestRig {
     );
     const commandArgs = [...initialArgs];
 
-    if (options?.args) {
-      if (Array.isArray(options.args)) {
-        commandArgs.push(...options.args);
-      } else {
-        commandArgs.push(options.args);
-      }
-    }
+    const envVars = {
+      ...process.env,
+      GEMINI_CLI_HOME: this.homeDir!,
+      ...options?.env,
+    };
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
@@ -1129,7 +1148,7 @@ export class TestRig {
       rows: 80,
       cwd: this.testDir!,
       env: Object.fromEntries(
-        Object.entries(env).filter(([, v]) => v !== undefined),
+        Object.entries(envVars).filter(([, v]) => v !== undefined),
       ) as { [key: string]: string },
     };
 
