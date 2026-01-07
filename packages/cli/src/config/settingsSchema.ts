@@ -1381,7 +1381,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Agent Skills (experimental).',
-        showInDialog: false,
+        showInDialog: true,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
@@ -1518,7 +1518,7 @@ const SETTINGS_SCHEMA = {
     requiresRestart: true,
     default: {},
     description: 'Settings for agent skills.',
-    showInDialog: true,
+    showInDialog: false,
     properties: {
       disabled: {
         type: 'array',
@@ -2136,8 +2136,10 @@ type InferSettings<T extends SettingsSchema> = {
 
 export type Settings = InferSettings<SettingsSchemaType>;
 
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
 export function getEnableHooks(settings: Settings): boolean {
-  return (
-    (settings.tools?.enableHooks ?? true) && (settings.hooks?.enabled ?? false)
-  );
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
 }

@@ -169,7 +169,7 @@ describe('ProQuotaDialog', () => {
     });
 
     describe('when it is a capacity error', () => {
-      it('should render keep trying and stop options', () => {
+      it('should render keep trying, switch, and stop options', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
@@ -189,6 +189,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Keep trying',
                 value: 'retry_once',
                 key: 'retry_once',
+              },
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
               },
               { label: 'Stop', value: 'retry_later', key: 'retry_later' },
             ],

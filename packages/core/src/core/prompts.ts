@@ -6,7 +6,6 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
@@ -23,7 +22,7 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
@@ -53,7 +52,7 @@ export function resolvePathFromEnv(envVar?: string): {
   // Safely expand the tilde (~) character to the user's home directory.
   if (customPath.startsWith('~/') || customPath === '~') {
     try {
-      const home = os.homedir(); // This is the call that can throw an error.
+      const home = homedir(); // This is the call that can throw an error.
       if (customPath === '~') {
         customPath = home;
       } else {
@@ -175,7 +174,7 @@ ${skillsXml}
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${
         skills.length > 0
           ? `
-- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<ACTIVATED_SKILL>\` tags. You MUST treat the content within \`<INSTRUCTIONS>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<AVAILABLE_RESOURCES>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`
           : ''
       }${mandatesVariant}${
         !interactiveMode
