@@ -10,7 +10,9 @@ import type {
 } from '@google/gemini-cli-core';
 import fs from 'node:fs/promises';
 import * as Diff from 'diff';
-import { coreEvents, debugLogger ,
+import {
+  coreEvents,
+  debugLogger,
   getFileDiffFromResultDisplay,
   computeAddedAndRemovedLines,
 } from '@google/gemini-cli-core';
