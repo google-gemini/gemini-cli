@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, listExtensions } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  listExtensions,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
@@ -26,6 +30,7 @@ import {
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
+import { stat } from 'node:fs/promises';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
@@ -510,6 +515,88 @@ async function installAction(context: CommandContext, args: string) {
   }
 }
 
+async function linkAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const sourceFilepath = args.trim();
+  if (!sourceFilepath) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions link <source>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+  if (/[;&|`'"]/.test(sourceFilepath)) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Source file path contains disallowed characters: ${sourceFilepath}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    await stat(sourceFilepath);
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Invalid source: ${sourceFilepath}`,
+      },
+      Date.now(),
+    );
+    debugLogger.error(
+      `Failed to stat path "${sourceFilepath}": ${getErrorMessage(error)}`,
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Linking extension from "${sourceFilepath}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    const installMetadata: ExtensionInstallMetadata = {
+      source: sourceFilepath,
+      type: 'link',
+    };
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${extension.name}" linked successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to link extension from "${sourceFilepath}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
 async function uninstallAction(context: CommandContext, args: string) {
   const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
@@ -645,6 +732,14 @@ const installCommand: SlashCommand = {
   action: installAction,
 };
 
+const linkCommand: SlashCommand = {
+  name: 'link',
+  description: 'Link an extension from a local path',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: linkAction,
+};
+
 const uninstallCommand: SlashCommand = {
   name: 'uninstall',
   description: 'Uninstall an extension',
@@ -675,7 +770,13 @@ export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
   const conditionalCommands = enableExtensionReloading
-    ? [disableCommand, enableCommand, installCommand, uninstallCommand]
+    ? [
+        disableCommand,
+        enableCommand,
+        installCommand,
+        uninstallCommand,
+        linkCommand,
+      ]
     : [];
   return {
     name: 'extensions',
