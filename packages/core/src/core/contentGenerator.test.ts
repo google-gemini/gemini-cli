@@ -411,6 +411,45 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should not include apiVersion when GOOGLE_GENAI_API_VERSION is an empty string', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GENAI_API_VERSION', '');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+    });
+    // Explicitly assert that apiVersion is NOT present when env var is empty string
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        apiVersion: expect.any(String),
+      }),
+    );
+  });
+
   it('should pass apiVersion for Vertex AI when GOOGLE_GENAI_API_VERSION is set', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
