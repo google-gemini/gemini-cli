@@ -79,6 +79,7 @@ export async function loadConfig(
       : settings.checkpointing?.enabled,
     previewFeatures: settings.general?.previewFeatures,
     interactive: true,
+    enableInteractiveShell: true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
