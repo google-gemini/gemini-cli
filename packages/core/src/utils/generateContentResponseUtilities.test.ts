@@ -202,7 +202,7 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
-    it('should handle llmContent with fileData for non-Gemini 3 models', () => {
+    it('should handle llmContent with fileData for non-Gemini 3 models (should omit siblings)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
       };
@@ -220,7 +220,6 @@ describe('generateContentResponseUtilities', () => {
             response: { output: 'Binary content provided (1 item(s)).' },
           },
         },
-        llmContent,
       ]);
     });
 
