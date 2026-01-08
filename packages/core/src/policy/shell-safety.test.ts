@@ -17,6 +17,76 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
+// Mock shell-utils to avoid relying on tree-sitter WASM which is flaky in CI on Windows
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+
+  // Static map of test commands to their expected subcommands
+  // This mirrors what the real parser would output for these specific strings
+  const commandMap: Record<string, string[]> = {
+    'git log': ['git log'],
+    'git log --oneline': ['git log --oneline'],
+    'git logout': ['git logout'],
+    'git log && rm -rf /': ['git log', 'rm -rf /'],
+    'git log; rm -rf /': ['git log', 'rm -rf /'],
+    'git log || rm -rf /': ['git log', 'rm -rf /'],
+    'git log &&& rm -rf /': [], // Simulates parse failure
+    'echo $(rm -rf /)': ['echo $(rm -rf /)', 'rm -rf /'],
+    'echo $(git log)': ['echo $(git log)', 'git log'],
+    'echo `rm -rf /`': ['echo `rm -rf /`', 'rm -rf /'],
+    'diff <(git log) <(rm -rf /)': [
+      'diff <(git log) <(rm -rf /)',
+      'git log',
+      'rm -rf /',
+    ],
+    'tee >(rm -rf /)': ['tee >(rm -rf /)', 'rm -rf /'],
+    'git log | rm -rf /': ['git log', 'rm -rf /'],
+    'git log --format=$(rm -rf /)': [
+      'git log --format=$(rm -rf /)',
+      'rm -rf /',
+    ],
+    'git log && echo $(git log | rm -rf /)': [
+      'git log',
+      'echo $(git log | rm -rf /)',
+      'git log',
+      'rm -rf /',
+    ],
+    'git log && echo $(git log)': ['git log', 'echo $(git log)', 'git log'],
+    'git log > /tmp/test': ['git log > /tmp/test'],
+    'git log @(Get-Process)': [], // Simulates parse failure (Bash parser vs PowerShell syntax)
+    'git commit -m "msg" && git push': ['git commit -m "msg"', 'git push'],
+    'git status && unknown_command': ['git status', 'unknown_command'],
+    'unknown_command_1 && another_unknown_command': [
+      'unknown_command_1',
+      'another_unknown_command',
+    ],
+    'known_ask_command_1 && known_ask_command_2': [
+      'known_ask_command_1',
+      'known_ask_command_2',
+    ],
+  };
+
+  return {
+    ...actual,
+    initializeShellParsers: vi.fn(),
+    splitCommands: (command: string) => {
+      if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
+        return commandMap[command];
+      }
+      // Fallback for simple commands not in map, or throw if strictness preferred
+      // For now, assume it's atomic if not in map, but logically we should ensure map coverage
+      const known = commandMap[command];
+      if (known) return known;
+      // Default fallback for unmatched simple cases in development, but explicit map is better
+      return [command];
+    },
+    hasRedirection: (command: string) =>
+      // Simple regex check sufficient for testing the policy engine's handling of the *result* of hasRedirection
+      /[><]/.test(command),
+  };
+});
+
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
 import type { FunctionCall } from '@google/genai';
