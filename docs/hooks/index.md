@@ -689,5 +689,6 @@ matchers:
 - [Best Practices](best-practices.md) - Security, performance, and debugging
 - [Custom Commands](../cli/custom-commands.md) - Create reusable prompt
   shortcuts
-- [Configuration](../cli/configuration.md) - Gemini CLI configuration options
+- [Configuration](../get-started/configuration.md) - Gemini CLI configuration
+  options
 - [Hooks Design Document](../hooks-design.md) - Technical architecture details
