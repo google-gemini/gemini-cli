@@ -16,6 +16,9 @@ import {
   findNextWordAcrossLines,
   findPrevWordAcrossLines,
   findWordEndInLine,
+  findNextBigWordAcrossLines,
+  findPrevBigWordAcrossLines,
+  findBigWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints, cpSlice } from '../../utils/textUtils.js';
 // import { assumeExhaustive } from '../../../utils/checks.js';
@@ -146,9 +149,15 @@ export type VimAction = Extract<
   | { type: 'vim_delete_word_forward' }
   | { type: 'vim_delete_word_backward' }
   | { type: 'vim_delete_word_end' }
+  | { type: 'vim_delete_big_word_forward' }
+  | { type: 'vim_delete_big_word_backward' }
+  | { type: 'vim_delete_big_word_end' }
   | { type: 'vim_change_word_forward' }
   | { type: 'vim_change_word_backward' }
   | { type: 'vim_change_word_end' }
+  | { type: 'vim_change_big_word_forward' }
+  | { type: 'vim_change_big_word_backward' }
+  | { type: 'vim_change_big_word_end' }
   | { type: 'vim_delete_line' }
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
@@ -162,6 +171,9 @@ export type VimAction = Extract<
   | { type: 'vim_move_word_forward' }
   | { type: 'vim_move_word_backward' }
   | { type: 'vim_move_word_end' }
+  | { type: 'vim_move_big_word_forward' }
+  | { type: 'vim_move_big_word_backward' }
+  | { type: 'vim_move_big_word_end' }
   | { type: 'vim_delete_char' }
   | { type: 'vim_delete_char_before'; payload: { count: number } }
   | { type: 'vim_toggle_case'; payload: { count: number } }
@@ -248,6 +260,49 @@ export function handleVimAction(
       return state;
     }
 
+    case 'vim_delete_big_word_forward':
+    case 'vim_change_big_word_forward': {
+      const { count } = action.payload;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextBigWordAcrossLines(
+          lines,
+          endRow,
+          endCol,
+          true,
+        );
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
+        } else {
+          // No more words, delete/change to end of current word or line
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findBigWordEndInLine(currentLine, endCol);
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1; // Include the character at word end
+          } else {
+            endCol = cpLen(currentLine);
+          }
+          break;
+        }
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const nextState = pushUndo(state);
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
     case 'vim_delete_word_backward':
     case 'vim_change_word_backward': {
       const { count } = action.payload;
@@ -256,6 +311,36 @@ export function handleVimAction(
 
       for (let i = 0; i < count; i++) {
         const prevWord = findPrevWordAcrossLines(lines, startRow, startCol);
+        if (prevWord) {
+          startRow = prevWord.row;
+          startCol = prevWord.col;
+        } else {
+          break;
+        }
+      }
+
+      if (startRow !== cursorRow || startCol !== cursorCol) {
+        const nextState = pushUndo(state);
+        return replaceRangeInternal(
+          nextState,
+          startRow,
+          startCol,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_big_word_backward':
+    case 'vim_change_big_word_backward': {
+      const { count } = action.payload;
+      let startRow = cursorRow;
+      let startCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const prevWord = findPrevBigWordAcrossLines(lines, startRow, startCol);
         if (prevWord) {
           startRow = prevWord.row;
           startCol = prevWord.col;
@@ -294,6 +379,59 @@ export function handleVimAction(
           // For next iteration, move to start of next word
           if (i < count - 1) {
             const nextWord = findNextWordAcrossLines(
+              lines,
+              wordEnd.row,
+              wordEnd.col + 1,
+              true,
+            );
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
+              break; // No more words
+            }
+          }
+        } else {
+          break;
+        }
+      }
+
+      // Ensure we don't go past the end of the last line
+      if (endRow < lines.length) {
+        const lineLen = cpLen(lines[endRow] || '');
+        endCol = Math.min(endCol, lineLen);
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const nextState = pushUndo(state);
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_big_word_end':
+    case 'vim_change_big_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1; // Include the character at word end
+          // For next iteration, move to start of next word
+          if (i < count - 1) {
+            const nextWord = findNextBigWordAcrossLines(
               lines,
               wordEnd.row,
               wordEnd.col + 1,
@@ -702,6 +840,30 @@ export function handleVimAction(
       };
     }
 
+    case 'vim_move_big_word_forward': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextBigWordAcrossLines(lines, row, col, true);
+        if (nextWord) {
+          row = nextWord.row;
+          col = nextWord.col;
+        } else {
+          // No more words to move to
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
     case 'vim_move_word_backward': {
       const { count } = action.payload;
       let row = cursorRow;
@@ -709,6 +871,29 @@ export function handleVimAction(
 
       for (let i = 0; i < count; i++) {
         const prevWord = findPrevWordAcrossLines(lines, row, col);
+        if (prevWord) {
+          row = prevWord.row;
+          col = prevWord.col;
+        } else {
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_move_big_word_backward': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const prevWord = findPrevBigWordAcrossLines(lines, row, col);
         if (prevWord) {
           row = prevWord.row;
           col = prevWord.col;
@@ -763,6 +948,61 @@ export function handleVimAction(
         }
 
         const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          row = wordEnd.row;
+          col = wordEnd.col;
+        } else {
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_move_big_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        // Special handling for the first iteration when we're at end of word
+        if (i === 0) {
+          const currentLine = lines[row] || '';
+          const lineCodePoints = toCodePoints(currentLine);
+
+          // Check if we're at the end of a big word (non-whitespace followed by whitespace or EOL)
+          // We must be on a non-whitespace character.
+          // Note: isWhitespace handles regular spaces.
+          // This logic mimics standard vim 'E': if at end of word, go to end of NEXT word.
+
+          const isBigWordChar =
+            col < lineCodePoints.length && !/\s/.test(lineCodePoints[col]);
+          const nextIsWhitespaceOrEOL =
+            col + 1 >= lineCodePoints.length ||
+            /\s/.test(lineCodePoints[col + 1]);
+
+          if (isBigWordChar && nextIsWhitespaceOrEOL) {
+            // We're already at end of big word, find next big word end
+            const nextWord = findNextBigWordAcrossLines(
+              lines,
+              row,
+              col + 1,
+              false,
+            );
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+              continue;
+            }
+          }
+        }
+
+        const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
         if (wordEnd) {
           row = wordEnd.row;
           col = wordEnd.col;
