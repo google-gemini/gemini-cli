@@ -535,13 +535,24 @@ async function linkAction(context: CommandContext, args: string) {
     );
     return;
   }
-  try {
-    await stat(sourceFilepath);
-  } catch {
+  if (/[;&|`'"]/.test(sourceFilepath)) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: `Invalid source: ${sourceFilepath}`,
+        text: `Source file path contains disallowed characters: ${sourceFilepath}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    await stat(sourceFilepath);
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Invalid source: ${sourceFilepath}: ${getErrorMessage(error)}`,
       },
       Date.now(),
     );
