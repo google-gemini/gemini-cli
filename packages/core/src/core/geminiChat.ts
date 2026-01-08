@@ -838,7 +838,10 @@ export class GeminiChat {
     const toolCallRecords = toolCalls.map((call) => {
       const resultDisplayRaw = call.response?.resultDisplay;
       const resultDisplay =
-        typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+        typeof resultDisplayRaw === 'string' ||
+        (typeof resultDisplayRaw === 'object' && resultDisplayRaw !== null)
+          ? resultDisplayRaw
+          : undefined;
 
       return {
         id: call.request.callId,

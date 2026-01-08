@@ -26,15 +26,24 @@ import { AuthType } from '../core/contentGenerator.js';
 import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
+import process from 'node:process';
 
-vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
   return {
-    ...os,
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
+
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
     homedir: vi.fn(),
   };
 });
@@ -88,6 +97,7 @@ describe('oauth2', () => {
         path.join(os.tmpdir(), 'gemini-cli-test-home-'),
       );
       vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      vi.mocked(pathsHomedir).mockReturnValue(tempHomeDir);
     });
     afterEach(() => {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });
@@ -1128,22 +1138,11 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Spy on process.on to capture the SIGINT handler
-        let sigIntHandler: (() => void) | undefined;
-        const originalOn = process.on;
+        // Mock process.on to capture SIGINT handler
         const processOnSpy = vi
           .spyOn(process, 'on')
-          .mockImplementation(
-            (
-              event: string | symbol,
-              listener: (...args: unknown[]) => void,
-            ) => {
-              if (event === 'SIGINT') {
-                sigIntHandler = listener as () => void;
-              }
-              return originalOn.call(process, event, listener);
-            },
-          );
+          .mockImplementation(() => process);
+
         const processRemoveListenerSpy = vi.spyOn(process, 'removeListener');
 
         const clientPromise = getOauthClient(
@@ -1151,8 +1150,16 @@ describe('oauth2', () => {
           mockConfig,
         );
 
-        // Wait a tick to ensure the SIGINT handler is registered
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        // Wait for the SIGINT handler to be registered
+        let sigIntHandler: (() => void) | undefined;
+        await vi.waitFor(() => {
+          const sigintCall = processOnSpy.mock.calls.find(
+            (call) => call[0] === 'SIGINT',
+          );
+          sigIntHandler = sigintCall?.[1] as (() => void) | undefined;
+          if (!sigIntHandler)
+            throw new Error('SIGINT handler not registered yet');
+        });
 
         expect(sigIntHandler).toBeDefined();
 
@@ -1195,16 +1202,11 @@ describe('oauth2', () => {
           () => mockHttpServer as unknown as http.Server,
         );
 
-        // Spy on process.stdin.on
-        let dataHandler: ((data: Buffer) => void) | undefined;
+        // Spy on process.stdin.on to capture data handler
         const stdinOnSpy = vi
           .spyOn(process.stdin, 'on')
-          .mockImplementation((event: string | symbol, listener) => {
-            if (event === 'data') {
-              dataHandler = listener as (data: Buffer) => void;
-            }
-            return process.stdin;
-          });
+          .mockImplementation(() => process.stdin);
+
         const stdinRemoveListenerSpy = vi.spyOn(
           process.stdin,
           'removeListener',
@@ -1215,7 +1217,15 @@ describe('oauth2', () => {
           mockConfig,
         );
 
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        // Wait for the stdin handler to be registered
+        let dataHandler: ((data: Buffer) => void) | undefined;
+        await vi.waitFor(() => {
+          const dataCall = stdinOnSpy.mock.calls.find(
+            (call: [string, ...unknown[]]) => call[0] === 'data',
+          );
+          dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
+          if (!dataHandler) throw new Error('stdin handler not registered yet');
+        });
 
         expect(dataHandler).toBeDefined();
 
@@ -1324,7 +1334,8 @@ describe('oauth2', () => {
       tempHomeDir = fs.mkdtempSync(
         path.join(os.tmpdir(), 'gemini-cli-test-home-'),
       );
-      (os.homedir as Mock).mockReturnValue(tempHomeDir);
+      vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+      vi.mocked(pathsHomedir).mockReturnValue(tempHomeDir);
     });
 
     afterEach(() => {
@@ -1430,7 +1441,7 @@ describe('oauth2', () => {
       await clientPromise;
 
       expect(
-        OAuthCredentialStorage.saveCredentials as Mock,
+        vi.mocked(OAuthCredentialStorage.saveCredentials),
       ).toHaveBeenCalledWith(mockTokens);
       const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
       expect(fs.existsSync(credsPath)).toBe(false);
@@ -1441,7 +1452,7 @@ describe('oauth2', () => {
         './oauth-credential-storage.js'
       );
       const cachedCreds = { refresh_token: 'cached-encrypted-token' };
-      (OAuthCredentialStorage.loadCredentials as Mock).mockResolvedValue(
+      vi.mocked(OAuthCredentialStorage.loadCredentials).mockResolvedValue(
         cachedCreds,
       );
 
@@ -1465,7 +1476,9 @@ describe('oauth2', () => {
 
       await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-      expect(OAuthCredentialStorage.loadCredentials as Mock).toHaveBeenCalled();
+      expect(
+        vi.mocked(OAuthCredentialStorage.loadCredentials),
+      ).toHaveBeenCalled();
       expect(mockClient.setCredentials).toHaveBeenCalledWith(cachedCreds);
       expect(mockClient.setCredentials).not.toHaveBeenCalledWith(
         unencryptedCreds,

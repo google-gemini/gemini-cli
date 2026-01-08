@@ -39,7 +39,6 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
-          contains(github.event.issue.labels.*.name, 'status/need-triage') &&
           (github.event_name != 'issue_comment' || (
             contains(github.event.comment.body, '@gemini-cli /triage') &&
             (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR')
@@ -75,11 +74,6 @@ jobs:
           ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number }}'
           LABELS: '${{ steps.get_issue_data.outputs.labels }}'
         run: |
-          if ! echo "${LABELS}" | grep -q 'status/need-triage'; then
-            echo "Issue #${ISSUE_NUMBER_INPUT} does not have the 'status/need-triage' label. Stopping workflow."
-            exit 1
-          fi
-
           if echo "${LABELS}" | grep -q 'area/'; then
             echo "Issue #${ISSUE_NUMBER_INPUT} already has 'area/' label. Stopping workflow."
             exit 1
