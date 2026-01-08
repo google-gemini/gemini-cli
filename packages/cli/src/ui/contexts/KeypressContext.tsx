@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, type Config, coreEvents } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 import { useStdin } from 'ink';
 import type React from 'react';
 import {
@@ -18,6 +18,7 @@ import {
 import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
@@ -236,10 +237,7 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
         clearTimeout(timeoutId);
 
         if (key === null) {
-          coreEvents.emitFeedback(
-            'warning',
-            'Paste Timed out. Possibly due to slow connection.',
-          );
+          appEvents.emit(AppEvent.PasteTimeout);
           break;
         }
 

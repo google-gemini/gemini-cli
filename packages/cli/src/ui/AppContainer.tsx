@@ -47,6 +47,7 @@ import {
   saveApiKey,
   debugLogger,
   coreEvents,
+  CoreEvent,
   refreshServerHierarchicalMemory,
   type MemoryChangedPayload,
   writeToStdout,
@@ -61,7 +62,6 @@ import {
   fireSessionStartHook,
   fireSessionEndHook,
   generateSummary,
-  CoreEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -97,6 +97,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -1059,25 +1060,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }, WARNING_PROMPT_DURATION_MS);
     };
 
-    const handleSelectionWarning = (payload: UserFeedbackPayload) => {
-      if (
-        payload.message === 'Press Ctrl-S to enter selection mode to copy text.'
-      ) {
-        handleWarning('Press Ctrl-S to enter selection mode to copy text.');
-      }
+    const handleSelectionWarning = () => {
+      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
     };
-    const handlePasteTimeout = (payload: UserFeedbackPayload) => {
-      if (
-        payload.message === 'Paste Timed out. Possibly due to slow connection.'
-      ) {
-        handleWarning('Paste Timed out. Possibly due to slow connection.');
-      }
+    const handlePasteTimeout = () => {
+      handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
-    coreEvents.on(CoreEvent.UserFeedback, handleSelectionWarning);
-    coreEvents.on(CoreEvent.UserFeedback, handlePasteTimeout);
+    appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
+    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
     return () => {
-      coreEvents.off(CoreEvent.UserFeedback, handleSelectionWarning);
-      coreEvents.off(CoreEvent.UserFeedback, handlePasteTimeout);
+      appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
+      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -1128,10 +1121,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setShowErrorDetails(true);
       setConstrainHeight(false);
     };
-    coreEvents.on(CoreEvent.OpenDebugConsole, openDebugConsole);
+    appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 
     return () => {
-      coreEvents.off(CoreEvent.OpenDebugConsole, openDebugConsole);
+      appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
     };
   }, [config]);
 
@@ -1337,15 +1330,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
-      // Ignore paste timeout warnings and selection warning as they are handled by a dedicated transient warning
-      if (
-        payload.message ===
-          'Paste Timed out. Possibly due to slow connection.' ||
-        payload.message === 'Press Ctrl-S to enter selection mode to copy text.'
-      ) {
-        return;
-      }
-
       let type: MessageType;
       switch (payload.severity) {
         case 'error':

@@ -79,8 +79,6 @@ export enum CoreEvent {
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
-  OpenDebugConsole = 'open-debug-console',
-  Flicker = 'flicker',
   McpClientUpdate = 'mcp-client-update',
   ExtensionsStarting = 'extensionsStarting',
   ExtensionsStopping = 'extensionsStopping',
@@ -95,8 +93,6 @@ export interface CoreEvents {
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
-  [CoreEvent.OpenDebugConsole]: never[];
-  [CoreEvent.Flicker]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.ExtensionsStarting]: [ExtensionsStartingEvent];
   [CoreEvent.ExtensionsStopping]: [ExtensionsStoppingEvent];

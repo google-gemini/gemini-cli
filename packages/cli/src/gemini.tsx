@@ -79,6 +79,7 @@ import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
+import { appEvents, AppEvent } from './utils/events.js';
 import { SessionSelector } from './utils/sessionUtils.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
@@ -170,7 +171,7 @@ ${reason.stack}`
     debugLogger.error(errorMessage);
     if (!unhandledRejectionOccurred) {
       unhandledRejectionOccurred = true;
-      coreEvents.emit(CoreEvent.OpenDebugConsole);
+      appEvents.emit(AppEvent.OpenDebugConsole);
     }
   });
 }

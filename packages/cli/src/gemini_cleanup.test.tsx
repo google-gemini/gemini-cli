@@ -89,6 +89,11 @@ vi.mock('update-notifier', () => ({
   default: vi.fn(() => ({ notify: vi.fn() })),
 }));
 
+vi.mock('./utils/events.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils/events.js')>();
+  return { ...actual, appEvents: { emit: vi.fn() } };
+});
+
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''),
   start_sandbox: vi.fn(() => Promise.resolve()),

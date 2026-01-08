@@ -7,11 +7,8 @@
 import { type DOMElement, measureElement } from 'ink';
 import { useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
-import {
-  recordFlickerFrame,
-  coreEvents,
-  CoreEvent,
-} from '@google/gemini-cli-core';
+import { recordFlickerFrame } from '@google/gemini-cli-core';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
 /**
@@ -39,7 +36,7 @@ export function useFlickerDetector(
         }
 
         recordFlickerFrame(config);
-        coreEvents.emit(CoreEvent.Flicker);
+        appEvents.emit(AppEvent.Flicker);
       }
     }
   });
