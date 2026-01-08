@@ -31,6 +31,7 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { stat } from 'node:fs/promises';
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
@@ -42,9 +43,14 @@ vi.mock('../../config/extension-manager.js', async (importOriginal) => {
 });
 
 import open from 'open';
+import type { Stats } from 'node:fs';
 
 vi.mock('open', () => ({
   default: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn(),
 }));
 
 vi.mock('../../config/extensions/update.js', () => ({
@@ -493,34 +499,37 @@ describe('extensionsCommand', () => {
   });
 
   describe('when enableExtensionReloading is true', () => {
-    it('should include enable, disable, install, and uninstall subcommands', () => {
+    it('should include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(true);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
       expect(subCommandNames).toContain('install');
+      expect(subCommandNames).toContain('link');
       expect(subCommandNames).toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is false', () => {
-    it('should not include enable, disable, install, and uninstall subcommands', () => {
+    it('should not include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(false);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('link');
       expect(subCommandNames).not.toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is not provided', () => {
-    it('should not include enable, disable, install, and uninstall subcommands by default', () => {
+    it('should not include enable, disable, install, link, and uninstall subcommands by default', () => {
       const command = extensionsCommand();
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('link');
       expect(subCommandNames).not.toContain('uninstall');
     });
   });
@@ -613,6 +622,88 @@ describe('extensionsCommand', () => {
         },
         expect.any(Number),
       );
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('link', () => {
+    let linkAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      linkAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'link',
+      )?.action;
+
+      expect(linkAction).not.toBeNull();
+      mockContext.invocation!.name = 'link';
+    });
+
+    it('should show usage if no extension is provided', async () => {
+      await linkAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: 'Usage: /extensions link <source>',
+        },
+        expect.any(Number),
+      );
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call installExtension and show success message', async () => {
+      const packageName = 'test-extension-package';
+      mockInstallExtension.mockResolvedValue({ name: packageName });
+      vi.mocked(stat).mockResolvedValue({
+        size: 100,
+      } as Stats);
+      await linkAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'link',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Linking extension from "${packageName}"...`,
+        },
+        expect.any(Number),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Extension "${packageName}" linked successfully.`,
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show error message on linking failure', async () => {
+      const packageName = 'test-extension-package';
+      const errorMessage = 'link failed';
+      mockInstallExtension.mockRejectedValue(new Error(errorMessage));
+      vi.mocked(stat).mockResolvedValue({
+        size: 100,
+      } as Stats);
+
+      await linkAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'link',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.ERROR,
+          text: `Failed to link extension from "${packageName}": ${errorMessage}`,
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show error message for invalid source', async () => {
+      const packageName = 'test-extension-package';
+      const errorMessage = 'invalid path';
+      vi.mocked(stat).mockRejectedValue(new Error(errorMessage));
+      await linkAction!(mockContext, packageName);
       expect(mockInstallExtension).not.toHaveBeenCalled();
     });
   });
