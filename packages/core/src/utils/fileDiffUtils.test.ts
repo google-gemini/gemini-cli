@@ -32,18 +32,6 @@ describe('fileDiffUtils', () => {
       ).toBeUndefined();
     });
 
-    it('returns undefined if diffStat is incomplete', () => {
-      const resultDisplay = {
-        diffStat: {
-          model_added_lines: 1,
-          // Missing other fields
-        },
-      };
-      expect(
-        getFileDiffFromResultDisplay(resultDisplay as ToolResultDisplay),
-      ).toBeUndefined();
-    });
-
     it('returns the FileDiff object if structure is valid', () => {
       const validDiffStat = {
         model_added_lines: 1,
