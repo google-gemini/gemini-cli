@@ -315,7 +315,7 @@ describe('Shell Safety Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('SHOULD NOT allow generic redirection > /dev/null with unsafe target', async () => {
+  it('SHOULD NOT allow generic redirection > /tmp/test', async () => {
     // Current logic downgrades ALLOW to ASK_USER for redirections if redirection is not explicitly allowed.
     const toolCall: FunctionCall = {
       name: 'run_shell_command',
@@ -323,6 +323,34 @@ describe('Shell Safety Policy', () => {
     };
     const result = await policyEngine.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
+  });
+
+  it('SHOULD allow generic redirection > /tmp/test if allowRedirection is true', async () => {
+    // If PolicyRule has allowRedirection: true, it should stay ALLOW
+    const argsPatternsGitLog = buildArgsPatterns(
+      undefined,
+      'git log',
+      undefined,
+    );
+    const policyWithRedirection = new PolicyEngine({
+      rules: [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: new RegExp(argsPatternsGitLog[0]!),
+          decision: PolicyDecision.ALLOW,
+          priority: 2,
+          allowRedirection: true,
+        },
+      ],
+      defaultDecision: PolicyDecision.ASK_USER,
+    });
+
+    const toolCall: FunctionCall = {
+      name: 'run_shell_command',
+      args: { command: 'git log > /tmp/test' },
+    };
+    const result = await policyWithRedirection.check(toolCall, undefined);
+    expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
   it('SHOULD NOT allow PowerShell @(...) usage if it implies code execution', async () => {
