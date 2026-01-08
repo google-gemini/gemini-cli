@@ -1188,6 +1188,17 @@ export const useGeminiStream = (
           (
             tc: TrackedToolCall,
           ): tc is TrackedCompletedToolCall | TrackedCancelledToolCall => {
+            // Check if we've already submitted this tool call.
+            // We need to look up the tracked version because the incoming 'tc'
+            // comes directly from the scheduler core and lacks the
+            // 'responseSubmittedToGemini' flag.
+            const trackedToolCall = toolCalls.find(
+              (t) => t.request.callId === tc.request.callId,
+            );
+            if (trackedToolCall?.responseSubmittedToGemini) {
+              return false;
+            }
+
             const isTerminalState =
               tc.status === 'success' ||
               tc.status === 'error' ||
@@ -1327,6 +1338,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      toolCalls,
     ],
   );
 
