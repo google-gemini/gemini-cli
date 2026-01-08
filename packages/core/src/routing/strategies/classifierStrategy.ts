@@ -12,10 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-} from '../../config/models.js';
+import { resolveClassifierModel } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
@@ -131,7 +128,7 @@ export class ClassifierStrategy implements RoutingStrategy {
 
   async route(
     context: RoutingContext,
-    _config: Config,
+    config: Config,
     baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
@@ -170,26 +167,20 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
+      const selectedModel = resolveClassifierModel(
+        context.requestedModel ?? config.getModel(),
+        routerResponse.model_choice,
+        config.getPreviewFeatures(),
+      );
 
-      if (routerResponse.model_choice === FLASH_MODEL) {
-        return {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          metadata: {
-            source: 'Classifier',
-            latencyMs,
-            reasoning,
-          },
-        };
-      } else {
-        return {
-          model: DEFAULT_GEMINI_MODEL,
-          metadata: {
-            source: 'Classifier',
-            reasoning,
-            latencyMs,
-          },
-        };
-      }
+      return {
+        model: selectedModel,
+        metadata: {
+          source: 'Classifier',
+          latencyMs,
+          reasoning,
+        },
+      };
     } catch (error) {
       // If the classifier fails for any reason (API error, parsing error, etc.),
       // we log it and return null to allow the composite strategy to proceed.

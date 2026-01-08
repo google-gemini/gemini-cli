@@ -7,14 +7,13 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, homedir } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -31,10 +30,10 @@ const logger = {
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [MemoryDiscovery]', ...args),
+    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
-interface GeminiFileContent {
+export interface GeminiFileContent {
   filePath: string;
   content: string | null;
 }
@@ -304,7 +303,7 @@ async function readGeminiMdFiles(
   return results;
 }
 
-function concatenateInstructions(
+export function concatenateInstructions(
   instructionContents: GeminiFileContent[],
   // CWD is needed to resolve relative paths for display markers
   currentWorkingDirectoryForDisplay: string,
@@ -436,7 +435,7 @@ export async function loadEnvironmentMemory(
         `Loading environment memory for trusted root: ${resolvedRoot} (Stopping exactly here)`,
       );
     }
-    return await findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
+    return findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
   });
 
   const pathArrays = await Promise.all(traversalPromises);
@@ -569,10 +568,15 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.getFileFilteringOptions(),
     config.getDiscoveryMaxDirs(),
   );
-  config.setUserMemory(result.memoryContent);
+  const mcpInstructions =
+    config.getMcpClientManager()?.getMcpInstructions() || '';
+  const finalMemory = [result.memoryContent, mcpInstructions.trimStart()]
+    .filter(Boolean)
+    .join('\n\n');
+  config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
-  coreEvents.emit(CoreEvent.MemoryChanged, result);
+  coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: result.fileCount });
   return result;
 }
 

@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, type Mock, type MockInstance } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -14,8 +23,10 @@ import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
 
 const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedExit = vi.hoisted(() => vi.fn());
 
 vi.mock('node:process', async () => {
   const actual =
@@ -23,6 +34,7 @@ vi.mock('node:process', async () => {
   return {
     ...actual,
     cwd: mockedCwd,
+    exit: mockedExit,
     platform: 'linux',
   };
 });
@@ -35,6 +47,7 @@ describe('useFolderTrust', () => {
   let addItem: Mock;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     mockSettings = {
       merged: {
         security: {
@@ -60,6 +73,7 @@ describe('useFolderTrust', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -113,7 +127,7 @@ describe('useFolderTrust', () => {
     expect(addItem).not.toHaveBeenCalled();
   });
 
-  it('should handle TRUST_FOLDER choice', async () => {
+  it('should handle TRUST_FOLDER choice and trigger restart', async () => {
     isWorkspaceTrustedSpy.mockReturnValue({
       isTrusted: undefined,
       source: undefined,
@@ -135,9 +149,7 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      await result.current.handleFolderTrustSelect(
-        FolderTrustChoice.TRUST_FOLDER,
-      );
+      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
     await waitFor(() => {
@@ -145,12 +157,13 @@ describe('useFolderTrust', () => {
         '/test/path',
         TrustLevel.TRUST_FOLDER,
       );
-      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(result.current.isRestarting).toBe(true);
+      expect(result.current.isFolderTrustDialogOpen).toBe(true);
       expect(onTrustChange).toHaveBeenLastCalledWith(true);
     });
   });
 
-  it('should handle TRUST_PARENT choice', () => {
+  it('should handle TRUST_PARENT choice and trigger restart', async () => {
     isWorkspaceTrustedSpy.mockReturnValue({
       isTrusted: undefined,
       source: undefined,
@@ -159,19 +172,22 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    act(() => {
+    await act(async () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_PARENT);
     });
 
-    expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
-      '/test/path',
-      TrustLevel.TRUST_PARENT,
-    );
-    expect(result.current.isFolderTrustDialogOpen).toBe(false);
-    expect(onTrustChange).toHaveBeenLastCalledWith(true);
+    await waitFor(() => {
+      expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
+        '/test/path',
+        TrustLevel.TRUST_PARENT,
+      );
+      expect(result.current.isRestarting).toBe(true);
+      expect(result.current.isFolderTrustDialogOpen).toBe(true);
+      expect(onTrustChange).toHaveBeenLastCalledWith(true);
+    });
   });
 
-  it('should handle DO_NOT_TRUST choice and trigger restart', () => {
+  it('should handle DO_NOT_TRUST choice and NOT trigger restart (implicit -> explicit)', async () => {
     isWorkspaceTrustedSpy.mockReturnValue({
       isTrusted: undefined,
       source: undefined,
@@ -180,17 +196,19 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    act(() => {
+    await act(async () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.DO_NOT_TRUST);
     });
 
-    expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
-      '/test/path',
-      TrustLevel.DO_NOT_TRUST,
-    );
-    expect(onTrustChange).toHaveBeenLastCalledWith(false);
-    expect(result.current.isRestarting).toBe(true);
-    expect(result.current.isFolderTrustDialogOpen).toBe(true);
+    await waitFor(() => {
+      expect(mockTrustedFolders.setValue).toHaveBeenCalledWith(
+        '/test/path',
+        TrustLevel.DO_NOT_TRUST,
+      );
+      expect(onTrustChange).toHaveBeenLastCalledWith(false);
+      expect(result.current.isRestarting).toBe(false);
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+    });
   });
 
   it('should do nothing for default choice', async () => {
@@ -202,7 +220,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    act(() => {
+    await act(async () => {
       result.current.handleFolderTrustSelect(
         'invalid_choice' as FolderTrustChoice,
       );
@@ -234,7 +252,7 @@ describe('useFolderTrust', () => {
       expect(result.current.isTrusted).toBe(false);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
@@ -244,11 +262,34 @@ describe('useFolderTrust', () => {
     });
   });
 
-  it('should not set isRestarting to true when trust status does not change', () => {
+  it('should not set isRestarting to true when trust status does not change (true -> true)', async () => {
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+    const { result } = renderHook(() =>
+      useFolderTrust(mockSettings, onTrustChange, addItem),
+    );
+
+    await act(async () => {
+      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isRestarting).toBe(false);
+      expect(result.current.isFolderTrustDialogOpen).toBe(false); // Dialog should close
+    });
+  });
+
+  it('should emit feedback on failure to set value', async () => {
     isWorkspaceTrustedSpy.mockReturnValue({
       isTrusted: undefined,
       source: undefined,
     });
+    (mockTrustedFolders.setValue as Mock).mockImplementation(() => {
+      throw new Error('test error');
+    });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
@@ -257,7 +298,12 @@ describe('useFolderTrust', () => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
 
-    expect(result.current.isRestarting).toBe(false);
-    expect(result.current.isFolderTrustDialogOpen).toBe(false); // Dialog should close
+    await vi.runAllTimersAsync();
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      'Failed to save trust settings. Exiting Gemini CLI.',
+    );
+    expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
   });
 });

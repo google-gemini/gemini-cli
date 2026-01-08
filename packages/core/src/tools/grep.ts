@@ -62,7 +62,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: GrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -523,7 +523,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const allMatches: GrepMatch[] = [];
 
       for await (const filePath of filesStream) {
-        const fileAbsolutePath = filePath as string;
+        const fileAbsolutePath = filePath;
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
@@ -571,7 +571,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   static readonly Name = GREP_TOOL_NAME;
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       GrepTool.Name,
@@ -599,9 +599,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
         required: ['pattern'],
         type: 'object',
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
@@ -674,7 +674,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
 
   protected createInvocation(
     params: GrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<GrepToolParams, ToolResult> {

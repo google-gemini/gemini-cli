@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ChatRecordingService, type Config } from '@google/gemini-cli-core';
+import {
+  ChatRecordingService,
+  generateSummary,
+  writeToStderr,
+  writeToStdout,
+  type Config,
+} from '@google/gemini-cli-core';
 import {
   formatRelativeTime,
   SessionSelector,
@@ -12,15 +18,20 @@ import {
 } from './sessionUtils.js';
 
 export async function listSessions(config: Config): Promise<void> {
+  // Generate summary for most recent session if needed
+  await generateSummary(config);
+
   const sessionSelector = new SessionSelector(config);
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    console.log('No previous sessions found for this project.');
+    writeToStdout('No previous sessions found for this project.');
     return;
   }
 
-  console.log(`\nAvailable sessions for this project (${sessions.length}):\n`);
+  writeToStdout(
+    `\nAvailable sessions for this project (${sessions.length}):\n`,
+  );
 
   sessions
     .sort(
@@ -30,8 +41,12 @@ export async function listSessions(config: Config): Promise<void> {
     .forEach((session, index) => {
       const current = session.isCurrentSession ? ', current' : '';
       const time = formatRelativeTime(session.lastUpdated);
-      console.log(
-        `  ${index + 1}. ${session.firstUserMessage} (${time}${current}) [${session.id}]`,
+      const title =
+        session.displayName.length > 100
+          ? session.displayName.slice(0, 97) + '...'
+          : session.displayName;
+      writeToStdout(
+        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
       );
     });
 }
@@ -44,7 +59,7 @@ export async function deleteSession(
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    console.error('No sessions found for this project.');
+    writeToStderr('No sessions found for this project.');
     return;
   }
 
@@ -65,7 +80,7 @@ export async function deleteSession(
     // Parse session index
     const index = parseInt(sessionIndex, 10);
     if (isNaN(index) || index < 1 || index > sessions.length) {
-      console.error(
+      writeToStderr(
         `Invalid session identifier "${sessionIndex}". Use --list-sessions to see available sessions.`,
       );
       return;
@@ -75,7 +90,7 @@ export async function deleteSession(
 
   // Prevent deleting the current session
   if (sessionToDelete.isCurrentSession) {
-    console.error('Cannot delete the current active session.');
+    writeToStderr('Cannot delete the current active session.');
     return;
   }
 
@@ -85,11 +100,11 @@ export async function deleteSession(
     chatRecordingService.deleteSession(sessionToDelete.file);
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
-    console.log(
+    writeToStdout(
       `Deleted session ${sessionToDelete.index}: ${sessionToDelete.firstUserMessage} (${time})`,
     );
   } catch (error) {
-    console.error(
+    writeToStderr(
       `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }

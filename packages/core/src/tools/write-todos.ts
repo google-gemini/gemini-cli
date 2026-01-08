@@ -41,7 +41,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 
 
 ## Methodology for using this tool
-1. Use this todo list list as soon as you receive a user request based on the complexity of the task.
+1. Use this todo list as soon as you receive a user request based on the complexity of the task.
 2. Keep track of every subtask that you update the list with.
 3. Mark a subtask as in_progress before you begin working on it. You should only have one subtask as in_progress at a time.
 4. Update the subtask list as you proceed in executing the task. The subtask list is not static and should reflect your progress and current plans, which may evolve as you acquire new information.
@@ -101,7 +101,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     params: WriteTodosToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -145,7 +145,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
-  constructor() {
+  constructor(messageBus: MessageBus) {
     super(
       WriteTodosTool.Name,
       'WriteTodos',
@@ -180,6 +180,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
         required: ['todos'],
         additionalProperties: false,
       },
+      messageBus,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
   }
 
@@ -248,13 +251,13 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
-    _messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
-      _messageBus,
+      messageBus,
       _toolName,
       _displayName,
     );

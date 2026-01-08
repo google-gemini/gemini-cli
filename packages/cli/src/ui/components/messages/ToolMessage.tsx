@@ -4,44 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { ToolCallStatus } from '../../types.js';
-import { DiffRenderer } from './DiffRenderer.js';
-import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import { AnsiOutputText } from '../AnsiOutput.js';
-import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
-import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
+import { ToolResultDisplay } from './ToolResultDisplay.js';
+import {
+  ToolStatusIndicator,
+  ToolInfo,
+  TrailingIndicator,
+  type TextEmphasis,
+  STATUS_INDICATOR_WIDTH,
+} from './ToolShared.js';
 import {
   SHELL_COMMAND_NAME,
-  SHELL_NAME,
-  TOOL_STATUS,
+  SHELL_FOCUS_HINT_DELAY_MS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, Config } from '@google/gemini-cli-core';
-import { useUIState } from '../../contexts/UIStateContext.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import type { Config } from '@google/gemini-cli-core';
+import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
+import { ToolCallStatus } from '../../types.js';
+import { ShellInputPrompt } from '../ShellInputPrompt.js';
 
-const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
-const STATUS_INDICATOR_WIDTH = 3;
-const MIN_LINES_SHOWN = 2; // show at least this many lines
-
-// Large threshold to ensure we don't cause performance issues for very large
-// outputs that will get truncated further MaxSizedBox anyway.
-const MAXIMUM_RESULT_DISPLAY_CHARACTERS = 1000000;
-export type TextEmphasis = 'high' | 'medium' | 'low';
+export type { TextEmphasis };
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
   availableTerminalHeight?: number;
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
+  isFirst: boolean;
+  borderColor: string;
+  borderDimColor: boolean;
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
+  ptyId?: number;
   config?: Config;
 }
 
@@ -54,42 +52,35 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
+  isFirst,
+  borderColor,
+  borderDimColor,
   activeShellPtyId,
   embeddedShellFocused,
   ptyId,
   config,
 }) => {
-  const { renderMarkdown } = useUIState();
-  const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
     embeddedShellFocused;
 
-  const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
-  const [userHasFocused, setUserHasFocused] = React.useState(false);
-  const [showFocusHint, setShowFocusHint] = React.useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  const [userHasFocused, setUserHasFocused] = useState(false);
+  const showFocusHint = useInactivityTimer(
+    !!lastUpdateTime,
+    lastUpdateTime ? lastUpdateTime.getTime() : 0,
+    SHELL_FOCUS_HINT_DELAY_MS,
+  );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (resultDisplay) {
       setLastUpdateTime(new Date());
     }
   }, [resultDisplay]);
 
-  React.useEffect(() => {
-    if (!lastUpdateTime) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setShowFocusHint(true);
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [lastUpdateTime]);
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (isThisShellFocused) {
       setUserHasFocused(true);
     }
@@ -103,101 +94,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const shouldShowFocusHint =
     isThisShellFocusable && (showFocusHint || userHasFocused);
 
-  const availableHeight = availableTerminalHeight
-    ? Math.max(
-        availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
-        MIN_LINES_SHOWN + 1, // enforce minimum lines shown
-      )
-    : undefined;
-
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight && !isAlternateBuffer) {
-    renderOutputAsMarkdown = false;
-  }
-  const childWidth = terminalWidth;
-
-  const truncatedResultDisplay = React.useMemo(() => {
-    if (typeof resultDisplay === 'string') {
-      if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        return '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
-      }
-    }
-    return resultDisplay;
-  }, [resultDisplay]);
-
-  const renderedResult = React.useMemo(() => {
-    if (!truncatedResultDisplay) return null;
-
-    return (
-      <Box width={terminalWidth} flexDirection="column" paddingLeft={1}>
-        <Box flexDirection="column">
-          {typeof truncatedResultDisplay === 'string' &&
-          renderOutputAsMarkdown ? (
-            <Box flexDirection="column">
-              <MarkdownDisplay
-                text={truncatedResultDisplay}
-                terminalWidth={childWidth}
-                renderMarkdown={renderMarkdown}
-                isPending={false}
-              />
-            </Box>
-          ) : typeof truncatedResultDisplay === 'string' &&
-            !renderOutputAsMarkdown ? (
-            isAlternateBuffer ? (
-              <Box flexDirection="column" width={childWidth}>
-                <Text wrap="wrap" color={theme.text.primary}>
-                  {truncatedResultDisplay}
-                </Text>
-              </Box>
-            ) : (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-                <Box>
-                  <Text wrap="wrap" color={theme.text.primary}>
-                    {truncatedResultDisplay}
-                  </Text>
-                </Box>
-              </MaxSizedBox>
-            )
-          ) : typeof truncatedResultDisplay === 'object' &&
-            'fileDiff' in truncatedResultDisplay ? (
-            <DiffRenderer
-              diffContent={truncatedResultDisplay.fileDiff}
-              filename={truncatedResultDisplay.fileName}
-              availableTerminalHeight={availableHeight}
-              terminalWidth={childWidth}
-            />
-          ) : typeof truncatedResultDisplay === 'object' &&
-            'todos' in truncatedResultDisplay ? (
-            // display nothing, as the TodoTray will handle rendering todos
-            <></>
-          ) : (
-            <AnsiOutputText
-              data={truncatedResultDisplay as AnsiOutput}
-              availableTerminalHeight={availableHeight}
-              width={childWidth}
-            />
-          )}
-        </Box>
-      </Box>
-    );
-  }, [
-    truncatedResultDisplay,
-    renderOutputAsMarkdown,
-    childWidth,
-    renderMarkdown,
-    isAlternateBuffer,
-    availableHeight,
-    terminalWidth,
-  ]);
-
   return (
-    // We have the StickyHeader intentionally exceedsthe allowed width for this
-    // component by 1 so tne horizontal line it renders can extend into the 1
-    // pixel of padding of the box drawn by the parent of the ToolMessage.
-    <>
-      <StickyHeader width={terminalWidth + 1}>
+    <Box flexDirection="column" width={terminalWidth}>
+      <StickyHeader
+        width={terminalWidth}
+        isFirst={isFirst}
+        borderColor={borderColor}
+        borderDimColor={borderDimColor}
+      >
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
@@ -214,107 +118,33 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         )}
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
-      {renderedResult}
-      {isThisShellFocused && config && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-          <ShellInputPrompt
-            activeShellPtyId={activeShellPtyId ?? null}
-            focus={embeddedShellFocused}
-          />
-        </Box>
-      )}
-    </>
-  );
-};
-
-type ToolStatusIndicatorProps = {
-  status: ToolCallStatus;
-  name: string;
-};
-
-const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
-  status,
-  name,
-}) => {
-  const isShell = name === SHELL_COMMAND_NAME || name === SHELL_NAME;
-  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
-
-  return (
-    <Box minWidth={STATUS_INDICATOR_WIDTH}>
-      {status === ToolCallStatus.Pending && (
-        <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
-      )}
-      {status === ToolCallStatus.Executing && (
-        <GeminiRespondingSpinner
-          spinnerType="toggle"
-          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
+      <Box
+        width={terminalWidth}
+        borderStyle="round"
+        borderColor={borderColor}
+        borderDimColor={borderDimColor}
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={true}
+        borderRight={true}
+        paddingX={1}
+        flexDirection="column"
+      >
+        <ToolResultDisplay
+          resultDisplay={resultDisplay}
+          availableTerminalHeight={availableTerminalHeight}
+          terminalWidth={terminalWidth}
+          renderOutputAsMarkdown={renderOutputAsMarkdown}
         />
-      )}
-      {status === ToolCallStatus.Success && (
-        <Text color={theme.status.success} aria-label={'Success:'}>
-          {TOOL_STATUS.SUCCESS}
-        </Text>
-      )}
-      {status === ToolCallStatus.Confirming && (
-        <Text color={statusColor} aria-label={'Confirming:'}>
-          {TOOL_STATUS.CONFIRMING}
-        </Text>
-      )}
-      {status === ToolCallStatus.Canceled && (
-        <Text color={statusColor} aria-label={'Canceled:'} bold>
-          {TOOL_STATUS.CANCELED}
-        </Text>
-      )}
-      {status === ToolCallStatus.Error && (
-        <Text color={theme.status.error} aria-label={'Error:'} bold>
-          {TOOL_STATUS.ERROR}
-        </Text>
-      )}
+        {isThisShellFocused && config && (
+          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+            <ShellInputPrompt
+              activeShellPtyId={activeShellPtyId ?? null}
+              focus={embeddedShellFocused}
+            />
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };
-
-type ToolInfo = {
-  name: string;
-  description: string;
-  status: ToolCallStatus;
-  emphasis: TextEmphasis;
-};
-const ToolInfo: React.FC<ToolInfo> = ({
-  name,
-  description,
-  status,
-  emphasis,
-}) => {
-  const nameColor = React.useMemo<string>(() => {
-    switch (emphasis) {
-      case 'high':
-        return theme.text.primary;
-      case 'medium':
-        return theme.text.primary;
-      case 'low':
-        return theme.text.secondary;
-      default: {
-        const exhaustiveCheck: never = emphasis;
-        return exhaustiveCheck;
-      }
-    }
-  }, [emphasis]);
-  return (
-    <Box>
-      <Text strikethrough={status === ToolCallStatus.Canceled}>
-        <Text color={nameColor} bold>
-          {name}
-        </Text>{' '}
-        <Text color={theme.text.secondary}>{description}</Text>
-      </Text>
-    </Box>
-  );
-};
-
-const TrailingIndicator: React.FC = () => (
-  <Text color={theme.text.primary} wrap="truncate">
-    {' '}
-    ←
-  </Text>
-);

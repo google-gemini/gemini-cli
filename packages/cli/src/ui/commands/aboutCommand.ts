@@ -4,17 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getCliVersion } from '../../utils/version.js';
 import type { CommandContext, SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  UserAccountManager,
+  debugLogger,
+  getVersion,
+} from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
   description: 'Show version info',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (context) => {
     const osVersion = process.platform;
     let sandboxEnv = 'no sandbox';
@@ -26,11 +31,18 @@ export const aboutCommand: SlashCommand = {
       })`;
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
-    const cliVersion = await getCliVersion();
+    const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security?.auth?.selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient = await getIdeClientName(context);
+
+    const userAccountManager = new UserAccountManager();
+    const cachedAccount = userAccountManager.getCachedGoogleAccount();
+    debugLogger.log('AboutCommand: Retrieved cached Google account', {
+      cachedAccount,
+    });
+    const userEmail = cachedAccount ?? undefined;
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
       type: MessageType.ABOUT,
@@ -41,6 +53,7 @@ export const aboutCommand: SlashCommand = {
       selectedAuthType,
       gcpProject,
       ideClient,
+      userEmail,
     };
 
     context.ui.addItem(aboutItem, Date.now());

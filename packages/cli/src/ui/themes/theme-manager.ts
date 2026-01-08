@@ -11,13 +11,13 @@ import { Dracula } from './dracula.js';
 import { GitHubDark } from './github-dark.js';
 import { GitHubLight } from './github-light.js';
 import { GoogleCode } from './googlecode.js';
+import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import type { Theme, ThemeType, CustomTheme } from './theme.js';
 import { createCustomTheme, validateCustomTheme } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
@@ -25,7 +25,7 @@ import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
 import process from 'node:process';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, homedir } from '@google/gemini-cli-core';
 
 export interface ThemeDisplay {
   name: string;
@@ -51,6 +51,7 @@ class ThemeManager {
       GitHubDark,
       GitHubLight,
       GoogleCode,
+      Holiday,
       ShadesOfPurple,
       XCode,
       ANSI,
@@ -226,6 +227,14 @@ class ThemeManager {
     return this.findThemeByName(themeName);
   }
 
+  /**
+   * Gets all available themes.
+   * @returns A list of all available themes.
+   */
+  getAllThemes(): Theme[] {
+    return [...this.availableThemes, ...Array.from(this.customThemes.values())];
+  }
+
   private isPath(themeName: string): boolean {
     return (
       themeName.endsWith('.json') ||
@@ -245,7 +254,7 @@ class ThemeManager {
       }
 
       // 2. Perform security check.
-      const homeDir = path.resolve(os.homedir());
+      const homeDir = path.resolve(homedir());
       if (!canonicalPath.startsWith(homeDir)) {
         debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +

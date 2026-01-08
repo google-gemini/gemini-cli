@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
-import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
-import {
-  CoreToolScheduler,
-  convertToFunctionResponse,
-  truncateAndSaveToFile,
-} from './coreToolScheduler.js';
+import { CoreToolScheduler } from './coreToolScheduler.js';
+import type {
+  ToolCall,
+  WaitingToolCall,
+  ErroredToolCall,
+} from '../scheduler/types.js';
 import type {
   ToolCallConfirmationDetails,
   ToolConfirmationPayload,
@@ -19,7 +19,7 @@ import type {
   ToolResult,
   Config,
   ToolRegistry,
-  AnyToolInvocation,
+  MessageBus,
 } from '../index.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -29,17 +29,18 @@ import {
   ToolConfirmationOutcome,
   Kind,
   ApprovalMode,
+  HookSystem,
+  PolicyDecision,
 } from '../index.js';
-import type { Part, PartListUnion } from '@google/genai';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
   MockModifiableTool,
   MockTool,
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
-import { isShellInvocationAllowlisted } from '../utils/shell-utils.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import type { PolicyEngine } from '../policy/policy-engine.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -48,7 +49,10 @@ vi.mock('fs/promises', () => ({
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
     super(
       TestApprovalTool.Name,
       'TestApprovalTool',
@@ -59,13 +63,17 @@ class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
         required: ['id'],
         type: 'object',
       },
+      messageBus,
     );
   }
 
-  protected createInvocation(params: {
-    id: string;
-  }): ToolInvocation<{ id: string }, ToolResult> {
-    return new TestApprovalInvocation(this.config, params);
+  protected createInvocation(
+    params: { id: string },
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<{ id: string }, ToolResult> {
+    return new TestApprovalInvocation(this.config, params, messageBus);
   }
 }
 
@@ -76,8 +84,9 @@ class TestApprovalInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: { id: string },
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -124,8 +133,9 @@ class AbortDuringConfirmationInvocation extends BaseToolInvocation<
     private readonly abortController: AbortController,
     private readonly abortError: Error,
     params: Record<string, unknown>,
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   override async shouldConfirmExecute(
@@ -151,6 +161,7 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
   constructor(
     private readonly abortController: AbortController,
     private readonly abortError: Error,
+    messageBus: MessageBus,
   ) {
     super(
       'abortDuringConfirmationTool',
@@ -161,16 +172,21 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
         type: 'object',
         properties: {},
       },
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
     return new AbortDuringConfirmationInvocation(
       this.abortController,
       this.abortError,
       params,
+      messageBus,
     );
   }
 }
@@ -223,12 +239,14 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     discoverTools: async () => {},
     getAllTools: () => [],
     getToolsByServer: () => [],
+    getExperiments: () => {},
   } as unknown as ToolRegistry;
 
   const baseConfig = {
     getSessionId: () => 'test-session-id',
     getUsageStatisticsEnabled: () => true,
     getDebugMode: () => false,
+    isInteractive: () => true,
     getApprovalMode: () => ApprovalMode.DEFAULT,
     setApprovalMode: () => {},
     getAllowedTools: () => [],
@@ -239,6 +257,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getShellExecutionConfig: () => ({
       terminalWidth: 90,
       terminalHeight: 30,
+      sanitizationConfig: {
+        enableEnvironmentVariableRedaction: true,
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+      },
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -247,15 +270,39 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
-    getUseSmartEdit: () => false,
-    getUseModelRouter: () => false,
+    getActiveModel: () => DEFAULT_GEMINI_MODEL,
     getGeminiClient: () => null,
-    getEnableMessageBusIntegration: () => false,
-    getMessageBus: () => null,
-    getPolicyEngine: () => null,
+    getMessageBus: () => createMockMessageBus(),
+    getEnableHooks: () => false,
+    getExperiments: () => {},
   } as unknown as Config;
 
-  return { ...baseConfig, ...overrides } as Config;
+  const finalConfig = { ...baseConfig, ...overrides } as Config;
+
+  // Patch the policy engine to use the final config if not overridden
+  if (!overrides.getPolicyEngine) {
+    finalConfig.getPolicyEngine = () =>
+      ({
+        check: async (toolCall: { name: string; args: object }) => {
+          // Mock simple policy logic for tests
+          const mode = finalConfig.getApprovalMode();
+          if (mode === ApprovalMode.YOLO) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          const allowed = finalConfig.getAllowedTools();
+          if (
+            allowed &&
+            (allowed.includes(toolCall.name) ||
+              allowed.some((p) => toolCall.name.startsWith(p)))
+          ) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          return { decision: PolicyDecision.ASK_USER };
+        },
+      }) as unknown as PolicyEngine;
+  }
+
+  return finalConfig;
 }
 
 describe('CoreToolScheduler', () => {
@@ -292,7 +339,6 @@ describe('CoreToolScheduler', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -350,7 +396,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
+      getHookSystem: () => undefined,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -358,7 +404,6 @@ describe('CoreToolScheduler', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -452,7 +497,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
+      getHookSystem: () => undefined,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -460,7 +505,6 @@ describe('CoreToolScheduler', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -528,6 +572,7 @@ describe('CoreToolScheduler', () => {
     const declarativeTool = new AbortDuringConfirmationTool(
       abortController,
       abortError,
+      createMockMessageBus(),
     );
 
     const mockToolRegistry = {
@@ -549,7 +594,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
+      isInteractive: () => true,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -557,7 +602,6 @@ describe('CoreToolScheduler', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const request = {
@@ -580,48 +624,11 @@ describe('CoreToolScheduler', () => {
     expect(statuses).not.toContain('error');
   });
 
-  describe('getToolSuggestion', () => {
-    it('should suggest the top N closest tool names for a typo', () => {
-      // Create mocked tool registry
-      const mockToolRegistry = {
-        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
-      } as unknown as ToolRegistry;
-      const mockConfig = createMockConfig({
-        getToolRegistry: () => mockToolRegistry,
-        isInteractive: () => false,
-      });
-
-      // Create scheduler
-      const scheduler = new CoreToolScheduler({
-        config: mockConfig,
-        getPreferredEditor: () => 'vscode',
-        onEditorClose: vi.fn(),
-      });
-
-      // Test that the right tool is selected, with only 1 result, for typos
-      // @ts-expect-error accessing private method
-      const misspelledTool = scheduler.getToolSuggestion('list_fils', 1);
-      expect(misspelledTool).toBe(' Did you mean "list_files"?');
-
-      // Test that the right tool is selected, with only 1 result, for prefixes
-      // @ts-expect-error accessing private method
-      const prefixedTool = scheduler.getToolSuggestion('github.list_files', 1);
-      expect(prefixedTool).toBe(' Did you mean "list_files"?');
-
-      // Test that the right tool is first
-      // @ts-expect-error accessing private method
-      const suggestionMultiple = scheduler.getToolSuggestion('list_fils');
-      expect(suggestionMultiple).toBe(
-        ' Did you mean one of: "list_files", "read_file", "write_file"?',
-      );
+  it('should error when tool requires confirmation in non-interactive mode', async () => {
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
     });
-  });
-});
-
-describe('CoreToolScheduler with payload', () => {
-  it('should update args and diff and execute tool when payload is provided', async () => {
-    const mockTool = new MockModifiableTool();
-    mockTool.executeFn = vi.fn();
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -650,7 +657,72 @@ describe('CoreToolScheduler with payload', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('error');
+
+    const erroredCall = completedCalls[0] as ErroredToolCall;
+    const errorResponse = erroredCall.response;
+    const errorParts = errorResponse.responseParts;
+    // @ts-expect-error - accessing internal structure of FunctionResponsePart
+    const errorMessage = errorParts[0].functionResponse.response.error;
+    expect(errorMessage).toContain(
+      'Tool execution for "mockTool" requires user confirmation, which is not supported in non-interactive mode.',
+    );
+  });
+});
+
+describe('CoreToolScheduler with payload', () => {
+  it('should update args and diff and execute tool when payload is provided', async () => {
+    const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
+    const declarativeTool = mockTool;
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
     });
 
     const abortController = new AbortController();
@@ -692,191 +764,12 @@ describe('CoreToolScheduler with payload', () => {
   });
 });
 
-describe('convertToFunctionResponse', () => {
-  const toolName = 'testTool';
-  const callId = 'call1';
-
-  it('should handle simple string llmContent', () => {
-    const llmContent = 'Simple text output';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Simple text output' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a single Part with text', () => {
-    const llmContent: Part = { text: 'Text from Part object' };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from Part object' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a PartListUnion array with a single text Part', () => {
-    const llmContent: PartListUnion = [{ text: 'Text from array' }];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Text from array' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent with inlineData', () => {
-    const llmContent: Part = {
-      inlineData: { mimeType: 'image/png', data: 'base64...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type image/png was processed.',
-          },
-        },
-      },
-      llmContent,
-    ]);
-  });
-
-  it('should handle llmContent with fileData', () => {
-    const llmContent: Part = {
-      fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
-    };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type application/pdf was processed.',
-          },
-        },
-      },
-      llmContent,
-    ]);
-  });
-
-  it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
-    const llmContent: PartListUnion = [
-      { text: 'Some textual description' },
-      { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
-      { text: 'Another text part' },
-    ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-      ...llmContent,
-    ]);
-  });
-
-  it('should handle llmContent as an array with a single inlineData Part', () => {
-    const llmContent: PartListUnion = [
-      { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
-    ];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: {
-            output: 'Binary content of type image/gif was processed.',
-          },
-        },
-      },
-      ...llmContent,
-    ]);
-  });
-
-  it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
-    const llmContent: Part = { functionCall: { name: 'test', args: {} } };
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle empty string llmContent', () => {
-    const llmContent = '';
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: '' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as an empty array', () => {
-    const llmContent: PartListUnion = [];
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-    ]);
-  });
-
-  it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
-    const llmContent: Part = {}; // An empty part object
-    const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual([
-      {
-        functionResponse: {
-          name: toolName,
-          id: callId,
-          response: { output: 'Tool execution succeeded.' },
-        },
-      },
-    ]);
-  });
-});
-
 class MockEditToolInvocation extends BaseToolInvocation<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor(params: Record<string, unknown>) {
-    super(params);
+  constructor(params: Record<string, unknown>, messageBus: MessageBus) {
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -911,20 +804,30 @@ class MockEditTool extends BaseDeclarativeTool<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor() {
-    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+  constructor(messageBus: MessageBus) {
+    super(
+      'mockEditTool',
+      'mockEditTool',
+      'A mock edit tool',
+      Kind.Edit,
+      {},
+      messageBus,
+    );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockEditToolInvocation(params);
+    return new MockEditToolInvocation(params, messageBus);
   }
 }
 
 describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
-    const mockEditTool = new MockEditTool();
+    const mockEditTool = new MockEditTool(createMockMessageBus());
     const mockToolRegistry = {
       getTool: () => mockEditTool,
       getFunctionDeclarations: () => [],
@@ -944,15 +847,19 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1032,13 +939,18 @@ describe('CoreToolScheduler YOLO mode', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1119,13 +1031,18 @@ describe('CoreToolScheduler request queueing', () => {
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1145,6 +1062,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Schedule the first call, which will pause execution.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     scheduler.schedule([request1], abortController.signal);
 
     // Wait for the first call to be in the 'executing' state.
@@ -1230,16 +1148,26 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1288,15 +1216,6 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should require approval for a chained shell command even when prefix is allowlisted', async () => {
-    expect(
-      isShellInvocationAllowlisted(
-        {
-          params: { command: 'git status && rm -rf /tmp/should-not-run' },
-        } as unknown as AnyToolInvocation,
-        ['run_shell_command(git)'],
-      ),
-    ).toBe(false);
-
     const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Shell command executed',
       returnDisplay: 'Shell command executed',
@@ -1337,9 +1256,18 @@ describe('CoreToolScheduler request queueing', () => {
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
       }),
       getToolRegistry: () => toolRegistry,
-      isInteractive: () => false,
+      getHookSystem: () => undefined,
+      getPolicyEngine: () =>
+        ({
+          check: async () => ({ decision: PolicyDecision.ASK_USER }),
+        }) as unknown as PolicyEngine,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1347,7 +1275,6 @@ describe('CoreToolScheduler request queueing', () => {
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1396,15 +1323,19 @@ describe('CoreToolScheduler request queueing', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
-      isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1452,10 +1383,15 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
-      isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
-    const testTool = new TestApprovalTool(mockConfig);
+    const testTool = new TestApprovalTool(mockConfig, mockMessageBus);
     const toolRegistry = {
       getTool: () => testTool,
       getFunctionDeclarations: () => [],
@@ -1493,7 +1429,7 @@ describe('CoreToolScheduler request queueing', () => {
         // Capture confirmation handlers for awaiting_approval tools
         toolCalls.forEach((call) => {
           if (call.status === 'awaiting_approval') {
-            const waitingCall = call as WaitingToolCall;
+            const waitingCall = call;
             if (waitingCall.confirmationDetails?.onConfirm) {
               const originalHandler = pendingConfirmations.find(
                 (h) => h === waitingCall.confirmationDetails.onConfirm,
@@ -1508,7 +1444,6 @@ describe('CoreToolScheduler request queueing', () => {
         });
       },
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1626,13 +1561,18 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1726,13 +1666,18 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const requests = [
@@ -1825,13 +1770,18 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
     });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
     });
 
     const abortController = new AbortController();
@@ -1865,233 +1815,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const overrides =
       modifyWithEditorSpy.mock.calls[
         modifyWithEditorSpy.mock.calls.length - 1
-      ][5];
+      ][4];
     expect(overrides).toEqual({
       currentContent: 'originalContent',
       proposedContent: 'newContent',
     });
 
     modifyWithEditorSpy.mockRestore();
-  });
-});
-
-describe('truncateAndSaveToFile', () => {
-  const mockWriteFile = vi.mocked(fs.writeFile);
-  const THRESHOLD = 40_000;
-  const TRUNCATE_LINES = 1000;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return content unchanged if below threshold', async () => {
-    const content = 'Short content';
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result).toEqual({ content });
-    expect(mockWriteFile).not.toHaveBeenCalled();
-  });
-
-  it('should truncate content by lines when content has many lines', async () => {
-    // Create content that exceeds 100,000 character threshold with many lines
-    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
-    const content = lines.join('\n');
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBe(
-      path.join(projectTempDir, `${callId}.output`),
-    );
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      path.join(projectTempDir, `${callId}.output`),
-      content,
-    );
-
-    // Should contain the first and last lines with 1/5 head and 4/5 tail
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = lines.slice(0, head);
-    const end = lines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
-  });
-
-  it('should wrap and truncate content when content has few but long lines', async () => {
-    const content = 'a'.repeat(200_000); // A single very long line
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBe(
-      path.join(projectTempDir, `${callId}.output`),
-    );
-    // Check that the file was written with the wrapped content
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      path.join(projectTempDir, `${callId}.output`),
-      expectedFileContent,
-    );
-
-    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
-    const head = Math.floor(TRUNCATE_LINES / 5);
-    const beginning = wrappedLines.slice(0, head);
-    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-    expect(result.content).toContain(
-      'Tool output was too large and has been truncated',
-    );
-    expect(result.content).toContain('Truncated part of the output:');
-    expect(result.content).toContain(expectedTruncated);
-  });
-
-  it('should handle file write errors gracefully', async () => {
-    const content = 'a'.repeat(2_000_000);
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockRejectedValue(new Error('File write failed'));
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.outputFile).toBeUndefined();
-    expect(result.content).toContain(
-      '[Note: Could not save full output to file]',
-    );
-    expect(mockWriteFile).toHaveBeenCalled();
-  });
-
-  it('should save to correct file path with call ID', async () => {
-    const content = 'a'.repeat(200_000);
-    const callId = 'unique-call-123';
-    const projectTempDir = '/custom/temp/dir';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    const expectedPath = path.join(projectTempDir, `${callId}.output`);
-    expect(result.outputFile).toBe(expectedPath);
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expectedPath,
-      expectedFileContent,
-    );
-  });
-
-  it('should include helpful instructions in truncated message', async () => {
-    const content = 'a'.repeat(2_000_000);
-    const callId = 'test-call-id';
-    const projectTempDir = '/tmp';
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    const result = await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    expect(result.content).toContain(
-      'read_file tool with the absolute file path above',
-    );
-    expect(result.content).toContain('read_file tool with offset=0, limit=100');
-    expect(result.content).toContain(
-      'read_file tool with offset=N to skip N lines',
-    );
-    expect(result.content).toContain(
-      'read_file tool with limit=M to read only M lines',
-    );
-  });
-
-  it('should sanitize callId to prevent path traversal', async () => {
-    const content = 'a'.repeat(200_000);
-    const callId = '../../../../../etc/passwd';
-    const projectTempDir = '/tmp/safe_dir';
-    const wrapWidth = 120;
-
-    mockWriteFile.mockResolvedValue(undefined);
-
-    // Manually wrap the content to generate the expected file content
-    const wrappedLines: string[] = [];
-    for (let i = 0; i < content.length; i += wrapWidth) {
-      wrappedLines.push(content.substring(i, i + wrapWidth));
-    }
-    const expectedFileContent = wrappedLines.join('\n');
-
-    await truncateAndSaveToFile(
-      content,
-      callId,
-      projectTempDir,
-      THRESHOLD,
-      TRUNCATE_LINES,
-    );
-
-    const expectedPath = path.join(projectTempDir, 'passwd.output');
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expectedPath,
-      expectedFileContent,
-    );
   });
 });

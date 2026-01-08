@@ -1,0 +1,123 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolConfirmationMessage > should display urls if prompt and url are different 1`] = `
+"fetch https://github.com/google/gemini-react/blob/main/README.md
+
+URLs to fetch:
+ - https://raw.githubusercontent.com/google/gemini-react/main/README.md
+
+Do you want to proceed?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > should not display urls if prompt and url are the same 1`] = `
+"https://example.com
+
+Do you want to proceed?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
+"╭──────────────────────╮
+│                      │
+│ No changes detected. │
+│                      │
+╰──────────────────────╯
+
+Apply this change?
+
+● 1. Allow once
+  2. Modify with external editor
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should show "allow always" when folder is trusted 1`] = `
+"╭──────────────────────╮
+│                      │
+│ No changes detected. │
+│                      │
+╰──────────────────────╯
+
+Apply this change?
+
+● 1. Allow once
+  2. Allow for this session
+  3. Modify with external editor
+  4. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
+"echo "hello"
+
+Allow execution of: 'echo'?
+
+● 1. Allow once
+  2. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should show "allow always" when folder is trusted 1`] = `
+"echo "hello"
+
+Allow execution of: 'echo'?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
+"https://example.com
+
+Do you want to proceed?
+
+● 1. Allow once
+  2. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' > should show "allow always" when folder is trusted 1`] = `
+"https://example.com
+
+Do you want to proceed?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
+"MCP Server: test-server
+Tool: test-tool
+
+Allow execution of MCP tool "test-tool" from server "test-server"?
+
+● 1. Allow once
+  2. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' > should show "allow always" when folder is trusted 1`] = `
+"MCP Server: test-server
+Tool: test-tool
+
+Allow execution of MCP tool "test-tool" from server "test-server"?
+
+● 1. Allow once
+  2. Allow tool for this session
+  3. Allow all server tools for this session
+  4. No, suggest changes (esc)
+"
+`;

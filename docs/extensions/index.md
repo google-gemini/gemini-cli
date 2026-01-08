@@ -1,4 +1,4 @@
-# Gemini CLI Extensions
+# Gemini CLI extensions
 
 _This documentation is up-to-date with the v0.4.0 release._
 
@@ -54,10 +54,11 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 
 ### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall <name>`:
+To uninstall one or more extensions, run
+`gemini extensions uninstall <name...>`:
 
 ```
-gemini extensions uninstall gemini-cli-security
+gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
 ```
 
 ### Disabling an extension
@@ -162,11 +163,11 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
-- `mcpServers`: A map of MCP servers to configure. The key is the name of the
+- `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers configured in a
+  loaded on startup just like MCP servers settingsd in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file configure an MCP server with the same name, the
+  and a `settings.json` file settings an MCP server with the same name, the
   server defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
@@ -222,6 +223,21 @@ When a user installs this extension, they will be prompted to enter their API
 key. The value will be saved to a `.env` file in the extension's directory
 (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
 
+You can view a list of an extension's settings by running:
+
+```
+gemini extensions list
+```
+
+and you can update a given setting using:
+
+```
+gemini extensions config <extension name> [setting name] [--scope <scope>]
+```
+
+- `--scope`: The scope to set the setting in (`user` or `workspace`). This is
+  optional and will default to `user`.
+
 ### Custom commands
 
 Extensions can provide [custom commands](../cli/custom-commands.md) by placing
@@ -247,6 +263,54 @@ Would provide these commands:
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
 
+### Hooks
+
+Extensions can provide [hooks](../hooks/index.md) to intercept and customize
+Gemini CLI behavior at specific lifecycle events. Hooks provided by an extension
+must be defined in a `hooks/hooks.json` file within the extension directory.
+
+> [!IMPORTANT] Hooks are not defined directly in `gemini-extension.json`. The
+> CLI specifically looks for the `hooks/hooks.json` file.
+
+#### Directory structure
+
+```
+.gemini/extensions/my-extension/
+├── gemini-extension.json
+└── hooks/
+    └── hooks.json
+```
+
+#### `hooks/hooks.json` format
+
+The `hooks.json` file contains a `hooks` object where keys are
+[event names](../hooks/reference.md#supported-events) and values are arrays of
+[hook definitions](../hooks/reference.md#hook-definition).
+
+```json
+{
+  "hooks": {
+    "before_agent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${extensionPath}/scripts/setup.js",
+            "name": "Extension Setup"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Supported variables
+
+Just like `gemini-extension.json`, the `hooks/hooks.json` file supports
+[variable substitution](#variables). This is particularly useful for referencing
+scripts within the extension directory using `${extensionPath}`.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user
@@ -262,11 +326,12 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 - `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]`
   tag)
 
-## Variables
+### Variables
 
-Gemini CLI extensions allow variable substitution in `gemini-extension.json`.
-This can be useful if e.g., you need the current directory to run an MCP server
-using `"cwd": "${extensionPath}${/}run.ts"`.
+Gemini CLI extensions allow variable substitution in both
+`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
+need the current directory to run an MCP server or hook script using
+`"cwd": "${extensionPath}${/}run.ts"`.
 
 **Supported variables:**
 
@@ -275,3 +340,4 @@ using `"cwd": "${extensionPath}${/}run.ts"`.
 | `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
 | `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
 | `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+| `${process.execPath}`      | The path to the Node.js binary executing the CLI.                                                                                                               |

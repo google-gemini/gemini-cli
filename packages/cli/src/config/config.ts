@@ -8,14 +8,14 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type { OutputFormat } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
+import { skillsCommand } from '../commands/skills.js';
+import { hooksCommand } from '../commands/hooks.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -30,13 +30,20 @@ import {
   EDIT_TOOL_NAME,
   debugLogger,
   loadServerHierarchicalMemory,
+  WEB_FETCH_TOOL_NAME,
+  getVersion,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  type HookDefinition,
+  type HookEventName,
+  type OutputFormat,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import { saveModelChange, loadSettings } from './settings.js';
 
-import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
@@ -45,6 +52,8 @@ import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensio
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { runExitCleanup } from '../utils/cleanup.js';
+import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -61,12 +70,11 @@ export interface CliArgs {
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  resume: string | 'latest' | undefined;
+  resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
-  useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
@@ -189,7 +197,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
             if (value === '') {
-              return 'latest';
+              return RESUME_LATEST;
             }
             return value;
           },
@@ -238,65 +246,80 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
-        )
-        // Ensure validation flows through .fail() for clean UX
-        .fail((msg, err, yargs) => {
-          debugLogger.error(msg || err?.message || 'Unknown error');
-          yargs.showHelp();
-          process.exit(1);
-        })
-        .check((argv) => {
-          // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-          // This guard safely checks if any positional argument was provided.
-          const query = argv['query'] as string | string[] | undefined;
-          const hasPositionalQuery = Array.isArray(query)
-            ? query.length > 0
-            : !!query;
-
-          if (argv['prompt'] && hasPositionalQuery) {
-            return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-          }
-          if (argv['prompt'] && argv['promptInteractive']) {
-            return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-          }
-          if (argv.resume && !argv.prompt && !process.stdin.isTTY) {
-            throw new Error(
-              'When resuming a session, you must provide a message via --prompt (-p) or stdin',
-            );
-          }
-          if (argv.yolo && argv['approvalMode']) {
-            return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-          }
-          return true;
-        }),
+        ),
     )
     // Register MCP subcommands
-    .command(mcpCommand);
+    .command(mcpCommand)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const query = argv['query'] as string | string[] | undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+      if (
+        argv['outputFormat'] &&
+        !['text', 'json', 'stream-json'].includes(
+          argv['outputFormat'] as string,
+        )
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      return true;
+    });
 
   if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
   }
 
+  if (settings?.experimental?.skills ?? false) {
+    yargsInstance.command(skillsCommand);
+  }
+
+  // Register hooks command if hooks are enabled
+  if (getEnableHooksUI(settings)) {
+    yargsInstance.command(hooksCommand);
+  }
+
   yargsInstance
-    .version(await getCliVersion()) // This will enable the --version flag based on package.json
+    .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
     .strict()
-    .demandCommand(0, 0); // Allow base command to run with no subcommands
+    .demandCommand(0, 0) // Allow base command to run with no subcommands
+    .exitProcess(false);
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  const result = await yargsInstance.parse();
+  let result;
+  try {
+    result = await yargsInstance.parse();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    debugLogger.error(msg);
+    yargsInstance.showHelp();
+    await runExitCleanup();
+    process.exit(1);
+  }
 
-  // If yargs handled --help/--version it will have exited; nothing to do here.
-
-  // Handle case where MCP subcommands are executed - they should exit the process
-  // and not return to main CLI logic
-  if (
-    result._.length > 0 &&
-    (result._[0] === 'mcp' || result._[0] === 'extensions')
-  ) {
-    // MCP commands handle their own execution and process exit
+  // Handle help and version flags manually since we disabled exitProcess
+  if (result['help'] || result['version']) {
+    await runExitCleanup();
     process.exit(0);
   }
 
@@ -364,13 +387,23 @@ export function isDebugMode(argv: CliArgs): boolean {
   );
 }
 
+export interface LoadCliConfigOptions {
+  cwd?: string;
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
+    disabled?: string[];
+  };
+}
+
 export async function loadCliConfig(
   settings: Settings,
   sessionId: string,
   argv: CliArgs,
-  cwd: string = process.cwd(),
+  options: LoadCliConfigOptions = {},
 ): Promise<Config> {
+  const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
+
+  const loadedSettings = loadSettings(cwd);
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -381,7 +414,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? true;
+  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -420,13 +453,17 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount, filePaths } =
-    await loadServerHierarchicalMemory(
+  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+
+  let memoryContent = '';
+  let fileCount = 0;
+  let filePaths: string[] = [];
+
+  if (!experimentalJitContext) {
+    // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
+    const result = await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories
-        ? includeDirectories
-        : [],
+      [],
       debugMode,
       fileService,
       extensionManager,
@@ -435,6 +472,10 @@ export async function loadCliConfig(
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
     );
+    memoryContent = result.memoryContent;
+    fileCount = result.fileCount;
+    filePaths = result.filePaths;
+  }
 
   const question = argv.promptInteractive || argv.prompt || '';
 
@@ -464,11 +505,19 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode) {
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
-      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      if (settings.admin?.secureModeEnabled) {
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode when it is disabled by settings',
+        'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
     approvalMode = ApprovalMode.DEFAULT;
@@ -501,29 +550,24 @@ export async function loadCliConfig(
     throw err;
   }
 
-  const policyEngineConfig = await createPolicyEngineConfig(
-    settings,
-    approvalMode,
-  );
-
-  const enableMessageBusIntegration =
-    settings.tools?.enableMessageBusIntegration ?? false;
-
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
-  const allowedToolsSet = new Set(allowedTools);
-
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
     !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
     (process.stdin.isTTY && !hasQuery && !argv.prompt);
+
+  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const allowedToolsSet = new Set(allowedTools);
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive && !argv.experimentalAcp) {
+  if (!interactive) {
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
+      WEB_FETCH_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
 
@@ -555,10 +599,29 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? true;
-  const defaultModel = useModelRouter
-    ? DEFAULT_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL;
+  // Create a settings object that includes CLI overrides for policy generation
+  const effectiveSettings: Settings = {
+    ...settings,
+    tools: {
+      ...settings.tools,
+      allowed: allowedTools,
+      exclude: excludeTools,
+    },
+    mcp: {
+      ...settings.mcp,
+      allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+    },
+  };
+
+  const policyEngineConfig = await createPolicyEngineConfig(
+    effectiveSettings,
+    approvalMode,
+  );
+  policyEngineConfig.nonInteractive = !interactive;
+
+  const defaultModel = settings.general?.previewFeatures
+    ? PREVIEW_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL_AUTO;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -573,6 +636,8 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -583,6 +648,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
+    previewFeatures: settings.general?.previewFeatures,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -590,24 +656,34 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers: settings.mcpServers,
-    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
-    blockedMcpServers: argv.allowedMcpServerNames
-      ? [] // explicitly allowed servers overrides everything
-      : settings.mcp?.excluded,
+    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
+    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnabled,
+    allowedMcpServers: mcpEnabled
+      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      : undefined,
+    blockedMcpServers: mcpEnabled
+      ? argv.allowedMcpServerNames
+        ? undefined
+        : settings.mcp?.excluded
+      : undefined,
+    blockedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.blocked,
+    enableEnvironmentVariableRedaction:
+      settings.security?.environmentVariableRedaction?.enabled,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    disableYoloMode: settings.security?.disableYoloMode,
+    disableYoloMode:
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
       screenReader,
     },
     telemetry: telemetrySettings,
-    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
+    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
     fileFiltering,
     checkpointing: settings.general?.checkpointing?.enabled,
     proxy:
@@ -619,7 +695,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
-    maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
+    maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
@@ -627,6 +703,10 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    enableAgents: settings.experimental?.enableAgents,
+    skillsSupport: settings.experimental?.skills,
+    disabledSkills: settings.skills?.disabled,
+    experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
@@ -635,31 +715,40 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    enableInteractiveShell:
-      settings.tools?.shell?.enableInteractiveShell ?? true,
+    enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
+    shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
+    enableShellOutputEfficiency:
+      settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
-    enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
-    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
-    enableMessageBusIntegration,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
-    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
+    retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.tools?.enableHooks ?? false,
+    enableHooks: getEnableHooks(settings),
+    enableHooksUI: getEnableHooksUI(settings),
     hooks: settings.hooks || {},
+    projectHooks: projectHooks || {},
+    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onReload: async () => {
+      const refreshedSettings = loadSettings(cwd);
+      return {
+        disabledSkills: refreshedSettings.merged.skills?.disabled,
+      };
+    },
   });
 }
 

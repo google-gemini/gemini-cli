@@ -38,11 +38,13 @@ export class McpPromptLoader implements ICommandLoader {
     for (const serverName in mcpServers) {
       const prompts = getMCPServerPrompts(this.config, serverName) || [];
       for (const prompt of prompts) {
-        const commandName = `${prompt.name}`;
+        // Sanitize prompt names to ensure they are valid slash commands (e.g. "Prompt Name" -> "Prompt-Name")
+        const commandName = `${prompt.name}`.trim().replace(/\s+/g, '-');
         const newPromptCommand: SlashCommand = {
           name: commandName,
           description: prompt.description || `Invoke prompt ${prompt.name}`,
           kind: CommandKind.MCP_PROMPT,
+          autoExecute: !prompt.arguments || prompt.arguments.length === 0,
           subCommands: [
             {
               name: 'help',
@@ -121,7 +123,8 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              if (!result.messages?.[0]?.content?.['text']) {
+              const maybeContent = result.messages?.[0]?.content;
+              if (maybeContent.type !== 'text') {
                 return {
                   type: 'message',
                   messageType: 'error',
@@ -132,7 +135,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(result.messages[0].content.text),
+                content: JSON.stringify(maybeContent.text),
               };
             } catch (error) {
               return {

@@ -11,8 +11,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
   ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
 import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
@@ -22,6 +20,7 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -41,9 +40,11 @@ export const ToolConfirmationMessage: React.FC<
   terminalWidth,
 }) => {
   const { onConfirm } = confirmationDetails;
-  const childWidth = terminalWidth - 2; // 2 for padding
 
   const isAlternateBuffer = useAlternateBuffer();
+  const settings = useSettings();
+  const allowPermanentApproval =
+    settings.merged.security?.enablePermanentToolApproval ?? false;
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
@@ -58,6 +59,7 @@ export const ToolConfirmationMessage: React.FC<
           setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
         }
       };
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       getIdeClient();
     }
     return () => {
@@ -76,6 +78,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     onConfirm(outcome);
   };
 
@@ -85,6 +88,7 @@ export const ToolConfirmationMessage: React.FC<
     (key) => {
       if (!isFocused) return;
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleConfirm(ToolConfirmationOutcome.Cancel);
       }
     },
@@ -102,16 +106,23 @@ export const ToolConfirmationMessage: React.FC<
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
         options.push({
-          label: 'Yes, allow once',
+          label: 'Allow once',
           value: ToolConfirmationOutcome.ProceedOnce,
-          key: 'Yes, allow once',
+          key: 'Allow once',
         });
         if (isTrustedFolder) {
           options.push({
-            label: 'Yes, allow always',
+            label: 'Allow for this session',
             value: ToolConfirmationOutcome.ProceedAlways,
-            key: 'Yes, allow always',
+            key: 'Allow for this session',
           });
+          if (allowPermanentApproval) {
+            options.push({
+              label: 'Allow for all future sessions',
+              value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+              key: 'Allow for all future sessions',
+            });
+          }
         }
         if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
@@ -128,21 +139,27 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
 
       question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, allow always ...`,
+          label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Yes, allow always ...`,
+          key: `Allow for this session`,
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: `Allow for all future sessions`,
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: `Allow for all future sessions`,
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -152,16 +169,23 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: 'Yes, allow always',
+          label: 'Allow for this session',
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: 'Yes, allow always',
+          key: 'Allow for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -170,24 +194,31 @@ export const ToolConfirmationMessage: React.FC<
       });
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-          value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
-          key: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+          label: 'Allow tool for this session',
+          value: ToolConfirmationOutcome.ProceedAlwaysTool,
+          key: 'Allow tool for this session',
         });
         options.push({
-          label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          label: 'Allow all server tools for this session',
           value: ToolConfirmationOutcome.ProceedAlwaysServer,
-          key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          key: 'Allow all server tools for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow tool for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow tool for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -236,8 +267,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
       let bodyContentHeight = availableBodyContentHeight();
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
@@ -249,21 +279,15 @@ export const ToolConfirmationMessage: React.FC<
         </Box>
       );
 
-      bodyContent = (
-        <Box flexDirection="column">
-          <Box paddingX={1}>
-            {isAlternateBuffer ? (
-              commandBox
-            ) : (
-              <MaxSizedBox
-                maxHeight={bodyContentHeight}
-                maxWidth={Math.max(childWidth, 1)}
-              >
-                {commandBox}
-              </MaxSizedBox>
-            )}
-          </Box>
-        </Box>
+      bodyContent = isAlternateBuffer ? (
+        commandBox
+      ) : (
+        <MaxSizedBox
+          maxHeight={bodyContentHeight}
+          maxWidth={Math.max(terminalWidth, 1)}
+        >
+          {commandBox}
+        </MaxSizedBox>
       );
     } else if (confirmationDetails.type === 'info') {
       const infoProps = confirmationDetails;
@@ -274,7 +298,7 @@ export const ToolConfirmationMessage: React.FC<
         );
 
       bodyContent = (
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column">
           <Text color={theme.text.link}>
             <RenderInline
               text={infoProps.prompt}
@@ -296,10 +320,10 @@ export const ToolConfirmationMessage: React.FC<
       );
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
 
       bodyContent = (
-        <Box flexDirection="column" paddingX={1}>
+        <Box flexDirection="column">
           <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
           <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
         </Box>
@@ -315,7 +339,7 @@ export const ToolConfirmationMessage: React.FC<
     availableTerminalHeight,
     terminalWidth,
     isAlternateBuffer,
-    childWidth,
+    allowPermanentApproval,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -326,7 +350,8 @@ export const ToolConfirmationMessage: React.FC<
           borderStyle="round"
           borderColor={theme.border.default}
           justifyContent="space-around"
-          padding={1}
+          paddingTop={1}
+          paddingBottom={1}
           overflow="hidden"
         >
           <Text color={theme.text.primary}>Modify in progress: </Text>
@@ -342,23 +367,17 @@ export const ToolConfirmationMessage: React.FC<
     <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
-      <Box
-        flexGrow={1}
-        flexShrink={1}
-        overflow="hidden"
-        marginBottom={1}
-        paddingLeft={1}
-      >
+      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
         {bodyContent}
       </Box>
 
       {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0} paddingX={1}>
+      <Box marginBottom={1} flexShrink={0}>
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
       {/* Select Input for Options */}
-      <Box flexShrink={0} paddingX={1}>
+      <Box flexShrink={0}>
         <RadioButtonSelect
           items={options}
           onSelect={handleSelect}

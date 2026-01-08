@@ -4,71 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApprovalMode, PolicyDecision } from './types.js';
-import type { Dirent } from 'node:fs';
-import nodePath from 'node:path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { PolicyDecision } from './types.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { loadPoliciesFromToml } from './toml-loader.js';
 import type { PolicyLoadResult } from './toml-loader.js';
 
-async function runLoadPoliciesFromToml(
-  tomlContent: string,
-  fileName = 'test.toml',
-): Promise<PolicyLoadResult> {
-  const actualFs =
-    await vi.importActual<typeof import('node:fs/promises')>(
-      'node:fs/promises',
-    );
-
-  const mockReaddir = vi.fn(
-    async (
-      path: string,
-      _options?: { withFileTypes: boolean },
-    ): Promise<Dirent[]> => {
-      if (nodePath.normalize(path) === nodePath.normalize('/policies')) {
-        return [
-          {
-            name: fileName,
-            isFile: () => true,
-            isDirectory: () => false,
-          } as Dirent,
-        ];
-      }
-      return [];
-    },
-  );
-
-  const mockReadFile = vi.fn(async (path: string): Promise<string> => {
-    if (
-      nodePath.normalize(path) ===
-      nodePath.normalize(nodePath.join('/policies', fileName))
-    ) {
-      return tomlContent;
-    }
-    throw new Error('File not found');
-  });
-
-  vi.doMock('node:fs/promises', () => ({
-    ...actualFs,
-    default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
-    readFile: mockReadFile,
-    readdir: mockReaddir,
-  }));
-
-  const { loadPoliciesFromToml: load } = await import('./toml-loader.js');
-
-  const getPolicyTier = (_dir: string) => 1;
-  return load(ApprovalMode.DEFAULT, ['/policies'], getPolicyTier);
-}
-
 describe('policy-toml-loader', () => {
-  beforeEach(() => {
-    vi.resetModules();
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'policy-test-'));
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.doUnmock('node:fs/promises');
+  afterEach(async () => {
+    if (tempDir) {
+      await fs.rm(tempDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: 10,
+      });
+    }
   });
+
+  async function runLoadPoliciesFromToml(
+    tomlContent: string,
+    fileName = 'test.toml',
+  ): Promise<PolicyLoadResult> {
+    await fs.writeFile(path.join(tempDir, fileName), tomlContent);
+    const getPolicyTier = (_dir: string) => 1;
+    return loadPoliciesFromToml([tempDir], getPolicyTier);
+  }
 
   describe('loadPoliciesFromToml', () => {
     it('should load and parse a simple policy file', async () => {
@@ -85,6 +54,7 @@ priority = 100
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
       });
+      expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -163,7 +133,7 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should filter rules by mode', async () => {
+    it('should NOT filter rules by mode at load time but preserve modes property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
 toolName = "glob"
@@ -178,9 +148,48 @@ priority = 100
 modes = ["yolo"]
 `);
 
-      // Only the first rule should be included (modes includes "default")
-      expect(result.rules).toHaveLength(1);
+      // Both rules should be included
+      expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('glob');
+      expect(result.rules[0].modes).toEqual(['default', 'yolo']);
+      expect(result.rules[1].toolName).toBe('grep');
+      expect(result.rules[1].modes).toEqual(['yolo']);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should parse and transform allow_redirection property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allow_redirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
+      await fs.writeFile(
+        path.join(tempDir, 'tier2.toml'),
+        `
+[[rule]]
+toolName = "tier2-tool"
+decision = "allow"
+priority = 100
+modes = ["autoEdit"]
+`,
+      );
+
+      const getPolicyTier = (_dir: string) => 2; // Tier 2
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('tier2-tool');
+      expect(result.rules[0].modes).toEqual(['autoEdit']);
       expect(result.errors).toHaveLength(0);
     });
 
@@ -276,75 +285,28 @@ priority = 100
     });
 
     it('should handle a mix of valid and invalid policy files', async () => {
-      const actualFs =
-        await vi.importActual<typeof import('node:fs/promises')>(
-          'node:fs/promises',
-        );
-
-      const mockReaddir = vi.fn(
-        async (
-          path: string,
-          _options?: { withFileTypes: boolean },
-        ): Promise<Dirent[]> => {
-          if (nodePath.normalize(path) === nodePath.normalize('/policies')) {
-            return [
-              {
-                name: 'valid.toml',
-                isFile: () => true,
-                isDirectory: () => false,
-              } as Dirent,
-              {
-                name: 'invalid.toml',
-                isFile: () => true,
-                isDirectory: () => false,
-              } as Dirent,
-            ];
-          }
-          return [];
-        },
-      );
-
-      const mockReadFile = vi.fn(async (path: string): Promise<string> => {
-        if (
-          nodePath.normalize(path) ===
-          nodePath.normalize(nodePath.join('/policies', 'valid.toml'))
-        ) {
-          return `
+      await fs.writeFile(
+        path.join(tempDir, 'valid.toml'),
+        `
 [[rule]]
 toolName = "glob"
 decision = "allow"
 priority = 100
-`;
-        }
-        if (
-          nodePath.normalize(path) ===
-          nodePath.normalize(nodePath.join('/policies', 'invalid.toml'))
-        ) {
-          return `
+`,
+      );
+
+      await fs.writeFile(
+        path.join(tempDir, 'invalid.toml'),
+        `
 [[rule]]
 toolName = "grep"
 decision = "allow"
 priority = -1
-`;
-        }
-        throw new Error('File not found');
-      });
-
-      vi.doMock('node:fs/promises', () => ({
-        ...actualFs,
-        default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
-        readFile: mockReadFile,
-        readdir: mockReaddir,
-      }));
-
-      const { loadPoliciesFromToml: load } = await import('./toml-loader.js');
+`,
+      );
 
       const getPolicyTier = (_dir: string) => 1;
-      const result = await load(
-        ApprovalMode.DEFAULT,
-        ['/policies'],
-        getPolicyTier,
-      );
+      const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
 
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('glob');
@@ -353,6 +315,7 @@ priority = -1
       expect(result.errors[0].errorType).toBe('schema_validation');
     });
   });
+
   describe('Negative Tests', () => {
     it('should return a schema_validation error if priority is missing', async () => {
       const result = await runLoadPoliciesFromToml(`
@@ -506,28 +469,12 @@ priority = 100
     });
 
     it('should return a file_read error if readdir fails', async () => {
-      const actualFs =
-        await vi.importActual<typeof import('node:fs/promises')>(
-          'node:fs/promises',
-        );
+      // Create a file and pass it as a directory to trigger ENOTDIR
+      const filePath = path.join(tempDir, 'not-a-dir');
+      await fs.writeFile(filePath, 'content');
 
-      const mockReaddir = vi.fn(async () => {
-        throw new Error('Permission denied');
-      });
-
-      vi.doMock('node:fs/promises', () => ({
-        ...actualFs,
-        default: { ...actualFs, readdir: mockReaddir },
-        readdir: mockReaddir,
-      }));
-
-      const { loadPoliciesFromToml: load } = await import('./toml-loader.js');
       const getPolicyTier = (_dir: string) => 1;
-      const result = await load(
-        ApprovalMode.DEFAULT,
-        ['/policies'],
-        getPolicyTier,
-      );
+      const result = await loadPoliciesFromToml([filePath], getPolicyTier);
 
       expect(result.errors).toHaveLength(1);
       const error = result.errors[0];

@@ -281,4 +281,97 @@ describe('ScrollableList Demo Behavior', () => {
     });
     expect(lastFrame!()).not.toContain('[STICKY] Item 1');
   });
+
+  describe('Keyboard Navigation', () => {
+    it('should handle scroll keys correctly', async () => {
+      let listRef: ScrollableListRef<Item> | null = null;
+      let lastFrame: () => string | undefined;
+      let stdin: { write: (data: string) => void };
+
+      const items = Array.from({ length: 50 }, (_, i) => ({
+        id: String(i),
+        title: `Item ${i}`,
+      }));
+
+      await act(async () => {
+        const result = render(
+          <MouseProvider mouseEventsEnabled={false}>
+            <KeypressProvider>
+              <ScrollProvider>
+                <Box flexDirection="column" width={80} height={10}>
+                  <ScrollableList
+                    ref={(ref) => {
+                      listRef = ref;
+                    }}
+                    data={items}
+                    renderItem={({ item }) => <Text>{item.title}</Text>}
+                    estimatedItemHeight={() => 1}
+                    keyExtractor={(item) => item.id}
+                    hasFocus={true}
+                  />
+                </Box>
+              </ScrollProvider>
+            </KeypressProvider>
+          </MouseProvider>,
+        );
+        lastFrame = result.lastFrame;
+        stdin = result.stdin;
+      });
+
+      // Initial state
+      expect(lastFrame!()).toContain('Item 0');
+      expect(listRef).toBeDefined();
+      expect(listRef!.getScrollState()?.scrollTop).toBe(0);
+
+      // Scroll Down (Shift+Down) -> \x1b[b
+      await act(async () => {
+        stdin.write('\x1b[b');
+      });
+      await waitFor(() => {
+        expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(0);
+      });
+
+      // Scroll Up (Shift+Up) -> \x1b[a
+      await act(async () => {
+        stdin.write('\x1b[a');
+      });
+      await waitFor(() => {
+        expect(listRef?.getScrollState()?.scrollTop).toBe(0);
+      });
+
+      // Page Down -> \x1b[6~
+      await act(async () => {
+        stdin.write('\x1b[6~');
+      });
+      await waitFor(() => {
+        // Height is 10, so should scroll ~10 units
+        expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThanOrEqual(9);
+      });
+
+      // Page Up -> \x1b[5~
+      await act(async () => {
+        stdin.write('\x1b[5~');
+      });
+      await waitFor(() => {
+        expect(listRef?.getScrollState()?.scrollTop).toBeLessThan(2);
+      });
+
+      // End -> \x1b[F
+      await act(async () => {
+        stdin.write('\x1b[F');
+      });
+      await waitFor(() => {
+        // Total 50 items, height 10. Max scroll ~40.
+        expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(30);
+      });
+
+      // Home -> \x1b[H
+      await act(async () => {
+        stdin.write('\x1b[H');
+      });
+      await waitFor(() => {
+        expect(listRef?.getScrollState()?.scrollTop).toBe(0);
+      });
+    });
+  });
 });

@@ -10,9 +10,14 @@ import { StickyHeader } from './StickyHeader.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 
 describe('StickyHeader', () => {
-  it('renders children', () => {
+  it.each([true, false])('renders children with isFirst=%s', (isFirst) => {
     const { lastFrame } = renderWithProviders(
-      <StickyHeader width={80}>
+      <StickyHeader
+        isFirst={isFirst}
+        width={80}
+        borderColor="green"
+        borderDimColor={false}
+      >
         <Text>Hello Sticky</Text>
       </StickyHeader>,
     );

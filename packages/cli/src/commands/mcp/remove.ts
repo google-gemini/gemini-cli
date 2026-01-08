@@ -8,6 +8,7 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 async function removeMcpServer(
   name: string,
@@ -57,5 +58,6 @@ export const removeCommand: CommandModule = {
     await removeMcpServer(argv['name'] as string, {
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

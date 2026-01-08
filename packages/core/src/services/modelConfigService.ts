@@ -21,6 +21,11 @@ export interface ModelConfigKey {
   // model calls made by this specific subagent, and no others, while still
   // ensuring model configs are fully orthogonal to the agents who use them.
   overrideScope?: string;
+
+  // Indicates whether this configuration request is happening during a retry attempt.
+  // This allows overrides to specify different settings (e.g., higher temperature)
+  // specifically for retry scenarios.
+  isRetry?: boolean;
 }
 
 export interface ModelConfig {
@@ -32,6 +37,7 @@ export interface ModelConfigOverride {
   match: {
     model?: string; // Can be a model name or an alias
     overrideScope?: string;
+    isRetry?: boolean;
   };
   modelConfig: ModelConfig;
 }
@@ -43,7 +49,9 @@ export interface ModelConfigAlias {
 
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
+  customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
+  customOverrides?: ModelConfigOverride[];
 }
 
 export type ResolvedModelConfig = _ResolvedModelConfig & {
@@ -56,8 +64,19 @@ export interface _ResolvedModelConfig {
 }
 
 export class ModelConfigService {
+  private readonly runtimeAliases: Record<string, ModelConfigAlias> = {};
+  private readonly runtimeOverrides: ModelConfigOverride[] = [];
+
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
+    this.runtimeAliases[aliasName] = alias;
+  }
+
+  registerRuntimeModelOverride(override: ModelConfigOverride): void {
+    this.runtimeOverrides.push(override);
+  }
 
   private resolveAlias(
     aliasName: string,
@@ -98,13 +117,28 @@ export class ModelConfigService {
     generateContentConfig: GenerateContentConfig;
   } {
     const config = this.config || {};
-    const { aliases = {}, overrides = [] } = config;
+    const {
+      aliases = {},
+      customAliases = {},
+      overrides = [],
+      customOverrides = [],
+    } = config;
+    const allAliases = {
+      ...aliases,
+      ...customAliases,
+      ...this.runtimeAliases,
+    };
+    const allOverrides = [
+      ...overrides,
+      ...customOverrides,
+      ...this.runtimeOverrides,
+    ];
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
 
     // Step 1: Alias Resolution
-    if (aliases[context.model]) {
-      const resolvedAlias = this.resolveAlias(context.model, aliases);
+    if (allAliases[context.model]) {
+      const resolvedAlias = this.resolveAlias(context.model, allAliases);
       baseModel = resolvedAlias.modelConfig.model; // This can now be undefined
       resolvedConfig = this.deepMerge(
         resolvedConfig,
@@ -123,7 +157,7 @@ export class ModelConfigService {
     };
 
     // Step 2: Override Application
-    const matches = overrides
+    const matches = allOverrides
       .map((override, index) => {
         const matchEntries = Object.entries(override.match);
         if (matchEntries.length === 0) {
@@ -233,10 +267,7 @@ export class ModelConfigService {
         // TODO(joshualitt): Consider knobs here, i.e. opt-in to deep merging
         // arrays on a case-by-case basis.
         if (this.isObject(accValue) && this.isObject(objValue)) {
-          acc[key] = this.deepMerge(
-            accValue as Record<string, unknown>,
-            objValue as Record<string, unknown>,
-          );
+          acc[key] = this.deepMerge(accValue, objValue);
         } else {
           acc[key] = objValue;
         }

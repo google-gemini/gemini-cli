@@ -16,14 +16,14 @@ An MCP server enables the Gemini CLI to:
   through standardized schema definitions.
 - **Execute tools:** Call specific tools with defined arguments and receive
   structured responses.
-- **Access resources:** Read data from specific resources (though the Gemini CLI
-  primarily focuses on tool execution).
+- **Access resources:** Read data from specific resources that the server
+  exposes (files, API payloads, reports, etc.).
 
 With an MCP server, you can extend the Gemini CLI's capabilities to perform
 actions beyond its built-in features, such as interacting with databases, APIs,
 custom scripts, or specialized workflows.
 
-## Core Integration Architecture
+## Core integration architecture
 
 The Gemini CLI integrates with MCP servers through a sophisticated discovery and
 execution system built into the core package (`packages/core/src/tools/`):
@@ -40,8 +40,9 @@ The discovery process is orchestrated by `discoverMcpTools()`, which:
 4. **Sanitizes and validates** tool schemas for compatibility with the Gemini
    API
 5. **Registers tools** in the global tool registry with conflict resolution
+6. **Fetches and registers resources** if the server exposes any
 
-### Execution Layer (`mcp-tool.ts`)
+### Execution layer (`mcp-tool.ts`)
 
 Each discovered MCP tool is wrapped in a `DiscoveredMCPTool` instance that:
 
@@ -51,13 +52,39 @@ Each discovered MCP tool is wrapped in a `DiscoveredMCPTool` instance that:
 - **Processes responses** for both the LLM context and user display
 - **Maintains connection state** and handles timeouts
 
-### Transport Mechanisms
+### Transport mechanisms
 
 The Gemini CLI supports three MCP transport types:
 
 - **Stdio Transport:** Spawns a subprocess and communicates via stdin/stdout
 - **SSE Transport:** Connects to Server-Sent Events endpoints
 - **Streamable HTTP Transport:** Uses HTTP streaming for communication
+
+## Working with MCP resources
+
+Some MCP servers expose contextual “resources” in addition to the tools and
+prompts. Gemini CLI discovers these automatically and gives you the possibility
+to reference them in the chat.
+
+### Discovery and listing
+
+- When discovery runs, the CLI fetches each server’s `resources/list` results.
+- The `/mcp` command displays a Resources section alongside Tools and Prompts
+  for every connected server.
+
+This returns a concise, plain-text list of URIs plus metadata.
+
+### Referencing resources in a conversation
+
+You can use the same `@` syntax already known for referencing local files:
+
+```
+@server://resource/path
+```
+
+Resource URIs appear in the completion menu together with filesystem paths. When
+you submit the message, the CLI calls `resources/read` and injects the content
+in the conversation.
 
 ## How to set up your MCP server
 
@@ -72,7 +99,7 @@ through the top-level `mcpServers` object for specific server definitions, and
 through the `mcp` object for global settings that control server discovery and
 execution.
 
-#### Global MCP Settings (`mcp`)
+#### Global MCP settings (`mcp`)
 
 The `mcp` object in your `settings.json` allows you to define global rules for
 all MCP servers.
@@ -95,12 +122,12 @@ all MCP servers.
 }
 ```
 
-#### Server-Specific Configuration (`mcpServers`)
+#### Server-specific configuration (`mcpServers`)
 
 The `mcpServers` object is where you define each individual MCP server you want
 the CLI to connect to.
 
-### Configuration Structure
+### Configuration structure
 
 Add an `mcpServers` object to your `settings.json` file:
 
@@ -121,7 +148,7 @@ Add an `mcpServers` object to your `settings.json` file:
 }
 ```
 
-### Configuration Properties
+### Configuration properties
 
 Each server configuration supports the following properties:
 
@@ -157,13 +184,13 @@ Each server configuration supports the following properties:
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
 
-### OAuth Support for Remote MCP Servers
+### OAuth support for remote MCP servers
 
 The Gemini CLI supports OAuth 2.0 authentication for remote MCP servers using
 SSE or HTTP transports. This enables secure access to MCP servers that require
 authentication.
 
-#### Automatic OAuth Discovery
+#### Automatic OAuth discovery
 
 For servers that support OAuth discovery, you can omit the OAuth configuration
 and let the CLI discover it automatically:
@@ -185,7 +212,7 @@ The CLI will automatically:
 - Perform dynamic client registration if supported
 - Handle the OAuth flow and token management
 
-#### Authentication Flow
+#### Authentication flow
 
 When connecting to an OAuth-enabled server:
 
@@ -196,7 +223,7 @@ When connecting to an OAuth-enabled server:
 5. **Tokens are stored** securely for future use
 6. **Connection retry** succeeds with valid tokens
 
-#### Browser Redirect Requirements
+#### Browser redirect requirements
 
 **Important:** OAuth authentication requires that your local machine can:
 
@@ -209,7 +236,7 @@ This feature will not work in:
 - Remote SSH sessions without X11 forwarding
 - Containerized environments without browser support
 
-#### Managing OAuth Authentication
+#### Managing OAuth authentication
 
 Use the `/mcp auth` command to manage OAuth authentication:
 
@@ -224,7 +251,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 /mcp auth serverName
 ```
 
-#### OAuth Configuration Properties
+#### OAuth configuration properties
 
 - **`enabled`** (boolean): Enable OAuth for this server
 - **`clientId`** (string): OAuth client identifier (optional with dynamic
@@ -239,7 +266,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
 
-#### Token Management
+#### Token management
 
 OAuth tokens are automatically:
 
@@ -248,7 +275,7 @@ OAuth tokens are automatically:
 - **Validated** before each connection attempt
 - **Cleaned up** when invalid or expired
 
-#### Authentication Provider Type
+#### Authentication provider type
 
 You can specify the authentication provider type using the `authProviderType`
 property:
@@ -265,7 +292,7 @@ property:
     accessing IAP-protected services (this was specifically designed for Cloud
     Run services).
 
-#### Google Credentials
+#### Google credentials
 
 ```json
 {
@@ -281,7 +308,7 @@ property:
 }
 ```
 
-#### Service Account Impersonation
+#### Service account impersonation
 
 To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
@@ -296,7 +323,7 @@ The CLI will use your local Application Default Credentials (ADC) to generate an
 OIDC ID token for the specified service account and audience. This token will
 then be used to authenticate with the MCP server.
 
-#### Setup Instructions
+#### Setup instructions
 
 1. **[Create](https://cloud.google.com/iap/docs/oauth-client-creation) or use an
    existing OAuth 2.0 client ID.** To use an existing OAuth 2.0 client ID,
@@ -318,9 +345,9 @@ then be used to authenticate with the MCP server.
 6. **[Enable](https://console.cloud.google.com/apis/library/iamcredentials.googleapis.com)
    the IAM Credentials API** for your project.
 
-### Example Configurations
+### Example configurations
 
-#### Python MCP Server (Stdio)
+#### Python MCP server (stdio)
 
 ```json
 {
@@ -339,7 +366,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### Node.js MCP Server (Stdio)
+#### Node.js MCP server (stdio)
 
 ```json
 {
@@ -354,7 +381,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### Docker-based MCP Server
+#### Docker-based MCP server
 
 ```json
 {
@@ -379,7 +406,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### HTTP-based MCP Server
+#### HTTP-based MCP server
 
 ```json
 {
@@ -392,7 +419,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### HTTP-based MCP Server with Custom Headers
+#### HTTP-based MCP Server with custom headers
 
 ```json
 {
@@ -410,7 +437,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-#### MCP Server with Tool Filtering
+#### MCP server with tool filtering
 
 ```json
 {
@@ -426,7 +453,7 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-### SSE MCP Server with SA Impersonation
+### SSE MCP server with SA impersonation
 
 ```json
 {
@@ -441,12 +468,12 @@ then be used to authenticate with the MCP server.
 }
 ```
 
-## Discovery Process Deep Dive
+## Discovery process deep dive
 
 When the Gemini CLI starts, it performs MCP server discovery through the
 following detailed process:
 
-### 1. Server Iteration and Connection
+### 1. Server iteration and connection
 
 For each configured server in `mcpServers`:
 
@@ -460,7 +487,7 @@ For each configured server in `mcpServers`:
 4. **Error handling:** Connection failures are logged and the server status is
    set to `DISCONNECTED`
 
-### 2. Tool Discovery
+### 2. Tool discovery
 
 Upon successful connection:
 
@@ -475,7 +502,7 @@ Upon successful connection:
    - Names longer than 63 characters are truncated with middle replacement
      (`___`)
 
-### 3. Conflict Resolution
+### 3. Conflict resolution
 
 When multiple servers expose tools with the same name:
 
@@ -486,7 +513,7 @@ When multiple servers expose tools with the same name:
 3. **Registry tracking:** The tool registry maintains mappings between server
    names and their tools
 
-### 4. Schema Processing
+### 4. Schema processing
 
 Tool parameter schemas undergo sanitization for Gemini API compatibility:
 
@@ -496,7 +523,7 @@ Tool parameter schemas undergo sanitization for Gemini API compatibility:
   compatibility)
 - **Recursive processing** applies to nested schemas
 
-### 5. Connection Management
+### 5. Connection management
 
 After discovery:
 
@@ -507,23 +534,23 @@ After discovery:
 - **Status updates:** Final server statuses are set to `CONNECTED` or
   `DISCONNECTED`
 
-## Tool Execution Flow
+## Tool execution flow
 
 When the Gemini model decides to use an MCP tool, the following execution flow
 occurs:
 
-### 1. Tool Invocation
+### 1. Tool invocation
 
 The model generates a `FunctionCall` with:
 
 - **Tool name:** The registered name (potentially prefixed)
 - **Arguments:** JSON object matching the tool's parameter schema
 
-### 2. Confirmation Process
+### 2. Confirmation process
 
 Each `DiscoveredMCPTool` implements sophisticated confirmation logic:
 
-#### Trust-based Bypass
+#### Trust-based bypass
 
 ```typescript
 if (this.trust) {
@@ -531,14 +558,14 @@ if (this.trust) {
 }
 ```
 
-#### Dynamic Allow-listing
+#### Dynamic allow-listing
 
 The system maintains internal allow-lists for:
 
 - **Server-level:** `serverName` → All tools from this server are trusted
 - **Tool-level:** `serverName.toolName` → This specific tool is trusted
 
-#### User Choice Handling
+#### User choice handling
 
 When confirmation is required, users can choose:
 
@@ -566,7 +593,7 @@ Upon confirmation (or trust bypass):
 3. **Response processing:** Results are formatted for both LLM context and user
    display
 
-### 4. Response Handling
+### 4. Response handling
 
 The execution result contains:
 
@@ -576,7 +603,7 @@ The execution result contains:
 
 ## How to interact with your MCP server
 
-### Using the `/mcp` Command
+### Using the `/mcp` command
 
 The `/mcp` command provides comprehensive information about your MCP server
 setup:
@@ -593,7 +620,7 @@ This displays:
 - **Available tools:** List of tools from each server with descriptions
 - **Discovery state:** Overall discovery process status
 
-### Example `/mcp` Output
+### Example `/mcp` output
 
 ```
 MCP Servers Status:
@@ -615,7 +642,7 @@ MCP Servers Status:
 Discovery State: COMPLETED
 ```
 
-### Tool Usage
+### Tool usage
 
 Once discovered, MCP tools are available to the Gemini model like built-in
 tools. The model will automatically:
@@ -625,27 +652,27 @@ tools. The model will automatically:
 3. **Execute tools** with proper parameters
 4. **Display results** in a user-friendly format
 
-## Status Monitoring and Troubleshooting
+## Status monitoring and troubleshooting
 
-### Connection States
+### Connection states
 
 The MCP integration tracks several states:
 
-#### Server Status (`MCPServerStatus`)
+#### Server status (`MCPServerStatus`)
 
 - **`DISCONNECTED`:** Server is not connected or has errors
 - **`CONNECTING`:** Connection attempt in progress
 - **`CONNECTED`:** Server is connected and ready
 
-#### Discovery State (`MCPDiscoveryState`)
+#### Discovery state (`MCPDiscoveryState`)
 
 - **`NOT_STARTED`:** Discovery hasn't begun
 - **`IN_PROGRESS`:** Currently discovering servers
 - **`COMPLETED`:** Discovery finished (with or without errors)
 
-### Common Issues and Solutions
+### Common issues and solutions
 
-#### Server Won't Connect
+#### Server won't connect
 
 **Symptoms:** Server shows `DISCONNECTED` status
 
@@ -657,7 +684,7 @@ The MCP integration tracks several states:
 4. **Review logs:** Look for error messages in the CLI output
 5. **Verify permissions:** Ensure the CLI can execute the server command
 
-#### No Tools Discovered
+#### No tools discovered
 
 **Symptoms:** Server connects but no tools are available
 
@@ -669,7 +696,7 @@ The MCP integration tracks several states:
 3. **Review server logs:** Check stderr output for server-side errors
 4. **Test tool listing:** Manually test your server's tool discovery endpoint
 
-#### Tools Not Executing
+#### Tools not executing
 
 **Symptoms:** Tools are discovered but fail during execution
 
@@ -680,7 +707,7 @@ The MCP integration tracks several states:
 3. **Error handling:** Check if your tool is throwing unhandled exceptions
 4. **Timeout issues:** Consider increasing the `timeout` setting
 
-#### Sandbox Compatibility
+#### Sandbox compatibility
 
 **Symptoms:** MCP servers fail when sandboxing is enabled
 
@@ -693,7 +720,7 @@ The MCP integration tracks several states:
 4. **Environment variables:** Verify required environment variables are passed
    through
 
-### Debugging Tips
+### Debugging tips
 
 1. **Enable debug mode:** Run the CLI with `--debug` for verbose output
 2. **Check stderr:** MCP server stderr is captured and logged (INFO messages
@@ -703,9 +730,9 @@ The MCP integration tracks several states:
    functionality
 5. **Use `/mcp` frequently:** Monitor server status during development
 
-## Important Notes
+## Important notes
 
-### Security Considerations
+### Security sonsiderations
 
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
@@ -716,7 +743,7 @@ The MCP integration tracks several states:
 - **Private data:** Using broadly scoped personal access tokens can lead to
   information leakage between repositories
 
-### Performance and Resource Management
+### Performance and resource management
 
 - **Connection persistence:** The CLI maintains persistent connections to
   servers that successfully register tools
@@ -727,7 +754,7 @@ The MCP integration tracks several states:
 - **Resource monitoring:** MCP servers run as separate processes and consume
   system resources
 
-### Schema Compatibility
+### Schema compatibility
 
 - **Property stripping:** The system automatically removes certain schema
   properties (`$schema`, `additionalProperties`) for Gemini API compatibility
@@ -740,7 +767,7 @@ This comprehensive integration makes MCP servers a powerful way to extend the
 Gemini CLI's capabilities while maintaining security, reliability, and ease of
 use.
 
-## Returning Rich Content from Tools
+## Returning rich content from tools
 
 MCP tools are not limited to returning simple text. You can return rich,
 multi-part content, including text, images, audio, and other binary data in a
@@ -751,7 +778,7 @@ All data returned from the tool is processed and sent to the model as context
 for its next generation, enabling it to reason about or summarize the provided
 information.
 
-### How It Works
+### How it works
 
 To return rich content, your tool's response must adhere to the MCP
 specification for a
@@ -769,7 +796,7 @@ supported block types include:
 - `resource` (embedded content)
 - `resource_link`
 
-### Example: Returning Text and an Image
+### Example: Returning text and an image
 
 Here is an example of a valid JSON response from an MCP tool that returns both a
 text description and an image:
@@ -805,13 +832,13 @@ When the Gemini CLI receives this response, it will:
 This enables you to build sophisticated tools that can provide rich, multi-modal
 context to the Gemini model.
 
-## MCP Prompts as Slash Commands
+## MCP prompts as slash commands
 
 In addition to tools, MCP servers can expose predefined prompts that can be
 executed as slash commands within the Gemini CLI. This allows you to create
 shortcuts for common or complex queries that can be easily invoked by name.
 
-### Defining Prompts on the Server
+### Defining prompts on the server
 
 Here's a small example of a stdio MCP server that defines prompts:
 
@@ -862,7 +889,7 @@ This can be included in `settings.json` under `mcpServers` with:
 }
 ```
 
-### Invoking Prompts
+### Invoking prompts
 
 Once a prompt is discovered, you can invoke it using its name as a slash
 command. The CLI will automatically handle parsing arguments.
@@ -883,7 +910,7 @@ substituting the arguments into the prompt template and returning the final
 prompt text. The CLI then sends this prompt to the model for execution. This
 provides a convenient way to automate and share common workflows.
 
-## Managing MCP Servers with `gemini mcp`
+## Managing MCP servers with `gemini mcp`
 
 While you can always configure MCP servers by manually editing your
 `settings.json` file, the Gemini CLI provides a convenient set of commands to
@@ -891,7 +918,7 @@ manage your server configurations programmatically. These commands streamline
 the process of adding, listing, and removing MCP servers without needing to
 directly edit JSON files.
 
-### Adding a Server (`gemini mcp add`)
+### Adding a server (`gemini mcp add`)
 
 The `add` command configures a new MCP server in your `settings.json`. Based on
 the scope (`-s, --scope`), it will be added to either the user config
@@ -908,7 +935,7 @@ gemini mcp add [options] <name> <commandOrUrl> [args...]
   `http`/`sse`).
 - `[args...]`: Optional arguments for a `stdio` command.
 
-**Options (Flags):**
+**Options (flags):**
 
 - `-s, --scope`: Configuration scope (user or project). [default: "project"]
 - `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
@@ -966,7 +993,7 @@ gemini mcp add --transport sse sse-server https://api.example.com/sse/
 gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-sse https://api.example.com/sse/
 ```
 
-### Listing Servers (`gemini mcp list`)
+### Listing servers (`gemini mcp list`)
 
 To view all MCP servers currently configured, use the `list` command. It
 displays each server's name, configuration details, and connection status. This
@@ -978,7 +1005,7 @@ command has no flags.
 gemini mcp list
 ```
 
-**Example Output:**
+**Example output:**
 
 ```sh
 ✓ stdio-server: command: python3 server.py (stdio) - Connected
@@ -986,7 +1013,7 @@ gemini mcp list
 ✗ sse-server: https://api.example.com/sse (sse) - Disconnected
 ```
 
-### Removing a Server (`gemini mcp remove`)
+### Removing a server (`gemini mcp remove`)
 
 To delete a server from your configuration, use the `remove` command with the
 server's name.
@@ -997,7 +1024,7 @@ server's name.
 gemini mcp remove <name>
 ```
 
-**Options (Flags):**
+**Options (flags):**
 
 - `-s, --scope`: Configuration scope (user or project). [default: "project"]
 
@@ -1009,3 +1036,9 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+## Instructions
+
+Gemini CLI supports
+[MCP server instructions](https://modelcontextprotocol.io/specification/2025-06-18/schema#initializeresult),
+which will be appended to the system instructions.
