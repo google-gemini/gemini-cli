@@ -81,10 +81,11 @@ describe('mcpToolWrapper', () => {
         mockMessageBus,
       );
 
-      expect(tools[0].description).toBe(
+      // Descriptions include augmented hints, so we check they contain the original
+      expect(tools[0].description).toContain(
         'Take a snapshot of the page accessibility tree',
       );
-      expect(tools[1].description).toBe('Click on an element by uid');
+      expect(tools[1].description).toContain('Click on an element by uid');
     });
 
     it('should return tools with proper FunctionDeclaration schema', async () => {

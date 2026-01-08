@@ -25,7 +25,6 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
-import { BrowserAgentDefinition } from './browserAgentDefinition.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -48,11 +47,12 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
+    // Note: BrowserAgentDefinition is a factory function, so we use hardcoded names
     super(
       params,
       messageBus,
-      _toolName ?? BrowserAgentDefinition.name,
-      _toolDisplayName ?? BrowserAgentDefinition.displayName,
+      _toolName ?? 'browser_agent',
+      _toolDisplayName ?? 'Browser Agent',
     );
   }
 

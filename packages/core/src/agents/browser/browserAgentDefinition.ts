@@ -65,7 +65,12 @@ Before interacting with page content, scan the accessibility tree for blocking o
 - If you see such elements, DISMISS THEM FIRST by clicking close/dismiss buttons before proceeding
 - If a click seems to have no effect, check if an overlay appeared or is blocking the target
 
-For complex visual interactions (coordinate-based clicks, dragging) OR when you need to identify elements by visual attributes not present in the AX tree (e.g., "click the yellow button", "find the red error message"), use delegate_to_visual_agent with a clear instruction.
+VISUAL IDENTIFICATION (analyze_screenshot):
+When you need to identify elements by visual attributes not in the AX tree (e.g., "click the yellow button", "find the red error message"), or need precise pixel coordinates:
+1. Call analyze_screenshot with a clear instruction describing what to find
+2. It returns visual analysis with coordinates/descriptions — it does NOT perform actions
+3. Use the returned coordinates with click_at(x, y) or other tools yourself
+4. If the analysis is insufficient, call it again with a more specific instruction
 
 CRITICAL: When you have fully completed the user's task, you MUST call the complete_task tool with a summary of what you accomplished. Do NOT just return text - you must explicitly call complete_task to exit the loop.`;
 

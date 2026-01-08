@@ -12,15 +12,19 @@ import {
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import { BrowserAgentDefinition } from './browserAgentDefinition.js';
 import type { BrowserManager } from './browserManager.js';
 
 // Create mock browser manager
 const mockBrowserManager = {
   ensureConnection: vi.fn().mockResolvedValue(undefined),
   getDiscoveredTools: vi.fn().mockResolvedValue([
+    // Semantic tools
     { name: 'take_snapshot', description: 'Take snapshot' },
     { name: 'click', description: 'Click element' },
+    { name: 'fill', description: 'Fill form field' },
+    { name: 'navigate_page', description: 'Navigate to URL' },
+    // Visual tools (from --experimental-vision)
+    { name: 'click_at', description: 'Click at coordinates' },
   ]),
   callTool: vi.fn().mockResolvedValue({ content: [] }),
   close: vi.fn().mockResolvedValue(undefined),
@@ -34,6 +38,7 @@ vi.mock('./browserManager.js', () => ({
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
@@ -48,8 +53,13 @@ describe('browserAgentFactory', () => {
     // Reset mock implementations
     mockBrowserManager.ensureConnection.mockResolvedValue(undefined);
     mockBrowserManager.getDiscoveredTools.mockResolvedValue([
+      // Semantic tools
       { name: 'take_snapshot', description: 'Take snapshot' },
       { name: 'click', description: 'Click element' },
+      { name: 'fill', description: 'Fill form field' },
+      { name: 'navigate_page', description: 'Navigate to URL' },
+      // Visual tools (from --experimental-vision)
+      { name: 'click_at', description: 'Click at coordinates' },
     ]);
     mockBrowserManager.close.mockResolvedValue(undefined);
 
@@ -90,8 +100,9 @@ describe('browserAgentFactory', () => {
         mockMessageBus,
       );
 
-      expect(definition.name).toBe(BrowserAgentDefinition.name);
-      expect(definition.toolConfig?.tools).toHaveLength(2);
+      expect(definition.name).toBe('browser_agent');
+      // 5 MCP tools + 1 analyze_screenshot tool
+      expect(definition.toolConfig?.tools).toHaveLength(6);
     });
 
     it('should return browser manager for cleanup', async () => {
