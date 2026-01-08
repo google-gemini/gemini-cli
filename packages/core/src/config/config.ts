@@ -625,7 +625,7 @@ export class Config {
       model: params.codebaseInvestigatorSettings?.model,
     };
     this.cliHelpAgentSettings = {
-      enabled: params.cliHelpAgentSettings?.enabled ?? false,
+      enabled: params.cliHelpAgentSettings?.enabled ?? true,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1761,7 +1761,8 @@ export class Config {
     // Register DelegateToAgentTool if agents are enabled
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled
+      this.getCodebaseInvestigatorSettings().enabled ||
+      this.getCliHelpAgentSettings().enabled
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();

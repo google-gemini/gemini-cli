@@ -853,7 +853,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.cliHelpAgentSettings.enabled`** (boolean):
   - **Description:** Enable the CLI Help Agent.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `skills`
