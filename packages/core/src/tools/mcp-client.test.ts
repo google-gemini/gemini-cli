@@ -1915,9 +1915,16 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
 
   it('should handle HTTP 404 → SSE 401 → OAuth → SSE+OAuth succeeds', async () => {
     // Tests that OAuth flow works when SSE (not HTTP) requires auth
+    // Include www-authenticate header in the 401 error to avoid fetch timeout
+    const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server/.well-known/oauth-protected-resource"`;
     vi.mocked(mockedClient.connect)
       .mockRejectedValueOnce(new StreamableHTTPError(404, 'Not Found'))
-      .mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'))
+      .mockRejectedValueOnce(
+        new StreamableHTTPError(
+          401,
+          `Unauthorized\nwww-authenticate: ${wwwAuthHeader}`,
+        ),
+      )
       .mockResolvedValueOnce(undefined);
 
     const client = await connectToMcpServer(
