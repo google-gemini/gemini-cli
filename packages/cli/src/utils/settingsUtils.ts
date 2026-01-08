@@ -279,11 +279,7 @@ export function getSettingValue(
   if (typeof value === 'boolean') {
     return value;
   }
-  // Fall back to default value, ensuring it's a boolean
-  const defaultValue = definition.default;
-  if (typeof defaultValue === 'boolean') {
-    return defaultValue;
-  }
+
   return false; // Final fallback
 }
 

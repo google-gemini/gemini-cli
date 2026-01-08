@@ -35,7 +35,7 @@ async function panelAction(
       type: 'message',
       messageType: 'info',
       content:
-        'Hook system is not enabled. Enable it in settings with tools.enableHooks',
+        'Hook system is not enabled. Enable it in settings with hooks.enabled.',
     };
   }
 
@@ -213,7 +213,7 @@ function completeHookNames(
  * Get a display name for a hook
  */
 function getHookDisplayName(hook: HookRegistryEntry): string {
-  return hook.config.command || 'unknown-hook';
+  return hook.config.name || hook.config.command || 'unknown-hook';
 }
 
 const panelCommand: SlashCommand = {

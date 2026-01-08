@@ -11,6 +11,7 @@ import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
 import { HookEventName } from './types.js';
 import type {
+  HookConfig,
   HookInput,
   BeforeToolInput,
   AfterToolInput,
@@ -42,6 +43,7 @@ import {
   type HookExecutionRequest,
 } from '../confirmation-bus/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Validates that a value is a non-null object
@@ -279,7 +281,7 @@ export class HookEventHandler {
   private readonly hookPlanner: HookPlanner;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
-  private readonly messageBus?: MessageBus;
+  private readonly messageBus: MessageBus;
 
   constructor(
     config: Config,
@@ -287,7 +289,7 @@ export class HookEventHandler {
     hookPlanner: HookPlanner,
     hookRunner: HookRunner,
     hookAggregator: HookAggregator,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     this.config = config;
     this.hookPlanner = hookPlanner;
@@ -506,17 +508,38 @@ export class HookEventHandler {
         };
       }
 
+      const onHookStart = (config: HookConfig, index: number) => {
+        coreEvents.emitHookStart({
+          hookName: this.getHookName(config),
+          eventName,
+          hookIndex: index + 1,
+          totalHooks: plan.hookConfigs.length,
+        });
+      };
+
+      const onHookEnd = (config: HookConfig, result: HookExecutionResult) => {
+        coreEvents.emitHookEnd({
+          hookName: this.getHookName(config),
+          eventName,
+          success: result.success,
+        });
+      };
+
       // Execute hooks according to the plan's strategy
       const results = plan.sequential
         ? await this.hookRunner.executeHooksSequential(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           )
         : await this.hookRunner.executeHooksParallel(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           );
 
       // Aggregate results
@@ -573,13 +596,23 @@ export class HookEventHandler {
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
   ): void {
-    const successCount = results.filter((r) => r.success).length;
-    const errorCount = results.length - successCount;
+    const failedHooks = results.filter((r) => !r.success);
+    const successCount = results.length - failedHooks.length;
+    const errorCount = failedHooks.length;
 
     if (errorCount > 0) {
+      const failedNames = failedHooks
+        .map((r) => this.getHookNameFromResult(r))
+        .join(', ');
+
       debugLogger.warn(
-        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed, ` +
+        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
+      );
+
+      coreEvents.emitFeedback(
+        'warning',
+        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
       );
     } else {
       debugLogger.debug(
@@ -613,7 +646,7 @@ export class HookEventHandler {
 
     // Log individual errors
     for (const error of aggregated.errors) {
-      debugLogger.error(`Hook execution error: ${error.message}`);
+      debugLogger.warn(`Hook execution error: ${error.message}`);
     }
   }
 
@@ -649,10 +682,17 @@ export class HookEventHandler {
   }
 
   /**
+   * Get hook name from config for display or telemetry
+   */
+  private getHookName(config: HookConfig): string {
+    return config.name || config.command || 'unknown-command';
+  }
+
+  /**
    * Get hook name from execution result for telemetry
    */
   private getHookNameFromResult(result: HookExecutionResult): string {
-    return result.hookConfig.command || 'unknown-command';
+    return this.getHookName(result.hookConfig);
   }
 
   /**

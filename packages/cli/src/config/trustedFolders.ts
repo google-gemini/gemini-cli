@@ -6,13 +6,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import {
   FatalConfigError,
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
   GEMINI_DIR,
+  homedir,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -34,6 +34,13 @@ export enum TrustLevel {
   TRUST_FOLDER = 'TRUST_FOLDER',
   TRUST_PARENT = 'TRUST_PARENT',
   DO_NOT_TRUST = 'DO_NOT_TRUST',
+}
+
+export function isTrustLevel(value: unknown): value is TrustLevel {
+  return (
+    typeof value === 'string' &&
+    Object.values(TrustLevel).includes(value as TrustLevel)
+  );
 }
 
 export interface TrustRule {
@@ -151,10 +158,9 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   }
 
   const errors: TrustedFoldersError[] = [];
-  let userConfig: Record<string, TrustLevel> = {};
+  const userConfig: Record<string, TrustLevel> = {};
 
   const userPath = getTrustedFoldersPath();
-
   // Load user trusted folders
   try {
     if (fs.existsSync(userPath)) {
@@ -171,7 +177,17 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
           path: userPath,
         });
       } else {
-        userConfig = parsed as Record<string, TrustLevel>;
+        for (const [path, trustLevel] of Object.entries(parsed)) {
+          if (isTrustLevel(trustLevel)) {
+            userConfig[path] = trustLevel;
+          } else {
+            const possibleValues = Object.values(TrustLevel).join(', ');
+            errors.push({
+              message: `Invalid trust level "${trustLevel}" for path "${path}". Possible values are: ${possibleValues}.`,
+              path: userPath,
+            });
+          }
+        }
       }
     }
   } catch (error: unknown) {

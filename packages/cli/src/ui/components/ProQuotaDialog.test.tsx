@@ -33,7 +33,7 @@ describe('ProQuotaDialog', () => {
       const { unmount } = render(
         <ProQuotaDialog
           failedModel={DEFAULT_GEMINI_FLASH_MODEL}
-          fallbackModel="gemini-2.5-pro"
+          fallbackModel={DEFAULT_GEMINI_FLASH_MODEL}
           message="flash error"
           isTerminalQuotaError={true} // should not matter
           onChoice={mockOnChoice}
@@ -84,6 +84,38 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-flash',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              {
+                label: 'Stop',
+                value: 'retry_later',
+                key: 'retry_later',
+              },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
+
+      it('should render "Keep trying" and "Stop" options when failed model and fallback model are the same', () => {
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel={PREVIEW_GEMINI_MODEL}
+            fallbackModel={PREVIEW_GEMINI_MODEL}
+            message="flash error"
+            isTerminalQuotaError={true}
+            onChoice={mockOnChoice}
+            userTier={UserTierId.FREE}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Keep trying',
+                value: 'retry_once',
+                key: 'retry_once',
               },
               {
                 label: 'Stop',
@@ -260,46 +292,6 @@ describe('ProQuotaDialog', () => {
       });
 
       expect(mockOnChoice).toHaveBeenCalledWith('retry_always');
-      unmount();
-    });
-  });
-
-  describe('footer note', () => {
-    it('should show a special note for PREVIEW_GEMINI_MODEL', () => {
-      const { lastFrame, unmount } = render(
-        <ProQuotaDialog
-          failedModel={PREVIEW_GEMINI_MODEL}
-          fallbackModel="gemini-2.5-pro"
-          message=""
-          isTerminalQuotaError={false}
-          onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
-        />,
-      );
-
-      const output = lastFrame();
-      expect(output).toContain(
-        'Note: We will periodically retry Preview Model to see if congestion has cleared.',
-      );
-      unmount();
-    });
-
-    it('should show the default note for other models', () => {
-      const { lastFrame, unmount } = render(
-        <ProQuotaDialog
-          failedModel="gemini-2.5-pro"
-          fallbackModel="gemini-2.5-flash"
-          message=""
-          isTerminalQuotaError={false}
-          onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
-        />,
-      );
-
-      const output = lastFrame();
-      expect(output).toContain(
-        'Note: You can always use /model to select a different option.',
-      );
       unmount();
     });
   });

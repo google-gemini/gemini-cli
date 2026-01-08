@@ -12,7 +12,7 @@ import {
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 describe('CodebaseInvestigatorAgent', () => {
   it('should have the correct agent definition', () => {
@@ -26,7 +26,7 @@ describe('CodebaseInvestigatorAgent', () => {
     ).toBe(true);
     expect(CodebaseInvestigatorAgent.outputConfig?.outputName).toBe('report');
     expect(CodebaseInvestigatorAgent.modelConfig?.model).toBe(
-      GEMINI_MODEL_ALIAS_PRO,
+      DEFAULT_GEMINI_MODEL,
     );
     expect(CodebaseInvestigatorAgent.toolConfig?.tools).toEqual([
       LS_TOOL_NAME,

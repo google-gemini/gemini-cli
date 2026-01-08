@@ -6,28 +6,10 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-/**
- * Error thrown when attempting to use HookRegistry before initialization
- */
-export class HookRegistryNotInitializedError extends Error {
-  constructor(message = 'Hook registry not initialized') {
-    super(message);
-    this.name = 'HookRegistryNotInitializedError';
-  }
-}
-
-/**
- * Configuration source levels in precedence order (highest to lowest)
- */
-export enum ConfigSource {
-  Project = 'project',
-  User = 'user',
-  System = 'system',
-  Extensions = 'extensions',
-}
+import { TrustedHooksManager } from './trustedHooks.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Hook registry entry with source information
@@ -47,7 +29,6 @@ export interface HookRegistryEntry {
 export class HookRegistry {
   private readonly config: Config;
   private entries: HookRegistryEntry[] = [];
-  private initialized = false;
 
   constructor(config: Config) {
     this.config = config;
@@ -57,13 +38,8 @@ export class HookRegistry {
    * Initialize the registry by processing hooks from config
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
     this.entries = [];
     this.processHooksFromConfig();
-    this.initialized = true;
 
     debugLogger.log(
       `Hook registry initialized with ${this.entries.length} hook entries`,
@@ -74,10 +50,6 @@ export class HookRegistry {
    * Get all hook entries for a specific event
    */
   getHooksForEvent(eventName: HookEventName): HookRegistryEntry[] {
-    if (!this.initialized) {
-      throw new HookRegistryNotInitializedError();
-    }
-
     return this.entries
       .filter((entry) => entry.eventName === eventName && entry.enabled)
       .sort(
@@ -90,10 +62,6 @@ export class HookRegistry {
    * Get all registered hooks
    */
   getAllHooks(): HookRegistryEntry[] {
-    if (!this.initialized) {
-      throw new HookRegistryNotInitializedError();
-    }
-
     return [...this.entries];
   }
 
@@ -120,20 +88,65 @@ export class HookRegistry {
   }
 
   /**
-   * Get hook name for display purposes
+   * Get hook name for identification and display purposes
    */
-  private getHookName(entry: HookRegistryEntry): string {
-    return entry.config.command || 'unknown-command';
+  private getHookName(
+    entry: HookRegistryEntry | { config: HookConfig },
+  ): string {
+    return entry.config.name || entry.config.command || 'unknown-command';
+  }
+
+  /**
+   * Check for untrusted project hooks and warn the user
+   */
+  private checkProjectHooksTrust(): void {
+    const projectHooks = this.config.getProjectHooks();
+    if (!projectHooks) return;
+
+    try {
+      const trustedHooksManager = new TrustedHooksManager();
+      const untrusted = trustedHooksManager.getUntrustedHooks(
+        this.config.getProjectRoot(),
+        projectHooks,
+      );
+
+      if (untrusted.length > 0) {
+        const message = `WARNING: The following project-level hooks have been detected in this workspace:
+${untrusted.map((h) => `  - ${h}`).join('\n')}
+
+These hooks will be executed. If you did not configure these hooks or do not trust this project,
+please review the project settings (.gemini/settings.json) and remove them.`;
+        coreEvents.emitFeedback('warning', message);
+
+        // Trust them so we don't warn again
+        trustedHooksManager.trustHooks(
+          this.config.getProjectRoot(),
+          projectHooks,
+        );
+      }
+    } catch (error) {
+      debugLogger.warn('Failed to check project hooks trust', error);
+    }
   }
 
   /**
    * Process hooks from the config that was already loaded by the CLI
    */
   private processHooksFromConfig(): void {
+    if (this.config.isTrustedFolder()) {
+      this.checkProjectHooksTrust();
+    }
+
     // Get hooks from the main config (this comes from the merged settings)
     const configHooks = this.config.getHooks();
     if (configHooks) {
-      this.processHooksConfiguration(configHooks, ConfigSource.Project);
+      if (this.config.isTrustedFolder()) {
+        this.processHooksConfiguration(configHooks, ConfigSource.Project);
+      } else {
+        debugLogger.warn(
+          'Project hooks disabled because the folder is not trusted.',
+        );
+      }
     }
 
     // Get hooks from extensions
@@ -161,7 +174,7 @@ export class HookRegistry {
         continue;
       }
 
-      const typedEventName = eventName as HookEventName;
+      const typedEventName = eventName;
 
       if (!Array.isArray(definitions)) {
         debugLogger.warn(
@@ -210,6 +223,9 @@ export class HookRegistry {
           config: hookConfig,
         } as HookRegistryEntry);
         const isDisabled = disabledHooks.includes(hookName);
+
+        // Add source to hook config
+        hookConfig.source = source;
 
         this.entries.push({
           config: hookConfig,

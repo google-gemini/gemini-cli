@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
+import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type Settings, SettingScope } from './settings.js';
@@ -37,12 +37,16 @@ import {
   logExtensionInstallEvent,
   logExtensionUninstall,
   logExtensionUpdateEvent,
+  loadSkillsFromDir,
+  homedir,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
   type HookDefinition,
   type HookEventName,
+  type ResolvedExtensionSetting,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -56,9 +60,11 @@ import {
 import {
   getEnvContents,
   maybePromptForSettings,
+  getMissingSettings,
   type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { getEnableHooks } from './settingsSchema.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -123,7 +129,7 @@ export class ExtensionManager extends ExtensionLoader {
         'Extensions not yet loaded, must call `loadExtensions` first',
       );
     }
-    return this.loadedExtensions!;
+    return this.loadedExtensions;
   }
 
   async installOrUpdateExtension(
@@ -198,7 +204,9 @@ export class ExtensionManager extends ExtensionLoader {
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
             (await this.requestConsent(
-              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+              `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
+
+Would you like to attempt to install via "git clone" instead?`,
             ))
           ) {
             await cloneFromGit(installMetadata, tempDir);
@@ -220,26 +228,7 @@ export class ExtensionManager extends ExtensionLoader {
       }
 
       try {
-        newExtensionConfig = this.loadExtensionConfig(localSourcePath);
-
-        if (isUpdate && installMetadata.autoUpdate) {
-          const oldSettings = new Set(
-            previousExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-          const newSettings = new Set(
-            newExtensionConfig.settings?.map((s) => s.name) || [],
-          );
-
-          const settingsAreEqual =
-            oldSettings.size === newSettings.size &&
-            [...oldSettings].every((value) => newSettings.has(value));
-
-          if (!settingsAreEqual && installMetadata.autoUpdate) {
-            throw new Error(
-              `Extension "${newExtensionConfig.name}" has settings changes and cannot be auto-updated. Please update manually.`,
-            );
-          }
-        }
+        newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         const newExtensionName = newExtensionConfig.name;
         const previous = this.getExtensions().find(
@@ -258,10 +247,17 @@ export class ExtensionManager extends ExtensionLoader {
         const newHasHooks = fs.existsSync(
           path.join(localSourcePath, 'hooks', 'hooks.json'),
         );
-        let previousHasHooks = false;
-        if (isUpdate && previous && previous.hooks) {
-          previousHasHooks = Object.keys(previous.hooks).length > 0;
-        }
+        const previousHasHooks = !!(
+          isUpdate &&
+          previous &&
+          previous.hooks &&
+          Object.keys(previous.hooks).length > 0
+        );
+
+        const newSkills = await loadSkillsFromDir(
+          path.join(localSourcePath, 'skills'),
+        );
+        const previousSkills = previous?.skills ?? [];
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
@@ -269,6 +265,8 @@ export class ExtensionManager extends ExtensionLoader {
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
+          newSkills,
+          previousSkills,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
@@ -302,6 +300,20 @@ export class ExtensionManager extends ExtensionLoader {
           }
         }
 
+        const missingSettings = await getMissingSettings(
+          newExtensionConfig,
+          extensionId,
+        );
+        if (missingSettings.length > 0) {
+          const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
+            .map((s) => s.name)
+            .join(
+              ', ',
+            )}. Please run "gemini extensions config ${newExtensionConfig.name} [setting-name]" to configure them.`;
+          debugLogger.warn(message);
+          coreEvents.emitFeedback('warning', message);
+        }
+
         if (
           installMetadata.type === 'local' ||
           installMetadata.type === 'git' ||
@@ -319,7 +331,7 @@ export class ExtensionManager extends ExtensionLoader {
 
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
-        extension = await this.loadExtension(destinationPath)!;
+        extension = await this.loadExtension(destinationPath);
         if (!extension) {
           throw new Error(`Extension not found`);
         }
@@ -327,6 +339,7 @@ export class ExtensionManager extends ExtensionLoader {
           await logExtensionUpdateEvent(
             this.telemetryConfig,
             new ExtensionUpdateEvent(
+              newExtensionConfig.name,
               hashValue(newExtensionConfig.name),
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
@@ -339,6 +352,7 @@ export class ExtensionManager extends ExtensionLoader {
           await logExtensionInstallEvent(
             this.telemetryConfig,
             new ExtensionInstallEvent(
+              newExtensionConfig.name,
               hashValue(newExtensionConfig.name),
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
@@ -346,8 +360,10 @@ export class ExtensionManager extends ExtensionLoader {
               'success',
             ),
           );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          this.enableExtension(newExtensionConfig.name, SettingScope.User);
+          await this.enableExtension(
+            newExtensionConfig.name,
+            SettingScope.User,
+          );
         }
       } finally {
         if (tempDir) {
@@ -360,7 +376,7 @@ export class ExtensionManager extends ExtensionLoader {
       // to get the name and version for logging.
       if (!newExtensionConfig && localSourcePath) {
         try {
-          newExtensionConfig = this.loadExtensionConfig(localSourcePath);
+          newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
         } catch {
           // Ignore error, this is just for logging.
         }
@@ -373,6 +389,7 @@ export class ExtensionManager extends ExtensionLoader {
         await logExtensionUpdateEvent(
           this.telemetryConfig,
           new ExtensionUpdateEvent(
+            config?.name ?? '',
             hashValue(config?.name ?? ''),
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
@@ -385,6 +402,7 @@ export class ExtensionManager extends ExtensionLoader {
         await logExtensionInstallEvent(
           this.telemetryConfig,
           new ExtensionInstallEvent(
+            newExtensionConfig?.name ?? '',
             hashValue(newExtensionConfig?.name ?? ''),
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
@@ -432,6 +450,7 @@ export class ExtensionManager extends ExtensionLoader {
     await logExtensionUninstall(
       this.telemetryConfig,
       new ExtensionUninstallEvent(
+        extension.name,
         hashValue(extension.name),
         extension.id,
         'success',
@@ -484,7 +503,7 @@ export class ExtensionManager extends ExtensionLoader {
     }
 
     try {
-      let config = this.loadExtensionConfig(effectiveExtensionPath);
+      let config = await this.loadExtensionConfig(effectiveExtensionPath);
       if (
         this.getExtensions().find((extension) => extension.name === config.name)
       ) {
@@ -498,6 +517,24 @@ export class ExtensionManager extends ExtensionLoader {
         getExtensionId(config, installMetadata),
       );
       config = resolveEnvVarsInObject(config, customEnv);
+
+      const resolvedSettings: ResolvedExtensionSetting[] = [];
+      if (config.settings) {
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          resolvedSettings.push({
+            name: setting.name,
+            envVar: setting.envVar,
+            value:
+              value === undefined
+                ? '[not set]'
+                : setting.sensitive
+                  ? '***'
+                  : value,
+            sensitive: setting.sensitive ?? false,
+          });
+        }
+      }
 
       if (config.mcpServers) {
         config.mcpServers = Object.fromEntries(
@@ -515,14 +552,18 @@ export class ExtensionManager extends ExtensionLoader {
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (this.settings.tools?.enableHooks) {
+      if (getEnableHooks(this.settings)) {
         hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
           extensionPath: effectiveExtensionPath,
           workspacePath: this.workspaceDir,
         });
       }
 
-      const extension = {
+      const skills = await loadSkillsFromDir(
+        path.join(effectiveExtensionPath, 'skills'),
+      );
+
+      const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
         path: effectiveExtensionPath,
@@ -536,6 +577,9 @@ export class ExtensionManager extends ExtensionLoader {
           this.workspaceDir,
         ),
         id: getExtensionId(config, installMetadata),
+        settings: config.settings,
+        resolvedSettings,
+        skills,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -564,13 +608,13 @@ export class ExtensionManager extends ExtensionLoader {
     return this.maybeStopExtension(extension);
   }
 
-  loadExtensionConfig(extensionDir: string): ExtensionConfig {
+  async loadExtensionConfig(extensionDir: string): Promise<ExtensionConfig> {
     const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
     if (!fs.existsSync(configFilePath)) {
       throw new Error(`Configuration file not found at ${configFilePath}`);
     }
     try {
-      const configContent = fs.readFileSync(configFilePath, 'utf-8');
+      const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
       const rawConfig = JSON.parse(configContent) as ExtensionConfig;
       if (!rawConfig.name || !rawConfig.version) {
         throw new Error(
@@ -648,7 +692,7 @@ export class ExtensionManager extends ExtensionLoader {
   toOutputString(extension: GeminiCLIExtension): string {
     const userEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
-      os.homedir(),
+      homedir(),
     );
     const workspaceEnabled = this.extensionEnablementManager.isEnabled(
       extension.name,
@@ -690,6 +734,19 @@ export class ExtensionManager extends ExtensionLoader {
         output += `\n  ${tool}`;
       });
     }
+    if (extension.skills && extension.skills.length > 0) {
+      output += `\n Agent skills:`;
+      extension.skills.forEach((skill) => {
+        output += `\n  ${skill.name}: ${skill.description}`;
+      });
+    }
+    const resolvedSettings = extension.resolvedSettings;
+    if (resolvedSettings && resolvedSettings.length > 0) {
+      output += `\n Settings:`;
+      resolvedSettings.forEach((setting) => {
+        output += `\n  ${setting.name}: ${setting.value}`;
+      });
+    }
     return output;
   }
 
@@ -709,12 +766,12 @@ export class ExtensionManager extends ExtensionLoader {
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
       this.telemetryConfig,
-      new ExtensionDisableEvent(hashValue(name), extension.id, scope),
+      new ExtensionDisableEvent(name, hashValue(name), extension.id, scope),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it
@@ -744,12 +801,12 @@ export class ExtensionManager extends ExtensionLoader {
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : os.homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(
       this.telemetryConfig,
-      new ExtensionEnableEvent(hashValue(name), extension.id, scope),
+      new ExtensionEnableEvent(name, hashValue(name), extension.id, scope),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it
@@ -787,6 +844,45 @@ function validateName(name: string) {
     throw new Error(
       `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
     );
+  }
+}
+
+export async function inferInstallMetadata(
+  source: string,
+  args: {
+    ref?: string;
+    autoUpdate?: boolean;
+    allowPreRelease?: boolean;
+  } = {},
+): Promise<ExtensionInstallMetadata> {
+  if (
+    source.startsWith('http://') ||
+    source.startsWith('https://') ||
+    source.startsWith('git@') ||
+    source.startsWith('sso://')
+  ) {
+    return {
+      source,
+      type: 'git',
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    };
+  } else {
+    if (args.ref || args.autoUpdate) {
+      throw new Error(
+        '--ref and --auto-update are not applicable for local extensions.',
+      );
+    }
+    try {
+      await stat(source);
+      return {
+        source,
+        type: 'local',
+      };
+    } catch {
+      throw new Error('Install source not found.');
+    }
   }
 }
 

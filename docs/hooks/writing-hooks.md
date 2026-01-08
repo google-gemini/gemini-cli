@@ -72,9 +72,9 @@ Run Gemini CLI and execute any command that uses tools:
 ```
 > Read the README.md file
 
-[Agent uses ReadFile tool]
+[Agent uses read_file tool]
 
-Logged: ReadFile
+Logged: read_file
 ```
 
 Check `.gemini/tool-log.txt` to see the logged tool executions.
@@ -110,7 +110,7 @@ exit 0
   "hooks": {
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "secret-scanner",
@@ -167,7 +167,7 @@ exit 0
   "hooks": {
     "AfterTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "auto-test",
@@ -379,7 +379,7 @@ chmod +x .gemini/hooks/*.js
     ],
     "BeforeTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "security-check",
@@ -392,7 +392,7 @@ chmod +x .gemini/hooks/*.js
     ],
     "AfterTool": [
       {
-        "matcher": "WriteFile|Edit",
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "name": "auto-test",
@@ -601,7 +601,7 @@ async function main() {
     .map((k) => k.trim());
 
   // Simple keyword-based filtering + core tools
-  const coreTools = ['ReadFile', 'WriteFile', 'Edit', 'RunShellCommand'];
+  const coreTools = ['read_file', 'write_file', 'replace', 'run_shell_command'];
   const filtered = candidateTools.filter((tool) => {
     if (coreTools.includes(tool)) return true;
     const toolLower = tool.toLowerCase();
@@ -1017,6 +1017,24 @@ const SECRET_PATTERNS = [
   /auth[_-]?token/i,
 ];
 ```
+
+## Packaging as an extension
+
+While project-level hooks are great for specific repositories, you might want to
+share your hooks across multiple projects or with other users. You can do this
+by packaging your hooks as a [Gemini CLI extension](../extensions/index.md).
+
+Packaging as an extension provides:
+
+- **Easy distribution:** Share hooks via a git repository or GitHub release.
+- **Centralized management:** Install, update, and disable hooks using
+  `gemini extensions` commands.
+- **Version control:** Manage hook versions separately from your project code.
+- **Variable substitution:** Use `${extensionPath}` and `${process.execPath}`
+  for portable, cross-platform scripts.
+
+To package hooks as an extension, follow the
+[extensions hook documentation](../extensions/index.md#hooks).
 
 ## Learn more
 
