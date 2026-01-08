@@ -246,7 +246,7 @@ export async function parseAgentMarkdown(
   const agentDef: FrontmatterLocalAgentDefinition = {
     ...frontmatter,
     kind: 'local',
-    system_prompt: frontmatter.system_prompt || body.trim(),
+    system_prompt: frontmatter.system_prompt ?? body.trim(),
     query: frontmatter.query,
   };
 
