@@ -352,6 +352,21 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
    50 Line 50"
 `;
 
+exports[`<HistoryItemDisplay /> > renders AgentsStatus for "agents_list" type 1`] = `
+"Local Agents
+
+  - Local Agent (local_agent)
+      Local agent description.
+        Second line.
+
+Remote Agents
+
+  - remote_agent
+    Remote agent description.
+
+"
+`;
+
 exports[`<HistoryItemDisplay /> > renders InfoMessage for "info" type with multi-line text (alternateBuffer=false) 1`] = `
 "
 ℹ ⚡ Line 1

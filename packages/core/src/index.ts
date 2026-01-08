@@ -120,6 +120,9 @@ export * from './resources/resource-registry.js';
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
 
+// Export agent definitions
+export * from './agents/types.js';
+
 // Export specific tool logic
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
