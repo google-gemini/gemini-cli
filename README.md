@@ -18,7 +18,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
   account.
-- **🧠 Powerful Gemini 3**: Access to improved reasoning and 1M token context
+- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token context
   window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
