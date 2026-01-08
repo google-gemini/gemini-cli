@@ -81,7 +81,7 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" enabled by removing it from the disabled list in user and project settings.',
+        'Skill "skill1" enabled by removing it from the disabled list in user (/user/settings.json) and project (/project/settings.json) settings. Restart required to take effect.',
       );
     });
 
@@ -122,7 +122,7 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" enabled by removing it from the disabled list in project and user settings.',
+        'Skill "skill1" enabled by removing it from the disabled list in project (/workspace/settings.json) and user (/user/settings.json) settings. Restart required to take effect.',
       );
     });
 

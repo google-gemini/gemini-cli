@@ -96,7 +96,7 @@ async function disableAction(
 
   let feedback = renderSkillActionFeedback(
     result,
-    (label, _path) => `${label}`,
+    (label, path) => `${label} (${path})`,
   );
   if (result.status === 'success') {
     feedback += ' Use "/skills reload" for it to take effect.';
@@ -131,7 +131,7 @@ async function enableAction(
 
   let feedback = renderSkillActionFeedback(
     result,
-    (label, _path) => `${label}`,
+    (label, path) => `${label} (${path})`,
   );
   if (result.status === 'success') {
     feedback += ' Use "/skills reload" for it to take effect.';
