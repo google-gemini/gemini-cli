@@ -53,16 +53,12 @@ vi.mock('../config/models.js', async (importOriginal) => {
 
 describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
-  const originalPlatform = process.platform;
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
-    Object.defineProperty(process, 'platform', {
-      value: 'linux',
-      configurable: true,
-    });
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -86,17 +82,11 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   afterEach(() => {
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
+    vi.restoreAllMocks();
   });
 
   it('should use Windows-specific commands when platform is win32', () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'win32',
-      configurable: true,
-    });
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
     vi.mocked(isGitRepository).mockReturnValue(true);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain("'Select-String'");
@@ -106,7 +96,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should use Linux-specific commands when platform is linux', () => {
-    // Platform is already mocked to linux in beforeEach
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
     vi.mocked(isGitRepository).mockReturnValue(true);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain("'grep'");
