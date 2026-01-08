@@ -130,7 +130,7 @@ export async function createContentGenerator(
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
-    const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
+    const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION']?.trim();
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
