@@ -14,7 +14,6 @@ import EventEmitter from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
-import { mergeSettings } from '../config/settings.js';
 
 vi.mock('./installationInfo.js', async () => {
   const actual = await vi.importActual('./installationInfo.js');
@@ -50,11 +49,14 @@ describe('handleAutoUpdate', () => {
       message: 'An update is available!',
     };
 
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
       merged: {
         general: {
           enableAutoUpdate: true,
+          enableAutoUpdateNotification: true,
+        },
+        tools: {
+          sandbox: false,
         },
       },
     } as LoadedSettings;

@@ -17,6 +17,7 @@ import {
   coreEvents,
   homedir,
   type FetchAdminControlsResponse,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -613,7 +614,7 @@ export function loadSettings(
     );
   }
 
-  return new LoadedSettings(
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -641,42 +642,37 @@ export function loadSettings(
     isTrusted,
     settingsErrors,
   );
+
+  // Automatically migrate deprecated settings when loading.
+  migrateDeprecatedSettings(loadedSettings);
+
+  return loadedSettings;
 }
 
+/**
+ * Migrates deprecated settings to their new counterparts.
+ *
+ * TODO: After a couple of weeks (around early Feb 2026), we should start removing
+ * the deprecated settings from the settings files by default.
+ *
+ * @returns true if any changes were made and need to be saved.
+ */
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  extensionManager: ExtensionManager,
-): void {
+  removeDeprecated = false,
+): boolean {
+  let anyModified = false;
   const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
 
-    // Migrate deprecated extensions.disabled
-    if (settings.extensions?.disabled) {
-      debugLogger.log(
-        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
-      );
-      for (const extension of settings.extensions.disabled ?? []) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        extensionManager.disableExtension(extension, scope);
-      }
-
-      const newExtensionsValue = { ...settings.extensions };
-      newExtensionsValue.disabled = undefined;
-
-      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
-    }
-
     // Migrate inverted boolean settings (disableX -> enableX)
     // These settings were renamed and their boolean logic inverted
-    // We use type casting since the old keys are no longer in the Settings type
     const generalSettings = settings.general as
-      | (Record<string, unknown> & typeof settings.general)
+      | Record<string, unknown>
       | undefined;
-    const uiSettings = settings.ui as
-      | (Record<string, unknown> & typeof settings.ui)
-      | undefined;
+    const uiSettings = settings.ui as Record<string, unknown> | undefined;
     const contextSettings = settings.context as
-      | (Record<string, unknown> & typeof settings.context)
+      | Record<string, unknown>
       | undefined;
 
     // Migrate general settings (disableAutoUpdate, disableUpdateNag)
@@ -685,27 +681,48 @@ export function migrateDeprecatedSettings(
       let modified = false;
 
       if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
-        const oldValue = newGeneral['disableAutoUpdate'];
-        debugLogger.log(
-          `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-        );
-        newGeneral['enableAutoUpdate'] = !oldValue;
-        delete newGeneral['disableAutoUpdate'];
-        modified = true;
+        if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableAutoUpdate'];
+          debugLogger.log(
+            `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newGeneral['enableAutoUpdate'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+          }
+          modified = true;
+        }
       }
 
       if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
-        const oldValue = newGeneral['disableUpdateNag'];
-        debugLogger.log(
-          `Migrating deprecated general.disableUpdateNag to general.enableAutoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-        );
-        newGeneral['enableAutoUpdateNotification'] = !oldValue;
-        delete newGeneral['disableUpdateNag'];
-        modified = true;
+        if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableUpdateNag'];
+          debugLogger.log(
+            `Migrating deprecated general.disableUpdateNag to general.enableAutoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newGeneral['enableAutoUpdateNotification'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+          }
+          modified = true;
+        }
       }
 
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
+        anyModified = true;
       }
     }
 
@@ -722,21 +739,35 @@ export function migrateDeprecatedSettings(
         accessibilitySettings &&
         typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
       ) {
-        const oldValue = accessibilitySettings['disableLoadingPhrases'];
-        debugLogger.log(
-          `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.enableLoadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-        );
         const newAccessibility: Record<string, unknown> = {
           ...accessibilitySettings,
-          enableLoadingPhrases: !oldValue,
         };
-        delete newAccessibility['disableLoadingPhrases'];
-        newUi['accessibility'] = newAccessibility;
-        modified = true;
+        if (
+          typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
+        ) {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+            newUi['accessibility'] = newAccessibility;
+            modified = true;
+          }
+        } else {
+          const oldValue = accessibilitySettings['disableLoadingPhrases'];
+          debugLogger.log(
+            `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.enableLoadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newAccessibility['enableLoadingPhrases'] = !oldValue;
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+          }
+          newUi['accessibility'] = newAccessibility;
+          modified = true;
+        }
       }
 
       if (modified) {
         loadedSettings.setValue(scope, 'ui', newUi);
+        anyModified = true;
       }
     }
 
@@ -753,27 +784,41 @@ export function migrateDeprecatedSettings(
         fileFilteringSettings &&
         typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
       ) {
-        const oldValue = fileFilteringSettings['disableFuzzySearch'];
-        debugLogger.log(
-          `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.enableFuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-        );
         const newFileFiltering: Record<string, unknown> = {
           ...fileFilteringSettings,
-          enableFuzzySearch: !oldValue,
         };
-        delete newFileFiltering['disableFuzzySearch'];
-        newContext['fileFiltering'] = newFileFiltering;
-        modified = true;
+        if (typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+            newContext['fileFiltering'] = newFileFiltering;
+            modified = true;
+          }
+        } else {
+          const oldValue = fileFilteringSettings['disableFuzzySearch'];
+          debugLogger.log(
+            `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.enableFuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newFileFiltering['enableFuzzySearch'] = !oldValue;
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+          }
+          newContext['fileFiltering'] = newFileFiltering;
+          modified = true;
+        }
       }
 
       if (modified) {
         loadedSettings.setValue(scope, 'context', newContext);
+        anyModified = true;
       }
     }
   };
 
   processScope(SettingScope.User);
   processScope(SettingScope.Workspace);
+
+  return anyModified;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {

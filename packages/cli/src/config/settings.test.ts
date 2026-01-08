@@ -44,7 +44,7 @@ vi.mock('./settingsSchema.js', async (importOriginal) => {
 });
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as path from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -69,6 +69,10 @@ import {
   saveSettings,
   type SettingsFile,
   getDefaultsFromSchema,
+  loadEnvironment,
+  migrateDeprecatedSettings,
+  SettingScope,
+  LoadedSettings,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -80,7 +84,7 @@ import {
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
-const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
+const MOCK_WORKSPACE_SETTINGS_PATH = path.join(
   MOCK_WORKSPACE_DIR,
   GEMINI_DIR,
   'settings.json',
@@ -1602,7 +1606,7 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
-describe('with workspace trust', () => {
+  describe('with workspace trust', () => {
     it('should merge workspace settings when workspace is trusted', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
@@ -1664,339 +1668,6 @@ describe('with workspace trust', () => {
     });
   });
 
-  describe('migrateSettingsToV1', () => {
-    it('should handle an empty object', () => {
-      const v2Settings = {};
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({});
-    });
-
-    it('should migrate a simple v2 settings object to v1', () => {
-      const v2Settings = {
-        general: {
-          preferredEditor: 'vscode',
-          vimMode: true,
-        },
-        ui: {
-          theme: 'dark',
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({
-        preferredEditor: 'vscode',
-        vimMode: true,
-        theme: 'dark',
-      });
-    });
-
-    it('should handle nested properties correctly', () => {
-      const v2Settings = {
-        security: {
-          folderTrust: {
-            enabled: true,
-          },
-          auth: {
-            selectedType: 'oauth',
-          },
-        },
-        advanced: {
-          autoConfigureMemory: true,
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({
-        folderTrust: true,
-        selectedAuthType: 'oauth',
-        autoConfigureMaxOldSpaceSize: true,
-      });
-    });
-
-    it('should preserve mcpServers at the top level', () => {
-      const v2Settings = {
-        general: {
-          preferredEditor: 'vscode',
-        },
-        mcpServers: {
-          'my-server': {
-            command: 'npm start',
-          },
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({
-        preferredEditor: 'vscode',
-        mcpServers: {
-          'my-server': {
-            command: 'npm start',
-          },
-        },
-      });
-    });
-
-    it('should carry over unrecognized top-level properties', () => {
-      const v2Settings = {
-        general: {
-          vimMode: false,
-        },
-        unrecognized: 'value',
-        another: {
-          nested: true,
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({
-        vimMode: false,
-        unrecognized: 'value',
-        another: {
-          nested: true,
-        },
-      });
-    });
-
-    it('should handle a complex object with mixed properties', () => {
-      const v2Settings = {
-        general: {
-          disableAutoUpdate: true,
-        },
-        ui: {
-          hideBanner: true,
-          customThemes: {
-            myTheme: {},
-          },
-        },
-        model: {
-          name: 'gemini-pro',
-        },
-        mcpServers: {
-          'server-1': {
-            command: 'node server.js',
-          },
-        },
-        unrecognized: {
-          should: 'be-preserved',
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({
-        disableAutoUpdate: true,
-        hideBanner: true,
-        customThemes: {
-          myTheme: {},
-        },
-        model: 'gemini-pro',
-        mcpServers: {
-          'server-1': {
-            command: 'node server.js',
-          },
-        },
-        unrecognized: {
-          should: 'be-preserved',
-        },
-      });
-    });
-
-    it('should not migrate a v1 settings object', () => {
-      const v1Settings = {
-        preferredEditor: 'vscode',
-        vimMode: true,
-        theme: 'dark',
-      };
-      const migratedSettings = migrateSettingsToV1(v1Settings);
-      expect(migratedSettings).toEqual({
-        preferredEditor: 'vscode',
-        vimMode: true,
-        theme: 'dark',
-      });
-    });
-
-    it('should migrate a full v2 settings object to v1', () => {
-      const v2Settings: TestSettings = {
-        general: {
-          preferredEditor: 'code',
-          vimMode: true,
-        },
-        ui: {
-          theme: 'dark',
-        },
-        privacy: {
-          usageStatisticsEnabled: false,
-        },
-        model: {
-          name: 'gemini-2.5-pro',
-        },
-        context: {
-          fileName: 'CONTEXT.md',
-          includeDirectories: ['/src'],
-        },
-        tools: {
-          sandbox: true,
-          exclude: ['toolA'],
-        },
-        mcp: {
-          allowed: ['server1'],
-        },
-        security: {
-          folderTrust: {
-            enabled: true,
-          },
-        },
-        advanced: {
-          dnsResolutionOrder: 'ipv4first',
-          excludedEnvVars: ['SECRET'],
-        },
-        mcpServers: {
-          'my-server': {
-            command: 'npm start',
-          },
-        },
-        unrecognizedTopLevel: {
-          value: 'should be preserved',
-        },
-      };
-
-      const v1Settings = migrateSettingsToV1(v2Settings);
-
-      expect(v1Settings).toEqual({
-        preferredEditor: 'code',
-        vimMode: true,
-        theme: 'dark',
-        usageStatisticsEnabled: false,
-        model: 'gemini-2.5-pro',
-        contextFileName: 'CONTEXT.md',
-        includeDirectories: ['/src'],
-        sandbox: true,
-        excludeTools: ['toolA'],
-        allowMCPServers: ['server1'],
-        folderTrust: true,
-        dnsResolutionOrder: 'ipv4first',
-        excludedProjectEnvVars: ['SECRET'],
-        mcpServers: {
-          'my-server': {
-            command: 'npm start',
-          },
-        },
-        unrecognizedTopLevel: {
-          value: 'should be preserved',
-        },
-      });
-    });
-
-    it('should handle partial v2 settings', () => {
-      const v2Settings: TestSettings = {
-        general: {
-          vimMode: false,
-        },
-        ui: {},
-        model: {
-          name: 'gemini-2.5-pro',
-        },
-        unrecognized: 'value',
-      };
-
-      const v1Settings = migrateSettingsToV1(v2Settings);
-
-      expect(v1Settings).toEqual({
-        vimMode: false,
-        model: 'gemini-2.5-pro',
-        unrecognized: 'value',
-      });
-    });
-
-    it('should handle settings with different data types', () => {
-      const v2Settings: TestSettings = {
-        general: {
-          vimMode: false,
-        },
-        model: {
-          maxSessionTurns: -1,
-        },
-        context: {
-          includeDirectories: [],
-        },
-        security: {
-          folderTrust: {
-            enabled: undefined,
-          },
-        },
-      };
-
-      const v1Settings = migrateSettingsToV1(v2Settings);
-
-      expect(v1Settings).toEqual({
-        vimMode: false,
-        maxSessionTurns: -1,
-        includeDirectories: [],
-        security: {
-          folderTrust: {
-            enabled: undefined,
-          },
-        },
-      });
-    });
-
-    it('should preserve unrecognized top-level keys', () => {
-      const v2Settings: TestSettings = {
-        general: {
-          vimMode: true,
-        },
-        customTopLevel: {
-          a: 1,
-          b: [2],
-        },
-        anotherOne: 'hello',
-      };
-
-      const v1Settings = migrateSettingsToV1(v2Settings);
-
-      expect(v1Settings).toEqual({
-        vimMode: true,
-        customTopLevel: {
-          a: 1,
-          b: [2],
-        },
-        anotherOne: 'hello',
-      });
-    });
-
-    it('should handle an empty v2 settings object', () => {
-      const v2Settings = {};
-      const v1Settings = migrateSettingsToV1(v2Settings);
-      expect(v1Settings).toEqual({});
-    });
-
-    it('should correctly handle mcpServers at the top level', () => {
-      const v2Settings: TestSettings = {
-        mcpServers: {
-          serverA: { command: 'a' },
-        },
-        mcp: {
-          allowed: ['serverA'],
-        },
-      };
-
-      const v1Settings = migrateSettingsToV1(v2Settings);
-
-      expect(v1Settings).toEqual({
-        mcpServers: {
-          serverA: { command: 'a' },
-        },
-        allowMCPServers: ['serverA'],
-      });
-    });
-
-    it('should correctly migrate customWittyPhrases', () => {
-      const v2Settings: Partial<Settings> = {
-        ui: {
-          customWittyPhrases: ['test phrase'],
-        },
-      };
-      const v1Settings = migrateSettingsToV1(v2Settings as Settings);
-      expect(v1Settings).toEqual({
-        customWittyPhrases: ['test phrase'],
-      });
-    });
-  });
-
   describe('loadEnvironment', () => {
     function setup({
       isFolderTrustEnabled = true,
@@ -2050,73 +1721,6 @@ describe('with workspace trust', () => {
     });
   });
 
-  describe('needsMigration', () => {
-    it('should return false for an empty object', () => {
-      expect(needsMigration({})).toBe(false);
-    });
-
-    it('should return false for settings that are already in V2 format', () => {
-      const v2Settings: Partial<Settings> = {
-        ui: {
-          theme: 'dark',
-        },
-        tools: {
-          sandbox: true,
-        },
-      };
-      expect(needsMigration(v2Settings)).toBe(false);
-    });
-
-    it('should return true for settings with a V1 key that needs to be moved', () => {
-      const v1Settings = {
-        theme: 'dark', // v1 key
-      };
-      expect(needsMigration(v1Settings)).toBe(true);
-    });
-
-    it('should return true for settings with a mix of V1 and V2 keys', () => {
-      const mixedSettings = {
-        theme: 'dark', // v1 key
-        tools: {
-          sandbox: true, // v2 key
-        },
-      };
-      expect(needsMigration(mixedSettings)).toBe(true);
-    });
-
-    it('should return false for settings with only V1 keys that are the same in V2', () => {
-      const v1Settings = {
-        mcpServers: {},
-        telemetry: {},
-        extensions: [],
-      };
-      expect(needsMigration(v1Settings)).toBe(false);
-    });
-
-    it('should return true for settings with a mix of V1 keys that are the same in V2 and V1 keys that need moving', () => {
-      const v1Settings = {
-        mcpServers: {}, // same in v2
-        theme: 'dark', // needs moving
-      };
-      expect(needsMigration(v1Settings)).toBe(true);
-    });
-
-    it('should return false for settings with unrecognized keys', () => {
-      const settings = {
-        someUnrecognizedKey: 'value',
-      };
-      expect(needsMigration(settings)).toBe(false);
-    });
-
-    it('should return false for settings with v2 keys and unrecognized keys', () => {
-      const settings = {
-        ui: { theme: 'dark' },
-        someUnrecognizedKey: 'value',
-      };
-      expect(needsMigration(settings)).toBe(false);
-    });
-  });
-
   describe('migrateDeprecatedSettings', () => {
     let mockFsExistsSync: Mock;
     let mockFsReadFileSync: Mock;
@@ -2137,79 +1741,6 @@ describe('with workspace trust', () => {
       vi.restoreAllMocks();
     });
 
-    it('should migrate disabled extensions from user and workspace settings', () => {
-      const userSettingsContent = {
-        extensions: {
-          disabled: ['user-ext-1', 'shared-ext'],
-        },
-      };
-      const workspaceSettingsContent = {
-        extensions: {
-          disabled: ['workspace-ext-1', 'shared-ext'],
-        },
-      };
-
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-          return JSON.stringify(workspaceSettingsContent);
-        return '{}';
-      });
-
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
-      const mockDisableExtension = vi.spyOn(
-        extensionManager,
-        'disableExtension',
-      );
-      mockDisableExtension.mockImplementation(async () => {});
-
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
-
-      // Check user settings migration
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'user-ext-1',
-        SettingScope.User,
-      );
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'shared-ext',
-        SettingScope.User,
-      );
-
-      // Check workspace settings migration
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'workspace-ext-1',
-        SettingScope.Workspace,
-      );
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'shared-ext',
-        SettingScope.Workspace,
-      );
-
-      // Check that setValue was called to remove the deprecated setting
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'extensions',
-        {
-          disabled: undefined,
-        },
-      );
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.Workspace,
-        'extensions',
-        {
-          disabled: undefined,
-        },
-      );
-    });
-
     it('should not do anything if there are no deprecated settings', () => {
       const userSettingsContent = {
         extensions: {
@@ -2220,31 +1751,22 @@ describe('with workspace trust', () => {
         someOtherSetting: 'value',
       };
 
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-          return JSON.stringify(workspaceSettingsContent);
-        return '{}';
-      });
-
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
-      const mockDisableExtension = vi.spyOn(
-        extensionManager,
-        'disableExtension',
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
       );
-      mockDisableExtension.mockImplementation(async () => {});
 
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      setValueSpy.mockClear();
 
-      expect(mockDisableExtension).not.toHaveBeenCalled();
+      migrateDeprecatedSettings(loadedSettings, true);
+
       expect(setValueSpy).not.toHaveBeenCalled();
     });
 
@@ -2255,22 +1777,18 @@ describe('with workspace trust', () => {
         },
       };
 
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        return '{}';
-      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
 
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
 
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
+      migrateDeprecatedSettings(loadedSettings, true);
 
       // Should set new value to false (inverted from true)
       expect(setValueSpy).toHaveBeenCalledWith(
@@ -2298,22 +1816,18 @@ describe('with workspace trust', () => {
         },
       };
 
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        return '{}';
-      });
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
 
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
 
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
+      migrateDeprecatedSettings(loadedSettings, true);
 
       // Check that general settings were migrated with inverted values
       expect(setValueSpy).toHaveBeenCalledWith(
@@ -2344,6 +1858,106 @@ describe('with workspace trust', () => {
           accessibility: expect.objectContaining({
             enableLoadingPhrases: false,
           }),
+        }),
+      );
+    });
+
+    it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+          enableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableFuzzySearch: false, // Trust this (false) over disableFuzzySearch (false -> true)
+          },
+        },
+      };
+
+      const loadedSettings = new LoadedSettings(
+        {
+          path: getSystemSettingsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: getSystemDefaultsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: USER_SETTINGS_PATH,
+          settings: userSettingsContent as unknown as Settings,
+          originalSettings: userSettingsContent as unknown as Settings,
+        },
+        {
+          path: MOCK_WORKSPACE_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+        },
+        true,
+      );
+
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      // 1. removeDeprecated = false (default)
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should still have old settings
+      expect(
+        loadedSettings.forScope(SettingScope.User).settings.general,
+      ).toHaveProperty('disableAutoUpdate');
+      expect(
+        (
+          loadedSettings.forScope(SettingScope.User).settings.context as {
+            fileFiltering: { disableFuzzySearch: boolean };
+          }
+        ).fileFiltering,
+      ).toHaveProperty('disableFuzzySearch');
+
+      // 2. removeDeprecated = true
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Should remove disableAutoUpdate and trust enableAutoUpdate: true
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
+        enableAutoUpdate: true,
+      });
+
+      // Should remove disableFuzzySearch and trust enableFuzzySearch: false
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
+        fileFiltering: { enableFuzzySearch: false },
+      });
+    });
+
+    it('should trigger migration automatically during loadSettings', () => {
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in the merged settings
+      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+
+      // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
+      expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        expect.objectContaining({
+          general: expect.objectContaining({ enableAutoUpdate: false }),
         }),
       );
     });

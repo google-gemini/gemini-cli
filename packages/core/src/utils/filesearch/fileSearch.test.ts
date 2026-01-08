@@ -330,7 +330,7 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/style.css']);
   });
 
-  it('should not use fzf for fuzzy matching when disableFuzzySearch is true', async () => {
+  it('should not use fzf for fuzzy matching when enableFuzzySearch is false', async () => {
     tmpDir = await createTmpDir({
       src: {
         'file1.js': '',
@@ -356,7 +356,7 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/flexible.js']);
   });
 
-  it('should use fzf for fuzzy matching when disableFuzzySearch is false', async () => {
+  it('should use fzf for fuzzy matching when enableFuzzySearch is true', async () => {
     tmpDir = await createTmpDir({
       src: {
         'file1.js': '',
@@ -497,7 +497,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      disableFuzzySearch: false,
+      enableFuzzySearch: true,
     });
 
     await fileSearch.initialize();
