@@ -84,7 +84,7 @@ const shellExecutionConfig: ShellExecutionConfig = {
   showColor: false,
   disableDynamicLineTrimming: true,
   sanitizationConfig: {
-    enableEnvironmentVariableRedaction: true,
+    enableEnvironmentVariableRedaction: false,
     allowedEnvironmentVariables: [],
     blockedEnvironmentVariables: [],
   },
