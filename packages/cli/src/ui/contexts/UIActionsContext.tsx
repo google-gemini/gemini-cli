@@ -56,6 +56,7 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  setTaskBackgrounded: (value: boolean) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

@@ -130,6 +130,7 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
+  isTaskBackgrounded: boolean;
   warningMessage: string | null;
   bannerData: {
     defaultText: string;

@@ -184,6 +184,7 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
+  const [isTaskBackgrounded, setIsTaskBackgrounded] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -1229,6 +1230,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (activePtyId || embeddedShellFocused) {
           setEmbeddedShellFocused((prev) => !prev);
         }
+      } else if (keyMatchers[Command.BACKGROUND_TASK](key)) {
+        // Only background if there's an active streaming request
+        if (streamingState !== StreamingState.Idle) {
+          setIsTaskBackgrounded(true);
+          // Allow user to continue typing while task runs in background
+        }
       }
     },
     [
@@ -1249,6 +1256,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
+      streamingState,
+      setIsTaskBackgrounded,
     ],
   );
 
@@ -1516,6 +1525,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showDebugProfiler,
       customDialog,
       copyModeEnabled,
+      isTaskBackgrounded,
       warningMessage,
       bannerData,
       bannerVisible,
@@ -1608,6 +1618,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       apiKeyDefaultValue,
       authState,
       copyModeEnabled,
+      isTaskBackgrounded,
       warningMessage,
       bannerData,
       bannerVisible,
@@ -1655,6 +1666,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setTaskBackgrounded: setIsTaskBackgrounded,
     }),
     [
       handleThemeSelect,
@@ -1690,6 +1702,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setIsTaskBackgrounded,
     ],
   );
 

@@ -27,6 +27,7 @@ import {
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
 import type { Config } from '@google/gemini-cli-core';
+import { useTimer } from '../../hooks/useTimer.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -122,6 +123,10 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   const shouldShowFocusHint =
     isThisShellFocusable && (showFocusHint || userHasFocused);
 
+  // Track elapsed time for executing shell commands
+  const isExecuting = status === ToolCallStatus.Executing;
+  const elapsedTime = useTimer(isExecuting, ptyId);
+
   return (
     <Box ref={containerRef} flexDirection="column" width={terminalWidth}>
       <StickyHeader
@@ -164,6 +169,16 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
         />
+        {isExecuting && (
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.text.secondary}>
+              ({elapsedTime}s)
+            </Text>
+            <Text color={theme.text.secondary}>
+              ctrl+b to run in background
+            </Text>
+          </Box>
+        )}
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
             <ShellInputPrompt
