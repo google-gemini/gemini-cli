@@ -56,8 +56,8 @@
           "default": true,
           "type": "boolean"
         },
-        "enableUpdatePrompts": {
-          "title": "Enable Update Prompts",
+        "enableAutoUpdateNotification": {
+          "title": "Enable Auto Update Notification",
           "description": "Enable update notification prompts.",
           "markdownDescription": "Enable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
