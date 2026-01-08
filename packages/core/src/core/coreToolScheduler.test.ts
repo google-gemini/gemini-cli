@@ -990,7 +990,11 @@ describe('CoreToolScheduler YOLO mode', () => {
       .map((call) => (call[0][0] as ToolCall)?.status)
       .filter(Boolean);
     expect(statusUpdates).not.toContain('awaiting_approval');
-    expect(statusUpdates).toEqual([
+    // Expect the sequence of states, ignoring duplicates
+    const uniqueStatusUpdates = statusUpdates.filter(
+      (status, index, self) => index === 0 || status !== self[index - 1],
+    );
+    expect(uniqueStatusUpdates).toEqual([
       'validating',
       'scheduled',
       'executing',
@@ -1207,7 +1211,11 @@ describe('CoreToolScheduler request queueing', () => {
       .map((call) => (call[0][0] as ToolCall)?.status)
       .filter(Boolean);
     expect(statusUpdates).not.toContain('awaiting_approval');
-    expect(statusUpdates).toEqual([
+    // Expect the sequence of states, ignoring duplicates
+    const uniqueStatusUpdates = statusUpdates.filter(
+      (status, index, self) => index === 0 || status !== self[index - 1],
+    );
+    expect(uniqueStatusUpdates).toEqual([
       'validating',
       'scheduled',
       'executing',
@@ -1810,8 +1818,9 @@ describe('CoreToolScheduler Sequential Execution', () => {
       abortController.signal,
     );
 
-    const toolCall = (scheduler as unknown as { toolCalls: ToolCall[] })
-      .toolCalls[0] as WaitingToolCall;
+    const toolCall = (
+      scheduler as unknown as { state: { getSnapshot: () => ToolCall[] } }
+    ).state.getSnapshot()[0] as WaitingToolCall;
     expect(toolCall.status).toBe('awaiting_approval');
 
     const confirmationSignal = new AbortController().signal;

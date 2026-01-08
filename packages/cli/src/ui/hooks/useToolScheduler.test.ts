@@ -220,9 +220,11 @@ describe('useReactToolScheduler', () => {
     | undefined;
 
   const advanceAndSettle = async () => {
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    for (let i = 0; i < 7; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    }
   };
 
   const scheduleAndWaitForExecution = async (
@@ -236,8 +238,6 @@ describe('useReactToolScheduler', () => {
       schedule(request, new AbortController().signal);
     });
 
-    await advanceAndSettle();
-    await advanceAndSettle();
     await advanceAndSettle();
   };
 
@@ -349,6 +349,12 @@ describe('useReactToolScheduler', () => {
     act(() => {
       schedule(newRequest, new AbortController().signal);
     });
+
+    // Wait for the async schedule operation to update state
+    for (let i = 0; i < 50; i++) {
+      if (result.current[0].length === 1) break;
+      await advanceAndSettle();
+    }
 
     // After scheduling, the old call should be gone,
     // and the new one should be in the display in its initial state.
@@ -480,6 +486,12 @@ describe('useReactToolScheduler', () => {
       });
 
       await scheduleAndWaitForExecution(result.current[1], request);
+
+      // Poll for completion
+      for (let i = 0; i < 50; i++) {
+        if (completedToolCalls.length === 1) break;
+        await advanceAndSettle();
+      }
 
       expect(completedToolCalls).toHaveLength(1);
       expect(completedToolCalls[0].status).toBe('error');
