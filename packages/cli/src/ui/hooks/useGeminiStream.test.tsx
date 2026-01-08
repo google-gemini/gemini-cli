@@ -922,6 +922,110 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should not resubmit tool responses that have already been submitted to Gemini', async () => {
+    // This tests the fix for the unrecoverable 400 error where already-submitted
+    // tools were being resubmitted due to stale closure in handleCompletedTools.
+    // Once triggered, ALL subsequent prompts fail and session must be /clear'd.
+
+    const alreadySubmittedTool = {
+      request: {
+        callId: 'already-submitted-call',
+        name: 'tool1',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: true, // KEY: Already submitted
+      response: {
+        callId: 'already-submitted-call',
+        responseParts: [{ text: 'already sent' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool1' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    const newTool = {
+      request: {
+        callId: 'new-call',
+        name: 'tool2',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false, // Not yet submitted
+      response: {
+        callId: 'new-call',
+        responseParts: [{ text: 'new response' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool2' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [alreadySubmittedTool, newTool], // Current tracked state with flags
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Simulate scheduler calling onComplete - scheduler core doesn't track
+    // responseSubmittedToGemini, so we strip it to simulate real behavior
+    const fromScheduler = [
+      { ...alreadySubmittedTool, responseSubmittedToGemini: undefined },
+      { ...newTool, responseSubmittedToGemini: undefined },
+    ];
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(fromScheduler as TrackedToolCall[]);
+      }
+    });
+
+    // Only the NEW tool should be marked as submitted
+    // The already-submitted tool should be filtered out
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(1);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['new-call']);
+    });
+  });
+
   it('should not flicker streaming state to Idle between tool completion and submission', async () => {
     const toolCallResponseParts: PartListUnion = [
       { text: 'tool 1 final response' },
