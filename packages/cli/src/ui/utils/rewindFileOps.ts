@@ -187,7 +187,6 @@ export async function revertFileChanges(
                   `Error reading ${fileName} during revert: ${error.message}`,
                   e,
                 );
-                debugLogger.error(`Error reading file for revert:`, e);
                 // Continue to next tool call
                 return;
               }
@@ -234,7 +233,7 @@ export async function revertFileChanges(
               // This can happen if a file created by the agent is deleted before rewind.
               coreEvents.emitFeedback(
                 'warning',
-                `Cannot revert changes for ${fileName} because it was not found on disk. Can happen if a file created by the agent was deleted before rewind`,
+                `Cannot revert changes for ${fileName} because it was not found on disk. This is expected if a file created by the agent was deleted before rewind`,
               );
             }
           } catch (e) {
@@ -243,7 +242,6 @@ export async function revertFileChanges(
               `An unexpected error occurred while reverting ${fileName}.`,
               e,
             );
-            debugLogger.error(`Unexpected error during file reversion:`, e);
           }
         }
       }
