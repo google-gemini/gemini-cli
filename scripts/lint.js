@@ -48,7 +48,7 @@ function getPlatformArch() {
   if (platform === 'win32' && arch === 'x64') {
     return {
       actionlint: 'windows_amd64',
-      shellcheck: 'windows_amd64',
+      shellcheck: 'win.x86_64',
     };
   }
   throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
@@ -88,7 +88,6 @@ const shellcheckCheck = isWindows
 
 const shellcheckInstaller = isWindows
   ? `powershell -Command "` +
-    `New-Item -ItemType Directory -Force -Path '${TEMP_DIR}/shellcheck' | Out-Null; ` +
     `Invoke-WebRequest -Uri 'https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.zip' -OutFile '${TEMP_DIR}/.shellcheck.zip'; ` +
     `Add-Type -AssemblyName System.IO.Compression.FileSystem; ` +
     `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.shellcheck.zip', '${TEMP_DIR}/shellcheck')"`
