@@ -232,12 +232,12 @@ describe('ClearcutLogger', () => {
   });
 
   describe('createLogEvent', () => {
-    it('logs the total number of google accounts', () => {
+    it('logs the total number of google accounts', async () => {
       const { logger } = setup({
         lifetimeGoogleAccounts: 9001,
       });
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
@@ -245,7 +245,7 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs default metadata', () => {
+    it('logs default metadata', async () => {
       // Define expected values
       const session_id = 'my-session-id';
       const auth_type = AuthType.USE_GEMINI;
@@ -264,11 +264,11 @@ describe('ClearcutLogger', () => {
       vi.spyOn(loggerConfig, 'getContentGeneratorConfig').mockReturnValue({
         authType: auth_type,
       } as ContentGeneratorConfig);
-      logger?.logNewPromptEvent(new UserPromptEvent(1, prompt_id)); // prompt_id == session_id before this
+      await logger?.logNewPromptEvent(new UserPromptEvent(1, prompt_id)); // prompt_id == session_id before this
       vi.stubEnv('SURFACE', surface);
 
       // Create log event
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       // Ensure expected values exist
       expect(event?.event_metadata[0]).toEqual(
@@ -313,10 +313,10 @@ describe('ClearcutLogger', () => {
       );
     });
 
-    it('logs the current nodejs version', () => {
+    it('logs the current nodejs version', async () => {
       const { logger } = setup({});
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
@@ -324,7 +324,7 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs all user settings', () => {
+    it('logs all user settings', async () => {
       const { logger } = setup({
         config: {},
       });
@@ -332,7 +332,7 @@ describe('ClearcutLogger', () => {
       vi.stubEnv('TERM_PROGRAM', 'vscode');
       vi.stubEnv('SURFACE', 'ide-1234');
 
-      const event = logger?.createLogEvent(EventNames.TOOL_CALL, []);
+      const event = await logger?.createLogEvent(EventNames.TOOL_CALL, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
@@ -349,7 +349,7 @@ describe('ClearcutLogger', () => {
       // Wait a bit for the async refreshGpuInfo to complete
       await vi.advanceTimersByTimeAsync(100);
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       const gpuInfoEntry = event?.event_metadata[0].find(
         (item) => item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GPU_INFO,
@@ -368,7 +368,7 @@ describe('ClearcutLogger', () => {
       await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       const metadata = event?.event_metadata[0];
 
       [
@@ -396,7 +396,7 @@ describe('ClearcutLogger', () => {
       await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       const metadata = event?.event_metadata[0];
 
       [
@@ -424,7 +424,7 @@ describe('ClearcutLogger', () => {
       await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
@@ -511,12 +511,12 @@ describe('ClearcutLogger', () => {
       },
     ])(
       'logs the current surface as $expected from $name',
-      ({ env, expected }) => {
+      async ({ env, expected }) => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
-        const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+        const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0]).toContainEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expected,
@@ -526,22 +526,22 @@ describe('ClearcutLogger', () => {
   });
 
   describe('GH_WORKFLOW_NAME metadata', () => {
-    it('includes workflow name when GH_WORKFLOW_NAME is set', () => {
+    it('includes workflow name when GH_WORKFLOW_NAME is set', async () => {
       const { logger } = setup({});
       vi.stubEnv('GH_WORKFLOW_NAME', 'test-workflow');
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
         value: 'test-workflow',
       });
     });
 
-    it('does not include workflow name when GH_WORKFLOW_NAME is not set', () => {
+    it('does not include workflow name when GH_WORKFLOW_NAME is not set', async () => {
       const { logger } = setup({});
       vi.stubEnv('GH_WORKFLOW_NAME', undefined);
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasWorkflowName = event?.event_metadata[0].some(
         (item) =>
           item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
@@ -551,11 +551,11 @@ describe('ClearcutLogger', () => {
   });
 
   describe('GITHUB_REPOSITORY metadata', () => {
-    it('includes hashed repository when GITHUB_REPOSITORY is set', () => {
+    it('includes hashed repository when GITHUB_REPOSITORY is set', async () => {
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
       const { logger } = setup({});
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       const repositoryMetadata = event?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
@@ -566,12 +566,12 @@ describe('ClearcutLogger', () => {
       expect(repositoryMetadata?.value).not.toBe('google/gemini-cli');
     });
 
-    it('hashes repository name consistently', () => {
+    it('hashes repository name consistently', async () => {
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
       const { logger } = setup({});
 
-      const event1 = logger?.createLogEvent(EventNames.API_ERROR, []);
-      const event2 = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event1 = await logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event2 = await logger?.createLogEvent(EventNames.API_ERROR, []);
 
       const hash1 = event1?.event_metadata[0].find(
         (item) =>
@@ -589,10 +589,10 @@ describe('ClearcutLogger', () => {
       expect(hash1).toBe(hash2);
     });
 
-    it('produces different hashes for different repositories', () => {
+    it('produces different hashes for different repositories', async () => {
       vi.stubEnv('GITHUB_REPOSITORY', 'google/gemini-cli');
       const { logger: logger1 } = setup({});
-      const event1 = logger1?.createLogEvent(EventNames.API_ERROR, []);
+      const event1 = await logger1?.createLogEvent(EventNames.API_ERROR, []);
       const hash1 = event1?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
@@ -602,7 +602,7 @@ describe('ClearcutLogger', () => {
       vi.stubEnv('GITHUB_REPOSITORY', 'google/other-repo');
       ClearcutLogger.clearInstance();
       const { logger: logger2 } = setup({});
-      const event2 = logger2?.createLogEvent(EventNames.API_ERROR, []);
+      const event2 = await logger2?.createLogEvent(EventNames.API_ERROR, []);
       const hash2 = event2?.event_metadata[0].find(
         (item) =>
           item.gemini_cli_key ===
@@ -614,11 +614,11 @@ describe('ClearcutLogger', () => {
       expect(hash1).not.toBe(hash2);
     });
 
-    it('does not include repository when GITHUB_REPOSITORY is not set', () => {
+    it('does not include repository when GITHUB_REPOSITORY is not set', async () => {
       vi.stubEnv('GITHUB_REPOSITORY', undefined);
       const { logger } = setup({});
 
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const event = await logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasRepository = event?.event_metadata[0].some(
         (item) =>
           item.gemini_cli_key ===
@@ -629,9 +629,9 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logChatCompressionEvent', () => {
-    it('logs an event with proper fields', () => {
+    it('logs an event with proper fields', async () => {
       const { logger } = setup();
-      logger?.logChatCompressionEvent(
+      await logger?.logChatCompressionEvent(
         makeChatCompressionEvent({
           tokens_before: 9001,
           tokens_after: 8000,
@@ -653,7 +653,7 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logRipgrepFallbackEvent', () => {
-    it('logs an event with the proper name', () => {
+    it('logs an event with the proper name', async () => {
       const { logger } = setup();
       // Spy on flushToClearcut to prevent it from clearing the queue
       const flushSpy = vi
@@ -661,7 +661,7 @@ describe('ClearcutLogger', () => {
         .spyOn(logger!, 'flushToClearcut' as any)
         .mockResolvedValue({ nextRequestWaitMs: 0 });
 
-      logger?.logRipgrepFallbackEvent();
+      await logger?.logRipgrepFallbackEvent();
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -671,18 +671,20 @@ describe('ClearcutLogger', () => {
   });
 
   describe('enqueueLogEvent', () => {
-    it('should add events to the queue', () => {
+    it('should add events to the queue', async () => {
       const { logger } = setup();
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_ERROR),
+      );
       expect(getEventsSize(logger!)).toBe(1);
     });
 
-    it('should evict the oldest event when the queue is full', () => {
+    it('should evict the oldest event when the queue is full', async () => {
       const { logger } = setup();
 
       for (let i = 0; i < TEST_ONLY.MAX_EVENTS; i++) {
         logger!.enqueueLogEvent(
-          logger!.createLogEvent(EventNames.API_ERROR, [
+          await logger!.createLogEvent(EventNames.API_ERROR, [
             {
               gemini_cli_key: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
               value: `${i}`,
@@ -700,7 +702,7 @@ describe('ClearcutLogger', () => {
 
       // This should push out the first event
       logger!.enqueueLogEvent(
-        logger!.createLogEvent(EventNames.API_ERROR, [
+        await logger!.createLogEvent(EventNames.API_ERROR, [
           {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
             value: `${TEST_ONLY.MAX_EVENTS}`,
@@ -729,7 +731,9 @@ describe('ClearcutLogger', () => {
         },
       });
 
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_ERROR),
+      );
 
       const response = await logger!.flushToClearcut();
 
@@ -739,7 +743,9 @@ describe('ClearcutLogger', () => {
     it('should clear events on successful flush', async () => {
       const { logger } = setup();
 
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_ERROR),
+      );
       const response = await logger!.flushToClearcut();
 
       expect(getEvents(logger!)).toEqual([]);
@@ -750,8 +756,12 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
 
       server.resetHandlers(http.post(CLEARCUT_URL, () => HttpResponse.error()));
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_REQUEST));
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_REQUEST),
+      );
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_ERROR),
+      );
       expect(getEventsSize(logger!)).toBe(2);
 
       const x = logger!.flushToClearcut();
@@ -780,8 +790,12 @@ describe('ClearcutLogger', () => {
         ),
       );
 
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_REQUEST));
-      logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_REQUEST),
+      );
+      logger!.enqueueLogEvent(
+        await logger!.createLogEvent(EventNames.API_ERROR),
+      );
 
       expect(getEvents(logger!).length).toBe(2);
       await logger!.flushToClearcut();
@@ -818,13 +832,15 @@ describe('ClearcutLogger', () => {
       );
     });
 
-    it('should not requeue more events than available space in the queue', () => {
+    it('should not requeue more events than available space in the queue', async () => {
       const { logger } = setup();
       const maxEvents = TEST_ONLY.MAX_EVENTS;
       const spaceToLeave = 5;
       const initialEventCount = maxEvents - spaceToLeave;
       for (let i = 0; i < initialEventCount; i++) {
-        logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
+        logger!.enqueueLogEvent(
+          await logger!.createLogEvent(EventNames.API_ERROR),
+        );
       }
       expect(getEventsSize(logger!)).toBe(initialEventCount);
 
@@ -857,7 +873,7 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logModelRoutingEvent', () => {
-    it('logs a successful routing event', () => {
+    it('logs a successful routing event', async () => {
       const { logger } = setup();
       const event = new ModelRoutingEvent(
         'gemini-pro',
@@ -868,7 +884,7 @@ describe('ClearcutLogger', () => {
         undefined,
       );
 
-      logger?.logModelRoutingEvent(event);
+      await logger?.logModelRoutingEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -891,7 +907,7 @@ describe('ClearcutLogger', () => {
       ]);
     });
 
-    it('logs a failed routing event with a reason', () => {
+    it('logs a failed routing event with a reason', async () => {
       const { logger } = setup();
       const event = new ModelRoutingEvent(
         'gemini-pro',
@@ -902,7 +918,7 @@ describe('ClearcutLogger', () => {
         'Something went wrong',
       );
 
-      logger?.logModelRoutingEvent(event);
+      await logger?.logModelRoutingEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -931,11 +947,11 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logAgentStartEvent', () => {
-    it('logs an event with proper fields', () => {
+    it('logs an event with proper fields', async () => {
       const { logger } = setup();
       const event = new AgentStartEvent('agent-123', 'TestAgent');
 
-      logger?.logAgentStartEvent(event);
+      await logger?.logAgentStartEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -952,11 +968,11 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logExperiments', () => {
-    it('logs an event with gws_experiment field containing exp ids', () => {
+    it('logs an event with gws_experiment field containing exp ids', async () => {
       const { logger } = setup();
       const event = new AgentStartEvent('agent-123', 'TestAgent');
 
-      logger?.logAgentStartEvent(event);
+      await logger?.logAgentStartEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -969,7 +985,7 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logAgentFinishEvent', () => {
-    it('logs an event with proper fields (success)', () => {
+    it('logs an event with proper fields (success)', async () => {
       const { logger } = setup();
       const event = new AgentFinishEvent(
         'agent-123',
@@ -979,7 +995,7 @@ describe('ClearcutLogger', () => {
         AgentTerminateMode.GOAL,
       );
 
-      logger?.logAgentFinishEvent(event);
+      await logger?.logAgentFinishEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1006,7 +1022,7 @@ describe('ClearcutLogger', () => {
       ]);
     });
 
-    it('logs an event with proper fields (error)', () => {
+    it('logs an event with proper fields (error)', async () => {
       const { logger } = setup();
       const event = new AgentFinishEvent(
         'agent-123',
@@ -1016,7 +1032,7 @@ describe('ClearcutLogger', () => {
         AgentTerminateMode.ERROR,
       );
 
-      logger?.logAgentFinishEvent(event);
+      await logger?.logAgentFinishEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1029,7 +1045,7 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logToolCallEvent', () => {
-    it('logs an event with all diff metadata', () => {
+    it('logs an event with all diff metadata', async () => {
       const { logger } = setup();
       const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
@@ -1050,7 +1066,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+      await logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1089,7 +1105,7 @@ describe('ClearcutLogger', () => {
       ]);
     });
 
-    it('logs an event with partial diff metadata', () => {
+    it('logs an event with partial diff metadata', async () => {
       const { logger } = setup();
       const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
@@ -1106,7 +1122,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+      await logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1141,7 +1157,7 @@ describe('ClearcutLogger', () => {
       );
     });
 
-    it('does not log diff metadata if diffStat is not present', () => {
+    it('does not log diff metadata if diffStat is not present', async () => {
       const { logger } = setup();
       const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
@@ -1151,7 +1167,7 @@ describe('ClearcutLogger', () => {
         status: 'success',
       } as SuccessfulToolCall;
 
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+      await logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1190,11 +1206,11 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logWebFetchFallbackAttemptEvent', () => {
-    it('logs an event with the proper name and reason', () => {
+    it('logs an event with the proper name and reason', async () => {
       const { logger } = setup();
       const event = new WebFetchFallbackAttemptEvent('private_ip');
 
-      logger?.logWebFetchFallbackAttemptEvent(event);
+      await logger?.logWebFetchFallbackAttemptEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -1207,7 +1223,7 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logHookCallEvent', () => {
-    it('logs an event with proper fields', () => {
+    it('logs an event with proper fields', async () => {
       const { logger } = setup();
       const hookName = '/path/to/my/script.sh';
 
@@ -1222,7 +1238,7 @@ describe('ClearcutLogger', () => {
         0, // exit code
       );
 
-      logger?.logHookCallEvent(event);
+      await logger?.logHookCallEvent(event);
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
