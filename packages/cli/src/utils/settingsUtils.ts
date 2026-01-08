@@ -6,8 +6,8 @@
 
 import type {
   Settings,
-  SettingScope,
   LoadedSettings,
+  LoadableSettingScope,
 } from '../config/settings.js';
 import type {
   SettingDefinition,
@@ -279,11 +279,7 @@ export function getSettingValue(
   if (typeof value === 'boolean') {
     return value;
   }
-  // Fall back to default value, ensuring it's a boolean
-  const defaultValue = definition.default;
-  if (typeof defaultValue === 'boolean') {
-    return defaultValue;
-  }
+
   return false; // Final fallback
 }
 
@@ -391,7 +387,7 @@ export function saveModifiedSettings(
   modifiedSettings: Set<string>,
   pendingSettings: Settings,
   loadedSettings: LoadedSettings,
-  scope: SettingScope,
+  scope: LoadableSettingScope,
 ): void {
   modifiedSettings.forEach((settingKey) => {
     const path = settingKey.split('.');

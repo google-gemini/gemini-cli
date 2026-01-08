@@ -6,6 +6,8 @@
 
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type {
   RoutingContext,
   RoutingDecision,
@@ -59,7 +61,7 @@ export class CompositeStrategy implements TerminalStrategy {
           return this.finalizeDecision(decision, startTime);
         }
       } catch (error) {
-        console.error(
+        debugLogger.warn(
           `[Routing] Strategy '${strategy.name}' failed. Continuing to next strategy. Error:`,
           error,
         );
@@ -76,7 +78,8 @@ export class CompositeStrategy implements TerminalStrategy {
 
       return this.finalizeDecision(decision, startTime);
     } catch (error) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `[Routing] Critical Error: Terminal strategy '${terminalStrategy.name}' failed. Routing cannot proceed. Error:`,
         error,
       );
@@ -92,17 +95,18 @@ export class CompositeStrategy implements TerminalStrategy {
     startTime: number,
   ): RoutingDecision {
     const endTime = performance.now();
-    const totalLatency = endTime - startTime;
-
-    // Combine the source paths: composite_name/child_source (e.g. 'router/default')
     const compositeSource = `${this.name}/${decision.metadata.source}`;
+
+    // Use the child's latency if it's a meaningful (non-zero) value,
+    // otherwise use the total time spent in the composite strategy.
+    const latency = decision.metadata.latencyMs || endTime - startTime;
 
     return {
       ...decision,
       metadata: {
         ...decision.metadata,
         source: compositeSource,
-        latencyMs: decision.metadata.latencyMs || totalLatency,
+        latencyMs: Math.round(latency), // Round to ensure int for telemetry.
       },
     };
   }

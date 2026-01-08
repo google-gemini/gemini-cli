@@ -40,6 +40,7 @@ function addShellCommandToGeminiHistory(
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
       : resultText;
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   geminiClient.addHistory({
     role: 'user',
     parts: [
@@ -76,6 +77,8 @@ export const useShellCommandProcessor = (
   terminalHeight?: number,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
+  const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
+
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
@@ -109,7 +112,6 @@ export const useShellCommandProcessor = (
       const executeCommand = async (
         resolve: (value: void | PromiseLike<void>) => void,
       ) => {
-        let lastUpdateTime = Date.now();
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
@@ -160,7 +162,7 @@ export const useShellCommandProcessor = (
                   if (isBinaryStream) break;
                   // PTY provides the full screen state, so we just replace.
                   // Child process provides chunks, so we append.
-                  if (config.getShouldUseNodePtyShell()) {
+                  if (config.getEnableInteractiveShell()) {
                     cumulativeStdout = event.chunk;
                     shouldUpdate = true;
                   } else if (
@@ -168,6 +170,7 @@ export const useShellCommandProcessor = (
                     typeof cumulativeStdout === 'string'
                   ) {
                     cumulativeStdout += event.chunk;
+                    shouldUpdate = true;
                   }
                   break;
                 case 'binary_detected':
@@ -178,6 +181,7 @@ export const useShellCommandProcessor = (
                 case 'binary_progress':
                   isBinaryStream = true;
                   binaryBytesReceived = event.bytesReceived;
+                  shouldUpdate = true;
                   break;
                 default: {
                   throw new Error('An unhandled ShellOutputEvent was found.');
@@ -200,10 +204,8 @@ export const useShellCommandProcessor = (
               }
 
               // Throttle pending UI updates, but allow forced updates.
-              if (
-                shouldUpdate ||
-                Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
-              ) {
+              if (shouldUpdate) {
+                setLastShellOutputTime(Date.now());
                 setPendingHistoryItem((prevItem) => {
                   if (prevItem?.type === 'tool_group') {
                     return {
@@ -217,15 +219,12 @@ export const useShellCommandProcessor = (
                   }
                   return prevItem;
                 });
-                lastUpdateTime = Date.now();
               }
             },
             abortSignal,
-            config.getShouldUseNodePtyShell(),
+            config.getEnableInteractiveShell(),
             shellExecutionConfig,
           );
-
-          console.log(terminalHeight, terminalWidth);
 
           executionPid = pid;
           if (pid) {
@@ -289,13 +288,17 @@ export const useShellCommandProcessor = (
               };
 
               // Add the complete, contextual result to the local UI history.
-              addItemToHistory(
-                {
-                  type: 'tool_group',
-                  tools: [finalToolDisplay],
-                } as HistoryItemWithoutId,
-                userMessageTimestamp,
-              );
+              // We skip this for cancelled commands because useGeminiStream handles the
+              // immediate addition of the cancelled item to history to prevent flickering/duplicates.
+              if (finalStatus !== ToolCallStatus.Canceled) {
+                addItemToHistory(
+                  {
+                    type: 'tool_group',
+                    tools: [finalToolDisplay],
+                  } as HistoryItemWithoutId,
+                  userMessageTimestamp,
+                );
+              }
 
               // Add the same complete, contextual result to the LLM's history.
               addShellCommandToGeminiHistory(
@@ -348,6 +351,7 @@ export const useShellCommandProcessor = (
       };
 
       const execPromise = new Promise<void>((resolve) => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         executeCommand(resolve);
       });
 
@@ -367,5 +371,5 @@ export const useShellCommandProcessor = (
     ],
   );
 
-  return { handleShellCommand, activeShellPtyId };
+  return { handleShellCommand, activeShellPtyId, lastShellOutputTime };
 };

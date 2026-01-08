@@ -9,7 +9,7 @@ import {
   CloseDiffRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
-} from '@google/gemini-cli-core';
+} from '@google/gemini-cli-core/src/ide/types.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
+import { tmpdir } from '@google/gemini-cli-core';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -38,13 +38,13 @@ class CORSError extends Error {
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
+const IDE_AUTH_TOKEN_ENV_VAR = 'GEMINI_CLI_IDE_AUTH_TOKEN';
 
 interface WritePortAndWorkspaceArgs {
   context: vscode.ExtensionContext;
   port: number;
-  portFile: string;
-  ppidPortFile: string;
   authToken: string;
+  portFile: string | undefined;
   log: (message: string) => void;
 }
 
@@ -52,7 +52,6 @@ async function writePortAndWorkspace({
   context,
   port,
   portFile,
-  ppidPortFile,
   authToken,
   log,
 }: WritePortAndWorkspaceArgs): Promise<void> {
@@ -70,24 +69,26 @@ async function writePortAndWorkspace({
     IDE_WORKSPACE_PATH_ENV_VAR,
     workspacePath,
   );
+  context.environmentVariableCollection.replace(
+    IDE_AUTH_TOKEN_ENV_VAR,
+    authToken,
+  );
+
+  if (!portFile) {
+    log('Missing portFile, cannot write port and workspace info.');
+    return;
+  }
 
   const content = JSON.stringify({
     port,
     workspacePath,
-    ppid: process.ppid,
     authToken,
   });
 
   log(`Writing port file to: ${portFile}`);
-  log(`Writing ppid port file to: ${ppidPortFile}`);
 
   try {
-    await Promise.all([
-      fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600)),
-      fs
-        .writeFile(ppidPortFile, content)
-        .then(() => fs.chmod(ppidPortFile, 0o600)),
-    ]);
+    await fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to write port to file: ${message}`);
@@ -107,13 +108,7 @@ function sendIdeContextUpdateNotification(
     params: ideContext,
   });
 
-  log(
-    `Sending IDE context update notification: ${JSON.stringify(
-      notification,
-      null,
-      2,
-    )}`,
-  );
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   transport.send(notification);
 }
 
@@ -122,7 +117,7 @@ export class IDEServer {
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
   private portFile: string | undefined;
-  private ppidPortFile: string | undefined;
+
   private port: number | undefined;
   private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
@@ -173,24 +168,27 @@ export class IDEServer {
 
       app.use((req, res, next) => {
         const authHeader = req.headers.authorization;
-        if (authHeader) {
-          const parts = authHeader.split(' ');
-          if (parts.length !== 2 || parts[0] !== 'Bearer') {
-            this.log('Malformed Authorization header. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
-          const token = parts[1];
-          if (token !== this.authToken) {
-            this.log('Invalid auth token provided. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
+        if (!authHeader) {
+          this.log('Missing Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') {
+          this.log('Malformed Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const token = parts[1];
+        if (token !== this.authToken) {
+          this.log('Invalid auth token provided. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
         }
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager);
+      const mcpServer = createMcpServer(this.diffManager, this.log);
 
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
@@ -200,6 +198,7 @@ export class IDEServer {
       const onDidChangeDiffSubscription = this.diffManager.onDidChange(
         (notification) => {
           for (const transport of Object.values(this.transports)) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             transport.send(notification);
           }
         },
@@ -222,16 +221,27 @@ export class IDEServer {
               this.transports[newSessionId] = transport;
             },
           });
+          let missedPings = 0;
           const keepAlive = setInterval(() => {
-            try {
-              transport.send({ jsonrpc: '2.0', method: 'ping' });
-            } catch (e) {
-              this.log(
-                'Failed to send keep-alive ping, cleaning up interval.' + e,
-              );
-              clearInterval(keepAlive);
-            }
-          }, 30000); // 30 sec
+            const sessionId = transport.sessionId ?? 'unknown';
+            transport
+              .send({ jsonrpc: '2.0', method: 'ping' })
+              .then(() => {
+                missedPings = 0;
+              })
+              .catch((error) => {
+                missedPings++;
+                this.log(
+                  `Failed to send keep-alive ping for session ${sessionId}. Missed pings: ${missedPings}. Error: ${error.message}`,
+                );
+                if (missedPings >= 3) {
+                  this.log(
+                    `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
+                  );
+                  clearInterval(keepAlive);
+                }
+              });
+          }, 60000); // 60 sec
 
           transport.onclose = () => {
             clearInterval(keepAlive);
@@ -241,6 +251,8 @@ export class IDEServer {
               delete this.transports[transport.sessionId];
             }
           };
+
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           mcpServer.connect(transport);
         } else {
           this.log(
@@ -315,6 +327,8 @@ export class IDEServer {
       app.get('/mcp', handleSessionRequest);
 
       app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+        this.log(`Error processing request: ${err.message}`);
+        this.log(`Stack trace: ${err.stack}`);
         if (err instanceof CORSError) {
           res.status(403).json({ error: 'Request denied by CORS policy.' });
         } else {
@@ -326,28 +340,38 @@ export class IDEServer {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
-          this.portFile = path.join(
-            os.tmpdir(),
-            `gemini-ide-server-${this.port}.json`,
-          );
-          this.ppidPortFile = path.join(
-            os.tmpdir(),
-            `gemini-ide-server-${process.ppid}.json`,
-          );
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
-
-          if (this.authToken) {
-            await writePortAndWorkspace({
-              context,
-              port: this.port,
-              portFile: this.portFile,
-              ppidPortFile: this.ppidPortFile,
-              authToken: this.authToken,
-              log: this.log,
-            });
+          let portFile: string | undefined;
+          try {
+            const portDir = path.join(tmpdir(), 'gemini', 'ide');
+            await fs.mkdir(portDir, { recursive: true });
+            portFile = path.join(
+              portDir,
+              `gemini-ide-server-${process.ppid}-${this.port}.json`,
+            );
+            this.portFile = portFile;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(`Failed to create IDE port file: ${message}`);
           }
+
+          await writePortAndWorkspace({
+            context,
+            port: this.port,
+            portFile: this.portFile,
+            authToken: this.authToken ?? '',
+            log: this.log,
+          });
         }
         resolve();
+      });
+
+      this.server.on('close', () => {
+        this.log('IDE server connection closed.');
+      });
+
+      this.server.on('error', (error) => {
+        this.log(`IDE server error: ${error.message}`);
       });
     });
   }
@@ -366,19 +390,11 @@ export class IDEServer {
   }
 
   async syncEnvVars(): Promise<void> {
-    if (
-      this.context &&
-      this.server &&
-      this.port &&
-      this.portFile &&
-      this.ppidPortFile &&
-      this.authToken
-    ) {
+    if (this.context && this.server && this.port && this.authToken) {
       await writePortAndWorkspace({
         context: this.context,
         port: this.port,
         portFile: this.portFile,
-        ppidPortFile: this.ppidPortFile,
         authToken: this.authToken,
         log: this.log,
       });
@@ -411,17 +427,13 @@ export class IDEServer {
         // Ignore errors if the file doesn't exist.
       }
     }
-    if (this.ppidPortFile) {
-      try {
-        await fs.unlink(this.ppidPortFile);
-      } catch (_err) {
-        // Ignore errors if the file doesn't exist.
-      }
-    }
   }
 }
 
-const createMcpServer = (diffManager: DiffManager) => {
+const createMcpServer = (
+  diffManager: DiffManager,
+  log: (message: string) => void,
+) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
@@ -433,10 +445,11 @@ const createMcpServer = (diffManager: DiffManager) => {
     'openDiff',
     {
       description:
-        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
+        '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejected.',
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
+      log(`Received openDiff request for filePath: ${filePath}`);
       await diffManager.showDiff(filePath, newContent);
       return { content: [] };
     },
@@ -447,14 +460,9 @@ const createMcpServer = (diffManager: DiffManager) => {
       description: '(IDE Tool) Close an open diff view for a specific file.',
       inputSchema: CloseDiffRequestSchema.shape,
     },
-    async ({
-      filePath,
-      suppressNotification,
-    }: z.infer<typeof CloseDiffRequestSchema>) => {
-      const content = await diffManager.closeDiff(
-        filePath,
-        suppressNotification,
-      );
+    async ({ filePath }: z.infer<typeof CloseDiffRequestSchema>) => {
+      log(`Received closeDiff request for filePath: ${filePath}`);
+      const content = await diffManager.closeDiff(filePath);
       const response = { content: content ?? undefined };
       return {
         content: [

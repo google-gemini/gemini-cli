@@ -8,13 +8,22 @@ import * as fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { getErrorMessage, isNodeError } from './errors.js';
-import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import type { FileFilteringOptions } from '../config/config.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import type {
+  FileDiscoveryService,
+  FilterFilesOptions,
+} from '../services/fileDiscoveryService.js';
+import type { FileFilteringOptions } from '../config/constants.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import { debugLogger } from './debugLogger.js';
 
 const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';
-const DEFAULT_IGNORED_FOLDERS = new Set(['node_modules', '.git', 'dist']);
+const DEFAULT_IGNORED_FOLDERS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  '__pycache__',
+]);
 
 // --- Interfaces ---
 
@@ -104,7 +113,7 @@ async function readFullStructure(
         isNodeError(error) &&
         (error.code === 'EACCES' || error.code === 'ENOENT')
       ) {
-        console.warn(
+        debugLogger.warn(
           `Warning: Could not read directory ${currentPath}: ${error.message}`,
         );
         if (currentPath === rootPath && error.code === 'ENOENT') {
@@ -118,6 +127,10 @@ async function readFullStructure(
 
     const filesInCurrentDir: string[] = [];
     const subFoldersInCurrentDir: FullFolderInfo[] = [];
+    const filterFileOptions: FilterFilesOptions = {
+      respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
+      respectGeminiIgnore: options.fileFilteringOptions?.respectGeminiIgnore,
+    };
 
     // Process files first in the current directory
     for (const entry of entries) {
@@ -128,15 +141,10 @@ async function readFullStructure(
         }
         const fileName = entry.name;
         const filePath = path.join(currentPath, fileName);
-        if (options.fileService) {
-          const shouldIgnore =
-            (options.fileFilteringOptions.respectGitIgnore &&
-              options.fileService.shouldGitIgnoreFile(filePath)) ||
-            (options.fileFilteringOptions.respectGeminiIgnore &&
-              options.fileService.shouldGeminiIgnoreFile(filePath));
-          if (shouldIgnore) {
-            continue;
-          }
+        if (
+          options.fileService?.shouldIgnoreFile(filePath, filterFileOptions)
+        ) {
+          continue;
         }
         if (
           !options.fileIncludePattern ||
@@ -167,14 +175,11 @@ async function readFullStructure(
         const subFolderName = entry.name;
         const subFolderPath = path.join(currentPath, subFolderName);
 
-        let isIgnored = false;
-        if (options.fileService) {
-          isIgnored =
-            (options.fileFilteringOptions.respectGitIgnore &&
-              options.fileService.shouldGitIgnoreFile(subFolderPath)) ||
-            (options.fileFilteringOptions.respectGeminiIgnore &&
-              options.fileService.shouldGeminiIgnoreFile(subFolderPath));
-        }
+        const isIgnored =
+          options.fileService?.shouldIgnoreFile(
+            subFolderPath,
+            filterFileOptions,
+          ) ?? false;
 
         if (options.ignoredFolders.has(subFolderName) || isIgnored) {
           const ignoredSubFolder: FullFolderInfo = {
@@ -342,7 +347,10 @@ export async function getFolderStructure(
 
     return `${summary}\n\n${resolvedPath}${path.sep}\n${structureLines.join('\n')}`;
   } catch (error: unknown) {
-    console.error(`Error getting folder structure for ${resolvedPath}:`, error);
+    debugLogger.warn(
+      `Error getting folder structure for ${resolvedPath}:`,
+      error,
+    );
     return `Error processing directory "${resolvedPath}": ${getErrorMessage(error)}`;
   }
 }

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
@@ -34,6 +34,10 @@ vi.mock('./LoadingIndicator.js', () => ({
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
   ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
+}));
+
+vi.mock('./HookStatusDisplay.js', () => ({
+  HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
 }));
 
 vi.mock('./AutoAcceptIndicator.js', () => ({
@@ -111,8 +115,9 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showEscapePrompt: false,
     ideContextState: null,
     geminiMdFileCount: 0,
-    showToolDescriptions: false,
+    renderMarkdown: true,
     filteredConsoleMessages: [],
+    history: [],
     sessionStats: {
       lastPromptTokenCount: 0,
       sessionTokenCount: 0,
@@ -124,6 +129,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     errorCount: 0,
     nightly: false,
     isTrustedFolder: true,
+    activeHooks: [],
     ...overrides,
   }) as UIState;
 
@@ -143,7 +149,16 @@ const createMockConfig = (overrides = {}) => ({
   getDebugMode: vi.fn(() => false),
   getAccessibility: vi.fn(() => ({})),
   getMcpServers: vi.fn(() => ({})),
-  getBlockedMcpServers: vi.fn(() => []),
+  getToolRegistry: () => ({
+    getTool: vi.fn(),
+  }),
+  getSkillManager: () => ({
+    getSkills: () => [],
+  }),
+  getMcpClientManager: () => ({
+    getMcpServers: () => ({}),
+    getBlockedMcpServers: () => [],
+  }),
   ...overrides,
 });
 
@@ -331,6 +346,17 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ContextSummaryDisplay');
     });
 
+    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
+      const uiState = createMockUIState({
+        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('HookStatusDisplay');
+      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
+    });
+
     it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
@@ -402,6 +428,26 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShellModeIndicator');
+    });
+
+    it('shows RawMarkdownIndicator when renderMarkdown is false', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('raw markdown mode');
+    });
+
+    it('does not show RawMarkdownIndicator when renderMarkdown is true', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('raw markdown mode');
     });
   });
 

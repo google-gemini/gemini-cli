@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
   createToolCallErrorMessage,
@@ -13,12 +13,21 @@ import {
 } from './test-helper.js';
 
 describe('write_file', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to write a file', async () => {
-    const rig = new TestRig();
-    await rig.setup('should be able to write a file');
+    await rig.setup('should be able to write a file', {
+      settings: { tools: { core: ['write_file', 'read_file'] } },
+    });
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
 
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     const foundToolCall = await rig.waitForToolCall('write_file');
 
@@ -28,13 +37,14 @@ describe('write_file', () => {
     }
 
     const allTools = rig.readToolLogs();
-    expect(foundToolCall, 'Expected to find a write_file tool call').toBeTruthy(
+    expect(
+      foundToolCall,
       createToolCallErrorMessage(
         'write_file',
         allTools.map((t) => t.toolRequest.name),
         result,
       ),
-    );
+    ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
     validateModelOutput(result, 'dad.txt', 'Write file test');

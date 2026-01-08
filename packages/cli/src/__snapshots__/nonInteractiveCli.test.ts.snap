@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`runNonInteractive > should emit appropriate error event in streaming JSON mode: 'loop detected' 1`] = `
+"{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Loop test"}
+{"type":"error","timestamp":"<TIMESTAMP>","severity":"warning","message":"Loop detected, stopping execution"}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0}}
+"
+`;
+
+exports[`runNonInteractive > should emit appropriate error event in streaming JSON mode: 'max session turns' 1`] = `
+"{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Max turns test"}
+{"type":"error","timestamp":"<TIMESTAMP>","severity":"error","message":"Maximum session turns exceeded"}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0}}
+"
+`;
+
+exports[`runNonInteractive > should emit appropriate events for streaming JSON output 1`] = `
+"{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Stream test"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"assistant","content":"Thinking...","delta":true}
+{"type":"tool_use","timestamp":"<TIMESTAMP>","tool_name":"testTool","tool_id":"tool-1","parameters":{"arg1":"value1"}}
+{"type":"tool_result","timestamp":"<TIMESTAMP>","tool_id":"tool-1","status":"success","output":"Tool executed successfully"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"assistant","content":"Final answer","delta":true}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0}}
+"
+`;
+
+exports[`runNonInteractive > should write a single newline between sequential text outputs from the model 1`] = `
+"Use mock tool
+Use mock tool again
+Finished.
+"
+`;

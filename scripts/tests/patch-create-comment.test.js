@@ -18,7 +18,6 @@ function runPatchCreateComment(args, env = {}) {
   );
   const fullEnv = {
     ...process.env,
-    TEST_MODE: 'true', // Always run in test mode to avoid GitHub API calls
     ...env,
   };
 
@@ -39,18 +38,63 @@ function runPatchCreateComment(args, env = {}) {
 }
 
 describe('patch-create-comment', () => {
-  let originalEnv;
-
   beforeEach(() => {
-    // Save original environment
-    originalEnv = { ...process.env };
+    vi.stubEnv();
+    // Always run in test mode to avoid GitHub API calls
+    vi.stubEnv('TEST_MODE', 'true');
   });
 
   afterEach(() => {
-    // Restore original environment
-    process.env = originalEnv;
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
+
+  describe('Environment flag', () => {
+    it('can be overridden with a flag', () => {
+      vi.stubEnv('ENVIRONMENT', 'dev');
+      const result = runPatchCreateComment(
+        '--original-pr 8655 --exit-code 0 --environment prod --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('Environment**: `prod`');
+    });
+
+    it('reads from the ENVIRONMENT env variable', () => {
+      vi.stubEnv('ENVIRONMENT', 'dev');
+      const result = runPatchCreateComment(
+        '--original-pr 8655 --exit-code 0 --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('Environment**: `dev`');
+    });
+
+    it('fails if the ENVIRONMENT is bogus', () => {
+      vi.stubEnv('ENVIRONMENT', 'totally-bogus');
+      const result = runPatchCreateComment(
+        '--original-pr 8655 --exit-code 0 --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.stderr).toContain(
+        'Argument: environment, Given: "totally-bogus", Choices: "prod", "dev"',
+      );
+    });
+
+    it('defaults to prod if not specified', () => {
+      const result = runPatchCreateComment(
+        '--original-pr 8655 --exit-code 0 --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('Environment**: `prod`');
+    });
+  });
+
   describe('Environment Variable vs File Reading', () => {
     it('should prefer LOG_CONTENT environment variable over file', () => {
       const result = runPatchCreateComment(

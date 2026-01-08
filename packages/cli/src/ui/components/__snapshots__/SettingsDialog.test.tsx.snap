@@ -1,351 +1,415 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`SettingsDialog > Snapshot Tests > should render default state correctly 1`] = `
+exports[`SettingsDialog > Initial Rendering > should render settings list with visual indicators 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render focused on scope selector 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with accessibility settings enabled 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                   false*  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                              false*  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                               false*  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                     false*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with all boolean settings disabled 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false*                                    │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false*                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false*                                    │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false*                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with different scope selected (System) 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode (Modified in System)                        false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update (Modified in System)             false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with different scope selected (Workspace) 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│    Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode (Modified in Workspace)                     false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│    Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging (Modified in Workspace)      false                                     │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│  > Apply To                                                                                      │
+│  ● 1. User Settings                                                                              │
+│    2. Workspace Settings                                                                         │
+│    3. System Settings                                                                            │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with file filtering settings configured 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    true*  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                     false*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and number settings 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false*                                    │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    false  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false*                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render with tools and security settings 1`] = `
+exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│ > Settings                                                                                       │
+│  > Settings                                                                                      │
 │                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             false                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter                                                                             │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│   Disable Auto Update                                  false                                     │
+│  ▲                                                                                               │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│   Enable Prompt Completion                             false                                     │
+│    Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│   Debug Keystroke Logging                              false                                     │
+│    Disable Auto Update                                                                    true*  │
+│    Disable automatic updates                                                                     │
 │                                                                                                  │
-│   Output Format                                        Text                                      │
+│    Enable Prompt Completion                                                               true*  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│   Hide Window Title                                    false                                     │
+│    Debug Keystroke Logging                                                                true*  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output.                                                                 │
 │                                                                                                  │
-│ ▼                                                                                                │
+│    Hide Window Title                                                                      true*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│    Apply To                                                                                      │
+│  ● User Settings                                                                                 │
+│    Workspace Settings                                                                            │
+│    System Settings                                                                               │
 │                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`SettingsDialog > Snapshot Tests > should render with various boolean settings enabled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│ > Settings                                                                                       │
-│                                                                                                  │
-│ ▲                                                                                                │
-│ ● Vim Mode                                             true*                                     │
-│                                                                                                  │
-│   Disable Auto Update                                  true*                                     │
-│                                                                                                  │
-│   Enable Prompt Completion                             true*                                     │
-│                                                                                                  │
-│   Debug Keystroke Logging                              true*                                     │
-│                                                                                                  │
-│   Output Format                                        Text                                      │
-│                                                                                                  │
-│   Hide Window Title                                    true*                                     │
-│                                                                                                  │
-│   Hide Tips                                            true*                                     │
-│                                                                                                  │
-│   Hide Banner                                          false                                     │
-│                                                                                                  │
-│ ▼                                                                                                │
-│                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus)                                                       │
+│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

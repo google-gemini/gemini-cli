@@ -4,14 +4,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'node:child_process';
+import { expect } from 'vitest';
+import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
+import * as pty from '@lydell/node-pty';
+import stripAnsi from 'strip-ansi';
+import * as os from 'node:os';
+import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const BUNDLE_PATH = join(__dirname, '..', 'bundle/gemini.js');
+
+// Get timeout based on environment
+function getDefaultTimeout() {
+  if (env['CI']) return 60000; // 1 minute in CI
+  if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
+  return 15000; // 15s locally
+}
+
+export async function poll(
+  predicate: () => boolean,
+  timeout: number,
+  interval: number,
+): Promise<boolean> {
+  const startTime = Date.now();
+  let attempts = 0;
+  while (Date.now() - startTime < timeout) {
+    attempts++;
+    const result = predicate();
+    if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
+      console.log(
+        `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
+      );
+    }
+    if (result) {
+      return true;
+    }
+    await sleep(interval);
+  }
+  if (env['VERBOSE'] === 'true') {
+    console.log(`Poll timed out after ${attempts} attempts`);
+  }
+  return false;
+}
 
 function sanitizeTestName(name: string) {
   return name
@@ -100,8 +141,10 @@ export function validateModelOutput(
       console.warn(
         'The tool was called successfully, which is the main requirement.',
       );
+      console.warn('Expected content:', expectedContent);
+      console.warn('Actual output:', result);
       return false;
-    } else if (process.env.VERBOSE === 'true') {
+    } else if (env['VERBOSE'] === 'true') {
       console.log(`${testName}: Model output validated successfully.`);
     }
     return true;
@@ -110,52 +153,203 @@ export function validateModelOutput(
   return true;
 }
 
+interface ParsedLog {
+  attributes?: {
+    'event.name'?: string;
+    function_name?: string;
+    function_args?: string;
+    success?: boolean;
+    duration_ms?: number;
+    request_text?: string;
+    hook_event_name?: string;
+    hook_name?: string;
+    hook_input?: Record<string, unknown>;
+    hook_output?: Record<string, unknown>;
+    exit_code?: number;
+    stdout?: string;
+    stderr?: string;
+    error?: string;
+  };
+  scopeMetrics?: {
+    metrics: {
+      descriptor: {
+        name: string;
+      };
+    }[];
+  }[];
+}
+
+export class InteractiveRun {
+  ptyProcess: pty.IPty;
+  public output = '';
+
+  constructor(ptyProcess: pty.IPty) {
+    this.ptyProcess = ptyProcess;
+    ptyProcess.onData((data) => {
+      this.output += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stdout.write(data);
+      }
+    });
+  }
+
+  async expectText(text: string, timeout?: number) {
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+    await poll(
+      () => stripAnsi(this.output).toLowerCase().includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
+    expect(stripAnsi(this.output).toLowerCase()).toContain(text.toLowerCase());
+  }
+
+  // This types slowly to make sure command is correct, but only work for short
+  // commands that are not multi-line, use sendKeys to type long prompts
+  async type(text: string) {
+    let typedSoFar = '';
+    for (const char of text) {
+      if (char === '\r') {
+        // wait >30ms before `enter` to avoid fast return conversion
+        // from bufferFastReturn() in KeypressContent.tsx
+        await sleep(50);
+      }
+
+      this.ptyProcess.write(char);
+      typedSoFar += char;
+
+      // Wait for the typed sequence so far to be echoed back.
+      const found = await poll(
+        () => stripAnsi(this.output).includes(typedSoFar),
+        5000, // 5s timeout per character (generous for CI)
+        10, // check frequently
+      );
+
+      if (!found) {
+        throw new Error(
+          `Timed out waiting for typed text to appear in output: "${typedSoFar}".\nStripped output:\n${stripAnsi(
+            this.output,
+          )}`,
+        );
+      }
+    }
+  }
+
+  // Types an entire string at once, necessary for some things like commands
+  // but may run into paste detection issues for larger strings.
+  async sendText(text: string) {
+    this.ptyProcess.write(text);
+    await sleep(5);
+  }
+
+  // Simulates typing a string one character at a time to avoid paste detection.
+  async sendKeys(text: string) {
+    const delay = 5;
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      await sleep(delay);
+    }
+  }
+
+  async kill() {
+    this.ptyProcess.kill();
+  }
+
+  expectExit(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () =>
+          reject(
+            new Error(`Test timed out: process did not exit within a minute.`),
+          ),
+        60000,
+      );
+      this.ptyProcess.onExit(({ exitCode }) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
+  }
+}
+
 export class TestRig {
-  bundlePath: string;
-  testDir: string | null;
+  testDir: string | null = null;
+  homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
-
-  constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
-    this.testDir = null;
-  }
-
-  // Get timeout based on environment
-  getDefaultTimeout() {
-    if (env.CI) return 60000; // 1 minute in CI
-    if (env.GEMINI_SANDBOX) return 30000; // 30s in containers
-    return 15000; // 15s locally
-  }
+  // Path to the copied fake responses file for this test.
+  fakeResponsesPath?: string;
+  // Original fake responses file path for rewriting goldens in record mode.
+  originalFakeResponsesPath?: string;
+  private _interactiveRuns: InteractiveRun[] = [];
+  private _spawnedProcesses: ChildProcess[] = [];
 
   setup(
     testName: string,
-    options: { settings?: Record<string, unknown> } = {},
+    options: {
+      settings?: Record<string, unknown>;
+      fakeResponsesPath?: string;
+    } = {},
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
+    const testFileDir =
+      env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
+    this.testDir = join(testFileDir, sanitizedName);
+    this.homeDir = join(testFileDir, sanitizedName + '-home');
     mkdirSync(this.testDir, { recursive: true });
+    mkdirSync(this.homeDir, { recursive: true });
+    if (options.fakeResponsesPath) {
+      this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
+      this.originalFakeResponsesPath = options.fakeResponsesPath;
+      if (process.env['REGENERATE_MODEL_GOLDENS'] !== 'true') {
+        fs.copyFileSync(options.fakeResponsesPath, this.fakeResponsesPath);
+      }
+    }
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, '.gemini');
-    mkdirSync(geminiDir, { recursive: true });
+    this._createSettingsFile(options.settings);
+  }
+
+  private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
+    const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
+    mkdirSync(projectGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
+    const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
     const settings = {
+      general: {
+        // Nightly releases sometimes becomes out of sync with local code and
+        // triggers auto-update, which causes tests to fail.
+        disableAutoUpdate: true,
+        previewFeatures: false,
+      },
       telemetry: {
         enabled: true,
         target: 'local',
         otlpEndpoint: '',
         outfile: telemetryPath,
       },
-      sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
-      ...options.settings, // Allow tests to override/add settings
+      security: {
+        auth: {
+          selectedType: 'gemini-api-key',
+        },
+      },
+      ui: {
+        useAlternateBuffer: true,
+      },
+      model: DEFAULT_GEMINI_MODEL,
+      sandbox:
+        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+      // Don't show the IDE connection dialog when running from VsCode
+      ide: { enabled: false, hasSeenNudge: true },
+      ...overrideSettings, // Allow tests to override/add settings
     };
     writeFileSync(
-      join(geminiDir, 'settings.json'),
+      join(projectGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
   }
@@ -171,17 +365,49 @@ export class TestRig {
   }
 
   sync() {
+    if (os.platform() === 'win32') return;
     // ensure file system is done before spawning
     execSync('sync', { cwd: this.testDir! });
   }
 
-  run(
-    promptOrOptions:
-      | string
-      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
-    ...args: string[]
-  ): Promise<string> {
-    const commandArgs = [this.bundlePath, '--yolo'];
+  /**
+   * The command and args to use to invoke Gemini CLI. Allows us to switch
+   * between using the bundled gemini.js (the default) and using the installed
+   * 'gemini' (used to verify npm bundles).
+   */
+  private _getCommandAndArgs(extraInitialArgs: string[] = []): {
+    command: string;
+    initialArgs: string[];
+  } {
+    const isNpmReleaseTest =
+      env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
+    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const initialArgs = isNpmReleaseTest
+      ? extraInitialArgs
+      : [BUNDLE_PATH, ...extraInitialArgs];
+    if (this.fakeResponsesPath) {
+      if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
+        initialArgs.push('--record-responses', this.fakeResponsesPath);
+      } else {
+        initialArgs.push('--fake-responses', this.fakeResponsesPath);
+      }
+    }
+    return { command, initialArgs };
+  }
+
+  run(options: {
+    args?: string | string[];
+    stdin?: string;
+    stdinDoesNotEnd?: boolean;
+    yolo?: boolean;
+    timeout?: number;
+    env?: Record<string, string | undefined>;
+  }): Promise<string> {
+    const yolo = options.yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
@@ -191,26 +417,28 @@ export class TestRig {
       encoding: 'utf-8',
     };
 
-    if (typeof promptOrOptions === 'string') {
-      commandArgs.push('--prompt', promptOrOptions);
-    } else if (
-      typeof promptOrOptions === 'object' &&
-      promptOrOptions !== null
-    ) {
-      if (promptOrOptions.prompt) {
-        commandArgs.push('--prompt', promptOrOptions.prompt);
-      }
-      if (promptOrOptions.stdin) {
-        execOptions.input = promptOrOptions.stdin;
+    if (options.args) {
+      if (Array.isArray(options.args)) {
+        commandArgs.push(...options.args);
+      } else {
+        commandArgs.push(options.args);
       }
     }
 
-    commandArgs.push(...args);
+    if (options.stdin) {
+      execOptions.input = options.stdin;
+    }
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: {
+        ...process.env,
+        GEMINI_CLI_HOME: this.homeDir!,
+        ...options.env,
+      },
     });
+    this._spawnedProcesses.push(child);
 
     let stdout = '';
     let stderr = '';
@@ -220,70 +448,50 @@ export class TestRig {
       child.stdin!.write(execOptions.input);
     }
 
-    if (
-      typeof promptOrOptions === 'object' &&
-      !promptOrOptions.stdinDoesNotEnd
-    ) {
+    if (!options.stdinDoesNotEnd) {
       child.stdin!.end();
     }
 
-    child.stdout!.on('data', (data: Buffer) => {
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (data: string) => {
       stdout += data;
-      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stdout.write(data);
       }
     });
 
-    child.stderr!.on('data', (data: Buffer) => {
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (data: string) => {
       stderr += data;
-      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stderr.write(data);
       }
     });
 
+    const timeout = options.timeout ?? 120000;
     const promise = new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(
+          new Error(
+            `Process timed out after ${timeout}ms.\nStdout:\n${stdout}\nStderr:\n${stderr}`,
+          ),
+        );
+      }, timeout);
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+
       child.on('close', (code: number) => {
+        clearTimeout(timer);
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
 
           // Filter out telemetry output when running with Podman
-          // Podman seems to output telemetry to stdout even when writing to file
-          let result = stdout;
-          if (env.GEMINI_SANDBOX === 'podman') {
-            // Remove telemetry JSON objects from output
-            // They are multi-line JSON objects that start with { and contain telemetry fields
-            const lines = result.split(EOL);
-            const filteredLines = [];
-            let inTelemetryObject = false;
-            let braceDepth = 0;
-
-            for (const line of lines) {
-              if (!inTelemetryObject && line.trim() === '{') {
-                // Check if this might be start of telemetry object
-                inTelemetryObject = true;
-                braceDepth = 1;
-              } else if (inTelemetryObject) {
-                // Count braces to track nesting
-                for (const char of line) {
-                  if (char === '{') braceDepth++;
-                  else if (char === '}') braceDepth--;
-                }
-
-                // Check if we've closed all braces
-                if (braceDepth === 0) {
-                  inTelemetryObject = false;
-                  // Skip this line (the closing brace)
-                  continue;
-                }
-              } else {
-                // Not in telemetry object, keep the line
-                filteredLines.push(line);
-              }
-            }
-
-            result = filteredLines.join('\n');
-          }
+          const result = this._filterPodmanTelemetry(stdout);
 
           // Check if this is a JSON output test - if so, don't include stderr
           // as it would corrupt the JSON
@@ -292,11 +500,139 @@ export class TestRig {
             commandArgs.includes('json');
 
           // If we have stderr output and it's not a JSON test, include that also
-          if (stderr && !isJsonOutput) {
-            result += `\n\nStdErr:\n${stderr}`;
-          }
+          const finalResult =
+            stderr && !isJsonOutput
+              ? `${result}\n\nStdErr:\n${stderr}`
+              : result;
 
-          resolve(result);
+          resolve(finalResult);
+        } else {
+          reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+        }
+      });
+    });
+
+    return promise;
+  }
+
+  private _filterPodmanTelemetry(stdout: string): string {
+    if (env['GEMINI_SANDBOX'] !== 'podman') {
+      return stdout;
+    }
+
+    // Remove telemetry JSON objects from output
+    // They are multi-line JSON objects that start with { and contain telemetry fields
+    const lines = stdout.split(os.EOL);
+    const filteredLines = [];
+    let inTelemetryObject = false;
+    let braceDepth = 0;
+
+    for (const line of lines) {
+      if (!inTelemetryObject && line.trim() === '{') {
+        // Check if this might be start of telemetry object
+        inTelemetryObject = true;
+        braceDepth = 1;
+      } else if (inTelemetryObject) {
+        // Count braces to track nesting
+        for (const char of line) {
+          if (char === '{') braceDepth++;
+          else if (char === '}') braceDepth--;
+        }
+
+        // Check if we've closed all braces
+        if (braceDepth === 0) {
+          inTelemetryObject = false;
+          // Skip this line (the closing brace)
+          continue;
+        }
+      } else {
+        // Not in telemetry object, keep the line
+        filteredLines.push(line);
+      }
+    }
+
+    return filteredLines.join('\n');
+  }
+
+  runCommand(
+    args: string[],
+    options: {
+      stdin?: string;
+      timeout?: number;
+      env?: Record<string, string | undefined>;
+    } = {},
+  ): Promise<string> {
+    const { command, initialArgs } = this._getCommandAndArgs();
+    const commandArgs = [...initialArgs, ...args];
+
+    const child = spawn(command, commandArgs, {
+      cwd: this.testDir!,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GEMINI_CLI_HOME: this.homeDir!,
+        ...options.env,
+      },
+    });
+    this._spawnedProcesses.push(child);
+
+    let stdout = '';
+    let stderr = '';
+
+    if (options.stdin) {
+      child.stdin!.write(options.stdin);
+      child.stdin!.end();
+    }
+
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (data: string) => {
+      stdout += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (data: string) => {
+      stderr += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const timeout = options.timeout ?? 120000;
+    const promise = new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(
+          new Error(
+            `Process timed out after ${timeout}ms.\nStdout:\n${stdout}\nStderr:\n${stderr}`,
+          ),
+        );
+      }, timeout);
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+
+      child.on('close', (code: number) => {
+        clearTimeout(timer);
+        if (code === 0) {
+          this._lastRunStdout = stdout;
+          const result = this._filterPodmanTelemetry(stdout);
+
+          // Check if this is a JSON output test - if so, don't include stderr
+          // as it would corrupt the JSON
+          const isJsonOutput =
+            commandArgs.includes('--output-format') &&
+            commandArgs.includes('json');
+
+          const finalResult =
+            stderr && !isJsonOutput
+              ? `${result}\n\nStdErr:\n${stderr}`
+              : result;
+          resolve(finalResult);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
         }
@@ -309,7 +645,7 @@ export class TestRig {
   readFile(fileName: string) {
     const filePath = join(this.testDir!, fileName);
     const content = readFileSync(filePath, 'utf-8');
-    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+    if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
       console.log(`--- FILE: ${filePath} ---`);
       console.log(content);
       console.log(`--- END FILE: ${filePath} ---`);
@@ -318,13 +654,58 @@ export class TestRig {
   }
 
   async cleanup() {
-    // Clean up test directory
-    if (this.testDir && !env.KEEP_OUTPUT) {
+    // Kill any interactive runs that are still active
+    for (const run of this._interactiveRuns) {
       try {
-        execSync(`rm -rf ${this.testDir}`);
+        await run.kill();
+      } catch (error) {
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Failed to kill interactive run during cleanup:', error);
+        }
+      }
+    }
+    this._interactiveRuns = [];
+
+    // Kill any other spawned processes that are still running
+    for (const child of this._spawnedProcesses) {
+      if (child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill('SIGKILL');
+        } catch (error) {
+          if (env['VERBOSE'] === 'true') {
+            console.warn(
+              'Failed to kill spawned process during cleanup:',
+              error,
+            );
+          }
+        }
+      }
+    }
+    this._spawnedProcesses = [];
+
+    if (
+      process.env['REGENERATE_MODEL_GOLDENS'] === 'true' &&
+      this.fakeResponsesPath
+    ) {
+      fs.copyFileSync(this.fakeResponsesPath, this.originalFakeResponsesPath!);
+    }
+    // Clean up test directory and home directory
+    if (this.testDir && !env['KEEP_OUTPUT']) {
+      try {
+        fs.rmSync(this.testDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
-        if (env.VERBOSE === 'true') {
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Cleanup warning:', (error as Error).message);
+        }
+      }
+    }
+    if (this.homeDir && !env['KEEP_OUTPUT']) {
+      try {
+        fs.rmSync(this.homeDir, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore cleanup errors
+        if (env['VERBOSE'] === 'true') {
           console.warn('Cleanup warning:', (error as Error).message);
         }
       }
@@ -333,18 +714,18 @@ export class TestRig {
 
   async waitForTelemetryReady() {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logFilePath = join(this.homeDir!, 'telemetry.log');
 
     if (!logFilePath) return;
 
     // Wait for telemetry file to exist and have content
-    await this.poll(
+    await poll(
       () => {
         if (!fs.existsSync(logFilePath)) return false;
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
-          return content.includes('"event.name"');
+          return content.includes('"scopeMetrics"');
         } catch {
           return false;
         }
@@ -356,79 +737,96 @@ export class TestRig {
 
   async waitForTelemetryEvent(eventName: string, timeout?: number) {
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
-        const logFilePath = join(this.testDir!, 'telemetry.log');
-
-        if (!logFilePath || !fs.existsSync(logFilePath)) {
-          return false;
-        }
-
-        const content = readFileSync(logFilePath, 'utf-8');
-        const jsonObjects = content
-          .split(/}\n{/)
-          .map((obj, index, array) => {
-            // Add back the braces we removed during split
-            if (index > 0) obj = '{' + obj;
-            if (index < array.length - 1) obj = obj + '}';
-            return obj.trim();
-          })
-          .filter((obj) => obj);
-
-        for (const jsonStr of jsonObjects) {
-          try {
-            const logData = JSON.parse(jsonStr);
-            if (
-              logData.attributes &&
-              logData.attributes['event.name'] === `gemini_cli.${eventName}`
-            ) {
-              return true;
-            }
-          } catch {
-            // ignore
-          }
-        }
-        return false;
+        const logs = this._readAndParseTelemetryLog();
+        return logs.some(
+          (logData) =>
+            logData.attributes &&
+            logData.attributes['event.name'] === `gemini_cli.${eventName}`,
+        );
       },
       timeout,
       100,
     );
   }
 
-  async waitForToolCall(toolName: string, timeout?: number) {
+  async waitForToolCall(
+    toolName: string,
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
-        return toolLogs.some((log) => log.toolRequest.name === toolName);
+        return toolLogs.some(
+          (log) =>
+            log.toolRequest.name === toolName &&
+            (matchArgs?.call(this, log.toolRequest.args) ?? true),
+        );
       },
       timeout,
       100,
     );
+  }
+
+  async expectToolCallSuccess(
+    toolNames: string[],
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    const success = await poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some(
+            (log) =>
+              log.toolRequest.name === name &&
+              log.toolRequest.success &&
+              (matchArgs?.call(this, log.toolRequest.args) ?? true),
+          ),
+        );
+      },
+      timeout,
+      100,
+    );
+
+    expect(
+      success,
+      `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
+    ).toBe(true);
   }
 
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
-    // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
@@ -438,32 +836,6 @@ export class TestRig {
       timeout,
       100,
     );
-  }
-
-  async poll(
-    predicate: () => boolean,
-    timeout: number,
-    interval: number,
-  ): Promise<boolean> {
-    const startTime = Date.now();
-    let attempts = 0;
-    while (Date.now() - startTime < timeout) {
-      attempts++;
-      const result = predicate();
-      if (env.VERBOSE === 'true' && attempts % 5 === 0) {
-        console.log(
-          `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
-        );
-      }
-      if (result) {
-        return true;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-    if (env.VERBOSE === 'true') {
-      console.log(`Poll timed out after ${attempts} attempts`);
-    }
-    return false;
   }
 
   _parseToolLogsFromStdout(stdout: string) {
@@ -521,7 +893,7 @@ export class TestRig {
     // If no matches found with the simple pattern, try the JSON parsing approach
     // in case the format changes
     if (logs.length === 0) {
-      const lines = stdout.split(EOL);
+      const lines = stdout.split(os.EOL);
       let currentObject = '';
       let inObject = false;
       let braceDepth = 0;
@@ -590,12 +962,51 @@ export class TestRig {
     return logs;
   }
 
+  private _readAndParseTelemetryLog(): ParsedLog[] {
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.homeDir!, 'telemetry.log');
+
+    if (!logFilePath || !fs.existsSync(logFilePath)) {
+      return [];
+    }
+
+    const content = readFileSync(logFilePath, 'utf-8');
+
+    // Split the content into individual JSON objects
+    // They are separated by "}\n{"
+    const jsonObjects = content
+      .split(/}\n{/)
+      .map((obj, index, array) => {
+        // Add back the braces we removed during split
+        if (index > 0) obj = '{' + obj;
+        if (index < array.length - 1) obj = obj + '}';
+        return obj.trim();
+      })
+      .filter((obj) => obj);
+
+    const logs: ParsedLog[] = [];
+
+    for (const jsonStr of jsonObjects) {
+      try {
+        const logData = JSON.parse(jsonStr);
+        logs.push(logData);
+      } catch (e) {
+        // Skip objects that aren't valid JSON
+        if (env['VERBOSE'] === 'true') {
+          console.error('Failed to parse telemetry object:', e);
+        }
+      }
+    }
+
+    return logs;
+  }
+
   readToolLogs() {
     // For Podman, first check if telemetry file exists and has content
     // If not, fall back to parsing from stdout
-    if (env.GEMINI_SANDBOX === 'podman') {
+    if (env['GEMINI_SANDBOX'] === 'podman') {
       // Try reading from file first
-      const logFilePath = join(this.testDir!, 'telemetry.log');
+      const logFilePath = join(this.homeDir!, 'telemetry.log');
 
       if (fs.existsSync(logFilePath)) {
         try {
@@ -619,33 +1030,7 @@ export class TestRig {
       }
     }
 
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
-
-    if (!logFilePath) {
-      console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
-      return [];
-    }
-
-    // Check if file exists, if not return empty array (file might not be created yet)
-    if (!fs.existsSync(logFilePath)) {
-      return [];
-    }
-
-    const content = readFileSync(logFilePath, 'utf-8');
-
-    // Split the content into individual JSON objects
-    // They are separated by "}\n{"
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        // Add back the braces we removed during split
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
+    const parsedLogs = this._readAndParseTelemetryLog();
     const logs: {
       toolRequest: {
         name: string;
@@ -655,68 +1040,187 @@ export class TestRig {
       };
     }[] = [];
 
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        // Look for tool call logs
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.tool_call'
-        ) {
-          const toolName = logData.attributes.function_name;
-          logs.push({
-            toolRequest: {
-              name: toolName,
-              args: logData.attributes.function_args,
-              success: logData.attributes.success,
-              duration_ms: logData.attributes.duration_ms,
-            },
-          });
-        }
-      } catch (e) {
-        // Skip objects that aren't valid JSON
-        if (env.VERBOSE === 'true') {
-          console.error('Failed to parse telemetry object:', e);
-        }
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.tool_call'
+      ) {
+        const toolName = logData.attributes.function_name!;
+        logs.push({
+          toolRequest: {
+            name: toolName,
+            args: logData.attributes.function_args ?? '{}',
+            success: logData.attributes.success ?? false,
+            duration_ms: logData.attributes.duration_ms ?? 0,
+          },
+        });
       }
     }
 
     return logs;
   }
 
-  readLastApiRequest(): Record<string, unknown> | null {
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+  readAllApiRequest(): ParsedLog[] {
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === `gemini_cli.api_request`,
+    );
+    return apiRequests;
+  }
 
-    if (!logFilePath || !fs.existsSync(logFilePath)) {
-      return null;
-    }
+  readLastApiRequest(): ParsedLog | null {
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === `gemini_cli.api_request`,
+    );
+    return apiRequests.pop() || null;
+  }
 
-    const content = readFileSync(logFilePath, 'utf-8');
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
+  async waitForMetric(metricName: string, timeout?: number) {
+    await this.waitForTelemetryReady();
 
-    let lastApiRequest = null;
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
 
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.api_request'
-        ) {
-          lastApiRequest = logData;
+    return poll(
+      () => {
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
         }
-      } catch {
-        // ignore
+        return false;
+      },
+      timeout ?? getDefaultTimeout(),
+      100,
+    );
+  }
+
+  readMetric(metricName: string): Record<string, unknown> | null {
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === `gemini_cli.${metricName}`) {
+              return metric;
+            }
+          }
+        }
       }
     }
-    return lastApiRequest;
+    return null;
+  }
+
+  async runInteractive(options?: {
+    args?: string | string[];
+    yolo?: boolean;
+    env?: Record<string, string | undefined>;
+  }): Promise<InteractiveRun> {
+    const yolo = options?.yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
+    const commandArgs = [...initialArgs];
+
+    const envVars = {
+      ...process.env,
+      GEMINI_CLI_HOME: this.homeDir!,
+      ...options?.env,
+    };
+
+    const ptyOptions: pty.IPtyForkOptions = {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 80,
+      cwd: this.testDir!,
+      env: Object.fromEntries(
+        Object.entries(envVars).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
+    };
+
+    const executable = command === 'node' ? process.execPath : command;
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
+
+    const run = new InteractiveRun(ptyProcess);
+    this._interactiveRuns.push(run);
+    // Wait for the app to be ready
+    await run.expectText('  Type your message or @path/to/file', 30000);
+    return run;
+  }
+
+  readHookLogs() {
+    const parsedLogs = this._readAndParseTelemetryLog();
+    const logs: {
+      hookCall: {
+        hook_event_name: string;
+        hook_name: string;
+        hook_input: Record<string, unknown>;
+        hook_output: Record<string, unknown>;
+        exit_code: number;
+        stdout: string;
+        stderr: string;
+        duration_ms: number;
+        success: boolean;
+        error: string;
+      };
+    }[] = [];
+
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.hook_call'
+      ) {
+        logs.push({
+          hookCall: {
+            hook_event_name: logData.attributes.hook_event_name ?? '',
+            hook_name: logData.attributes.hook_name ?? '',
+            hook_input: logData.attributes.hook_input ?? {},
+            hook_output: logData.attributes.hook_output ?? {},
+            exit_code: logData.attributes.exit_code ?? 0,
+            stdout: logData.attributes.stdout ?? '',
+            stderr: logData.attributes.stderr ?? '',
+            duration_ms: logData.attributes.duration_ms ?? 0,
+            success: logData.attributes.success ?? false,
+            error: logData.attributes.error ?? '',
+          },
+        });
+      }
+    }
+
+    return logs;
+  }
+
+  async pollCommand(
+    commandFn: () => Promise<void>,
+    predicateFn: () => boolean,
+    timeout: number = 30000,
+    interval: number = 1000,
+  ) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      await commandFn();
+      // Give it a moment to process
+      await sleep(500);
+      if (predicateFn()) {
+        return;
+      }
+      await sleep(interval);
+    }
+    throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
 }

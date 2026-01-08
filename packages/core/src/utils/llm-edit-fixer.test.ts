@@ -12,11 +12,20 @@ import {
 } from './llm-edit-fixer.js';
 import { promptIdContext } from './promptIdContext.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import { debugLogger } from './debugLogger.js';
 
 // Mock the BaseLlmClient
 const mockGenerateJson = vi.fn();
 const mockBaseLlmClient = {
   generateJson: mockGenerateJson,
+  config: {
+    generationConfigService: {
+      getResolvedConfig: vi.fn().mockReturnValue({
+        model: 'edit-corrector',
+        generateContentConfig: {},
+      }),
+    },
+  },
 } as unknown as BaseLlmClient;
 
 describe('FixLLMEditWithInstruction', () => {
@@ -29,12 +38,24 @@ describe('FixLLMEditWithInstruction', () => {
   const abortSignal = abortController.signal;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
+    // Mock AbortSignal.timeout to use setTimeout so it respects fake timers
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(
+        () =>
+          controller.abort(new DOMException('TimeoutError', 'TimeoutError')),
+        ms,
+      );
+      return controller.signal;
+    });
     resetLlmEditFixerCaches_TEST_ONLY(); // Ensure cache is cleared before each test
   });
 
   afterEach(() => {
     vi.useRealTimers(); // Reset timers after each test
+    vi.restoreAllMocks();
   });
 
   const mockApiResponse: SearchReplaceEdit = {
@@ -72,7 +93,7 @@ describe('FixLLMEditWithInstruction', () => {
   it('should generate and use a fallback promptId when context is not available', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
 
     // Run the function outside of any context
@@ -199,5 +220,162 @@ describe('FixLLMEditWithInstruction', () => {
       // Verify the underlying service was called TWICE
       expect(mockGenerateJson).toHaveBeenCalledTimes(2);
     });
+  });
+
+  describe('cache collision prevention', () => {
+    it('should prevent cache collisions when parameters contain separator sequences', async () => {
+      // This test would have failed with the old string concatenation approach
+      // but passes with JSON.stringify implementation
+
+      const firstResponse: SearchReplaceEdit = {
+        search: 'original text',
+        replace: 'first replacement',
+        noChangesRequired: false,
+        explanation: 'First edit correction',
+      };
+
+      const secondResponse: SearchReplaceEdit = {
+        search: 'different text',
+        replace: 'second replacement',
+        noChangesRequired: false,
+        explanation: 'Second edit correction',
+      };
+
+      mockGenerateJson
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+
+      const testPromptId = 'cache-collision-test';
+
+      await promptIdContext.run(testPromptId, async () => {
+        // Scenario 1: Parameters that would create collision with string concatenation
+        // Cache key with old method would be: "Fix YAML---content---update--some---data--error"
+        const call1 = await FixLLMEditWithInstruction(
+          'Fix YAML', // instruction
+          'content', // old_string
+          'update--some', // new_string (contains --)
+          'data', // current_content
+          'error', // error
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Scenario 2: Different parameters that would create same cache key with concatenation
+        // Cache key with old method would be: "Fix YAML---content---update--some---data--error"
+        const call2 = await FixLLMEditWithInstruction(
+          'Fix YAML---content---update', // instruction (contains ---)
+          'some---data', // old_string (contains ---)
+          'error', // new_string
+          '', // current_content
+          '', // error
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // With the fixed JSON.stringify approach, these should be different
+        // and each should get its own LLM response
+        expect(call1).toEqual(firstResponse);
+        expect(call2).toEqual(secondResponse);
+        expect(call1).not.toEqual(call2);
+
+        // Most importantly: the LLM should be called TWICE, not once
+        // (proving no cache collision occurred)
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('should handle YAML frontmatter without cache collisions', async () => {
+      // Real-world test case with YAML frontmatter containing ---
+
+      const yamlResponse: SearchReplaceEdit = {
+        search: '---\ntitle: Old\n---',
+        replace: '---\ntitle: New\n---',
+        noChangesRequired: false,
+        explanation: 'Updated YAML frontmatter',
+      };
+
+      const contentResponse: SearchReplaceEdit = {
+        search: 'old content',
+        replace: 'new content',
+        noChangesRequired: false,
+        explanation: 'Updated content',
+      };
+
+      mockGenerateJson
+        .mockResolvedValueOnce(yamlResponse)
+        .mockResolvedValueOnce(contentResponse);
+
+      const testPromptId = 'yaml-frontmatter-test';
+
+      await promptIdContext.run(testPromptId, async () => {
+        // Call 1: Edit YAML frontmatter
+        const yamlEdit = await FixLLMEditWithInstruction(
+          'Update YAML frontmatter',
+          '---\ntitle: Old\n---', // Contains ---
+          '---\ntitle: New\n---', // Contains ---
+          'Some markdown content',
+          'YAML parse error',
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Call 2: Edit regular content
+        const contentEdit = await FixLLMEditWithInstruction(
+          'Update content',
+          'old content',
+          'new content',
+          'Different file content',
+          'Content not found',
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Verify both calls succeeded with different results
+        expect(yamlEdit).toEqual(yamlResponse);
+        expect(contentEdit).toEqual(contentResponse);
+        expect(yamlEdit).not.toEqual(contentEdit);
+
+        // Verify no cache collision - both calls should hit the LLM
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  it('should return null if the LLM call times out', async () => {
+    mockGenerateJson.mockImplementation(
+      async ({ abortSignal }) =>
+        // Simulate a long-running operation that never resolves on its own.
+        // It will only reject when the abort signal is triggered by the timeout.
+        new Promise((_resolve, reject) => {
+          if (abortSignal?.aborted) {
+            return reject(new DOMException('Aborted', 'AbortError'));
+          }
+          abortSignal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const testPromptId = 'test-prompt-id-timeout';
+
+    const fixPromise = promptIdContext.run(testPromptId, () =>
+      FixLLMEditWithInstruction(
+        instruction,
+        old_string,
+        new_string,
+        error,
+        current_content,
+        mockBaseLlmClient,
+        abortSignal,
+      ),
+    );
+
+    // Let the timers advance just past the 40000ms default timeout.
+    await vi.advanceTimersByTimeAsync(40001);
+
+    const result = await fixPromise;
+
+    expect(result).toBeNull();
+    expect(mockGenerateJson).toHaveBeenCalledOnce();
   });
 });

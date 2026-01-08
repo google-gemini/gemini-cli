@@ -24,12 +24,13 @@ import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [IDEClient]', ...args),
+  debug: (...args: any[]) => debugLogger.debug('[DEBUG] [IDEClient]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
+  error: (...args: any[]) => debugLogger.error('[ERROR] [IDEClient]', ...args),
 };
 
 export type DiffUpdateResult =
@@ -60,8 +61,8 @@ type StdioConfig = {
 
 type ConnectionConfig = {
   port?: string;
-  stdio?: StdioConfig;
   authToken?: string;
+  stdio?: StdioConfig;
 };
 
 function getRealPath(path: string): string {
@@ -87,6 +88,9 @@ export class IdeClient {
   };
   private currentIde: IdeInfo | undefined;
   private ideProcessInfo: { pid: number; command: string } | undefined;
+  private connectionConfig:
+    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
+    | undefined;
   private authToken: string | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
@@ -106,7 +110,11 @@ export class IdeClient {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
         client.ideProcessInfo = await getIdeProcessInfo();
-        client.currentIde = detectIde(client.ideProcessInfo);
+        client.connectionConfig = await client.getConnectionConfigFromFile();
+        client.currentIde = detectIde(
+          client.ideProcessInfo,
+          client.connectionConfig?.ideInfo,
+        );
         return client;
       })();
     }
@@ -129,11 +137,12 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
-  async connect(): Promise<void> {
+  async connect(options: { logToConsole?: boolean } = {}): Promise<void> {
+    const logError = options.logToConsole ?? true;
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
         false,
       );
       return;
@@ -141,37 +150,37 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    const configFromFile = await this.getConnectionConfigFromFile();
-    if (configFromFile?.authToken) {
-      this.authToken = configFromFile.authToken;
-    }
+    this.connectionConfig = await this.getConnectionConfigFromFile();
+    this.authToken =
+      this.connectionConfig?.authToken ??
+      process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+
     const workspacePath =
-      configFromFile?.workspacePath ??
+      this.connectionConfig?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
     const { isValid, error } = IdeClient.validateWorkspacePath(
       workspacePath,
-      this.currentIde.displayName,
       process.cwd(),
     );
 
     if (!isValid) {
-      this.setState(IDEConnectionStatus.Disconnected, error, true);
+      this.setState(IDEConnectionStatus.Disconnected, error, logError);
       return;
     }
 
-    if (configFromFile) {
-      if (configFromFile.port) {
+    if (this.connectionConfig) {
+      if (this.connectionConfig.port) {
         const connected = await this.establishHttpConnection(
-          configFromFile.port,
+          this.connectionConfig.port,
         );
         if (connected) {
           return;
         }
       }
-      if (configFromFile.stdio) {
+      if (this.connectionConfig.stdio) {
         const connected = await this.establishStdioConnection(
-          configFromFile.stdio,
+          this.connectionConfig.stdio,
         );
         if (connected) {
           return;
@@ -198,7 +207,7 @@ export class IdeClient {
     this.setState(
       IDEConnectionStatus.Disconnected,
       `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
-      true,
+      logError,
     );
   }
 
@@ -270,6 +279,7 @@ export class IdeClient {
     });
 
     // Ensure the mutex is released only after the diff interaction is complete.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     promise.finally(release);
 
     return promise;
@@ -398,6 +408,7 @@ export class IdeClient {
       IDEConnectionStatus.Disconnected,
       'IDE integration disabled. To enable it again, run /ide enable.',
     );
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.client?.close();
   }
 
@@ -494,20 +505,19 @@ export class IdeClient {
 
   static validateWorkspacePath(
     ideWorkspacePath: string | undefined,
-    currentIdeDisplayName: string | undefined,
     cwd: string,
   ): { isValid: boolean; error?: string } {
     if (ideWorkspacePath === undefined) {
       return {
         isValid: false,
-        error: `Failed to connect to IDE companion extension in ${currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+        error: `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`,
       };
     }
 
     if (ideWorkspacePath === '') {
       return {
         isValid: false,
-        error: `To use this feature, please open a workspace folder in ${currentIdeDisplayName} and try again.`,
+        error: `To use this feature, please open a workspace folder in your IDE and try again.`,
       };
     }
 
@@ -521,7 +531,7 @@ export class IdeClient {
     if (!isWithinWorkspace) {
       return {
         isValid: false,
-        error: `Directory mismatch. Gemini CLI is running in a different location than the open workspace in ${currentIdeDisplayName}. Please run the CLI from one of the following directories: ${ideWorkspacePaths.join(
+        error: `Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE. Please run the CLI from one of the following directories: ${ideWorkspacePaths.join(
           ', ',
         )}`,
       };
@@ -564,13 +574,14 @@ export class IdeClient {
   }
 
   private async getConnectionConfigFromFile(): Promise<
-    (ConnectionConfig & { workspacePath?: string }) | undefined
+    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
+    | undefined
   > {
     if (!this.ideProcessInfo) {
       return undefined;
     }
 
-    // For backwards compatability
+    // For backwards compatibility
     try {
       const portFile = path.join(
         os.tmpdir(),
@@ -591,6 +602,10 @@ export class IdeClient {
       portFiles = await fs.promises.readdir(portFileDir);
     } catch (e) {
       logger.debug('Failed to read IDE connection directory:', e);
+      return undefined;
+    }
+
+    if (!portFiles) {
       return undefined;
     }
 
@@ -630,7 +645,6 @@ export class IdeClient {
       }
       const { isValid } = IdeClient.validateWorkspacePath(
         content.workspacePath,
-        this.currentIde?.displayName,
         process.cwd(),
       );
       return isValid;
@@ -658,12 +672,15 @@ export class IdeClient {
   }
 
   private createProxyAwareFetch() {
-    // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    // ignore proxy for '127.0.0.1' by default to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
+      noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
     });
     const undiciPromise = import('undici');
+    // Suppress unhandled rejection if the promise is not awaited immediately.
+    // If the import fails, the error will be thrown when awaiting undiciPromise below.
+    undiciPromise.catch(() => {});
     return async (url: string | URL, init?: RequestInit): Promise<Response> => {
       const { fetch: fetchFn } = await undiciPromise;
       const fetchOptions: RequestInit & { dispatcher?: unknown } = {
@@ -740,7 +757,7 @@ export class IdeClient {
       },
     );
 
-    // For backwards compatability. Newer extension versions will only send
+    // For backwards compatibility. Newer extension versions will only send
     // IdeDiffRejectedNotificationSchema.
     this.client.setNotificationHandler(
       IdeDiffClosedNotificationSchema,
@@ -832,5 +849,5 @@ export class IdeClient {
 function getIdeServerHost() {
   const isInContainer =
     fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
-  return isInContainer ? 'host.docker.internal' : 'localhost';
+  return isInContainer ? 'host.docker.internal' : '127.0.0.1';
 }

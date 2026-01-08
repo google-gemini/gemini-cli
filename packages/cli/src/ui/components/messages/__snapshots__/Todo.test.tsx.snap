@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<TodoTray /> (showFullTodos: false) > renders a todo list with long descriptions that wrap when full view is on 1`] = `
+"──────────────────────────────────────────────────
+ Todo  1/2 completed (ctrl+t to toggle) » This i…"
+`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders full list when all todos are inactive 1`] = `""`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders null when no todos are in the history 1`] = `""`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders null when todo list is empty 1`] = `""`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders the most recent todo list when multiple write_todos calls are in history 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  0/2 completed (ctrl+t to toggle) » Newer Task 2"
+`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders when todos exist and one is in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  1/3 completed (ctrl+t to toggle) » Task 2"
+`;
+
+exports[`<TodoTray /> (showFullTodos: false) > renders when todos exist but none are in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  1/2 completed (ctrl+t to toggle)"
+`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders a todo list with long descriptions that wrap when full view is on 1`] = `
+"──────────────────────────────────────────────────
+ Todo  1/2 completed (ctrl+t to toggle)
+
+ » This is a very long description for a pending
+   task that should wrap around multiple lines
+   when the terminal width is constrained.
+ ✓ Another completed task with an equally verbose
+   description to test wrapping behavior."
+`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders full list when all todos are inactive 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  1/1 completed (ctrl+t to toggle)
+
+ ✓ Task 1
+ ✗ Task 2"
+`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders null when no todos are in the history 1`] = `""`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders null when todo list is empty 1`] = `""`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders the most recent todo list when multiple write_todos calls are in history 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  0/2 completed (ctrl+t to toggle)
+
+ ☐ Newer Task 1
+ » Newer Task 2"
+`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders when todos exist and one is in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  1/3 completed (ctrl+t to toggle)
+
+ ☐ Pending Task
+ » Task 2
+ ✗ In Progress Task
+ ✓ Completed Task"
+`;
+
+exports[`<TodoTray /> (showFullTodos: true) > renders when todos exist but none are in progress 1`] = `
+"────────────────────────────────────────────────────────────────────────────────────────────────────
+ Todo  1/2 completed (ctrl+t to toggle)
+
+ ☐ Pending Task
+ ✗ In Progress Task
+ ✓ Completed Task"
+`;

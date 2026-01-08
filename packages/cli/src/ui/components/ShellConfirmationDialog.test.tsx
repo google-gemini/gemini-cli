@@ -19,32 +19,34 @@ describe('ShellConfirmationDialog', () => {
   it('renders correctly', () => {
     const { lastFrame } = renderWithProviders(
       <ShellConfirmationDialog request={request} />,
+      { width: 101 },
     );
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('calls onConfirm with ProceedOnce when "Yes, allow once" is selected', () => {
+  it('calls onConfirm with ProceedOnce when "Allow once" is selected', () => {
     const { lastFrame } = renderWithProviders(
       <ShellConfirmationDialog request={request} />,
     );
     const select = lastFrame()!.toString();
     // Simulate selecting the first option
     // This is a simplified way to test the selection
-    expect(select).toContain('Yes, allow once');
+    expect(select).toContain('Allow once');
   });
 
-  it('calls onConfirm with ProceedAlways when "Yes, allow always for this session" is selected', () => {
+  it('calls onConfirm with ProceedAlways when "Allow for this session" is selected', () => {
     const { lastFrame } = renderWithProviders(
       <ShellConfirmationDialog request={request} />,
     );
     const select = lastFrame()!.toString();
     // Simulate selecting the second option
-    expect(select).toContain('Yes, allow always for this session');
+    expect(select).toContain('Allow for this session');
   });
 
   it('calls onConfirm with Cancel when "No (esc)" is selected', () => {
     const { lastFrame } = renderWithProviders(
       <ShellConfirmationDialog request={request} />,
+      { width: 100 },
     );
     const select = lastFrame()!.toString();
     // Simulate selecting the third option

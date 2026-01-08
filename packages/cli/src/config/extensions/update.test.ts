@@ -4,413 +4,346 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  EXTENSIONS_CONFIG_FILENAME,
-  INSTALL_METADATA_FILENAME,
-  annotateActiveExtensions,
-  loadExtension,
-} from '../extension.js';
-import { checkForAllExtensionUpdates, updateExtension } from './update.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
-import { isWorkspaceTrusted } from '../trustedFolders.js';
-import { ExtensionUpdateState } from '../../ui/state/extensions.js';
-import { createExtension } from '../../test-utils/createExtension.js';
+  updateExtension,
+  updateAllUpdatableExtensions,
+  checkForAllExtensionUpdates,
+} from './update.js';
+import {
+  ExtensionUpdateState,
+  type ExtensionUpdateStatus,
+} from '../../ui/state/extensions.js';
+import { ExtensionStorage } from './storage.js';
+import { copyExtension } from '../extension-manager.js';
+import { checkForExtensionUpdate } from './github.js';
+import { loadInstallMetadata } from '../extension.js';
+import * as fs from 'node:fs';
+import type { ExtensionManager } from '../extension-manager.js';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
-const mockGit = {
-  clone: vi.fn(),
-  getRemotes: vi.fn(),
-  fetch: vi.fn(),
-  checkout: vi.fn(),
-  listRemote: vi.fn(),
-  revparse: vi.fn(),
-  // Not a part of the actual API, but we need to use this to do the correct
-  // file system interactions.
-  path: vi.fn(),
-};
-
-vi.mock('simple-git', () => ({
-  simpleGit: vi.fn((path: string) => {
-    mockGit.path.mockReturnValue(path);
-    return mockGit;
-  }),
+// Mock dependencies
+vi.mock('./storage.js', () => ({
+  ExtensionStorage: {
+    createTmpDir: vi.fn(),
+  },
 }));
 
-vi.mock('os', async (importOriginal) => {
-  const mockedOs = await importOriginal<typeof os>();
-  return {
-    ...mockedOs,
-    homedir: vi.fn(),
-  };
-});
+vi.mock('../extension-manager.js', () => ({
+  copyExtension: vi.fn(),
+  // We don't need to mock the class implementation if we pass a mock instance
+}));
 
-vi.mock('../trustedFolders.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../trustedFolders.js')>();
+vi.mock('./github.js', () => ({
+  checkForExtensionUpdate: vi.fn(),
+}));
+
+vi.mock('../extension.js', () => ({
+  loadInstallMetadata: vi.fn(),
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    isWorkspaceTrusted: vi.fn(),
-  };
-});
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const mockLogExtensionInstallEvent = vi.fn();
-  const mockLogExtensionUninstallEvent = vi.fn();
-  return {
-    ...actual,
-    ClearcutLogger: {
-      getInstance: vi.fn(() => ({
-        logExtensionInstallEvent: mockLogExtensionInstallEvent,
-        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
-      })),
+    promises: {
+      ...actual.promises,
+      rm: vi.fn(),
     },
-    Config: vi.fn(),
-    ExtensionInstallEvent: vi.fn(),
-    ExtensionUninstallEvent: vi.fn(),
   };
 });
 
-describe('update tests', () => {
-  let tempHomeDir: string;
-  let tempWorkspaceDir: string;
-  let userExtensionsDir: string;
+describe('Extension Update Logic', () => {
+  let mockExtensionManager: ExtensionManager;
+  let mockDispatch: ReturnType<typeof vi.fn>;
+  const mockExtension: GeminiCLIExtension = {
+    name: 'test-extension',
+    version: '1.0.0',
+    path: '/path/to/extension',
+  } as GeminiCLIExtension;
 
   beforeEach(() => {
-    tempHomeDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
-    );
-    tempWorkspaceDir = fs.mkdtempSync(
-      path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
-    );
-    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
-    // Clean up before each test
-    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
-    fs.mkdirSync(userExtensionsDir, { recursive: true });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
-    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
-    Object.values(mockGit).forEach((fn) => fn.mockReset());
-  });
+    vi.clearAllMocks();
+    mockExtensionManager = {
+      loadExtensionConfig: vi.fn(),
+      installOrUpdateExtension: vi.fn(),
+    } as unknown as ExtensionManager;
+    mockDispatch = vi.fn();
 
-  afterEach(() => {
-    fs.rmSync(tempHomeDir, { recursive: true, force: true });
-    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    // Default mock behaviors
+    vi.mocked(ExtensionStorage.createTmpDir).mockResolvedValue('/tmp/mock-dir');
+    vi.mocked(loadInstallMetadata).mockReturnValue({
+      source: 'https://example.com/repo.git',
+      type: 'git',
+    });
   });
 
   describe('updateExtension', () => {
-    it('should update a git-installed extension', async () => {
-      const gitUrl = 'https://github.com/google/gemini-extensions.git';
-      const extensionName = 'gemini-extensions';
-      const targetExtDir = path.join(userExtensionsDir, extensionName);
-      const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
-
-      fs.mkdirSync(targetExtDir, { recursive: true });
-      fs.writeFileSync(
-        path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
-        JSON.stringify({ name: extensionName, version: '1.0.0' }),
+    it('should return undefined if state is already UPDATING', async () => {
+      const result = await updateExtension(
+        mockExtension,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATING,
+        mockDispatch,
       );
-      fs.writeFileSync(
-        metadataPath,
-        JSON.stringify({ source: gitUrl, type: 'git' }),
-      );
+      expect(result).toBeUndefined();
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
 
-      mockGit.clone.mockImplementation(async (_, destination) => {
-        fs.mkdirSync(path.join(mockGit.path(), destination), {
-          recursive: true,
-        });
-        fs.writeFileSync(
-          path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
-          JSON.stringify({ name: extensionName, version: '1.1.0' }),
-        );
+    it('should throw error and set state to ERROR if install metadata type is unknown', async () => {
+      vi.mocked(loadInstallMetadata).mockReturnValue({
+        type: undefined,
+      } as unknown as import('@google/gemini-cli-core').ExtensionInstallMetadata);
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow('type is unknown');
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.UPDATING,
+        },
       });
-      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir: targetExtDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-      const updateInfo = await updateExtension(
-        extension,
-        tempHomeDir,
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
+    });
+
+    it('should throw error and set state to UP_TO_DATE if extension is linked', async () => {
+      vi.mocked(loadInstallMetadata).mockReturnValue({
+        type: 'link',
+        source: '',
+      });
+
+      await expect(
+        updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        ),
+      ).rejects.toThrow('Extension is linked');
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.UP_TO_DATE,
+        },
+      });
+    });
+
+    it('should successfully update extension and set state to UPDATED_NEEDS_RESTART by default', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
+      });
+
+      const result = await updateExtension(
+        mockExtension,
+        mockExtensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
-        () => {},
+        mockDispatch,
       );
 
-      expect(updateInfo).toEqual({
-        name: 'gemini-extensions',
+      expect(mockExtensionManager.installOrUpdateExtension).toHaveBeenCalled();
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
+        },
+      });
+      expect(result).toEqual({
+        name: 'test-extension',
         originalVersion: '1.0.0',
         updatedVersion: '1.1.0',
       });
-
-      const updatedConfig = JSON.parse(
-        fs.readFileSync(
-          path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
-          'utf-8',
-        ),
-      );
-      expect(updatedConfig.version).toBe('1.1.0');
+      expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/mock-dir', {
+        recursive: true,
+        force: true,
+      });
     });
 
-    it('should call setExtensionUpdateState with UPDATING and then UPDATED_NEEDS_RESTART on success', async () => {
-      const extensionName = 'test-extension';
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: extensionName,
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
+    it('should set state to UPDATED if enableExtensionReloading is true', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
       });
 
-      mockGit.clone.mockImplementation(async (_, destination) => {
-        fs.mkdirSync(path.join(mockGit.path(), destination), {
-          recursive: true,
-        });
-        fs.writeFileSync(
-          path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
-          JSON.stringify({ name: extensionName, version: '1.1.0' }),
-        );
-      });
-      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-
-      const setExtensionUpdateState = vi.fn();
-
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
       await updateExtension(
-        extension,
-        tempHomeDir,
+        mockExtension,
+        mockExtensionManager,
         ExtensionUpdateState.UPDATE_AVAILABLE,
-        setExtensionUpdateState,
+        mockDispatch,
+        true, // enableExtensionReloading
       );
 
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATING,
-      );
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATED_NEEDS_RESTART,
-      );
-    });
-
-    it('should call setExtensionUpdateState with ERROR on failure', async () => {
-      const extensionName = 'test-extension';
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: extensionName,
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.UPDATED,
         },
       });
+    });
 
-      mockGit.clone.mockRejectedValue(new Error('Git clone failed'));
-      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+    it('should rollback and set state to ERROR if installation fails', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockRejectedValue(new Error('Install failed'));
 
-      const setExtensionUpdateState = vi.fn();
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
       await expect(
         updateExtension(
-          extension,
-          tempHomeDir,
+          mockExtension,
+          mockExtensionManager,
           ExtensionUpdateState.UPDATE_AVAILABLE,
-          setExtensionUpdateState,
+          mockDispatch,
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow('Updated extension not found after installation');
 
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATING,
+      expect(copyExtension).toHaveBeenCalledWith(
+        '/tmp/mock-dir',
+        mockExtension.path,
       );
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.ERROR,
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
+      expect(fs.promises.rm).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateAllUpdatableExtensions', () => {
+    it('should update all extensions with UPDATE_AVAILABLE status', async () => {
+      const extensions: GeminiCLIExtension[] = [
+        { ...mockExtension, name: 'ext1' },
+        { ...mockExtension, name: 'ext2' },
+        { ...mockExtension, name: 'ext3' },
+      ];
+      const extensionsState = new Map([
+        ['ext1', { status: ExtensionUpdateState.UPDATE_AVAILABLE }],
+        ['ext2', { status: ExtensionUpdateState.UP_TO_DATE }],
+        ['ext3', { status: ExtensionUpdateState.UPDATE_AVAILABLE }],
+      ]);
+
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'ext',
+          version: '1.0.0',
+        }),
       );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({ ...mockExtension, version: '1.1.0' });
+
+      const results = await updateAllUpdatableExtensions(
+        extensions,
+        extensionsState as Map<string, ExtensionUpdateStatus>,
+        mockExtensionManager,
+        mockDispatch,
+      );
+
+      expect(results).toHaveLength(2);
+      expect(results.map((r) => r.name)).toEqual(['ext1', 'ext3']);
+      expect(
+        mockExtensionManager.installOrUpdateExtension,
+      ).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('checkForAllExtensionUpdates', () => {
-    it('should return UpdateAvailable for a git extension with updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
+    it('should dispatch BATCH_CHECK_START and BATCH_CHECK_END', async () => {
+      await checkForAllExtensionUpdates([], mockExtensionManager, mockDispatch);
 
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
-      mockGit.revparse.mockResolvedValue('localHash');
-
-      let extensionState = new Map();
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
-      );
-      const result = results.get('test-extension');
-      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'BATCH_CHECK_START' });
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'BATCH_CHECK_END' });
     });
 
-    it('should return UpToDate for a git extension with no updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
+    it('should set state to NOT_UPDATABLE if no install metadata', async () => {
+      const extensions: GeminiCLIExtension[] = [
+        { ...mockExtension, installMetadata: undefined },
+      ];
+
+      await checkForAllExtensionUpdates(
+        extensions,
+        mockExtensionManager,
+        mockDispatch,
+      );
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.NOT_UPDATABLE,
         },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
-      mockGit.revparse.mockResolvedValue('sameHash');
-
-      let extensionState = new Map();
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
-      );
-      const result = results.get('test-extension');
-      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
-    it('should return NotUpdatable for a non-git extension', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'local-extension',
-        version: '1.0.0',
-        installMetadata: { source: '/local/path', type: 'local' },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-      let extensionState = new Map();
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+    it('should check for updates and update state', async () => {
+      const extensions: GeminiCLIExtension[] = [
+        { ...mockExtension, installMetadata: { type: 'git', source: '...' } },
+      ];
+      vi.mocked(checkForExtensionUpdate).mockResolvedValue(
+        ExtensionUpdateState.UPDATE_AVAILABLE,
       );
-      const result = results.get('local-extension');
-      expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
-    });
 
-    it('should return Error when git check fails', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'error-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
+      await checkForAllExtensionUpdates(
+        extensions,
+        mockExtensionManager,
+        mockDispatch,
+      );
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
         },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
-
-      let extensionState = new Map();
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: mockExtension.name,
+          state: ExtensionUpdateState.UPDATE_AVAILABLE,
         },
-      );
-      const result = results.get('error-extension');
-      expect(result).toBe(ExtensionUpdateState.ERROR);
+      });
     });
   });
 });

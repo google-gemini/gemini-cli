@@ -5,9 +5,11 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
-import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
+import { waitFor } from '../../test-utils/async.js';
+import { act } from 'react';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { FolderTrustDialog } from './FolderTrustDialog.js';
+import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -17,8 +19,9 @@ vi.mock('../../utils/processUtils.js', () => ({
 const mockedExit = vi.hoisted(() => vi.fn());
 const mockedCwd = vi.hoisted(() => vi.fn());
 
-vi.mock('process', async () => {
-  const actual = await vi.importActual('process');
+vi.mock('node:process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:process')>('node:process');
   return {
     ...actual,
     exit: mockedExit,
@@ -43,30 +46,27 @@ describe('FolderTrustDialog', () => {
     );
   });
 
-  it('should call onSelect with DO_NOT_TRUST when escape is pressed and not restarting', async () => {
+  it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { lastFrame, stdin } = renderWithProviders(
       <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
     );
 
-    stdin.write('\x1b'); // escape key
+    act(() => {
+      stdin.write('\u001b[27u'); // Press kitty escape key
+    });
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(FolderTrustChoice.DO_NOT_TRUST);
+      expect(lastFrame()).toContain(
+        'A folder trust level must be selected to continue. Exiting since escape was pressed.',
+      );
     });
-  });
-
-  it('should not call onSelect when escape is pressed and is restarting', async () => {
-    const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
-      <FolderTrustDialog onSelect={onSelect} isRestarting={true} />,
-    );
-
-    stdin.write('\x1b'); // escape key
-
     await waitFor(() => {
-      expect(onSelect).not.toHaveBeenCalled();
+      expect(mockedExit).toHaveBeenCalledWith(
+        ExitCodes.FATAL_CANCELLATION_ERROR,
+      );
     });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('should display restart message when isRestarting is true', () => {
@@ -74,7 +74,7 @@ describe('FolderTrustDialog', () => {
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
 
-    expect(lastFrame()).toContain(' Gemini CLI is restarting');
+    expect(lastFrame()).toContain('Gemini CLI is restarting');
   });
 
   it('should call relaunchApp when isRestarting is true', async () => {
@@ -83,8 +83,23 @@ describe('FolderTrustDialog', () => {
     renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('should not call relaunchApp if unmounted before timeout', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const { unmount } = renderWithProviders(
+      <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
+    );
+
+    // Unmount immediately (before 250ms)
+    unmount();
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(relaunchApp).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
@@ -93,7 +108,9 @@ describe('FolderTrustDialog', () => {
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={false} />,
     );
 
-    stdin.write('r');
+    act(() => {
+      stdin.write('r');
+    });
 
     await waitFor(() => {
       expect(mockedExit).not.toHaveBeenCalled();

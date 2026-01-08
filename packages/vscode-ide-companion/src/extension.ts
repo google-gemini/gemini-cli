@@ -13,18 +13,16 @@ import {
   detectIdeFromEnv,
   IDE_DEFINITIONS,
   type IdeInfo,
-} from '@google/gemini-cli-core';
+} from '@google/gemini-cli-core/src/ide/detect-ide.js';
 
 const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 export const DIFF_SCHEME = 'gemini-diff';
 
 /**
- * IDE environments where the installation greeting is hidden.  In these
- * environments we either are pre-installed and the installation message is
- * confusing or we just want to be quiet.
+ * In these environments the companion extension is installed and managed by the IDE instead of the user.
  */
-const HIDE_INSTALLATION_GREETING_IDES: ReadonlySet<IdeInfo['name']> = new Set([
+const MANAGED_EXTENSION_SURFACES: ReadonlySet<IdeInfo['name']> = new Set([
   IDE_DEFINITIONS.firebasestudio.name,
   IDE_DEFINITIONS.cloudshell.name,
 ]);
@@ -37,6 +35,7 @@ let log: (message: string) => void = () => {};
 async function checkForUpdates(
   context: vscode.ExtensionContext,
   log: (message: string) => void,
+  isManagedExtensionSurface: boolean,
 ) {
   try {
     const currentVersion = context.extension.packageJSON.version;
@@ -81,7 +80,11 @@ async function checkForUpdates(
     // The versions are sorted by date, so the first one is the latest.
     const latestVersion = extension?.versions?.[0]?.version;
 
-    if (latestVersion && semver.gt(latestVersion, currentVersion)) {
+    if (
+      !isManagedExtensionSurface &&
+      latestVersion &&
+      semver.gt(latestVersion, currentVersion)
+    ) {
       const selection = await vscode.window.showInformationMessage(
         `A new version (${latestVersion}) of the Gemini CLI Companion extension is available.`,
         'Update to latest version',
@@ -105,7 +108,12 @@ export async function activate(context: vscode.ExtensionContext) {
   log = createLogger(context, logger);
   log('Extension activated');
 
-  checkForUpdates(context, log);
+  const isManagedExtensionSurface = MANAGED_EXTENSION_SURFACES.has(
+    detectIdeFromEnv().name,
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  checkForUpdates(context, log, isManagedExtensionSurface);
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
@@ -113,6 +121,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc) => {
       if (doc.uri.scheme === DIFF_SCHEME) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         diffManager.cancelDiff(doc.uri);
       }
     }),
@@ -120,11 +129,12 @@ export async function activate(context: vscode.ExtensionContext) {
       DIFF_SCHEME,
       diffContentProvider,
     ),
-    vscode.commands.registerCommand(
+    (vscode.commands.registerCommand(
       'gemini.diff.accept',
       (uri?: vscode.Uri) => {
         const docUri = uri ?? vscode.window.activeTextEditor?.document.uri;
         if (docUri && docUri.scheme === DIFF_SCHEME) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           diffManager.acceptDiff(docUri);
         }
       },
@@ -134,10 +144,11 @@ export async function activate(context: vscode.ExtensionContext) {
       (uri?: vscode.Uri) => {
         const docUri = uri ?? vscode.window.activeTextEditor?.document.uri;
         if (docUri && docUri.scheme === DIFF_SCHEME) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           diffManager.cancelDiff(docUri);
         }
       },
-    ),
+    )),
   );
 
   ideServer = new IDEServer(log, diffManager);
@@ -148,11 +159,10 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
-  const infoMessageEnabled = !HIDE_INSTALLATION_GREETING_IDES.has(
-    detectIdeFromEnv().name,
-  );
-
-  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY) && infoMessageEnabled) {
+  if (
+    !context.globalState.get(INFO_MESSAGE_SHOWN_KEY) &&
+    !isManagedExtensionSurface
+  ) {
     void vscode.window.showInformationMessage(
       'Gemini CLI Companion extension successfully installed.',
     );
@@ -160,12 +170,14 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   context.subscriptions.push(
-    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    (vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       ideServer.syncEnvVars();
     }),
     vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       ideServer.syncEnvVars();
-    }),
+    })),
     vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {

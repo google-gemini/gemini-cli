@@ -28,7 +28,7 @@ const mockPrompt = {
     { name: 'trail', required: false, description: "The animal's trail." },
   ],
   invoke: vi.fn().mockResolvedValue({
-    messages: [{ content: { text: 'Hello, world!' } }],
+    messages: [{ content: { type: 'text', text: 'Hello, world!' } }],
   }),
 };
 
@@ -159,8 +159,10 @@ describe('McpPromptLoader', () => {
 
   describe('loadCommands', () => {
     const mockConfigWithPrompts = {
-      getMcpServers: () => ({
-        'test-server': { httpUrl: 'https://test-server.com' },
+      getMcpClientManager: () => ({
+        getMcpServers: () => ({
+          'test-server': { httpUrl: 'https://test-server.com' },
+        }),
       }),
     } as unknown as Config;
 
@@ -170,6 +172,40 @@ describe('McpPromptLoader', () => {
       expect(commands).toHaveLength(1);
       expect(commands[0].name).toBe('test-prompt');
       expect(commands[0].description).toBe('A test prompt.');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
+    it('should sanitize prompt names by replacing spaces with hyphens', async () => {
+      const mockPromptWithSpaces = {
+        ...mockPrompt,
+        name: 'Prompt Name',
+      };
+      vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+        mockPromptWithSpaces,
+      ]);
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('Prompt-Name');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
+    it('should trim whitespace from prompt names before sanitizing', async () => {
+      const mockPromptWithWhitespace = {
+        ...mockPrompt,
+        name: '  Prompt Name  ',
+      };
+      vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+        mockPromptWithWhitespace,
+      ]);
+
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('Prompt-Name');
       expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
     });
 
@@ -223,6 +259,58 @@ describe('McpPromptLoader', () => {
       const loader = new McpPromptLoader(null);
       const commands = await loader.loadCommands(new AbortController().signal);
       expect(commands).toEqual([]);
+    });
+
+    describe('autoExecute', () => {
+      it('should set autoExecute to true for prompts with no arguments (undefined)', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          { ...mockPrompt, arguments: undefined },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(true);
+      });
+
+      it('should set autoExecute to true for prompts with empty arguments array', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          { ...mockPrompt, arguments: [] },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(true);
+      });
+
+      it('should set autoExecute to false for prompts with only optional arguments', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          {
+            ...mockPrompt,
+            arguments: [{ name: 'optional', required: false }],
+          },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(false);
+      });
+
+      it('should set autoExecute to false for prompts with required arguments', async () => {
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          {
+            ...mockPrompt,
+            arguments: [{ name: 'required', required: true }],
+          },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        expect(commands[0].autoExecute).toBe(false);
+      });
     });
 
     describe('completion', () => {

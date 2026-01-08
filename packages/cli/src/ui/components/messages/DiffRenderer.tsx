@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { diffWords, diffChars } from 'diff';
 import crypto from 'node:crypto';
@@ -12,6 +13,8 @@ import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -99,75 +102,100 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   terminalWidth,
   theme,
 }) => {
+  const settings = useSettings();
+  const isAlternateBuffer = useAlternateBuffer();
+
   const screenReaderEnabled = useIsScreenReaderEnabled();
-  if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color={semanticTheme.status.warning}>No diff content.</Text>;
-  }
 
-  const parsedLines = parseDiffWithLineNumbers(diffContent);
+  const parsedLines = useMemo(() => {
+    if (!diffContent || typeof diffContent !== 'string') {
+      return [];
+    }
+    return parseDiffWithLineNumbers(diffContent);
+  }, [diffContent]);
 
-  if (parsedLines.length === 0) {
-    return (
-      <Box
-        borderStyle="round"
-        borderColor={semanticTheme.border.default}
-        padding={1}
-      >
-        <Text dimColor>No changes detected.</Text>
-      </Box>
+  const isNewFile = useMemo(() => {
+    if (parsedLines.length === 0) return false;
+    return parsedLines.every(
+      (line) =>
+        line.type === 'add' ||
+        line.type === 'hunk' ||
+        line.type === 'other' ||
+        line.content.startsWith('diff --git') ||
+        line.content.startsWith('new file mode'),
     );
-  }
-  if (screenReaderEnabled) {
-    return (
-      <Box flexDirection="column">
-        {parsedLines.map((line, index) => (
-          <Text key={index}>
-            {line.type}: {line.content}
-          </Text>
-        ))}
-      </Box>
-    );
-  }
+  }, [parsedLines]);
 
-  // Check if the diff represents a new file (only additions and header lines)
-  const isNewFile = parsedLines.every(
-    (line) =>
-      line.type === 'add' ||
-      line.type === 'hunk' ||
-      line.type === 'other' ||
-      line.content.startsWith('diff --git') ||
-      line.content.startsWith('new file mode'),
-  );
+  const renderedOutput = useMemo(() => {
+    if (!diffContent || typeof diffContent !== 'string') {
+      return <Text color={semanticTheme.status.warning}>No diff content.</Text>;
+    }
 
-  let renderedOutput;
+    if (parsedLines.length === 0) {
+      return (
+        <Box
+          borderStyle="round"
+          borderColor={semanticTheme.border.default}
+          padding={1}
+        >
+          <Text dimColor>No changes detected.</Text>
+        </Box>
+      );
+    }
+    if (screenReaderEnabled) {
+      return (
+        <Box flexDirection="column">
+          {parsedLines.map((line, index) => (
+            <Text key={index}>
+              {line.type}: {line.content}
+            </Text>
+          ))}
+        </Box>
+      );
+    }
 
-  if (isNewFile) {
-    // Extract only the added lines' content
-    const addedContent = parsedLines
-      .filter((line) => line.type === 'add')
-      .map((line) => line.content)
-      .join('\n');
-    // Attempt to infer language from filename, default to plain text if no filename
-    const fileExtension = filename?.split('.').pop() || null;
-    const language = fileExtension
-      ? getLanguageFromExtension(fileExtension)
-      : null;
-    renderedOutput = colorizeCode(
-      addedContent,
-      language,
-      availableTerminalHeight,
-      terminalWidth,
-      theme,
-    );
-  } else {
-    renderedOutput = renderDiffContent(
-      parsedLines,
-      filename,
-      tabWidth,
-      availableTerminalHeight,
-      terminalWidth,
-    );
-  }
+    if (isNewFile) {
+      // Extract only the added lines' content
+      const addedContent = parsedLines
+        .filter((line) => line.type === 'add')
+        .map((line) => line.content)
+        .join('\n');
+      // Attempt to infer language from filename, default to plain text if no filename
+      const fileExtension = filename?.split('.').pop() || null;
+      const language = fileExtension
+        ? getLanguageFromExtension(fileExtension)
+        : null;
+      return colorizeCode({
+        code: addedContent,
+        language,
+        availableHeight: availableTerminalHeight,
+        maxWidth: terminalWidth,
+        theme,
+        settings,
+      });
+    } else {
+      return renderDiffContent(
+        parsedLines,
+        filename,
+        tabWidth,
+        availableTerminalHeight,
+        terminalWidth,
+        !isAlternateBuffer,
+      );
+    }
+  }, [
+    diffContent,
+    parsedLines,
+    screenReaderEnabled,
+    isNewFile,
+    filename,
+    availableTerminalHeight,
+    terminalWidth,
+    theme,
+    settings,
+    isAlternateBuffer,
+    tabWidth,
+  ]);
 
   return renderedOutput;
 };
@@ -178,6 +206,7 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  useMaxSizedBox: boolean,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -409,10 +438,70 @@ const renderDiffContent = (
 
         const displayContent = item.line.content.substring(baseIndentation);
 
-        acc.push(
-          <Box key={lineKey} flexDirection="row">
+      const lineKey = `diff-line-${index}`;
+      let gutterNumStr = '';
+      let prefixSymbol = ' ';
+
+      switch (line.type) {
+        case 'add':
+          gutterNumStr = (line.newLine ?? '').toString();
+          prefixSymbol = '+';
+          lastLineNumber = line.newLine ?? null;
+          break;
+        case 'del':
+          gutterNumStr = (line.oldLine ?? '').toString();
+          prefixSymbol = '-';
+          // For deletions, update lastLineNumber based on oldLine if it's advancing.
+          // This helps manage gaps correctly if there are multiple consecutive deletions
+          // or if a deletion is followed by a context line far away in the original file.
+          if (line.oldLine !== undefined) {
+            lastLineNumber = line.oldLine;
+          }
+          break;
+        case 'context':
+          gutterNumStr = (line.newLine ?? '').toString();
+          prefixSymbol = ' ';
+          lastLineNumber = line.newLine ?? null;
+          break;
+        default:
+          return acc;
+      }
+
+      const displayContent = line.content.substring(baseIndentation);
+
+      const backgroundColor =
+        line.type === 'add'
+          ? semanticTheme.background.diff.added
+          : line.type === 'del'
+            ? semanticTheme.background.diff.removed
+            : undefined;
+      acc.push(
+        <Box key={lineKey} flexDirection="row">
+          {useMaxSizedBox ? (
             <Text
               color={semanticTheme.text.secondary}
+              backgroundColor={backgroundColor}
+            >
+              {gutterNumStr.padStart(gutterWidth)}{' '}
+            </Text>
+          ) : (
+            <Box
+              width={gutterWidth + 1}
+              paddingRight={1}
+              flexShrink={0}
+              backgroundColor={backgroundColor}
+              justifyContent="flex-end"
+            >
+              <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
+            </Box>
+          )}
+          {line.type === 'context' ? (
+            <>
+              <Text>{prefixSymbol} </Text>
+              <Text wrap="wrap">{colorizeLine(displayContent, language)}</Text>
+            </>
+          ) : (
+            <Text
               backgroundColor={
                 item.kind === 'add'
                   ? semanticTheme.background.diff.added
@@ -420,6 +509,7 @@ const renderDiffContent = (
                     ? semanticTheme.background.diff.removed
                     : undefined
               }
+              wrap="wrap"
             >
               {gutterNumStr.padStart(gutterWidth)}{' '}
             </Text>
@@ -437,7 +527,6 @@ const renderDiffContent = (
                     ? semanticTheme.background.diff.added
                     : semanticTheme.background.diff.removed
                 }
-                wrap="wrap"
               >
                 <Text
                   color={

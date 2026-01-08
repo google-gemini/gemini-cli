@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -12,7 +14,7 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -63,8 +65,11 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebSearchToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   override getDescription(): string {
@@ -76,10 +81,9 @@ class WebSearchToolInvocation extends BaseToolInvocation<
 
     try {
       const response = await geminiClient.generateContent(
+        { model: 'web-search' },
         [{ role: 'user', parts: [{ text: this.params.query }] }],
-        { tools: [{ googleSearch: {} }] },
         signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       const responseText = getResponseText(response);
@@ -164,7 +168,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       const errorMessage = `Error during web search for query "${
         this.params.query
       }": ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
+      debugLogger.warn(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error performing web search.`,
@@ -184,9 +188,12 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = 'google_web_search';
+  static readonly Name = WEB_SEARCH_TOOL_NAME;
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus: MessageBus,
+  ) {
     super(
       WebSearchTool.Name,
       'GoogleSearch',
@@ -202,6 +209,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
         },
         required: ['query'],
       },
+      messageBus,
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
     );
   }
 
@@ -221,7 +231,16 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebSearchToolParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
-    return new WebSearchToolInvocation(this.config, params);
+    return new WebSearchToolInvocation(
+      this.config,
+      params,
+      messageBus ?? this.messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }

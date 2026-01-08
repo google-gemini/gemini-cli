@@ -7,10 +7,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Config } from './config.js';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from './models.js';
+import { logFlashFallback } from '../telemetry/loggers.js';
+import { FlashFallbackEvent } from '../telemetry/types.js';
 
 import fs from 'node:fs';
 
 vi.mock('node:fs');
+vi.mock('../telemetry/loggers.js', () => ({
+  logFlashFallback: vi.fn(),
+  logRipgrepFallback: vi.fn(),
+}));
 
 describe('Flash Model Fallback Configuration', () => {
   let config: Config;
@@ -37,27 +43,6 @@ describe('Flash Model Fallback Configuration', () => {
     };
   });
 
-  // These tests do not actually test fallback. isInFallbackMode() only returns true,
-  // when setFallbackMode is marked as true. This is to decouple setting a model
-  // with the fallback mechanism. This will be necessary we introduce more
-  // intelligent model routing.
-  describe('setModel', () => {
-    it('should only mark as switched if contentGeneratorConfig exists', () => {
-      // Create config without initializing contentGeneratorConfig
-      const newConfig = new Config({
-        sessionId: 'test-session-2',
-        targetDir: '/test',
-        debugMode: false,
-        cwd: '/test',
-        model: DEFAULT_GEMINI_MODEL,
-      });
-
-      // Should not crash when contentGeneratorConfig is undefined
-      newConfig.setModel(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(newConfig.isInFallbackMode()).toBe(false);
-    });
-  });
-
   describe('getModel', () => {
     it('should return contentGeneratorConfig model if available', () => {
       // Simulate initialized content generator config
@@ -79,25 +64,14 @@ describe('Flash Model Fallback Configuration', () => {
     });
   });
 
-  describe('isInFallbackMode', () => {
-    it('should start as false for new session', () => {
-      expect(config.isInFallbackMode()).toBe(false);
-    });
-
-    it('should remain false if no model switch occurs', () => {
-      // Perform other operations that don't involve model switching
-      expect(config.isInFallbackMode()).toBe(false);
-    });
-
-    it('should persist switched state throughout session', () => {
-      config.setModel(DEFAULT_GEMINI_FLASH_MODEL);
-      // Setting state for fallback mode as is expected of clients
-      config.setFallbackMode(true);
-      expect(config.isInFallbackMode()).toBe(true);
-
-      // Should remain true even after getting model
-      config.getModel();
-      expect(config.isInFallbackMode()).toBe(true);
+  describe('activateFallbackMode', () => {
+    it('should set model to fallback and log event', () => {
+      config.activateFallbackMode(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(logFlashFallback).toHaveBeenCalledWith(
+        config,
+        expect.any(FlashFallbackEvent),
+      );
     });
   });
 });

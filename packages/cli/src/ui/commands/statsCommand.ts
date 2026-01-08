@@ -13,38 +13,60 @@ import {
   CommandKind,
 } from './types.js';
 
+async function defaultSessionView(context: CommandContext) {
+  const now = new Date();
+  const { sessionStartTime } = context.session.stats;
+  if (!sessionStartTime) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Session start time is unavailable, cannot calculate stats.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+  const wallDuration = now.getTime() - sessionStartTime.getTime();
+
+  const statsItem: HistoryItemStats = {
+    type: MessageType.STATS,
+    duration: formatDuration(wallDuration),
+  };
+
+  if (context.services.config) {
+    const quota = await context.services.config.refreshUserQuota();
+    if (quota) {
+      statsItem.quotas = quota;
+    }
+  }
+
+  context.ui.addItem(statsItem, Date.now());
+}
+
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'check session stats. Usage: /stats [model|tools]',
+  description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
-  action: (context: CommandContext) => {
-    const now = new Date();
-    const { sessionStartTime } = context.session.stats;
-    if (!sessionStartTime) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Session start time is unavailable, cannot calculate stats.',
-        },
-        Date.now(),
-      );
-      return;
-    }
-    const wallDuration = now.getTime() - sessionStartTime.getTime();
-
-    const statsItem: HistoryItemStats = {
-      type: MessageType.STATS,
-      duration: formatDuration(wallDuration),
-    };
-
-    context.ui.addItem(statsItem, Date.now());
+  autoExecute: false,
+  action: async (context: CommandContext) => {
+    await defaultSessionView(context);
   },
   subCommands: [
     {
-      name: 'model',
-      description: 'Show model-specific usage statistics.',
+      name: 'session',
+      description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: async (context: CommandContext) => {
+        await defaultSessionView(context);
+      },
+    },
+    {
+      name: 'model',
+      description: 'Show model-specific usage statistics',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {
@@ -56,8 +78,9 @@ export const statsCommand: SlashCommand = {
     },
     {
       name: 'tools',
-      description: 'Show tool-specific usage statistics.',
+      description: 'Show tool-specific usage statistics',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem(
           {

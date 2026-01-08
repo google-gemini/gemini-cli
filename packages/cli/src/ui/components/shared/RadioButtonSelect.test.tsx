@@ -4,178 +4,195 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
+import type React from 'react';
 import {
   RadioButtonSelect,
   type RadioSelectItem,
+  type RadioButtonSelectProps,
 } from './RadioButtonSelect.js';
-import { describe, it, expect, vi } from 'vitest';
+import {
+  BaseSelectionList,
+  type BaseSelectionListProps,
+  type RenderItemContext,
+} from './BaseSelectionList.js';
 
-const ITEMS: Array<RadioSelectItem<string>> = [
-  { label: 'Option 1', value: 'one' },
-  { label: 'Option 2', value: 'two' },
-  { label: 'Option 3', value: 'three', disabled: true },
-];
+vi.mock('./BaseSelectionList.js', () => ({
+  BaseSelectionList: vi.fn(() => null),
+}));
 
-describe('<RadioButtonSelect />', () => {
-  it('renders a list of items and matches snapshot', () => {
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect items={ITEMS} onSelect={() => {}} isFocused={true} />,
+vi.mock('../../semantic-colors.js', () => ({
+  theme: {
+    text: { secondary: 'COLOR_SECONDARY' },
+  },
+}));
+
+const MockedBaseSelectionList = vi.mocked(
+  BaseSelectionList,
+) as unknown as ReturnType<typeof vi.fn>;
+
+type RadioRenderItemFn = (
+  item: RadioSelectItem<string>,
+  context: RenderItemContext,
+) => React.JSX.Element;
+const extractRenderItem = (): RadioRenderItemFn => {
+  const mockCalls = MockedBaseSelectionList.mock.calls;
+
+  if (mockCalls.length === 0) {
+    throw new Error(
+      'BaseSelectionList was not called. Ensure RadioButtonSelect is rendered before calling extractRenderItem.',
     );
-    expect(lastFrame()).toMatchSnapshot();
+  }
+
+  const props = mockCalls[0][0] as BaseSelectionListProps<
+    string,
+    RadioSelectItem<string>
+  >;
+
+  if (typeof props.renderItem !== 'function') {
+    throw new Error('renderItem prop was not found on BaseSelectionList call.');
+  }
+
+  return props.renderItem as RadioRenderItemFn;
+};
+
+describe('RadioButtonSelect', () => {
+  const mockOnSelect = vi.fn();
+  const mockOnHighlight = vi.fn();
+
+  const ITEMS: Array<RadioSelectItem<string>> = [
+    { label: 'Option 1', value: 'one', key: 'one' },
+    { label: 'Option 2', value: 'two', key: 'two' },
+    { label: 'Option 3', value: 'three', disabled: true, key: 'three' },
+  ];
+
+  const renderComponent = (
+    props: Partial<RadioButtonSelectProps<string>> = {},
+  ) => {
+    const defaultProps: RadioButtonSelectProps<string> = {
+      items: ITEMS,
+      onSelect: mockOnSelect,
+      ...props,
+    };
+    return renderWithProviders(<RadioButtonSelect {...defaultProps} />);
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('renders with the second item selected and matches snapshot', () => {
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect items={ITEMS} initialIndex={1} onSelect={() => {}} />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
+  describe('Prop forwarding to BaseSelectionList', () => {
+    it('should forward all props correctly when provided', () => {
+      const props = {
+        items: ITEMS,
+        initialIndex: 1,
+        onSelect: mockOnSelect,
+        onHighlight: mockOnHighlight,
+        isFocused: false,
+        showScrollArrows: true,
+        maxItemsToShow: 5,
+        showNumbers: false,
+      };
+
+      renderComponent(props);
+
+      expect(BaseSelectionList).toHaveBeenCalledTimes(1);
+      expect(BaseSelectionList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...props,
+          renderItem: expect.any(Function),
+        }),
+        undefined,
+      );
+    });
+
+    it('should use default props if not provided', () => {
+      renderComponent({
+        items: ITEMS,
+        onSelect: mockOnSelect,
+      });
+
+      expect(BaseSelectionList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialIndex: 0,
+          isFocused: true,
+          showScrollArrows: false,
+          maxItemsToShow: 10,
+          showNumbers: true,
+        }),
+        undefined,
+      );
+    });
   });
 
-  it('renders with numbers hidden and matches snapshot', () => {
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect
-        items={ITEMS}
-        onSelect={() => {}}
-        showNumbers={false}
-      />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+  describe('renderItem implementation', () => {
+    let renderItem: RadioRenderItemFn;
+    const mockContext: RenderItemContext = {
+      isSelected: false,
+      titleColor: 'MOCK_TITLE_COLOR',
+      numberColor: 'MOCK_NUMBER_COLOR',
+    };
 
-  it('renders with scroll arrows and matches snapshot', () => {
-    const manyItems = Array.from({ length: 20 }, (_, i) => ({
-      label: `Item ${i + 1}`,
-      value: `item-${i + 1}`,
-    }));
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect
-        items={manyItems}
-        onSelect={() => {}}
-        showScrollArrows={true}
-        maxItemsToShow={5}
-      />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+    beforeEach(() => {
+      renderComponent();
+      renderItem = extractRenderItem();
+    });
 
-  it('renders with special theme display and matches snapshot', () => {
-    const themeItems: Array<RadioSelectItem<string>> = [
-      {
+    it('should render the standard label display with correct color and truncation', () => {
+      const item = ITEMS[0];
+
+      const result = renderItem(item, mockContext);
+
+      expect(result?.props?.color).toBe(mockContext.titleColor);
+      expect(result?.props?.children).toBe('Option 1');
+      expect(result?.props?.wrap).toBe('truncate');
+    });
+
+    it('should render the special theme display when theme props are present', () => {
+      const themeItem: RadioSelectItem<string> = {
         label: 'Theme A (Light)',
         value: 'a-light',
         themeNameDisplay: 'Theme A',
         themeTypeDisplay: '(Light)',
-      },
-      {
-        label: 'Theme B (Dark)',
-        value: 'b-dark',
-        themeNameDisplay: 'Theme B',
-        themeTypeDisplay: '(Dark)',
-      },
-    ];
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect items={themeItems} onSelect={() => {}} />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+        key: 'a-light',
+      };
 
-  it('renders a list with >10 items and matches snapshot', () => {
-    const manyItems = Array.from({ length: 12 }, (_, i) => ({
-      label: `Item ${i + 1}`,
-      value: `item-${i + 1}`,
-    }));
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect items={manyItems} onSelect={() => {}} />,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+      const result = renderItem(themeItem, mockContext);
 
-  it('renders nothing when no items are provided', () => {
-    const { lastFrame } = renderWithProviders(
-      <RadioButtonSelect items={[]} onSelect={() => {}} isFocused={true} />,
-    );
-    expect(lastFrame()).toBe('');
-  });
-});
+      expect(result?.props?.color).toBe(mockContext.titleColor);
+      expect(result?.props?.wrap).toBe('truncate');
 
-describe('keyboard navigation', () => {
-  it('should call onSelect when "enter" is pressed', () => {
-    const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
-      <RadioButtonSelect items={ITEMS} onSelect={onSelect} />,
-    );
+      const children = result?.props?.children;
 
-    stdin.write('\r');
+      if (!Array.isArray(children) || children.length < 3) {
+        throw new Error(
+          'Expected children to be an array with at least 3 elements for theme display',
+        );
+      }
 
-    expect(onSelect).toHaveBeenCalledWith('one');
-  });
+      expect(children[0]).toBe('Theme A');
+      expect(children[1]).toBe(' ');
 
-  describe('when isFocused is false', () => {
-    it('should not handle any keyboard input', () => {
-      const onSelect = vi.fn();
-      const { stdin } = renderWithProviders(
-        <RadioButtonSelect
-          items={ITEMS}
-          onSelect={onSelect}
-          isFocused={false}
-        />,
-      );
-
-      stdin.write('\u001B[B'); // Down arrow
-      stdin.write('\u001B[A'); // Up arrow
-      stdin.write('\r'); // Enter
-
-      expect(onSelect).not.toHaveBeenCalled();
-    });
-  });
-
-  describe.each([
-    { description: 'when isFocused is true', isFocused: true },
-    { description: 'when isFocused is omitted', isFocused: undefined },
-  ])('$description', ({ isFocused }) => {
-    it('should navigate down with arrow key and select with enter', async () => {
-      const onSelect = vi.fn();
-      const { stdin, lastFrame } = renderWithProviders(
-        <RadioButtonSelect
-          items={ITEMS}
-          onSelect={onSelect}
-          isFocused={isFocused}
-        />,
-      );
-
-      stdin.write('\u001B[B'); // Down arrow
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('● 2. Option 2');
-      });
-
-      stdin.write('\r');
-
-      expect(onSelect).toHaveBeenCalledWith('two');
+      const nestedTextElement = children[2] as React.ReactElement<{
+        color?: string;
+        children?: React.ReactNode;
+      }>;
+      expect(nestedTextElement?.props?.color).toBe('COLOR_SECONDARY');
+      expect(nestedTextElement?.props?.children).toBe('(Light)');
     });
 
-    it('should navigate up with arrow key and select with enter', async () => {
-      const onSelect = vi.fn();
-      const { stdin, lastFrame } = renderWithProviders(
-        <RadioButtonSelect
-          items={ITEMS}
-          onSelect={onSelect}
-          initialIndex={1}
-          isFocused={isFocused}
-        />,
-      );
+    it('should fall back to standard display if only one theme prop is present', () => {
+      const partialThemeItem: RadioSelectItem<string> = {
+        label: 'Incomplete Theme',
+        value: 'incomplete',
+        themeNameDisplay: 'Only Name',
+        key: 'incomplete',
+      };
 
-      stdin.write('\u001B[A'); // Up arrow
+      const result = renderItem(partialThemeItem, mockContext);
 
-      await waitFor(() => {
-        expect(lastFrame()).toContain('● 1. Option 1');
-      });
-
-      stdin.write('\r');
-
-      expect(onSelect).toHaveBeenCalledWith('one');
+      expect(result?.props?.children).toBe('Incomplete Theme');
     });
   });
 });
