@@ -750,6 +750,17 @@ describe('CoreToolScheduler with payload', () => {
       );
     }
 
+    // After internal update, the tool should be awaiting approval again with the NEW content.
+    const updatedAwaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+
+    // Now confirm for real to execute.
+    await updatedAwaitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.ProceedOnce,
+    );
+
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
       expect(onAllToolCallsComplete).toHaveBeenCalled();
