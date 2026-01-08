@@ -442,7 +442,7 @@ describe('createContentGenerator', () => {
         }),
       },
     });
-    // Explicitly assert that apiVersion is NOT present when env var is empty string
+
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.not.objectContaining({
         apiVersion: expect.any(String),
