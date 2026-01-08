@@ -520,7 +520,6 @@ export async function loadCliConfig(
         'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
-    approvalMode = ApprovalMode.DEFAULT;
   } else if (approvalMode === ApprovalMode.YOLO) {
     debugLogger.warn(
       'YOLO mode is enabled. All tool calls will be automatically approved.',
