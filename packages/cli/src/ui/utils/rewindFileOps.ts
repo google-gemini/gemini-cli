@@ -5,13 +5,16 @@
  */
 
 import type {
-  FileDiff,
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
 import fs from 'node:fs/promises';
 import * as Diff from 'diff';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger ,
+  getFileDiffFromResultDisplay,
+  computeAddedAndRemovedLines,
+} from '@google/gemini-cli-core';
+
 export interface FileChangeDetail {
   fileName: string;
   diff: string;
@@ -21,7 +24,6 @@ export interface FileChangeStats {
   addedLines: number;
   removedLines: number;
   fileCount: number;
-  firstFileName: string;
   details?: FileChangeDetail[];
 }
 
@@ -53,20 +55,15 @@ export function calculateTurnStats(
 
     if (msg.type === 'gemini' && msg.toolCalls) {
       for (const toolCall of msg.toolCalls) {
-        const result = toolCall.resultDisplay;
-        if (
-          result &&
-          typeof result === 'object' &&
-          'diffStat' in result &&
-          result.diffStat
-        ) {
+        const fileDiff = getFileDiffFromResultDisplay(toolCall.resultDisplay);
+        if (fileDiff) {
           hasEdits = true;
-          const stats = result.diffStat;
-          addedLines += stats.model_added_lines + stats.user_added_lines;
-          removedLines += stats.model_removed_lines + stats.user_removed_lines;
-          if ('fileName' in result && typeof result.fileName === 'string') {
-            files.add(result.fileName);
-          }
+          const stats = fileDiff.diffStat;
+          const calculations = computeAddedAndRemovedLines(stats);
+          addedLines += calculations.addedLines;
+          removedLines += calculations.removedLines;
+
+          files.add(fileDiff.fileName);
         }
       }
     }
@@ -78,7 +75,6 @@ export function calculateTurnStats(
     addedLines,
     removedLines,
     fileCount: files.size,
-    firstFileName: files.values().next().value as string,
   };
 }
 
@@ -110,26 +106,18 @@ export function calculateRewindImpact(
 
     if (msg.type === 'gemini' && msg.toolCalls) {
       for (const toolCall of msg.toolCalls) {
-        const result = toolCall.resultDisplay;
-        if (
-          result &&
-          typeof result === 'object' &&
-          'diffStat' in result &&
-          result.diffStat
-        ) {
+        const fileDiff = getFileDiffFromResultDisplay(toolCall.resultDisplay);
+        if (fileDiff) {
           hasEdits = true;
-          const stats = result.diffStat;
-          addedLines += stats.model_added_lines + stats.user_added_lines;
-          removedLines += stats.model_removed_lines + stats.user_removed_lines;
-          if ('fileName' in result && typeof result.fileName === 'string') {
-            files.add(result.fileName);
-            if ('fileDiff' in result && typeof result.fileDiff === 'string') {
-              details.push({
-                fileName: result.fileName,
-                diff: result.fileDiff,
-              });
-            }
-          }
+          const stats = fileDiff.diffStat;
+          const calculations = computeAddedAndRemovedLines(stats);
+          addedLines += calculations.addedLines;
+          removedLines += calculations.removedLines;
+          files.add(fileDiff.fileName);
+          details.push({
+            fileName: fileDiff.fileName,
+            diff: fileDiff.fileDiff,
+          });
         }
       }
     }
@@ -141,7 +129,6 @@ export function calculateRewindImpact(
     addedLines,
     removedLines,
     fileCount: files.size,
-    firstFileName: files.values().next().value as string,
     details,
   };
 }
@@ -165,7 +152,10 @@ export async function revertFileChanges(
     (m) => m.id === targetMessageId,
   );
 
-  if (messageIndex === -1) return;
+  if (messageIndex === -1) {
+    debugLogger.error('Requested message to rewind to was not found ');
+    return;
+  }
 
   // Iterate backwards from the end to the message being rewound (exclusive of the messageId itself)
   for (let i = conversation.messages.length - 1; i > messageIndex; i--) {
@@ -173,38 +163,37 @@ export async function revertFileChanges(
     if (msg.type === 'gemini' && msg.toolCalls) {
       for (let j = msg.toolCalls.length - 1; j >= 0; j--) {
         const toolCall = msg.toolCalls[j];
-        const result = toolCall.resultDisplay as FileDiff | undefined;
-
-        if (
-          result &&
-          typeof result === 'object' &&
-          'diffStat' in result &&
-          'fileName' in result &&
-          'newContent' in result &&
-          'originalContent' in result
-        ) {
-          const filePath = result.filePath;
-
+        const fileDiff = getFileDiffFromResultDisplay(toolCall.resultDisplay);
+        if (fileDiff) {
+          const { filePath, fileName, newContent, originalContent, isNewFile } =
+            fileDiff;
           try {
             let currentContent: string | null = null;
             try {
               currentContent = await fs.readFile(filePath, 'utf8');
             } catch (e) {
-              // File might not exist
-              coreEvents.emitFeedback(
-                'error',
-                `File does not exist : ${e instanceof Error ? e.message : String(e)}`,
-                e,
-              );
+              const error = e as Error;
+              if ('code' in error && error.code === 'ENOENT') {
+                // File does not exist, which is fine in some revert scenarios.
+                debugLogger.debug(
+                  `File ${fileName} not found during revert, proceeding as it may be a new file deletion.`,
+                );
+              } else {
+                // Other read errors are unexpected.
+                coreEvents.emitFeedback(
+                  'error',
+                  `Error reading ${fileName} during revert: ${error.message}`,
+                  e,
+                );
+                debugLogger.error(`Error reading file for revert:`, e);
+                // Continue to next tool call
+                return;
+              }
             }
-
             // 1. Exact Match: Safe to revert directly
-            if (
-              currentContent === result.newContent ||
-              (currentContent === null && result.newContent === '')
-            ) {
-              if (!result.isNewFile) {
-                await fs.writeFile(filePath, result.originalContent ?? '');
+            if (currentContent === newContent) {
+              if (!isNewFile) {
+                await fs.writeFile(filePath, originalContent ?? '');
               } else {
                 // Original content was null (new file), so we delete the file
                 await fs.unlink(filePath);
@@ -212,13 +201,12 @@ export async function revertFileChanges(
             }
             // 2. Mismatch: Attempt Smart Revert (Patch)
             else if (currentContent !== null) {
-              const originalText = result.originalContent ?? '';
-              const agentText = result.newContent;
+              const originalText = originalContent ?? '';
 
               // Create a patch that transforms Agent -> Original
               const undoPatch = Diff.createPatch(
-                result.fileName,
-                agentText,
+                fileName,
+                newContent,
                 originalText,
               );
 
@@ -226,8 +214,7 @@ export async function revertFileChanges(
               const patchedContent = Diff.applyPatch(currentContent, undoPatch);
 
               if (typeof patchedContent === 'string') {
-                // Patch succeeded!
-                if (patchedContent === '' && result.isNewFile) {
+                if (patchedContent === '' && isNewFile) {
                   // If the result is empty and the file didn't exist originally, delete it
                   await fs.unlink(filePath);
                 } else {
@@ -237,22 +224,24 @@ export async function revertFileChanges(
                 // Patch failed
                 coreEvents.emitFeedback(
                   'warning',
-                  `Failed to revert changes for ${result.fileName}: user has modified lines that model has modified`,
+                  `Smart revert for ${fileName} failed. The file may have been modified in a way that conflicts with the undo operation.`,
                 );
               }
             } else {
-              // File deleted by user, but we expected content.
+              // File was deleted by the user, but we expected content.
+              // This can happen if a file created by the agent is deleted before rewind.
               coreEvents.emitFeedback(
                 'warning',
-                `File ${result.fileName} missing, cannot revert.`,
+                `Cannot revert changes for ${fileName} because it was not found on disk. Can happen if a file created by the agent was deleted before rewind`,
               );
             }
           } catch (e) {
             coreEvents.emitFeedback(
               'error',
-              `Error reverting ${result.fileName}:`,
+              `An unexpected error occurred while reverting ${fileName}.`,
               e,
             );
+            debugLogger.error(`Unexpected error during file reversion:`, e);
           }
         }
       }

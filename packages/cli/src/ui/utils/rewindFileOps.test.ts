@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   calculateTurnStats,
   calculateRewindImpact,
@@ -15,10 +15,21 @@ import type {
   MessageRecord,
   ToolCallRecord,
 } from '@google/gemini-cli-core';
+import { coreEvents } from '@google/gemini-cli-core';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 vi.mock('node:fs/promises');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    coreEvents: {
+      emitFeedback: vi.fn(),
+    },
+  };
+});
 
 describe('rewindFileOps', () => {
   const mockConversation: ConversationRecord = {
@@ -31,6 +42,10 @@ describe('rewindFileOps', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('calculateTurnStats', () => {
@@ -74,6 +89,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file1.ts',
+              filePath: '/file1.ts',
               originalContent: 'old',
               newContent: 'new',
               isNewFile: false,
@@ -106,7 +122,6 @@ describe('rewindFileOps', () => {
         addedLines: 5,
         removedLines: 2,
         fileCount: 1,
-        firstFileName: 'file1.ts',
       });
     });
   });
@@ -133,6 +148,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file1.ts',
+              filePath: '/file1.ts',
               fileDiff: 'diff1',
               originalContent: 'old',
               newContent: 'new',
@@ -173,6 +189,7 @@ describe('rewindFileOps', () => {
             args: {},
             resultDisplay: {
               fileName: 'file2.ts',
+              filePath: '/file2.ts',
               fileDiff: 'diff2',
               originalContent: 'old',
               newContent: 'new',
@@ -200,7 +217,6 @@ describe('rewindFileOps', () => {
         addedLines: 8, // 5 + 3
         removedLines: 3, // 2 + 1
         fileCount: 2,
-        firstFileName: 'file1.ts',
         details: [
           { fileName: 'file1.ts', diff: 'diff1' },
           { fileName: 'file2.ts', diff: 'diff2' },
@@ -210,6 +226,17 @@ describe('rewindFileOps', () => {
   });
 
   describe('revertFileChanges', () => {
+    const mockDiffStat = {
+      model_added_lines: 1,
+      model_removed_lines: 1,
+      user_added_lines: 0,
+      user_removed_lines: 0,
+      model_added_chars: 1,
+      model_removed_chars: 1,
+      user_added_chars: 0,
+      user_removed_chars: 0,
+    };
+
     it('does nothing if message not found', async () => {
       mockConversation.messages = [];
       await revertFileChanges(mockConversation, 'missing-id');
@@ -241,16 +268,7 @@ describe('rewindFileOps', () => {
               originalContent: 'old',
               newContent: 'new',
               isNewFile: false,
-              diffStat: {
-                model_added_lines: 0,
-                model_removed_lines: 0,
-                user_added_lines: 0,
-                user_removed_lines: 0,
-                model_added_chars: 0,
-                model_removed_chars: 0,
-                user_added_chars: 0,
-                user_removed_chars: 0,
-              },
+              diffStat: mockDiffStat,
             },
           },
         ] as unknown as ToolCallRecord[],
@@ -293,16 +311,7 @@ describe('rewindFileOps', () => {
               originalContent: null,
               newContent: 'content',
               isNewFile: true,
-              diffStat: {
-                model_added_lines: 0,
-                model_removed_lines: 0,
-                user_added_lines: 0,
-                user_removed_lines: 0,
-                model_added_chars: 0,
-                model_removed_chars: 0,
-                user_added_chars: 0,
-                user_removed_chars: 0,
-              },
+              diffStat: mockDiffStat,
             },
           },
         ] as unknown as ToolCallRecord[],
@@ -315,6 +324,150 @@ describe('rewindFileOps', () => {
       await revertFileChanges(mockConversation, '1');
 
       expect(fs.unlink).toHaveBeenCalledWith(path.resolve('/root/file.txt'));
+    });
+
+    it('handles smart revert (patching) successfully', async () => {
+      const original = Array.from(
+        { length: 20 },
+        (_, i) => `line${i + 1}`,
+      ).join('\n');
+      // Agent changes line 2
+      const agentModifiedLines = original.split('\n');
+      agentModifiedLines[1] = 'line2-modified';
+      const agentModified = agentModifiedLines.join('\n');
+
+      // User changes line 18 (far away from line 2)
+      const userModifiedLines = [...agentModifiedLines];
+      userModifiedLines[17] = 'line18-modified';
+      const userModified = userModifiedLines.join('\n');
+
+      const toolMsg: MessageRecord = {
+        type: 'gemini',
+        id: '2',
+        timestamp: '2',
+        content: '',
+        toolCalls: [
+          {
+            name: 'replace',
+            id: 'tool-call-1',
+            status: 'success',
+            timestamp: '2',
+            args: {},
+            resultDisplay: {
+              fileName: 'file.txt',
+              filePath: path.resolve('/root/file.txt'),
+              originalContent: original,
+              newContent: agentModified,
+              isNewFile: false,
+              diffStat: mockDiffStat,
+            },
+          },
+        ] as unknown as ToolCallRecord[],
+      };
+
+      mockConversation.messages = [
+        { type: 'user', content: 'start', id: '1', timestamp: '1' },
+        toolMsg,
+      ];
+      vi.mocked(fs.readFile).mockResolvedValue(userModified);
+
+      await revertFileChanges(mockConversation, '1');
+
+      // Expect line 2 to be reverted to original, but line 18 to keep user modification
+      const expectedLines = original.split('\n');
+      expectedLines[17] = 'line18-modified';
+      const expectedContent = expectedLines.join('\n');
+
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        path.resolve('/root/file.txt'),
+        expectedContent,
+      );
+    });
+
+    it('emits warning on smart revert failure', async () => {
+      const original = 'line1\nline2\nline3';
+      const agentModified = 'line1\nline2-modified\nline3';
+      // User modification conflicts with the agent's change.
+      const userModified = 'line1\nline2-usermodified\nline3';
+
+      const toolMsg: MessageRecord = {
+        type: 'gemini',
+        id: '2',
+        timestamp: '2',
+        content: '',
+        toolCalls: [
+          {
+            name: 'replace',
+            id: 'tool-call-1',
+            status: 'success',
+            timestamp: '2',
+            args: {},
+            resultDisplay: {
+              fileName: 'file.txt',
+              filePath: path.resolve('/root/file.txt'),
+              originalContent: original,
+              newContent: agentModified,
+              isNewFile: false,
+              diffStat: mockDiffStat,
+            },
+          },
+        ] as unknown as ToolCallRecord[],
+      };
+
+      mockConversation.messages = [
+        { type: 'user', content: 'start', id: '1', timestamp: '1' },
+        toolMsg,
+      ];
+      vi.mocked(fs.readFile).mockResolvedValue(userModified);
+
+      await revertFileChanges(mockConversation, '1');
+
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Smart revert for file.txt failed'),
+      );
+    });
+
+    it('emits error if fs.readFile fails with a generic error', async () => {
+      const toolMsg: MessageRecord = {
+        type: 'gemini',
+        id: '2',
+        timestamp: '2',
+        content: '',
+        toolCalls: [
+          {
+            name: 'replace',
+            id: 'tool-call-1',
+            status: 'success',
+            timestamp: '2',
+            args: {},
+            resultDisplay: {
+              fileName: 'file.txt',
+              filePath: path.resolve('/root/file.txt'),
+              originalContent: 'old',
+              newContent: 'new',
+              isNewFile: false,
+              diffStat: mockDiffStat,
+            },
+          },
+        ] as unknown as ToolCallRecord[],
+      };
+
+      mockConversation.messages = [
+        { type: 'user', content: 'start', id: '1', timestamp: '1' },
+        toolMsg,
+      ];
+      // Simulate a generic file read error
+      vi.mocked(fs.readFile).mockRejectedValue(new Error('Permission denied'));
+
+      await revertFileChanges(mockConversation, '1');
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Error reading file.txt during revert: Permission denied',
+        expect.any(Error),
+      );
     });
   });
 });
