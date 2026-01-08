@@ -180,7 +180,7 @@ export async function createContentGenerator(
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
         httpOptions,
-        ...(apiVersionEnv !== undefined && { apiVersion: apiVersionEnv }),
+        ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
