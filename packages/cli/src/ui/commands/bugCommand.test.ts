@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import open from 'open';
+import path from 'node:path';
 import { bugCommand } from './bugCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { getVersion } from '@google/gemini-cli-core';
@@ -142,16 +143,18 @@ describe('bugCommand', () => {
     if (!bugCommand.action) throw new Error('Action is not defined');
     await bugCommand.action(mockContext, 'Bug with history');
 
+    const expectedPath = path.join(
+      '/tmp/gemini',
+      'bug-report-history-1704067200000.json',
+    );
     expect(exportHistoryToFile).toHaveBeenCalledWith({
       history,
-      filePath: '/tmp/gemini/bug-report-history-1704067200000.json',
+      filePath: expectedPath,
     });
 
     const addItemCall = vi.mocked(mockContext.ui.addItem).mock.calls[0];
     const messageText = addItemCall[0].text;
-    expect(messageText).toContain(
-      '/tmp/gemini/bug-report-history-1704067200000.json',
-    );
+    expect(messageText).toContain(expectedPath);
     expect(messageText).toContain('📄 **Chat History Exported**');
     expect(messageText).toContain('Privacy Disclaimer:');
     expect(messageText).not.toContain('additional-context=');
