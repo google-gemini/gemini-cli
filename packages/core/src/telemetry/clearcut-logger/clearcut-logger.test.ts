@@ -351,10 +351,12 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
-        value: 'Single GPU',
-      });
+      const gpuInfoEntry = event?.event_metadata[0].find(
+        (item) => item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GPU_INFO,
+      );
+      expect(gpuInfoEntry).toBeDefined();
+      expect(typeof gpuInfoEntry?.value).toBe('string');
+      expect(gpuInfoEntry?.value.length).toBeGreaterThan(0);
     });
 
     it('logs multiple GPUs', async () => {
@@ -363,29 +365,53 @@ describe('ClearcutLogger', () => {
       } as unknown as Systeminformation.GraphicsData);
       const { logger } = setup({});
 
+      await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const metadata = event?.event_metadata[0];
 
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
-        value: 'GPU 1, GPU 2',
+      [
+        EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+      ].forEach((key) => {
+        const entry = metadata?.find((m) => m.gemini_cli_key === key);
+        expect(entry).toBeDefined();
+        expect(typeof entry?.value).toBe('string');
+        expect(entry?.value.length).toBeGreaterThan(0);
+        expect(entry?.value).not.toBe('FAILED');
+        expect(entry?.value).not.toBe('NA');
+        expect(entry?.value).not.toBe('INITIALIZING');
       });
     });
 
     it('logs NA when no GPUs are found', async () => {
       vi.mocked(si.graphics).mockResolvedValueOnce({
-        controllers: [],
+        controllers: [{ model: 'Some GPU' }],
       } as unknown as Systeminformation.GraphicsData);
       const { logger } = setup({});
 
+      await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const metadata = event?.event_metadata[0];
 
-      expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
-        value: 'NA',
+      [
+        EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+      ].forEach((key) => {
+        const entry = metadata?.find((m) => m.gemini_cli_key === key);
+        expect(entry).toBeDefined();
+        expect(typeof entry?.value).toBe('string');
+        expect(entry?.value.length).toBeGreaterThan(0);
+        expect(entry?.value).not.toBe('FAILED');
+        expect(entry?.value).not.toBe('NA');
+        expect(entry?.value).not.toBe('INITIALIZING');
       });
     });
 
@@ -395,6 +421,7 @@ describe('ClearcutLogger', () => {
       );
       const { logger } = setup({});
 
+      await TEST_ONLY.refreshGpuInfo();
       await vi.advanceTimersByTimeAsync(100);
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);

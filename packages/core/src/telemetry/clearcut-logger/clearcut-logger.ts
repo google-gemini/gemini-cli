@@ -1575,4 +1575,5 @@ export class ClearcutLogger {
 export const TEST_ONLY = {
   MAX_RETRY_EVENTS,
   MAX_EVENTS,
+  refreshGpuInfo,
 };
