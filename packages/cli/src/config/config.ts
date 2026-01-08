@@ -637,6 +637,7 @@ export async function loadCliConfig(
   const ptyInfo = await getPty();
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+  const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -659,6 +660,7 @@ export async function loadCliConfig(
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
     mcpServers: mcpEnabled ? settings.mcpServers : {},
     mcpEnabled,
+    extensionsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
