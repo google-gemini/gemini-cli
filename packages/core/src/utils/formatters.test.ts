@@ -17,6 +17,11 @@ describe('bytesToMB', () => {
 });
 
 describe('formatBytes', () => {
+  it('formats values below one kilobyte in B', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(0)).toBe('0 B');
+  });
+
   it('formats values below one megabyte in KB', () => {
     expect(formatBytes(512 * 1024)).toBe('512.0 KB');
   });
