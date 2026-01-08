@@ -14,6 +14,7 @@ import * as path from 'node:path';
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
   respectGeminiIgnore?: boolean;
+  customIgnoreFilePath?: string;
 }
 
 export interface FilterReport {
@@ -25,10 +26,16 @@ export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
   private combinedIgnoreFilter: GitIgnoreFilter | null = null;
+  private defaultFilterFileOptions: FilterFilesOptions = {
+    respectGitIgnore: true,
+    respectGeminiIgnore: true,
+    customIgnoreFilePath: undefined,
+  };
   private projectRoot: string;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
+    this.applyFilterFilesOptions(options);
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
@@ -44,11 +51,32 @@ export class FileDiscoveryService {
     }
   }
 
+  private applyFilterFilesOptions(options?: FilterFilesOptions): void {
+    if (!options) return;
+
+    if (options.respectGitIgnore !== undefined) {
+      this.defaultFilterFileOptions.respectGitIgnore = options.respectGitIgnore;
+    }
+    if (options.respectGeminiIgnore !== undefined) {
+      this.defaultFilterFileOptions.respectGeminiIgnore =
+        options.respectGeminiIgnore;
+    }
+    if (options.customIgnoreFilePath) {
+      this.defaultFilterFileOptions.customIgnoreFilePath = path.join(
+        this.projectRoot,
+        options.customIgnoreFilePath,
+      );
+    }
+  }
+
   /**
    * Filters a list of file paths based on git ignore rules
    */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
-    const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
+    const {
+      respectGitIgnore = this.defaultFilterFileOptions.respectGitIgnore,
+      respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
+    } = options;
     return filePaths.filter((filePath) => {
       if (
         respectGitIgnore &&

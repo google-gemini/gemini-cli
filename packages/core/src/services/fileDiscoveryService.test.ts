@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -59,6 +59,55 @@ describe('FileDiscoveryService', () => {
 
       expect(service.shouldIgnoreFile('secrets.txt')).toBe(true);
       expect(service.shouldIgnoreFile('src/index.js')).toBe(false);
+    });
+
+    it('should call applyFilterFilesOptions in constructor', () => {
+      const resolveSpy = vi.spyOn(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        FileDiscoveryService.prototype as any,
+        'applyFilterFilesOptions',
+      );
+      const options = { respectGitIgnore: false };
+      new FileDiscoveryService(projectRoot, options);
+      expect(resolveSpy).toHaveBeenCalledWith(options);
+    });
+
+    it('should correctly resolve options passed to constructor', () => {
+      const options = {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePath: 'custom/.ignore',
+      };
+      const service = new FileDiscoveryService(projectRoot, options);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(false);
+      expect(defaults.respectGeminiIgnore).toBe(false);
+      expect(defaults.customIgnoreFilePath).toBe(
+        path.join(projectRoot, 'custom/.ignore'),
+      );
+    });
+
+    it('should use defaults when options are not provided', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(true);
+      expect(defaults.respectGeminiIgnore).toBe(true);
+      expect(defaults.customIgnoreFilePath).toBeUndefined();
+    });
+
+    it('should partially override defaults', () => {
+      const service = new FileDiscoveryService(projectRoot, {
+        respectGitIgnore: false,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(false);
+      expect(defaults.respectGeminiIgnore).toBe(true);
     });
   });
 

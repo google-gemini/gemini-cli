@@ -101,7 +101,11 @@ export async function loadConfig(
     ptyInfo: 'auto',
   };
 
-  const fileService = new FileDiscoveryService(workspaceDir);
+  const fileService = new FileDiscoveryService(workspaceDir, {
+    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
+    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
+    customIgnoreFilePath: configParams?.fileFiltering?.customIgnoreFilePath,
+  });
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       workspaceDir,

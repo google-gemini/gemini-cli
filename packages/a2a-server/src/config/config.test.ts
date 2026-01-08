@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
-import type { ExtensionLoader } from '@google/gemini-cli-core';
+import {
+  type ExtensionLoader,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -64,5 +67,23 @@ describe('loadConfig', () => {
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((config as any).fileFiltering.customIgnoreFilePath).toBeUndefined();
+  });
+
+  it('should initialize FileDiscoveryService with correct options', async () => {
+    const testPath = '/tmp/ignore';
+    process.env['CUSTOM_IGNORE_FILE_PATH'] = testPath;
+    const settings: Settings = {
+      fileFiltering: {
+        respectGitIgnore: false,
+      },
+    };
+
+    await loadConfig(settings, mockExtensionLoader, taskId);
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(expect.any(String), {
+      respectGitIgnore: false,
+      respectGeminiIgnore: undefined,
+      customIgnoreFilePath: testPath,
+    });
   });
 });
