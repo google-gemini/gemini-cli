@@ -122,7 +122,12 @@ export function convertToFunctionResponse(
   }
 
   if (siblingParts.length > 0) {
-    return [part, ...siblingParts];
+    if (isMultimodalFRSupported) {
+      return [part, ...siblingParts];
+    }
+    debugLogger.warn(
+      `Model ${model} does not support multimodal function responses. Sibling parts will be omitted to prevent API errors in parallel function calling.`,
+    );
   }
 
   return [part];
