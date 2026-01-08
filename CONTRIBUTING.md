@@ -256,7 +256,7 @@ npm run test:e2e
 ```
 
 For more detailed information on the integration testing framework, please see
-the [Integration Tests documentation](./integration-tests.md).
+the [Integration Tests documentation](/docs/integration-tests.md).
 
 ### Linting and preflight checks
 
@@ -390,7 +390,7 @@ used for the CLI's interface, is compatible with React DevTools version 4.x.
     ```
 
     Your running CLI application should then connect to React DevTools.
-    ![](./assets/connected_devtools.png)
+    ![](/docs/assets/connected_devtools.png)
 
 ### Sandboxing
 
@@ -485,7 +485,7 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](./sidebar.json) as the
+Our documentation is organized using [sidebar.json](/docs/sidebar.json) as the
 table of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
@@ -537,7 +537,7 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](./faq.md).
+- Check our [FAQ](/docs/faq.md).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.
