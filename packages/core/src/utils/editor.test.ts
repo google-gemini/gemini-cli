@@ -78,6 +78,7 @@ describe('editor utils', () => {
         commands: ['agy'],
         win32Commands: ['agy.cmd'],
       },
+      { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -318,6 +319,14 @@ describe('editor utils', () => {
       });
     });
 
+    it('should return the correct command for helix', () => {
+      const command = getDiffCommand('old.txt', 'new.txt', 'hx');
+      expect(command).toEqual({
+        command: 'hx',
+        args: ['--vsplit', '--', 'old.txt', 'new.txt'],
+      });
+    });
+
     it('should return null for an unsupported editor', () => {
       // @ts-expect-error Testing unsupported editor
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
@@ -385,7 +394,7 @@ describe('editor utils', () => {
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
@@ -439,6 +448,15 @@ describe('editor utils', () => {
 
     it('should allow neovim when not in sandbox mode', () => {
       expect(allowEditorTypeInSandbox('neovim')).toBe(true);
+    });
+
+    it('should allow hx in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('hx')).toBe(true);
+    });
+
+    it('should allow hx when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('hx')).toBe(true);
     });
 
     const guiEditors: EditorType[] = [
@@ -501,6 +519,12 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('emacs')).toBe(true);
+    });
+
+    it('should return true for hx when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/hx'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('hx')).toBe(true);
     });
 
     it('should return true for neovim when installed and in sandbox mode', () => {

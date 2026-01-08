@@ -220,7 +220,6 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getUseSmartEdit: () => false,
       isInteractive: () => false,
       getExperiments: () => {},
     } as unknown as Config;
@@ -2796,6 +2795,63 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+  });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: { reason: 'Stopped by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Stopped by hook',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: { reason: 'Blocked by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Blocked by hook',
+          },
+          expect.any(Number),
+        );
       });
     });
   });
