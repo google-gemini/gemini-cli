@@ -1359,6 +1359,13 @@
           "default": false,
           "type": "boolean"
         },
+        "dynamicExtensionLoading": {
+          "title": "Dynamic Extension Loading",
+          "description": "Enables the model to dynamically activate extensions (requires extensionReloading).",
+          "markdownDescription": "Enables the model to dynamically activate extensions (requires extensionReloading).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "jitContext": {
           "title": "JIT Context Loading",
           "description": "Enable Just-In-Time (JIT) context loading.",
