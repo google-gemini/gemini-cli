@@ -20,7 +20,7 @@ vi.mock('node:os', async (importOriginal) => {
 import { PolicyEngine } from './policy-engine.js';
 import { PolicyDecision, ApprovalMode } from './types.js';
 import type { FunctionCall } from '@google/genai';
-import { buildArgsPatterns } from './toml-loader.js';
+import { buildArgsPatterns } from './utils.js';
 
 describe('Shell Safety Policy', () => {
   let policyEngine: PolicyEngine;
@@ -257,16 +257,13 @@ describe('Shell Safety Policy', () => {
   });
 
   it('SHOULD NOT allow generic redirection > /dev/null with unsafe target', async () => {
-    // Current logic allows redirections if the main command is allowed,
-    // as `splitCommands` (bash parser) sees `git log > file` as just `git log`.
-    // This test documents current behavior: it IS allowed.
-    // If usage of redirection needs to be blocked, we'd need stricter policies.
+    // Current logic downgrades ALLOW to ASK_USER for redirections if redirection is not explicitly allowed.
     const toolCall: FunctionCall = {
       name: 'run_shell_command',
       args: { command: 'git log > /tmp/test' },
     };
     const result = await policyEngine.check(toolCall, undefined);
-    expect(result.decision).toBe(PolicyDecision.ALLOW);
+    expect(result.decision).toBe(PolicyDecision.ASK_USER);
   });
 
   it('SHOULD NOT allow PowerShell @(...) usage if it implies code execution', async () => {
@@ -379,7 +376,10 @@ describe('Shell Safety Policy', () => {
 
     const result = await policyEngine.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
-    expect(result.rule?.name).toBe('ask_another_unknown_command_rule');
+    // The first command triggers default ASK_USER (undefined rule).
+    // The second triggers explicit ASK_USER rule.
+    // We attribute to the first cause => undefined.
+    expect(result.rule).toBeUndefined();
   });
 
   it('SHOULD aggregate ASK_USER (rule) + ASK_USER (rule) to ASK_USER and blame the first specific ASK_USER rule in subcommands', async () => {

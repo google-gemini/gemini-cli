@@ -24,6 +24,7 @@ import {
   SHELL_TOOL_NAMES,
   initializeShellParsers,
   splitCommands,
+  hasRedirection,
 } from '../utils/shell-utils.js';
 
 function ruleMatches(
@@ -141,6 +142,134 @@ export class PolicyEngine {
   }
 
   /**
+   * Check if a shell command is allowed.
+   */
+  private async checkShellCommand(
+    toolName: string,
+    command: string | undefined,
+    ruleDecision: PolicyDecision,
+    serverName: string | undefined,
+    dir_path: string | undefined,
+    allowRedirection?: boolean,
+    rule?: PolicyRule,
+  ): Promise<{ decision: PolicyDecision; rule?: PolicyRule }> {
+    if (!command) {
+      return {
+        decision: this.applyNonInteractiveMode(ruleDecision),
+        rule,
+      };
+    }
+
+    await initializeShellParsers();
+    const subCommands = splitCommands(command);
+
+    if (subCommands.length === 0) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
+      );
+      // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
+      // We don't blame a specific rule here, unless the input rule was stricter.
+      return {
+        decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+        rule: undefined,
+      };
+    }
+
+    // If there are multiple parts, or if we just want to validate the single part against DENY rules
+    if (subCommands.length > 0) {
+      debugLogger.debug(
+        `[PolicyEngine.check] Validating shell command: ${subCommands.length} parts`,
+      );
+
+      if (ruleDecision === PolicyDecision.DENY) {
+        return { decision: PolicyDecision.DENY, rule };
+      }
+
+      // Start optimistically. If all parts are ALLOW, the whole is ALLOW.
+      // We will downgrade if any part is ASK_USER or DENY.
+      let aggregateDecision = PolicyDecision.ALLOW;
+      let responsibleRule: PolicyRule | undefined;
+
+      for (const rawSubCmd of subCommands) {
+        const subCmd = rawSubCmd.trim();
+        // Prevent infinite recursion for the root command
+        if (subCmd === command) {
+          if (!allowRedirection && hasRedirection(subCmd)) {
+            debugLogger.debug(
+              `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
+            );
+            // Redirection always downgrades ALLOW to ASK_USER
+            if (aggregateDecision === PolicyDecision.ALLOW) {
+              aggregateDecision = PolicyDecision.ASK_USER;
+              responsibleRule = undefined; // Inherent policy
+            }
+          } else {
+            // Atomic command matching the rule.
+            if (
+              ruleDecision === PolicyDecision.ASK_USER &&
+              aggregateDecision === PolicyDecision.ALLOW
+            ) {
+              aggregateDecision = PolicyDecision.ASK_USER;
+              responsibleRule = rule;
+            }
+          }
+          continue;
+        }
+
+        const subResult = await this.check(
+          { name: toolName, args: { command: subCmd, dir_path } },
+          serverName,
+        );
+
+        // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
+        const subDecision = subResult.decision;
+
+        // If any part is DENIED, the whole command is DENIED
+        if (subDecision === PolicyDecision.DENY) {
+          return {
+            decision: PolicyDecision.DENY,
+            rule: subResult.rule,
+          };
+        }
+
+        // If any part requires ASK_USER, the whole command requires ASK_USER
+        if (subDecision === PolicyDecision.ASK_USER) {
+          aggregateDecision = PolicyDecision.ASK_USER;
+          if (!responsibleRule) {
+            responsibleRule = subResult.rule;
+          }
+        }
+
+        // Check for redirection in allowed sub-commands
+        if (
+          subDecision === PolicyDecision.ALLOW &&
+          !allowRedirection &&
+          hasRedirection(subCmd)
+        ) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
+          );
+          if (aggregateDecision === PolicyDecision.ALLOW) {
+            aggregateDecision = PolicyDecision.ASK_USER;
+            responsibleRule = undefined;
+          }
+        }
+      }
+      return {
+        decision: this.applyNonInteractiveMode(aggregateDecision),
+        // If we stayed at ALLOW, we return the original rule (if any).
+        // If we downgraded, we return the responsible rule (or undefined if implicit).
+        rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
+      };
+    }
+
+    return {
+      decision: this.applyNonInteractiveMode(ruleDecision),
+      rule,
+    };
+  }
+
+  /**
    * Check if a tool call is allowed based on the configured policies.
    * Returns the decision and the matching rule (if any).
    */
@@ -166,36 +295,18 @@ export class PolicyEngine {
     );
 
     // Check for shell commands upfront to handle splitting
-    let subCommands: string[] | undefined;
     let isShellCommand = false;
     let command: string | undefined;
+    let shellDirPath: string | undefined;
 
     if (toolCall.name && SHELL_TOOL_NAMES.includes(toolCall.name)) {
       isShellCommand = true;
-      command = (toolCall.args as { command?: string })?.command;
-      if (command) {
-        // Initialize parser if needed (lazy load)
-        await initializeShellParsers();
-        subCommands = splitCommands(command);
-
-        if (subCommands.length === 0) {
-          // Parsing failed or empty command -> Unsafe to rely on prefix matching
-          debugLogger.debug(
-            `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to default/safe decision.`,
-          );
-          // If parsing fails, we cannot safely decompose the command.
-          // We force an ASK_USER decision (or DENY in non-interactive) regardless of rules,
-          // because we can't guarantee a rule matches the *actual* executed logic if we can't parse it.
-          // Using defaultDecision might be too lenient if default is ALLOW (though it shouldn't be).
-          // Safest is ASK_USER.
-          return {
-            decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
-            rule: undefined,
-          };
-        }
-      }
+      const args = toolCall.args as { command?: string; dir_path?: string };
+      command = args?.command;
+      shellDirPath = args?.dir_path;
     }
 
+    // Find the first matching rule (already sorted by priority)
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
@@ -213,76 +324,57 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        matchedRule = rule;
-        decision = rule.decision;
-        break;
+        if (isShellCommand) {
+          const shellResult = await this.checkShellCommand(
+            toolCall.name!,
+            command,
+            rule.decision,
+            serverName,
+            shellDirPath,
+            rule.allowRedirection,
+            rule,
+          );
+          decision = shellResult.decision;
+          if (shellResult.rule) {
+            matchedRule = shellResult.rule;
+            break;
+          }
+          // If no rule returned (e.g. downgraded to default ASK_USER due to redirection),
+          // we might still want to blame the matched rule?
+          // No, test says we should return undefined rule if implicit.
+          matchedRule = shellResult.rule;
+          break;
+        } else {
+          decision = this.applyNonInteractiveMode(rule.decision);
+          matchedRule = rule;
+          break;
+        }
       }
     }
 
     if (!decision) {
-      // No matching rule found
+      // No matching rule found, use default decision
       debugLogger.debug(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
-      decision = this.defaultDecision;
-    }
+      decision = this.applyNonInteractiveMode(this.defaultDecision);
 
-    if (isShellCommand && decision !== PolicyDecision.DENY) {
-      // For shell commands, if we are not already denying, we must verify ALL subcommands.
-      // We check subcommands if there's more than one (meaning decomposition happened).
-      // If subsCommands is set (length > 0), we check them.
-      if (subCommands && subCommands.length > 1) {
-        debugLogger.debug(
-          `[PolicyEngine.check] Compound command detected: ${subCommands.length} parts`,
+      // If it's a shell command and we fell back to default, we MUST still verify subcommands!
+      // This is critical for security: "git commit && git push" where "git push" is DENY but "git commit" has no rule.
+      if (isShellCommand && decision !== PolicyDecision.DENY) {
+        const shellResult = await this.checkShellCommand(
+          toolCall.name!,
+          command,
+          decision, // default decision
+          serverName,
+          shellDirPath,
+          false, // no rule, so no allowRedirection
+          undefined, // no rule
         );
-        let aggregateDecision: PolicyDecision = decision;
-        // We need to check if *any* subcommand fails the check.
-        // This ensures that "git log" matches the "git log" rule,
-        // and "rm -rf /" matches (or doesn't match) its own rules.
-
-        for (const subCmd of subCommands) {
-          // Prevent infinite recursion if the subcommand is identical to the original command.
-          // This happens when splitCommands returns the root command along with its children.
-          // We use trimmed comparison to be robust against whitespace differences.
-          if (command && subCmd.trim() === command.trim()) {
-            debugLogger.debug(
-              `[PolicyEngine.check] Skipping recursion for self-referential command: "${subCmd.trim()}" vs original: "${command.trim()}"`,
-            );
-            continue;
-          }
-
-          const subCall = {
-            name: toolCall.name,
-            args: { command: subCmd },
-          };
-          const subResult = await this.check(subCall, serverName);
-
-          if (subResult.decision === PolicyDecision.DENY) {
-            aggregateDecision = PolicyDecision.DENY;
-            matchedRule = subResult.rule ?? matchedRule; // Blame the rule that denied it
-            break;
-          } else if (subResult.decision === PolicyDecision.ASK_USER) {
-            // Downgrade ALLOW to ASK_USER, but keep DENY if already denied
-            if (aggregateDecision === PolicyDecision.ALLOW) {
-              aggregateDecision = PolicyDecision.ASK_USER;
-              matchedRule = subResult.rule ?? undefined; // If explicit rule, use it, else undefined
-            } else if (
-              aggregateDecision === PolicyDecision.ASK_USER &&
-              subResult.rule !== undefined &&
-              matchedRule === undefined
-            ) {
-              // If already ASK_USER (e.g., from default), and this subcommand has a specific ASK_USER rule,
-              // and no specific rule has been blamed yet, then blame this specific rule.
-              matchedRule = subResult.rule;
-            }
-          }
-        }
-        decision = aggregateDecision;
+        decision = shellResult.decision;
+        matchedRule = shellResult.rule;
       }
     }
-
-    // Apply non-interactive mode constraint to the final decision
-    decision = this.applyNonInteractiveMode(decision);
 
     // If decision is not DENY, run safety checkers
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
@@ -317,7 +409,7 @@ export class PolicyEngine {
               debugLogger.debug(
                 `[PolicyEngine.check] Safety checker requested ASK_USER: ${result.reason}`,
               );
-              decision = this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+              decision = PolicyDecision.ASK_USER;
             }
           } catch (error) {
             debugLogger.debug(
@@ -333,7 +425,7 @@ export class PolicyEngine {
     }
 
     return {
-      decision,
+      decision: this.applyNonInteractiveMode(decision),
       rule: matchedRule,
     };
   }

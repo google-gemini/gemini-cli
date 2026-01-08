@@ -128,6 +128,13 @@ export interface PolicyRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * If true, allows command redirection even if the policy engine would normally
+   * downgrade ALLOW to ASK_USER for redirected commands.
+   * Only applies when decision is ALLOW.
+   */
+  allowRedirection?: boolean;
 }
 
 export interface SafetyCheckerRule {

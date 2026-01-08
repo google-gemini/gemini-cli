@@ -189,6 +189,7 @@ describe('gemini.tsx main function cleanup', () => {
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => false),
+      getHookSystem: () => undefined,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -213,6 +214,7 @@ describe('gemini.tsx main function cleanup', () => {
       getOutputFormat: vi.fn(() => 'text'),
       getUsageStatisticsEnabled: vi.fn(() => false),
       setTerminalBackground: vi.fn(),
+      refreshAuth: vi.fn(),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {
