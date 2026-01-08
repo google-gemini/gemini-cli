@@ -60,8 +60,12 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const getFullLabel = (s: Suggestion) =>
-    s.label + (s.commandKind === CommandKind.MCP_PROMPT ? ' [MCP]' : '');
+  const getFullLabel = (s: Suggestion) => {
+    let suffix = '';
+    if (s.commandKind === CommandKind.MCP_PROMPT) suffix = ' [MCP]';
+    else if (s.commandKind === CommandKind.AGENT) suffix = ' [Agent]';
+    return s.label + suffix;
+  };
 
   const maxLabelLength = Math.max(
     ...suggestions.map((s) => getFullLabel(s).length),
@@ -100,6 +104,9 @@ export function SuggestionsDisplay({
                 {labelElement}
                 {suggestion.commandKind === CommandKind.MCP_PROMPT && (
                   <Text color={textColor}> [MCP]</Text>
+                )}
+                {suggestion.commandKind === CommandKind.AGENT && (
+                  <Text color={textColor}> [Agent]</Text>
                 )}
               </Box>
             </Box>

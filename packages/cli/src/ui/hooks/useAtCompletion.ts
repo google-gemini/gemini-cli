@@ -9,6 +9,7 @@ import type { Config, FileSearch } from '@google/gemini-cli-core';
 import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
 
 export enum AtCompletionStatus {
@@ -127,6 +128,18 @@ function buildResourceCandidates(
   return resources;
 }
 
+function buildAgentCandidates(config?: Config): Suggestion[] {
+  const registry = config?.getAgentRegistry?.();
+  if (!registry) {
+    return [];
+  }
+  return registry.getAllDefinitions().map((def) => ({
+    label: def.name,
+    value: def.name,
+    commandKind: CommandKind.AGENT,
+  }));
+}
+
 async function searchResourceCandidates(
   pattern: string,
   candidates: ResourceSuggestionCandidate[],
@@ -151,6 +164,27 @@ async function searchResourceCandidates(
   return results.map(
     (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
   );
+}
+
+async function searchAgentCandidates(
+  pattern: string,
+  candidates: Suggestion[],
+): Promise<Suggestion[]> {
+  if (candidates.length === 0) {
+    return [];
+  }
+  const normalizedPattern = pattern.toLowerCase();
+  if (!normalizedPattern) {
+    return candidates.slice(0, MAX_SUGGESTIONS_TO_SHOW);
+  }
+  const fzf = new AsyncFzf(candidates, {
+    selector: (s: Suggestion) => s.label,
+  });
+  const results = await fzf.find(normalizedPattern, {
+    limit: MAX_SUGGESTIONS_TO_SHOW,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return results.map((r: any) => r.item);
 }
 
 export function useAtCompletion(props: UseAtCompletionProps): void {
@@ -283,7 +317,14 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           value: suggestion.value.replace(/^@/, ''),
         }));
 
+        const agentCandidates = buildAgentCandidates(config);
+        const agentSuggestions = await searchAgentCandidates(
+          state.pattern ?? '',
+          agentCandidates,
+        );
+
         const combinedSuggestions = [
+          ...agentSuggestions,
           ...fileSuggestions,
           ...resourceSuggestions,
         ];
