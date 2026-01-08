@@ -221,22 +221,6 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should load description from package.json', async () => {
-      const extDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'desc-extension',
-        version: '1.0.0',
-      });
-      fs.writeFileSync(
-        path.join(extDir, 'package.json'),
-        JSON.stringify({ description: 'Extension Description' }),
-      );
-
-      const extensions = await extensionManager.loadExtensions();
-      expect(extensions).toHaveLength(1);
-      expect(extensions[0].description).toBe('Extension Description');
-    });
-
     it('should load context file path when GEMINI.md is present', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,

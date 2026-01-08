@@ -12,6 +12,7 @@ import type {
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../policy/types.js';
+import type { ExtensionScope } from '../utils/extensionLoader.js';
 
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -1424,7 +1425,7 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
     extension_name: string,
     hashed_extension_name: string,
     extension_id: string,
-    settingScope: string,
+    settingScope: string | ExtensionScope,
   ) {
     this['event.name'] = 'extension_enable';
     this['event.timestamp'] = new Date().toISOString();
@@ -1565,7 +1566,7 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
     extension_name: string,
     hashed_extension_name: string,
     extension_id: string,
-    settingScope: string,
+    settingScope: string | ExtensionScope,
   ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();

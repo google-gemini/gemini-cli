@@ -638,24 +638,6 @@ Would you like to attempt to install via "git clone" instead?`,
       ) as unknown as ExtensionConfig;
 
       validateName(config.name);
-
-      // Attempt to load description from package.json if not present
-      if (!config.description) {
-        try {
-          const packageJsonPath = path.join(extensionDir, 'package.json');
-          const packageJsonContent = await fs.promises.readFile(
-            packageJsonPath,
-            'utf-8',
-          );
-          const packageJson = JSON.parse(packageJsonContent);
-          if (packageJson.description) {
-            config.description = packageJson.description;
-          }
-        } catch {
-          // Ignore errors reading package.json (file might not exist)
-        }
-      }
-
       return config;
     } catch (e) {
       throw new Error(
@@ -799,12 +781,7 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     await logExtensionDisable(
       this.telemetryConfig,
-      new ExtensionDisableEvent(
-        name,
-        hashValue(name),
-        extension.id,
-        scope as SettingScope,
-      ),
+      new ExtensionDisableEvent(name, hashValue(name), extension.id, scope),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it
@@ -843,12 +820,7 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     await logExtensionEnable(
       this.telemetryConfig,
-      new ExtensionEnableEvent(
-        name,
-        hashValue(name),
-        extension.id,
-        scope as SettingScope,
-      ),
+      new ExtensionEnableEvent(name, hashValue(name), extension.id, scope),
     );
     if (!this.config || this.config.getEnableExtensionReloading()) {
       // Only toggle the isActive state if we are actually going to disable it
