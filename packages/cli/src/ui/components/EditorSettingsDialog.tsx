@@ -73,6 +73,7 @@ export function EditorSettingsDialog({
       'error',
       `Editor is not supported: ${currentPreference}`,
     );
+    onSelect(undefined, selectedScope);
     editorIndex = 0;
   }
 
