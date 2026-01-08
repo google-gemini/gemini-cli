@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
@@ -14,7 +13,10 @@ import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand } from './chatCommand.js';
-import { serializeHistoryToMarkdown , exportHistoryToFile } from '../utils/historyExportUtils.js';
+import {
+  serializeHistoryToMarkdown,
+  exportHistoryToFile,
+} from '../utils/historyExportUtils.js';
 import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
@@ -34,10 +36,9 @@ vi.mock('../utils/historyExportUtils.js', async (importOriginal) => {
   };
 });
 
-
 describe('chatCommand', () => {
-  const mockFs = fsPromises as Mocked<typeof fsPromises>;
-  const mockExport = exportHistoryToFile as Mocked<typeof exportHistoryToFile>;
+  const mockFs = vi.mocked(fsPromises);
+  const mockExport = vi.mocked(exportHistoryToFile);
 
   let mockContext: CommandContext;
   let mockGetChat: ReturnType<typeof vi.fn>;
