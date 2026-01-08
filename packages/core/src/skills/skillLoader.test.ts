@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { loadSkillsFromDir } from './skillLoader.js';
 import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 describe('skillLoader', () => {
   let testRootDir: string;
@@ -19,6 +20,7 @@ describe('skillLoader', () => {
       path.join(os.tmpdir(), 'skill-loader-test-'),
     );
     vi.spyOn(coreEvents, 'emitFeedback');
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(async () => {
@@ -53,8 +55,7 @@ describe('skillLoader', () => {
     const skills = await loadSkillsFromDir(testRootDir);
 
     expect(skills).toHaveLength(0);
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
     );
   });
@@ -89,8 +90,7 @@ describe('skillLoader', () => {
     const skills = await loadSkillsFromDir(testRootDir);
 
     expect(skills).toHaveLength(0);
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
     );
   });

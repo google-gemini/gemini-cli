@@ -12,7 +12,7 @@ import { ExtensionManager } from './extension-manager.js';
 import { loadSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn());
 
@@ -58,6 +58,7 @@ describe('ExtensionManager skills validation', () => {
       settings: loadSettings(tempWorkspaceDir).merged,
     });
     vi.spyOn(coreEvents, 'emitFeedback');
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -83,8 +84,7 @@ describe('ExtensionManager skills validation', () => {
     });
 
     expect(extension.name).toBe('skills-ext');
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
     );
   });
@@ -102,12 +102,10 @@ describe('ExtensionManager skills validation', () => {
 
     await extensionManager.loadExtensions();
 
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
     );
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining(
         'The directory is not empty but no valid skills were discovered',
       ),
@@ -139,8 +137,7 @@ describe('ExtensionManager skills validation', () => {
     expect(extension.skills![0].name).toBe('test-skill');
     // It might be called for other reasons during startup, but shouldn't be called for our skills loading success
     // Actually, it shouldn't be called with our warning message
-    expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-      'warning',
+    expect(debugLogger.debug).not.toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
     );
   });

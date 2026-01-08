@@ -60,8 +60,7 @@ export async function loadSkillsFromDir(
     if (discoveredSkills.length === 0) {
       const files = await fs.readdir(absoluteSearchPath);
       if (files.length > 0) {
-        coreEvents.emitFeedback(
-          'warning',
+        debugLogger.debug(
           `Failed to load skills from ${absoluteSearchPath}. The directory is not empty but no valid skills were discovered. Please ensure SKILL.md files are present in subdirectories and have valid frontmatter.`,
         );
       }
