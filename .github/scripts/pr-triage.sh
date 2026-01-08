@@ -33,7 +33,7 @@ process_pr() {
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         local REFERENCED_ISSUE
         # Search for # followed by digits, not preceded by alphanumeric chars
-        REFERENCED_ISSUE=$(echo "${PR_DATA}" | jq -r '.body // empty' | grep -oE '(^|[[:space:],.:;()[\]])#[0-9]+\b' | head -n 1 | grep -oE '[0-9]+' || echo "")
+        REFERENCED_ISSUE=$(echo "${PR_DATA}" | jq -r '.body // empty' | grep -oE '(^|[^a-zA-Z0-9])#[0-9]+([^a-zA-Z0-9]|$)' | head -n 1 | grep -oE '[0-9]+' || echo "")
         if [[ -n "${REFERENCED_ISSUE}" ]]; then
             ISSUE_NUMBER="${REFERENCED_ISSUE}"
             echo "🔗 Found referenced issue #${ISSUE_NUMBER} in PR body"
