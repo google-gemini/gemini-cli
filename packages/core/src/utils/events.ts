@@ -6,10 +6,7 @@
 
 import { EventEmitter } from 'node:events';
 import type { McpClient } from '../tools/mcp-client.js';
-import type {
-  ExtensionsStartingEvent,
-  ExtensionsStoppingEvent,
-} from './extensionLoader.js';
+import type { ExtensionEvents } from './extensionLoader.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -80,13 +77,11 @@ export enum CoreEvent {
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
   McpClientUpdate = 'mcp-client-update',
-  ExtensionsStarting = 'extensionsStarting',
-  ExtensionsStopping = 'extensionsStopping',
   OauthDisplayMessage = 'oauth-display-message',
   SettingsChanged = 'settings-changed',
 }
 
-export interface CoreEvents {
+export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
@@ -94,8 +89,6 @@ export interface CoreEvents {
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
-  [CoreEvent.ExtensionsStarting]: [ExtensionsStartingEvent];
-  [CoreEvent.ExtensionsStopping]: [ExtensionsStoppingEvent];
   [CoreEvent.OauthDisplayMessage]: string[];
   [CoreEvent.SettingsChanged]: never[];
 }

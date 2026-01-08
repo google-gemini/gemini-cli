@@ -29,7 +29,6 @@ import {
   Storage,
   IdeClient,
   coreEvents,
-  CoreEvent,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -281,8 +280,8 @@ export const useSlashCommandProcessor = (
       // starting/stopping
       reloadCommands();
     };
-    coreEvents.on(CoreEvent.ExtensionsStarting, extensionEventListener);
-    coreEvents.on(CoreEvent.ExtensionsStopping, extensionEventListener);
+    coreEvents.on('extensionsStarting', extensionEventListener);
+    coreEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -290,8 +289,8 @@ export const useSlashCommandProcessor = (
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
       })();
-      coreEvents.off(CoreEvent.ExtensionsStarting, extensionEventListener);
-      coreEvents.off(CoreEvent.ExtensionsStopping, extensionEventListener);
+      coreEvents.off('extensionsStarting', extensionEventListener);
+      coreEvents.off('extensionsStopping', extensionEventListener);
     };
   }, [config, reloadCommands]);
 
