@@ -552,9 +552,12 @@ async function linkAction(context: CommandContext, args: string) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: `Invalid source: ${sourceFilepath}: ${getErrorMessage(error)}`,
+        text: `Invalid source: ${sourceFilepath}`,
       },
       Date.now(),
+    );
+    debugLogger.error(
+      `Failed to stat path "${sourceFilepath}": ${getErrorMessage(error)}`,
     );
     return;
   }
