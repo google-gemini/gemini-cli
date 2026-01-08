@@ -183,8 +183,7 @@ async function searchAgentCandidates(
   const results = await fzf.find(normalizedPattern, {
     limit: MAX_SUGGESTIONS_TO_SHOW,
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return results.map((r: any) => r.item);
+  return results.map((r: { item: Suggestion }) => r.item);
 }
 
 export function useAtCompletion(props: UseAtCompletionProps): void {
