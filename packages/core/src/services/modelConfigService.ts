@@ -80,6 +80,29 @@ export class ModelConfigService {
     this.runtimeOverrides.push(override);
   }
 
+  /**
+   * Resolves a model configuration by merging settings from aliases and applying overrides.
+   *
+   * The resolution follows a linear application pipeline:
+   *
+   * 1. Alias Chain Resolution:
+   *    Builds the inheritance chain from root to leaf. Configurations are merged starting from
+   *    the root, so that children naturally override parents.
+   *
+   * 2. Override Level Assignment:
+   *    Overrides are matched against the hierarchy and assigned a "Level" for application:
+   *    - Level 0: Broad matches (Global or Resolved Model name).
+   *    - Level 1..N: Hierarchy matches (from Root-most alias to Leaf-most alias).
+   *
+   * 3. Precedence & Application:
+   *    Overrides are applied in order of their Level (ASC), then Specificity (ASC), then
+   *    Configuration Order (ASC). This ensures that more targeted and "deeper" rules
+   *    naturally layer on top of broader ones.
+   *
+   * 4. Orthogonality:
+   *    All fields (including 'model') are treated equally. A more specific or deeper override
+   *    can freely change any setting, including the target model name.
+   */
   private internalGetResolvedConfig(context: ModelConfigKey): {
     model: string | undefined;
     generateContentConfig: GenerateContentConfig;
@@ -99,15 +122,13 @@ export class ModelConfigService {
     const {
       aliasChain,
       baseModel: initialBaseModel,
-      baseModelWeight: initialBaseModelWeight,
       resolvedConfig: initialResolvedConfig,
     } = this.resolveAliasChain(context.model, allAliases);
 
     let baseModel = initialBaseModel;
-    let baseModelWeight = initialBaseModelWeight;
     let resolvedConfig = initialResolvedConfig;
 
-    const modelToWeight = this.buildModelWeightMap(aliasChain, baseModel);
+    const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
     const allOverrides = [
       ...overrides,
       ...customOverrides,
@@ -116,17 +137,14 @@ export class ModelConfigService {
     const matches = this.findMatchingOverrides(
       allOverrides,
       context,
-      modelToWeight,
+      modelToLevel,
     );
 
     this.sortOverrides(matches);
 
     for (const match of matches) {
       if (match.modelConfig.model) {
-        if (baseModel === undefined || match.weight <= baseModelWeight) {
-          baseModel = match.modelConfig.model;
-          baseModelWeight = match.weight;
-        }
+        baseModel = match.modelConfig.model;
       }
       if (match.modelConfig.generateContentConfig) {
         resolvedConfig = this.deepMerge(
@@ -145,11 +163,9 @@ export class ModelConfigService {
   ): {
     aliasChain: string[];
     baseModel: string | undefined;
-    baseModelWeight: number;
     resolvedConfig: GenerateContentConfig;
   } {
     let baseModel: string | undefined = undefined;
-    let baseModelWeight = Infinity;
     let resolvedConfig: GenerateContentConfig = {};
     const aliasChain: string[] = [];
 
@@ -176,45 +192,49 @@ export class ModelConfigService {
         current = alias.extends;
       }
 
-      for (let i = aliasChain.length - 1; i >= 0; i--) {
-        const alias = allAliases[aliasChain[i]];
+      // Root-to-Leaf chain for merging and level assignment.
+      const reversedChain = [...aliasChain].reverse();
+      for (const aliasName of reversedChain) {
+        const alias = allAliases[aliasName];
         if (alias.modelConfig.model) {
           baseModel = alias.modelConfig.model;
-          baseModelWeight = i;
         }
         resolvedConfig = this.deepMerge(
           resolvedConfig,
           alias.modelConfig.generateContentConfig,
         );
       }
-    } else {
-      aliasChain.push(requestedModel);
-      baseModel = requestedModel;
-      baseModelWeight = 0;
+      return { aliasChain: reversedChain, baseModel, resolvedConfig };
     }
 
-    return { aliasChain, baseModel, baseModelWeight, resolvedConfig };
+    return {
+      aliasChain: [requestedModel],
+      baseModel: requestedModel,
+      resolvedConfig: {},
+    };
   }
 
-  private buildModelWeightMap(
+  private buildModelLevelMap(
     aliasChain: string[],
     baseModel: string | undefined,
   ): Map<string, number> {
-    const modelToWeight = new Map<string, number>();
-    aliasChain.forEach((name, i) => modelToWeight.set(name, i));
-    if (baseModel && !modelToWeight.has(baseModel)) {
-      modelToWeight.set(baseModel, 0.5);
+    const modelToLevel = new Map<string, number>();
+    // Global and Model name are both level 0.
+    if (baseModel) {
+      modelToLevel.set(baseModel, 0);
     }
-    return modelToWeight;
+    // Alias chain starts at level 1.
+    aliasChain.forEach((name, i) => modelToLevel.set(name, i + 1));
+    return modelToLevel;
   }
 
   private findMatchingOverrides(
     overrides: ModelConfigOverride[],
     context: ModelConfigKey,
-    modelToWeight: Map<string, number>,
+    modelToLevel: Map<string, number>,
   ): Array<{
     specificity: number;
-    weight: number;
+    level: number;
     modelConfig: ModelConfig;
     index: number;
   }> {
@@ -223,12 +243,12 @@ export class ModelConfigService {
         const matchEntries = Object.entries(override.match);
         if (matchEntries.length === 0) return null;
 
-        let matchedWeight = Infinity;
+        let matchedLevel = 0; // Default to Global
         const isMatch = matchEntries.every(([key, value]) => {
           if (key === 'model') {
-            const weight = modelToWeight.get(value as string);
-            if (weight === undefined) return false;
-            matchedWeight = weight;
+            const level = modelToLevel.get(value as string);
+            if (level === undefined) return false;
+            matchedLevel = level;
             return true;
           }
           if (key === 'overrideScope' && value === 'core') {
@@ -240,7 +260,7 @@ export class ModelConfigService {
         return isMatch
           ? {
               specificity: matchEntries.length,
-              weight: matchedWeight,
+              level: matchedLevel,
               modelConfig: override.modelConfig,
               index,
             }
@@ -250,18 +270,14 @@ export class ModelConfigService {
   }
 
   private sortOverrides(
-    matches: Array<{ specificity: number; weight: number; index: number }>,
+    matches: Array<{ specificity: number; level: number; index: number }>,
   ): void {
     matches.sort((a, b) => {
+      if (a.level !== b.level) {
+        return a.level - b.level;
+      }
       if (a.specificity !== b.specificity) {
         return a.specificity - b.specificity;
-      }
-      if (
-        a.weight !== b.weight &&
-        a.weight !== Infinity &&
-        b.weight !== Infinity
-      ) {
-        return b.weight - a.weight;
       }
       return a.index - b.index;
     });
