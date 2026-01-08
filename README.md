@@ -165,7 +165,7 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 100 requests/day with Gemini 3
+- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 
