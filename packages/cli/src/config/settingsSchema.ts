@@ -200,9 +200,9 @@ const SETTINGS_SCHEMA = {
         description: 'Enable automatic updates.',
         showInDialog: true,
       },
-      enableUpdatePrompts: {
+      enableAutoUpdateNotification: {
         type: 'boolean',
-        label: 'Enable Update Prompts',
+        label: 'Enable Auto Update Notification',
         category: 'General',
         requiresRestart: false,
         default: true,

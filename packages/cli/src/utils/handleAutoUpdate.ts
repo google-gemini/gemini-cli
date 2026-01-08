@@ -30,7 +30,7 @@ export function handleAutoUpdate(
     return;
   }
 
-  if (!settings.merged.general.enableUpdatePrompts) {
+  if (!settings.merged.general.enableAutoUpdateNotification) {
     return;
   }
 

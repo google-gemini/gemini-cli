@@ -697,9 +697,9 @@ export function migrateDeprecatedSettings(
       if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
         const oldValue = newGeneral['disableUpdateNag'];
         debugLogger.log(
-          `Migrating deprecated general.disableUpdateNag to general.enableUpdatePrompts from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          `Migrating deprecated general.disableUpdateNag to general.enableAutoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
         );
-        newGeneral['enableUpdatePrompts'] = !oldValue;
+        newGeneral['enableAutoUpdateNotification'] = !oldValue;
         delete newGeneral['disableUpdateNag'];
         modified = true;
       }

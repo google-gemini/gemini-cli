@@ -84,7 +84,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should do nothing if update prompts are disabled', () => {
-    mockSettings.merged.general.enableUpdatePrompts = false;
+    mockSettings.merged.general.enableAutoUpdateNotification = false;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
