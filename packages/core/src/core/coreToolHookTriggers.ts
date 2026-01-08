@@ -14,8 +14,10 @@ import {
   createHookOutput,
   NotificationType,
   type DefaultHookOutput,
+  type McpToolContext,
   BeforeToolHookOutput,
 } from '../hooks/types.js';
+import type { Config } from '../config/config.js';
 import type {
   ToolCallConfirmationDetails,
   ToolResult,
@@ -26,6 +28,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { ShellToolInvocation } from '../tools/shell.js';
+import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
 /**
  * Serializable representation of tool confirmation details for hooks.
@@ -155,17 +158,56 @@ export async function fireToolNotificationHook(
 }
 
 /**
+ * Extracts MCP context from a tool invocation if it's an MCP tool.
+ *
+ * @param invocation The tool invocation
+ * @param config Config to look up server details
+ * @returns MCP context if this is an MCP tool, undefined otherwise
+ */
+function extractMcpContext(
+  invocation: ShellToolInvocation | AnyToolInvocation,
+  config: Config,
+): McpToolContext | undefined {
+  if (!(invocation instanceof DiscoveredMCPToolInvocation)) {
+    return undefined;
+  }
+
+  // Get the server config
+  const mcpServers =
+    config.getMcpClientManager()?.getMcpServers() ??
+    config.getMcpServers() ??
+    {};
+  const serverConfig = mcpServers[invocation.serverName];
+  if (!serverConfig) {
+    return undefined;
+  }
+
+  return {
+    server_name: invocation.serverName,
+    tool_name: invocation.serverToolName,
+    // Non-sensitive connection details only
+    command: serverConfig.command,
+    args: serverConfig.args,
+    cwd: serverConfig.cwd,
+    url: serverConfig.url ?? serverConfig.httpUrl,
+    tcp: serverConfig.tcp,
+  };
+}
+
+/**
  * Fires the BeforeTool hook and returns the hook output.
  *
  * @param messageBus The message bus to use for hook communication
  * @param toolName The name of the tool being executed
  * @param toolInput The input parameters for the tool
+ * @param mcpContext Optional MCP context for MCP tools
  * @returns The hook output, or undefined if no hook was executed or on error
  */
 export async function fireBeforeToolHook(
   messageBus: MessageBus,
   toolName: string,
   toolInput: Record<string, unknown>,
+  mcpContext?: McpToolContext,
 ): Promise<DefaultHookOutput | undefined> {
   try {
     const response = await messageBus.request<
@@ -178,6 +220,7 @@ export async function fireBeforeToolHook(
         input: {
           tool_name: toolName,
           tool_input: toolInput,
+          ...(mcpContext && { mcp_context: mcpContext }),
         },
       },
       MessageBusType.HOOK_EXECUTION_RESPONSE,
@@ -199,6 +242,7 @@ export async function fireBeforeToolHook(
  * @param toolName The name of the tool that was executed
  * @param toolInput The input parameters for the tool
  * @param toolResponse The result from the tool execution
+ * @param mcpContext Optional MCP context for MCP tools
  * @returns The hook output, or undefined if no hook was executed or on error
  */
 export async function fireAfterToolHook(
@@ -210,6 +254,7 @@ export async function fireAfterToolHook(
     returnDisplay: ToolResult['returnDisplay'];
     error: ToolResult['error'];
   },
+  mcpContext?: McpToolContext,
 ): Promise<DefaultHookOutput | undefined> {
   try {
     const response = await messageBus.request<
@@ -223,6 +268,7 @@ export async function fireAfterToolHook(
           tool_name: toolName,
           tool_input: toolInput,
           tool_response: toolResponse,
+          ...(mcpContext && { mcp_context: mcpContext }),
         },
       },
       MessageBusType.HOOK_EXECUTION_RESPONSE,
@@ -248,6 +294,7 @@ export async function fireAfterToolHook(
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
  * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param config Config to look up MCP server details for hook context
  * @returns The tool result
  */
 export async function executeToolWithHooks(
@@ -260,10 +307,14 @@ export async function executeToolWithHooks(
   liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
+  config?: Config,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
   let inputWasModified = false;
   let modifiedKeys: string[] = [];
+
+  // Extract MCP context if this is an MCP tool (only if config is provided)
+  const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
 
   // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
@@ -271,6 +322,7 @@ export async function executeToolWithHooks(
       messageBus,
       toolName,
       toolInput,
+      mcpContext,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -378,6 +430,7 @@ export async function executeToolWithHooks(
         returnDisplay: toolResult.returnDisplay,
         error: toolResult.error,
       },
+      mcpContext,
     );
 
     // Check if hook requested to stop entire agent execution
