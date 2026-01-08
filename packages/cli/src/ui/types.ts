@@ -137,6 +137,12 @@ export type HistoryItemAbout = HistoryItemBase & {
   userEmail?: string;
 };
 
+export type HistoryItemWhoami = HistoryItemBase & {
+  type: 'whoami';
+  selectedAuthType: string;
+  userEmail?: string;
+};
+
 export type HistoryItemHelp = HistoryItemBase & {
   type: 'help';
   timestamp: Date;
@@ -292,6 +298,7 @@ export type HistoryItemWithoutId =
   | HistoryItemError
   | HistoryItemWarning
   | HistoryItemAbout
+  | HistoryItemWhoami
   | HistoryItemHelp
   | HistoryItemToolGroup
   | HistoryItemStats
@@ -317,6 +324,7 @@ export enum MessageType {
   WARNING = 'warning',
   USER = 'user',
   ABOUT = 'about',
+  WHOAMI = 'whoami',
   HELP = 'help',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',

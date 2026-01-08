@@ -19,6 +19,7 @@ import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
+import { WhoamiBox } from './WhoamiBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
@@ -111,6 +112,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
+          userEmail={itemForDisplay.userEmail}
+        />
+      )}
+      {itemForDisplay.type === 'whoami' && (
+        <WhoamiBox
+          selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
         />
       )}
