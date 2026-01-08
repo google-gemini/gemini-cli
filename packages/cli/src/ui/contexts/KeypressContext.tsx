@@ -193,7 +193,7 @@ function bufferBackslashEnter(
  * Converts return keys pressed quickly after other keys into plain
  * insertable return characters.
  *
- * This is to accomodate older terminals that paste text without bracketing.
+ * This is to accommodate older terminals that paste text without bracketing.
  */
 function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
   let lastKeyTime = 0;

@@ -243,6 +243,51 @@ describe('AgentRegistry', () => {
   });
 
   describe('registration logic', () => {
+    it('should register runtime overrides when the model is "auto"', async () => {
+      const autoAgent: LocalAgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'AutoAgent',
+        modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'auto' },
+      };
+
+      const registerOverrideSpy = vi.spyOn(
+        mockConfig.modelConfigService,
+        'registerRuntimeModelOverride',
+      );
+
+      await registry.testRegisterAgent(autoAgent);
+
+      // Should register one alias for the custom model config.
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(autoAgent),
+        }),
+      ).toStrictEqual({
+        model: 'auto',
+        generateContentConfig: {
+          temperature: autoAgent.modelConfig.temp,
+          topP: autoAgent.modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: -1,
+          },
+        },
+      });
+
+      // Should register one override for the agent name (scope)
+      expect(registerOverrideSpy).toHaveBeenCalledTimes(1);
+
+      // Check scope override
+      expect(registerOverrideSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          match: { overrideScope: autoAgent.name },
+          modelConfig: expect.objectContaining({
+            generateContentConfig: expect.any(Object),
+          }),
+        }),
+      );
+    });
+
     it('should register a valid agent definition', async () => {
       await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')).toEqual(MOCK_AGENT_V1);

@@ -20,8 +20,8 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   isPreviewModel,
+  isAutoModel,
 } from '../config/models.js';
-import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -199,7 +199,10 @@ export class AgentRegistry {
 
     this.agents.set(definition.name, definition);
 
-    // Register model config.
+    // Register model config. We always create a runtime alias. However,
+    // if the user is using `auto` as a model string then we also create
+    // runtime overrides to ensure the subagent generation settings are
+    // respected regardless of the final model string from routing.
     // TODO(12916): Migrate sub-agents where possible to static configs.
     const modelConfig = definition.modelConfig;
     let model = modelConfig.model;
@@ -207,24 +210,35 @@ export class AgentRegistry {
       model = this.config.getModel();
     }
 
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
-          },
-        },
+    const generateContentConfig = {
+      temperature: modelConfig.temp,
+      topP: modelConfig.top_p,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: modelConfig.thinkingBudget ?? -1,
       },
     };
 
     this.config.modelConfigService.registerRuntimeModelConfig(
       getModelConfigAlias(definition),
-      runtimeAlias,
+      {
+        modelConfig: {
+          model,
+          generateContentConfig,
+        },
+      },
     );
+
+    if (isAutoModel(model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig,
+        },
+      });
+    }
   }
 
   /**

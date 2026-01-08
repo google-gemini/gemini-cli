@@ -114,6 +114,18 @@ describe('detectIde', () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
+
+  it('should detect Sublime Text', () => {
+    vi.stubEnv('TERM_PROGRAM', 'sublime');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.sublimetext);
+  });
+
+  it('should prioritize Antigravity over Sublime Text', () => {
+    vi.stubEnv('TERM_PROGRAM', 'sublime');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
+  });
 });
 
 describe('detectIde with ideInfoFromFile', () => {
