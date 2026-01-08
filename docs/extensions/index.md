@@ -165,7 +165,7 @@ The file has the following structure:
 - `version`: The version of the extension.
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers settingsd in a
+  loaded on startup just like MCP servers settings in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
   and a `settings.json` file settings an MCP server with the same name, the
   server defined in the `settings.json` file takes precedence.
