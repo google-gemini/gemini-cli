@@ -16,6 +16,12 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -27,12 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -62,6 +62,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -73,12 +79,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -108,6 +108,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                   false*  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -119,12 +125,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                     false*  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -154,6 +154,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -165,12 +171,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -200,6 +200,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -211,12 +217,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -246,6 +246,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -257,12 +263,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -292,6 +292,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    true*  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -303,12 +309,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                     false*  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -338,6 +338,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    false  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -349,12 +355,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -384,6 +384,12 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Disable Vim Command Mode                                                               false  │
+│    Disable Vim command mode                                                                      │
+│                                                                                                  │
+│    Vim Mode Style                                                      Vim Editor (Full Buffer)  │
+│    Vim navigation style: "vim-editor" (full buffer) or "bash-vim" (…                             │
+│                                                                                                  │
 │    Disable Auto Update                                                                    true*  │
 │    Disable automatic updates                                                                     │
 │                                                                                                  │
@@ -395,12 +401,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
 │    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
-│                                                                                                  │
-│    Hide Window Title                                                                      true*  │
-│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

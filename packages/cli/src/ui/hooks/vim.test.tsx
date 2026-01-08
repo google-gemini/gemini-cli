@@ -674,7 +674,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle / input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: '/' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '/' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
@@ -686,7 +689,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle : input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: ':' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: ':' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
@@ -698,7 +704,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle ? input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: '?' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '?' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
