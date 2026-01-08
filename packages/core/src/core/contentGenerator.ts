@@ -130,6 +130,7 @@ export async function createContentGenerator(
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
+    const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
@@ -179,6 +180,7 @@ export async function createContentGenerator(
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
         httpOptions,
+        ...(apiVersionEnv !== undefined && { apiVersion: apiVersionEnv }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
