@@ -67,7 +67,6 @@ describe('useRewindLogic', () => {
       fileCount: 1,
       addedLines: 5,
       removedLines: 0,
-      firstFileName: 'file.ts',
     };
     vi.mocked(rewindFileOps.calculateRewindImpact).mockReturnValue(mockStats);
 
@@ -101,7 +100,6 @@ describe('useRewindLogic', () => {
       fileCount: 1,
       addedLines: 5,
       removedLines: 0,
-      firstFileName: 'file.ts',
     };
     vi.mocked(rewindFileOps.calculateRewindImpact).mockReturnValue(mockStats);
 
@@ -127,7 +125,6 @@ describe('useRewindLogic', () => {
       fileCount: 2,
       addedLines: 10,
       removedLines: 2,
-      firstFileName: 'file.ts',
     };
     vi.mocked(rewindFileOps.calculateTurnStats).mockReturnValue(mockStats);
 
