@@ -5,6 +5,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import * as os from 'node:os';
+import si from 'systeminformation';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type {
   StartSessionEvent,
@@ -57,6 +59,7 @@ import {
   isCloudShell,
 } from '../../ide/detect-ide.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -187,6 +190,37 @@ const MAX_EVENTS = 1000;
  */
 const MAX_RETRY_EVENTS = 100;
 
+let cachedGpuInfo = 'INITIALIZING';
+
+async function refreshGpuInfo() {
+  try {
+    const graphics = await si.graphics();
+    if (graphics.controllers && graphics.controllers.length > 0) {
+      cachedGpuInfo = graphics.controllers.map((c) => c.model).join(', ');
+    } else {
+      cachedGpuInfo = 'NA';
+    }
+  } catch (error) {
+    cachedGpuInfo = 'FAILED';
+    debugLogger.error(
+      'Failed to get GPU information for telemetry',
+      getErrorMessage(error),
+    );
+  }
+}
+
+// Kick off GPU info collection
+refreshGpuInfo().catch((error) => {
+  debugLogger.error(
+    'Failed to kick off GPU info collection',
+    getErrorMessage(error),
+  );
+});
+
+function getGpuInfo(): string {
+  return cachedGpuInfo;
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -312,6 +346,7 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const cpus = os.cpus();
 
     const baseMetadata: EventValue[] = [
       ...data,
@@ -330,6 +365,22 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
         value: process.platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        value: cpus[0].model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        value: cpus.length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+        value: (os.totalmem() / 1024 ** 3).toFixed(2).toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        value: getGpuInfo(),
       },
     ];
 

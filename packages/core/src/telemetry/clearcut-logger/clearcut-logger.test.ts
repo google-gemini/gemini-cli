@@ -40,6 +40,9 @@ import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 
+import si from 'systeminformation';
+import type { Systeminformation } from 'systeminformation';
+
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
@@ -97,6 +100,13 @@ expect.extend({
 
 vi.mock('../../utils/userAccountManager.js');
 vi.mock('../../utils/installationManager.js');
+vi.mock('systeminformation', () => ({
+  default: {
+    graphics: vi.fn().mockResolvedValue({
+      controllers: [{ model: 'Mock GPU' }],
+    }),
+  },
+}));
 
 const mockUserAccount = vi.mocked(UserAccountManager.prototype);
 const mockInstallMgr = vi.mocked(InstallationManager.prototype);
@@ -327,6 +337,71 @@ describe('ClearcutLogger', () => {
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: logger?.getConfigJson(),
+      });
+    });
+
+    it('logs the GPU information (single GPU)', async () => {
+      vi.mocked(si.graphics).mockResolvedValueOnce({
+        controllers: [{ model: 'Single GPU' }],
+      } as unknown as Systeminformation.GraphicsData);
+      const { logger } = setup({});
+
+      // Wait a bit for the async refreshGpuInfo to complete
+      await vi.advanceTimersByTimeAsync(100);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        value: 'Single GPU',
+      });
+    });
+
+    it('logs multiple GPUs', async () => {
+      vi.mocked(si.graphics).mockResolvedValueOnce({
+        controllers: [{ model: 'GPU 1' }, { model: 'GPU 2' }],
+      } as unknown as Systeminformation.GraphicsData);
+      const { logger } = setup({});
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        value: 'GPU 1, GPU 2',
+      });
+    });
+
+    it('logs NA when no GPUs are found', async () => {
+      vi.mocked(si.graphics).mockResolvedValueOnce({
+        controllers: [],
+      } as unknown as Systeminformation.GraphicsData);
+      const { logger } = setup({});
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        value: 'NA',
+      });
+    });
+
+    it('logs FAILED when GPU detection fails', async () => {
+      vi.mocked(si.graphics).mockRejectedValueOnce(
+        new Error('Detection failed'),
+      );
+      const { logger } = setup({});
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+        value: 'FAILED',
       });
     });
 
