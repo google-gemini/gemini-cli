@@ -250,6 +250,15 @@ Would provide these commands:
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
 
+### Hooks
+
+Extensions can provide [hooks](../hooks/index.md) to intercept and customize
+Gemini CLI behavior at specific lifecycle events. Hooks provided by an extension
+must be defined in a `hooks/hooks.json` file within the extension directory.
+
+> [!IMPORTANT] Hooks are not defined directly in `gemini-extension.json`. The
+> CLI specifically looks for the `hooks/hooks.json` file.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user
