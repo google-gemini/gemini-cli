@@ -6,17 +6,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock os.platform to return 'linux' so that shell-utils uses the bash parser
-// even when running tests on Windows. The tests below use bash syntax (&&, $())
-// which may fail to parse or parse differently with the PowerShell parser.
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:os')>();
-  return {
-    ...actual,
-    platform: () => 'linux',
-  };
-});
-
 // Mock shell-utils to avoid relying on tree-sitter WASM which is flaky in CI on Windows
 vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   const actual =
