@@ -720,7 +720,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        if (keyMatchers[Command.HISTORY_UP](key)) {
+        if (isHistoryUp) {
           // Check for queued messages first when input is empty
           // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
           if (tryLoadQueuedMessages()) {
@@ -730,30 +730,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           inputHistory.navigateUp();
           return;
         }
-        if (keyMatchers[Command.HISTORY_DOWN](key)) {
-          inputHistory.navigateDown();
-          return;
-        }
-        // Handle arrow-up/down for history on single-line or at edges
-        if (
-          keyMatchers[Command.NAVIGATION_UP](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-        ) {
-          // Check for queued messages first when input is empty
-          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
-          if (tryLoadQueuedMessages()) {
-            return;
-          }
-          // Only navigate history if popAllMessages doesn't exist
-          inputHistory.navigateUp();
-          return;
-        }
-        if (
-          keyMatchers[Command.NAVIGATION_DOWN](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-        ) {
+        if (isHistoryDown) {
           inputHistory.navigateDown();
           return;
         }
