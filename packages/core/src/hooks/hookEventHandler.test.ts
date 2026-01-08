@@ -324,6 +324,8 @@ describe('HookEventHandler', () => {
           tool_input: { path: '/etc/passwd' },
           mcp_context: mcpContext,
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -511,6 +513,8 @@ describe('HookEventHandler', () => {
           tool_response: toolResponse,
           mcp_context: mcpContext,
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
