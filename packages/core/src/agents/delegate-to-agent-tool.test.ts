@@ -13,6 +13,7 @@ import { LocalSubagentInvocation } from './local-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { RemoteAgentInvocation } from './remote-invocation.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('./local-invocation.js', () => ({
@@ -20,6 +21,21 @@ vi.mock('./local-invocation.js', () => ({
     execute: vi
       .fn()
       .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
+    shouldConfirmExecute: vi.fn().mockResolvedValue(false),
+  })),
+}));
+
+vi.mock('./remote-invocation.js', () => ({
+  RemoteAgentInvocation: vi.fn().mockImplementation(() => ({
+    execute: vi.fn().mockResolvedValue({
+      content: [{ type: 'text', text: 'Remote Success' }],
+    }),
+    shouldConfirmExecute: vi.fn().mockResolvedValue({
+      type: 'info',
+      title: 'Remote Confirmation',
+      prompt: 'Confirm remote call',
+      onConfirm: vi.fn(),
+    }),
   })),
 }));
 
@@ -45,6 +61,18 @@ describe('DelegateToAgentTool', () => {
     toolConfig: { tools: [] },
   };
 
+  const mockRemoteAgentDef: AgentDefinition = {
+    kind: 'remote',
+    name: 'remote_agent',
+    description: 'A remote agent',
+    agentCardUrl: 'https://example.com/agent.json',
+    inputConfig: {
+      inputs: {
+        query: { type: 'string', description: 'Query', required: true },
+      },
+    },
+  };
+
   beforeEach(() => {
     config = {
       getDebugMode: () => false,
@@ -58,6 +86,8 @@ describe('DelegateToAgentTool', () => {
     // Manually register the mock agent (bypassing protected method for testing)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (registry as any).agents.set(mockAgentDef.name, mockAgentDef);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(mockRemoteAgentDef.name, mockRemoteAgentDef);
 
     messageBus = createMockMessageBus();
 
@@ -175,5 +205,75 @@ describe('DelegateToAgentTool', () => {
         }),
       }),
     );
+  });
+
+  it('should delegate to remote agent correctly', async () => {
+    const invocation = tool.build({
+      agent_name: 'remote_agent',
+      query: 'hello remote',
+    });
+
+    const result = await invocation.execute(new AbortController().signal);
+    expect(result).toEqual({
+      content: [{ type: 'text', text: 'Remote Success' }],
+    });
+    expect(RemoteAgentInvocation).toHaveBeenCalledWith(
+      mockRemoteAgentDef,
+      { query: 'hello remote' },
+      messageBus,
+      'remote_agent',
+      'remote_agent',
+    );
+  });
+
+  describe('Confirmation', () => {
+    it('should use default behavior for local agents (super call)', async () => {
+      const invocation = tool.build({
+        agent_name: 'test_agent',
+        arg1: 'valid',
+      });
+
+      // We expect it to call messageBus.publish with 'delegate_to_agent'
+      // because super.shouldConfirmExecute checks the policy for the tool itself.
+      await invocation.shouldConfirmExecute(new AbortController().signal);
+
+      expect(messageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall: expect.objectContaining({
+            name: DELEGATE_TO_AGENT_TOOL_NAME,
+          }),
+        }),
+      );
+    });
+
+    it('should forward to remote agent confirmation logic', async () => {
+      const invocation = tool.build({
+        agent_name: 'remote_agent',
+        query: 'hello remote',
+      });
+
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Verify it returns the mock confirmation from RemoteAgentInvocation
+      expect(result).toMatchObject({
+        type: 'info',
+        title: 'Remote Confirmation',
+      });
+
+      // Verify it did NOT call messageBus.publish with 'delegate_to_agent'
+      // directly from DelegateInvocation, but instead went into RemoteAgentInvocation.
+      // RemoteAgentInvocation (the mock) doesn't call publish in its mock implementation.
+      const delegateToAgentPublish = vi
+        .mocked(messageBus.publish)
+        .mock.calls.find(
+          (call) =>
+            call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+            call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+        );
+      expect(delegateToAgentPublish).toBeUndefined();
+    });
   });
 });
