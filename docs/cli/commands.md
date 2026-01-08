@@ -28,8 +28,8 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage:** `/chat save <tag>`
       - **Details on checkpoint location:** The default locations for saved chat
         checkpoints are:
-        - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
-        - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
+        - Linux/macOS: `~/.gemini/data/<project_hash>/`
+        - Windows: `C:\Users\<YourUsername>\.gemini\data\<project_hash>\`
         - **Behavior:** Chats are saved into a project-specific directory,
           determined by where you run the CLI. Consequently, saved chats are
           only accessible when working within that same project.
