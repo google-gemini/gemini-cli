@@ -476,6 +476,10 @@ the `excludedProjectEnvVars` setting in your `settings.json` file.
   - If set to `bearer`, the API key will be sent in the
     `Authorization: Bearer <key>` header.
   - Example: `export GEMINI_API_KEY_AUTH_MECHANISM="bearer"`
+- **`GOOGLE_GENAI_API_VERSION`**:
+  - Specifies the API version to use for Gemini API requests.
+  - When set, overrides the default API version used by the SDK.
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
