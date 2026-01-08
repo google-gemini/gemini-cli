@@ -114,7 +114,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable automatic updates.
   - **Default:** `true`
 
-- **`general.enableUpdatePrompts`** (boolean):
+- **`general.enableAutoUpdateNotification`** (boolean):
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 

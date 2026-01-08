@@ -2255,13 +2255,11 @@ describe('with workspace trust', () => {
         },
       };
 
-      (mockFsReadFileSync).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
@@ -2300,13 +2298,11 @@ describe('with workspace trust', () => {
         },
       };
 
-      (mockFsReadFileSync).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          return '{}';
-        },
-      );
+      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+        if (p === USER_SETTINGS_PATH)
+          return JSON.stringify(userSettingsContent);
+        return '{}';
+      });
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
@@ -2328,7 +2324,7 @@ describe('with workspace trust', () => {
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
-        expect.objectContaining({ enableUpdatePrompts: false }),
+        expect.objectContaining({ enableAutoUpdateNotification: false }),
       );
 
       // Check context.fileFiltering was migrated
