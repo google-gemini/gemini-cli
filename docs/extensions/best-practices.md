@@ -63,7 +63,7 @@ intended scope.
 
 ```typescript
 // Good: Validating paths
-if (!path.resolve(inputPath).startsWith(allowedDir)) {
+if (!path.resolve(inputPath).startsWith(path.resolve(allowedDir) + path.sep)) {
   throw new Error('Access denied');
 }
 ```

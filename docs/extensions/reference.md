@@ -278,7 +278,7 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 Gemini CLI extensions allow variable substitution in `gemini-extension.json`.
 This can be useful if e.g., you need the current directory to run an MCP server
-using `"cwd": "${extensionPath}${/}run.ts"`.
+using an argument like `"args": ["${extensionPath}${/}dist${/}server.js"]`.
 
 **Supported variables:**
 
