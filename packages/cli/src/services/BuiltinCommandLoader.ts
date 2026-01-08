@@ -76,26 +76,9 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
-      ...(this.config?.getExtensionsEnabled() === false
-        ? [
-            {
-              name: 'extensions',
-              description: 'Manage extensions',
-              kind: CommandKind.BUILT_IN,
-              autoExecute: false,
-              subCommands: [],
-              action: async (
-                _context: CommandContext,
-              ): Promise<MessageActionReturn> => ({
-                type: 'message',
-                messageType: 'error',
-                content: 'Extensions are disabled by your admin.',
-              }),
-            },
-          ]
-        : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
+      extensionsCommand(this.config?.getEnableExtensionReloading()),
       helpCommand,
-      ...(this.config?.getEnableHooks() ? [hooksCommand] : []),
+      ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       await ideCommand(),
       initCommand,
       ...(this.config?.getMcpEnabled() === false
@@ -112,7 +95,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'MCP is disabled by your admin.',
+                content: 'MCP disabled by your admin.',
               }),
             },
           ]

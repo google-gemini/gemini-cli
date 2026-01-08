@@ -65,12 +65,17 @@ export interface _ResolvedModelConfig {
 
 export class ModelConfigService {
   private readonly runtimeAliases: Record<string, ModelConfigAlias> = {};
+  private readonly runtimeOverrides: ModelConfigOverride[] = [];
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
     this.runtimeAliases[aliasName] = alias;
+  }
+
+  registerRuntimeModelOverride(override: ModelConfigOverride): void {
+    this.runtimeOverrides.push(override);
   }
 
   private resolveAlias(
@@ -123,7 +128,11 @@ export class ModelConfigService {
       ...customAliases,
       ...this.runtimeAliases,
     };
-    const allOverrides = [...overrides, ...customOverrides];
+    const allOverrides = [
+      ...overrides,
+      ...customOverrides,
+      ...this.runtimeOverrides,
+    ];
     let baseModel: string | undefined = context.model;
     let resolvedConfig: GenerateContentConfig = {};
 
