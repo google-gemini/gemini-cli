@@ -16,12 +16,14 @@ using the `/theme` command within Gemini CLI:
   - `Default`
   - `Dracula`
   - `GitHub`
+  - `Gruvbox`
 - **Light themes:**
   - `ANSI Light`
   - `Ayu Light`
   - `Default Light`
   - `GitHub Light`
   - `Google Code`
+  - `Gruvbox Light`
   - `Xcode`
 
 ### Changing themes
@@ -210,6 +212,10 @@ untrusted sources.
 
 <img src="/assets/theme-github.png" alt="GitHub theme" width="600">
 
+### Gruvbox
+
+<img src="/assets/theme-gruvbox.png" alt="Gruvbox theme" width="600">
+
 ## Light themes
 
 ### ANSI Light
@@ -231,6 +237,10 @@ untrusted sources.
 ### Google Code
 
 <img src="/assets/theme-google-light.png" alt="Google Code theme" width="600">
+
+### Gruvbox Light
+
+<img src="/assets/theme-gruvbox-light.png" alt="Gruvbox Light theme" width="600">
 
 ### Xcode
 

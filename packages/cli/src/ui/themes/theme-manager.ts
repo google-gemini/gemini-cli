@@ -11,6 +11,8 @@ import { Dracula } from './dracula.js';
 import { GitHubDark } from './github-dark.js';
 import { GitHubLight } from './github-light.js';
 import { GoogleCode } from './googlecode.js';
+import { Gruvbox } from './gruvbox.js';
+import { GruvboxLight } from './gruvbox-light.js';
 import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
@@ -51,6 +53,8 @@ class ThemeManager {
       GitHubDark,
       GitHubLight,
       GoogleCode,
+      Gruvbox,
+      GruvboxLight,
       Holiday,
       ShadesOfPurple,
       XCode,
