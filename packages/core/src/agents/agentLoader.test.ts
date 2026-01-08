@@ -13,7 +13,7 @@ import {
   markdownToAgentDefinition,
   loadAgentsFromDirectory,
   AgentLoadError,
-} from './loader.js';
+} from './agentLoader.js';
 import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
 import type { LocalAgentDefinition } from './types.js';
 
@@ -207,6 +207,29 @@ agent_card_url: https://example.com/card
         kind: 'remote',
         name: 'no-body-remote',
         agent_card_url: 'https://example.com/card',
+      });
+    });
+
+    it('should parse multiple remote agents in a list', async () => {
+      const filePath = await writeAgentMarkdown(`---
+- kind: remote
+  name: remote-1
+  agent_card_url: https://example.com/1
+- kind: remote
+  name: remote-2
+  agent_card_url: https://example.com/2
+---`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'remote-1',
+        agent_card_url: 'https://example.com/1',
+      });
+      expect(result[1]).toEqual({
+        kind: 'remote',
+        name: 'remote-2',
+        agent_card_url: 'https://example.com/2',
       });
     });
   });

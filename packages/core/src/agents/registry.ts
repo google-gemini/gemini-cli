@@ -8,7 +8,7 @@ import { Storage } from '../config/storage.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
-import { loadAgentsFromDirectory } from './loader.js';
+import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { IntrospectionAgent } from './introspection-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';

@@ -123,6 +123,8 @@ const agentUnionOptions = [
   { schema: remoteAgentSchema, label: 'Remote Agent' },
 ] as const;
 
+const remoteAgentsListSchema = z.array(remoteAgentSchema);
+
 const markdownFrontmatterSchema = z.union([
   agentUnionOptions[0].schema,
   agentUnionOptions[1].schema,
@@ -191,6 +193,21 @@ export async function parseAgentMarkdown(
       filePath,
       `YAML frontmatter parsing failed: ${(error as Error).message}`,
     );
+  }
+
+  // Handle array of remote agents
+  if (Array.isArray(rawFrontmatter)) {
+    const result = remoteAgentsListSchema.safeParse(rawFrontmatter);
+    if (!result.success) {
+      throw new AgentLoadError(
+        filePath,
+        `Validation failed: ${formatZodError(result.error, 'Remote Agents List')}`,
+      );
+    }
+    return result.data.map((agent) => ({
+      ...agent,
+      kind: 'remote',
+    }));
   }
 
   const result = markdownFrontmatterSchema.safeParse(rawFrontmatter);
