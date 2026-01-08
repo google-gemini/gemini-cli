@@ -79,7 +79,6 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
-  enableExtensionReloading: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -183,10 +182,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'l',
           type: 'boolean',
           description: 'List all available extensions and exit.',
-        })
-        .option('enable-extension-reloading', {
-          type: 'boolean',
-          description: 'Enable dynamic extension reloading.',
         })
         .option('resume', {
           alias: 'r',
@@ -707,9 +702,7 @@ export async function loadCliConfig(
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
-    enableExtensionReloading:
-      argv.enableExtensionReloading ??
-      settings.experimental?.extensionReloading,
+    enableExtensionReloading: settings.experimental?.extensionReloading,
     dynamicExtensionLoading: settings.experimental?.dynamicExtensionLoading,
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,

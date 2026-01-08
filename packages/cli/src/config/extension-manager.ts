@@ -638,6 +638,7 @@ Would you like to attempt to install via "git clone" instead?`,
       ) as unknown as ExtensionConfig;
 
       validateName(config.name);
+
       return config;
     } catch (e) {
       throw new Error(

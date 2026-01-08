@@ -637,6 +637,7 @@ export class Config {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
+    this.dynamicExtensionLoading = params.dynamicExtensionLoading ?? false;
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -749,7 +750,7 @@ export class Config {
     initMcpHandle?.end();
 
     // Register ActivateExtensionTool
-    if (this.extensionManagement) {
+    if (this.enableExtensionReloading && this.dynamicExtensionLoading) {
       this.getToolRegistry().registerTool(
         new ActivateExtensionTool(this, this.messageBus),
       );
