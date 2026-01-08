@@ -57,8 +57,12 @@ import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
-import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type {
+  ModelConfigKey,
+  ResolvedModelConfig,
+} from '../services/modelConfigService.js';
 import { getModelConfigAlias } from './registry.js';
+import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
   mockSendMessageStream,
@@ -1189,6 +1193,101 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(output.result).toBe('Aborted due to tool failure.');
+    });
+  });
+
+  describe('Model Routing', () => {
+    it('should use model routing when the agent model is "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'auto';
+
+      const mockRouter = {
+        route: vi.fn().mockResolvedValue({
+          model: 'routed-model',
+          metadata: { source: 'test', reasoning: 'test' },
+        }),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'auto'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'auto',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT use model routing when the agent model is NOT "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'concrete-model';
+
+      const mockRouter = {
+        route: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'concrete-model'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'concrete-model',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'concrete-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
     });
   });
 
