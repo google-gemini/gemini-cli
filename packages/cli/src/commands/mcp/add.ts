@@ -80,8 +80,7 @@ async function addMcpServer(
       break;
     case 'http':
       newServer = {
-        url: commandOrUrl,
-        type: 'http',
+        httpUrl: commandOrUrl,
         headers,
         timeout,
         trust,
