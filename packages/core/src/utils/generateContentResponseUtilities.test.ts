@@ -158,7 +158,7 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
-    it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
+    it('should handle llmContent with fileData for Gemini 3 model (should be nested)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
       };
@@ -174,9 +174,9 @@ describe('generateContentResponseUtilities', () => {
             name: toolName,
             id: callId,
             response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [llmContent],
           },
         },
-        llmContent,
       ]);
     });
 
