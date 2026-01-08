@@ -12,13 +12,17 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
-import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  Storage,
+  debugLogger,
+  homedir,
+} from '@google/gemini-cli-core';
 
 import * as fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),
@@ -39,7 +43,7 @@ export const Notifications = () => {
   >(undefined);
 
   useEffect(() => {
-    const checkScreenReaderNudge = async () => {
+    const checkScreenReader = async () => {
       try {
         await fs.access(screenReaderNudgeFilePath);
         setHasSeenScreenReaderNudge(true);
@@ -47,8 +51,12 @@ export const Notifications = () => {
         setHasSeenScreenReaderNudge(false);
       }
     };
-    checkScreenReaderNudge();
-  }, []);
+
+    if (isScreenReaderEnabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      checkScreenReader();
+    }
+  }, [isScreenReaderEnabled]);
 
   const showScreenReaderNudge =
     isScreenReaderEnabled && hasSeenScreenReaderNudge === false;
@@ -62,10 +70,11 @@ export const Notifications = () => {
           });
           await fs.writeFile(screenReaderNudgeFilePath, 'true');
         } catch (error) {
-          console.error('Error storing screen reader nudge', error);
+          debugLogger.error('Error storing screen reader nudge', error);
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     writeScreenReaderNudgeFile();
   }, [showScreenReaderNudge]);
 

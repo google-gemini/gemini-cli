@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
+import crypto from 'node:crypto';
 
 const persistentStateMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -25,12 +26,13 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockReturnValue(0);
+    persistentStateMock.get.mockReturnValue({});
   });
 
   it('should render the banner with default text', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -51,6 +53,7 @@ describe('<AppHeader />', () => {
   it('should render the banner with warning text', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: 'There are capacity issues',
@@ -71,6 +74,7 @@ describe('<AppHeader />', () => {
   it('should not render the banner when no flags are set', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: '',
         warningText: '',
@@ -90,6 +94,7 @@ describe('<AppHeader />', () => {
   it('should render the banner when previewFeatures is disabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: false });
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -110,6 +115,7 @@ describe('<AppHeader />', () => {
   it('should not render the banner when previewFeatures is enabled', () => {
     const mockConfig = makeFakeConfig({ previewFeatures: true });
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -130,6 +136,7 @@ describe('<AppHeader />', () => {
     persistentStateMock.get.mockReturnValue(5);
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -146,10 +153,11 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should increment the shown count when default banner is displayed', () => {
-    persistentStateMock.get.mockReturnValue(0);
+  it('should increment the version count when default banner is displayed', () => {
+    persistentStateMock.get.mockReturnValue({});
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
@@ -163,7 +171,12 @@ describe('<AppHeader />', () => {
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
-      1,
+      {
+        [crypto
+          .createHash('sha256')
+          .update(uiState.bannerData.defaultText)
+          .digest('hex')]: 1,
+      },
     );
     unmount();
   });
@@ -171,6 +184,7 @@ describe('<AppHeader />', () => {
   it('should render banner text with unescaped newlines', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
+      history: [],
       bannerData: {
         defaultText: 'First line\\nSecond line',
         warningText: '',

@@ -5,7 +5,6 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -35,16 +34,6 @@ export interface UserFeedbackPayload {
 }
 
 /**
- * Payload for the 'fallback-mode-changed' event.
- */
-export interface FallbackModeChangedPayload {
-  /**
-   * Whether fallback mode is now active.
-   */
-  isInFallbackMode: boolean;
-}
-
-/**
  * Payload for the 'model-changed' event.
  */
 export interface ModelChangedPayload {
@@ -55,30 +44,115 @@ export interface ModelChangedPayload {
 }
 
 /**
+ * Payload for the 'console-log' event.
+ */
+export interface ConsoleLogPayload {
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
+  content: string;
+}
+
+/**
+ * Payload for the 'output' event.
+ */
+export interface OutputPayload {
+  isStderr: boolean;
+  chunk: Uint8Array | string;
+  encoding?: BufferEncoding;
+}
+
+/**
  * Payload for the 'memory-changed' event.
  */
-export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
+
+/**
+ * Base payload for hook-related events.
+ */
+export interface HookPayload {
+  hookName: string;
+  eventName: string;
+}
+
+/**
+ * Payload for the 'hook-start' event.
+ */
+export interface HookStartPayload extends HookPayload {
+  /**
+   * The 1-based index of the current hook in the execution sequence.
+   * Used for progress indication (e.g. "Hook 1/3").
+   */
+  hookIndex?: number;
+  /**
+   * The total number of hooks in the current execution sequence.
+   */
+  totalHooks?: number;
+}
+
+/**
+ * Payload for the 'hook-end' event.
+ */
+export interface HookEndPayload extends HookPayload {
+  success: boolean;
+}
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
+  ConsoleLog = 'console-log',
+  Output = 'output',
   MemoryChanged = 'memory-changed',
+  ExternalEditorClosed = 'external-editor-closed',
+  SettingsChanged = 'settings-changed',
+  HookStart = 'hook-start',
+  HookEnd = 'hook-end',
 }
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
-  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
+  [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.SettingsChanged]: never[];
+  [CoreEvent.HookStart]: [HookStartPayload];
+  [CoreEvent.HookEnd]: [HookEndPayload];
 }
 
+type EventBacklogItem = {
+  [K in keyof CoreEvents]: {
+    event: K;
+    args: CoreEvents[K];
+  };
+}[keyof CoreEvents];
+
 export class CoreEventEmitter extends EventEmitter<CoreEvents> {
-  private _feedbackBacklog: UserFeedbackPayload[] = [];
+  private _eventBacklog: EventBacklogItem[] = [];
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
     super();
+  }
+
+  private _emitOrQueue<K extends keyof CoreEvents>(
+    event: K,
+    ...args: CoreEvents[K]
+  ): void {
+    if (this.listenerCount(event) === 0) {
+      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        this._eventBacklog.shift();
+      }
+      this._eventBacklog.push({ event, args } as EventBacklogItem);
+    } else {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(event, ...args);
+    }
   }
 
   /**
@@ -91,24 +165,30 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     error?: unknown,
   ): void {
     const payload: UserFeedbackPayload = { severity, message, error };
-
-    if (this.listenerCount(CoreEvent.UserFeedback) === 0) {
-      if (this._feedbackBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._feedbackBacklog.shift();
-      }
-      this._feedbackBacklog.push(payload);
-    } else {
-      this.emit(CoreEvent.UserFeedback, payload);
-    }
+    this._emitOrQueue(CoreEvent.UserFeedback, payload);
   }
 
   /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
+   * Broadcasts a console log message.
    */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
+  emitConsoleLog(
+    type: 'log' | 'warn' | 'error' | 'debug' | 'info',
+    content: string,
+  ): void {
+    const payload: ConsoleLogPayload = { type, content };
+    this._emitOrQueue(CoreEvent.ConsoleLog, payload);
+  }
+
+  /**
+   * Broadcasts stdout/stderr output.
+   */
+  emitOutput(
+    isStderr: boolean,
+    chunk: Uint8Array | string,
+    encoding?: BufferEncoding,
+  ): void {
+    const payload: OutputPayload = { isStderr, chunk, encoding };
+    this._emitOrQueue(CoreEvent.Output, payload);
   }
 
   /**
@@ -120,14 +200,40 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has started.
+   */
+  emitHookStart(payload: HookStartPayload): void {
+    this.emit(CoreEvent.HookStart, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has ended.
+   */
+  emitHookEnd(payload: HookEndPayload): void {
+    this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
-  drainFeedbackBacklog(): void {
-    const backlog = [...this._feedbackBacklog];
-    this._feedbackBacklog.length = 0; // Clear in-place
-    for (const payload of backlog) {
-      this.emit(CoreEvent.UserFeedback, payload);
+  drainBacklogs(): void {
+    const backlog = [...this._eventBacklog];
+    this._eventBacklog.length = 0; // Clear in-place
+    for (const item of backlog) {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(item.event, ...item.args);
     }
   }
 }

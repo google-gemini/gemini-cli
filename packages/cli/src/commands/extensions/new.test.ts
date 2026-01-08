@@ -11,6 +11,9 @@ import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
 
 vi.mock('node:fs/promises');
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 const mockedFs = vi.mocked(fsPromises);
 

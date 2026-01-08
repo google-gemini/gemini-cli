@@ -24,7 +24,7 @@ export async function getExperiments(
   server: CodeAssistServer,
 ): Promise<Experiments> {
   if (experimentsPromise) {
-    return await experimentsPromise;
+    return experimentsPromise;
   }
 
   experimentsPromise = (async () => {
@@ -32,7 +32,7 @@ export async function getExperiments(
     const response = await server.listExperiments(metadata);
     return parseExperiments(response);
   })();
-  return await experimentsPromise;
+  return experimentsPromise;
 }
 
 function parseExperiments(response: ListExperimentsResponse): Experiments {

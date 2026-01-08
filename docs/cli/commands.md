@@ -1,4 +1,4 @@
-# CLI Commands
+# CLI commands
 
 Gemini CLI supports several built-in commands to help you manage your session,
 customize the interface, and control its behavior. These commands are prefixed
@@ -26,7 +26,7 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Saves the current conversation history. You must add a
         `<tag>` for identifying the conversation state.
       - **Usage:** `/chat save <tag>`
-      - **Details on Checkpoint Location:** The default locations for saved chat
+      - **Details on checkpoint location:** The default locations for saved chat
         checkpoints are:
         - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
         - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
@@ -164,6 +164,21 @@ Slash commands provide meta-level control over the CLI itself.
   - **Note:** Only available if checkpointing is configured via
     [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
+- **`/resume`**
+  - **Description:** Browse and resume previous conversation sessions. Opens an
+    interactive session browser where you can search, filter, and select from
+    automatically saved conversations.
+  - **Features:**
+    - **Session Browser:** Interactive interface showing all saved sessions with
+      timestamps, message counts, and first user message for context
+    - **Search:** Use `/` to search through conversation content across all
+      sessions
+    - **Sorting:** Sort sessions by date or message count
+    - **Management:** Delete unwanted sessions directly from the browser
+    - **Resume:** Select any session to resume and continue the conversation
+  - **Note:** All conversations are automatically saved as you chat - no manual
+    saving required. See [Session Management](../cli/session-management.md) for
+    complete details.
 
 - [**`/settings`**](./settings.md)
   - **Description:** Open the settings editor to view and modify Gemini CLI
@@ -241,13 +256,13 @@ Slash commands provide meta-level control over the CLI itself.
     file, making it simpler for them to provide project-specific instructions to
     the Gemini agent.
 
-### Custom Commands
+### Custom commands
 
 Custom commands allow you to create personalized shortcuts for your most-used
 prompts. For detailed instructions on how to create, manage, and use them,
 please see the dedicated [Custom Commands documentation](./custom-commands.md).
 
-## Input Prompt Shortcuts
+## Input prompt shortcuts
 
 These shortcuts apply directly to the input prompt for text manipulation.
 
@@ -305,7 +320,7 @@ your prompt to Gemini. These commands include git-aware filtering.
 - If the `read_many_files` tool encounters an error (e.g., permission issues),
   this will also be reported.
 
-## Shell mode & passthrough commands (`!`)
+## Shell mode and passthrough commands (`!`)
 
 The `!` prefix lets you interact with your system's shell directly from within
 Gemini CLI.
@@ -333,7 +348,7 @@ Gemini CLI.
 - **Caution for all `!` usage:** Commands you execute in shell mode have the
   same permissions and impact as if you ran them directly in your terminal.
 
-- **Environment Variable:** When a command is executed via `!` or in shell mode,
+- **Environment variable:** When a command is executed via `!` or in shell mode,
   the `GEMINI_CLI=1` environment variable is set in the subprocess's
   environment. This allows scripts or tools to detect if they are being run from
   within the Gemini CLI.

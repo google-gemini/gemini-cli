@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
@@ -319,20 +320,124 @@ describe('KeypressContext', () => {
         }),
       );
     });
+
+    it('should parse valid OSC 52 response', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Hello OSC 52').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Hello OSC 52',
+          }),
+        );
+      });
+    });
+
+    it('should handle split OSC 52 response', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Split Paste').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x07`;
+
+      // Split the sequence
+      const part1 = sequence.slice(0, 5);
+      const part2 = sequence.slice(5);
+
+      act(() => stdin.write(part1));
+      act(() => stdin.write(part2));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Split Paste',
+          }),
+        );
+      });
+    });
+
+    it('should handle OSC 52 response terminated by ESC \\', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const base64Data = Buffer.from('Terminated by ST').toString('base64');
+      const sequence = `\x1b]52;c;${base64Data}\x1b\\`;
+
+      act(() => stdin.write(sequence));
+
+      await waitFor(() => {
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'paste',
+            paste: true,
+            sequence: 'Terminated by ST',
+          }),
+        );
+      });
+    });
+
+    it('should ignore unknown OSC sequences', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const sequence = `\x1b]1337;File=name=Zm9vCg==\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should ignore invalid OSC 52 format', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => result.current.subscribe(keyHandler));
+
+      const sequence = `\x1b]52;x;notbase64\x07`;
+
+      act(() => stdin.write(sequence));
+
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
   });
 
   describe('debug keystroke logging', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+    let debugLoggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      debugLoggerSpy = vi
+        .spyOn(debugLogger, 'log')
+        .mockImplementation(() => {});
     });
 
     afterEach(() => {
-      consoleLogSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
+      debugLoggerSpy.mockRestore();
     });
 
     it('should not log keystrokes when debugKeystrokeLogging is false', async () => {
@@ -354,7 +459,7 @@ describe('KeypressContext', () => {
       });
 
       expect(keyHandler).toHaveBeenCalled();
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+      expect(debugLoggerSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('[DEBUG] Kitty'),
       );
     });
@@ -375,7 +480,7 @@ describe('KeypressContext', () => {
       // Send a complete kitty sequence for escape
       act(() => stdin.write('\x1b[27u'));
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
         `[DEBUG] Raw StdIn: ${JSON.stringify('\x1b[27u')}`,
       );
     });
@@ -397,7 +502,7 @@ describe('KeypressContext', () => {
       act(() => stdin.write(INCOMPLETE_KITTY_SEQUENCE));
 
       // Verify debug logging for accumulation
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(debugLoggerSpy).toHaveBeenCalledWith(
         `[DEBUG] Raw StdIn: ${JSON.stringify(INCOMPLETE_KITTY_SEQUENCE)}`,
       );
     });
@@ -645,12 +750,14 @@ describe('KeypressContext', () => {
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance time just before timeout
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(ESC_TIMEOUT - 5));
 
     // Still shouldn't broadcast
     expect(keyHandler).not.toHaveBeenCalled();
 
     // Advance past timeout
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(10));
 
     // Should now broadcast the incomplete sequence as regular input
@@ -789,12 +896,14 @@ describe('KeypressContext', () => {
     act(() => stdin.write('\x1b[97;13'));
 
     // Advance time partway
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(30));
 
     // Add more to sequence
     act(() => stdin.write('5'));
 
     // Advance time from the first timeout point
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     act(() => vi.advanceTimersByTime(25));
 
     // Should not have timed out yet (timeout restarted)
@@ -878,6 +987,7 @@ describe('KeypressContext', () => {
       act(() => stdin.write('\x1b[<'));
 
       // Advance time past the normal kitty timeout (50ms)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       act(() => vi.advanceTimersByTime(ESC_TIMEOUT + 10));
 
       // Send the rest
@@ -930,6 +1040,8 @@ describe('KeypressContext', () => {
 
       for (const char of sequence) {
         act(() => stdin.write(char));
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         act(() => vi.advanceTimersByTime(0));
       }
 

@@ -1,4 +1,4 @@
-# Gemini CLI Settings (`/settings` Command)
+# Gemini CLI settings (`/settings` command)
 
 Control your Gemini CLI experience with the `/settings` command. The `/settings`
 command opens a dialog to view and edit all your Gemini CLI settings, including
@@ -94,20 +94,22 @@ they appear in the UI.
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`  |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `10000` |
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `100`   |
-| Enable Message Bus Integration   | `tools.enableMessageBusIntegration`  | Enable policy-based tool confirmation via message bus integration.                                              | `false` |
 
 ### Security
 
-| UI Label                   | Setting                        | Description                                        | Default |
-| -------------------------- | ------------------------------ | -------------------------------------------------- | ------- |
-| Disable YOLO Mode          | `security.disableYoloMode`     | Disable YOLO mode, even if enabled by a flag.      | `false` |
-| Blocks extensions from Git | `security.blockGitExtensions`  | Blocks installing and loading extensions from Git. | `false` |
-| Folder Trust               | `security.folderTrust.enabled` | Setting to track whether Folder trust is enabled.  | `false` |
+| UI Label                      | Setting                                         | Description                                               | Default |
+| ----------------------------- | ----------------------------------------------- | --------------------------------------------------------- | ------- |
+| Disable YOLO Mode             | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.             | `false` |
+| Blocks extensions from Git    | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.        | `false` |
+| Folder Trust                  | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.         | `false` |
+| Allowed Environment Variables | `security.environmentVariableRedaction.allowed` | Environment variables to always allow (bypass redaction). | `[]`    |
+| Blocked Environment Variables | `security.environmentVariableRedaction.blocked` | Environment variables to always redact.                   | `[]`    |
 
 ### Experimental
 
-| UI Label                            | Setting                                                 | Description                                                                   | Default |
-| ----------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | ------- |
-| Use Model Router                    | `experimental.useModelRouter`                           | Enable model routing to route requests to the best model based on complexity. | `true`  |
-| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                       | `true`  |
-| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                  | `10`    |
+| UI Label                            | Setting                                                 | Description                                                  | Default |
+| ----------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ | ------- |
+| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                      | `true`  |
+| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent. | `10`    |
+| Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                   | `true`  |
+| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                          | `false` |

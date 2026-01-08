@@ -17,7 +17,7 @@ import {
 import { render } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
 import { cleanup } from 'ink-testing-library';
-import { act, useContext } from 'react';
+import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import {
@@ -33,13 +33,18 @@ import {
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
-  drainFeedbackBacklog: vi.fn(),
+  drainBacklogs: vi.fn(),
   emit: vi.fn(),
 }));
 
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
+}));
+
+// Mock stdout
+const mocks = vi.hoisted(() => ({
+  mockStdout: { write: vi.fn() },
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -49,8 +54,34 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     coreEvents: mockCoreEvents,
     IdeClient: mockIdeClient,
+    writeToStdout: vi.fn((...args) =>
+      process.stdout.write(
+        ...(args as Parameters<typeof process.stdout.write>),
+      ),
+    ),
+    writeToStderr: vi.fn((...args) =>
+      process.stderr.write(
+        ...(args as Parameters<typeof process.stderr.write>),
+      ),
+    ),
+    patchStdio: vi.fn(() => () => {}),
+    createWorkingStdio: vi.fn(() => ({
+      stdout: process.stdout,
+      stderr: process.stderr,
+    })),
+    enableMouseEvents: vi.fn(),
+    disableMouseEvents: vi.fn(),
+    FileDiscoveryService: vi.fn().mockImplementation(() => ({
+      initialize: vi.fn(),
+    })),
+    startupProfiler: {
+      flush: vi.fn(),
+      start: vi.fn(),
+      end: vi.fn(),
+    },
   };
 });
+import ansiEscapes from 'ansi-escapes';
 import type { LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
@@ -61,12 +92,11 @@ import {
 } from './contexts/UIActionsContext.js';
 
 // Mock useStdout to capture terminal title writes
-let mockStdout: { write: ReturnType<typeof vi.fn> };
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
-    useStdout: () => ({ stdout: mockStdout }),
+    useStdout: () => ({ stdout: mocks.mockStdout }),
     measureElement: vi.fn(),
   };
 });
@@ -112,16 +142,14 @@ vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
+vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/useHookDisplayState.js');
 
 // Mock external utilities
 vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
-vi.mock('./utils/mouse.js', () => ({
-  enableMouseEvents: vi.fn(),
-  disableMouseEvents: vi.fn(),
-}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
@@ -143,12 +171,18 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { ShellExecutionService } from '@google/gemini-cli-core';
+import {
+  ShellExecutionService,
+  writeToStdout,
+  enableMouseEvents,
+  disableMouseEvents,
+} from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
-import { enableMouseEvents, disableMouseEvents } from './utils/mouse.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -210,12 +244,14 @@ describe('AppContainer State Management', () => {
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
   const mockedUseKeypress = useKeypress as Mock;
+  const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
+  const mockedUseHookDisplayState = useHookDisplayState as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Initialize mock stdout for terminal title tests
-    mockStdout = { write: vi.fn() };
+    mocks.mockStdout.write.mockClear();
 
     // Mock computeWindowTitle function to centralize title logic testing
     vi.mock('../utils/windowTitle.js', async () => ({
@@ -319,18 +355,26 @@ describe('AppContainer State Management', () => {
       // Add other properties if AppContainer uses them
     });
     mockedUseLogger.mockReturnValue({
-      getPreviousUserMessages: vi.fn().mockReturnValue(new Promise(() => {})),
+      getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+    });
+    mockedUseInputHistoryStore.mockReturnValue({
+      inputHistory: [],
+      addInput: vi.fn(),
+      initializeFromLogger: vi.fn(),
     });
     mockedUseLoadingIndicator.mockReturnValue({
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseHookDisplayState.mockReturnValue([]);
 
     // Mock Config
     mockConfig = makeFakeConfig();
 
     // Mock config's getTargetDir to return consistent workspace directory
     vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+    vi.spyOn(mockConfig, 'initialize').mockResolvedValue(undefined);
+    vi.spyOn(mockConfig, 'getDebugMode').mockReturnValue(false);
 
     mockExtensionManager = vi.mockObject({
       getExtensions: vi.fn().mockReturnValue([]),
@@ -373,17 +417,25 @@ describe('AppContainer State Management', () => {
 
   describe('Basic Rendering', () => {
     it('renders without crashing with minimal props', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('renders with startup warnings', async () => {
       const startupWarnings = ['Warning 1', 'Warning 2'];
 
-      const { unmount } = renderAppContainer({ startupWarnings });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ startupWarnings });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -394,11 +446,15 @@ describe('AppContainer State Management', () => {
         themeError: 'Failed to load theme',
       };
 
-      const { unmount } = renderAppContainer({
-        initResult: initResultWithError,
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          initResult: initResultWithError,
+        });
+        unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('handles debug mode state', () => {
@@ -413,29 +469,45 @@ describe('AppContainer State Management', () => {
 
   describe('Context Providers', () => {
     it('provides AppContext with correct values', async () => {
-      const { unmount } = renderAppContainer({ version: '2.0.0' });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ version: '2.0.0' });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Should render and unmount cleanly
-      expect(() => unmount()).not.toThrow();
+      expect(() => unmount!()).not.toThrow();
     });
 
     it('provides UIStateContext with state management', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('provides UIActionsContext with action handlers', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('provides ConfigContext with config object', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -450,9 +522,13 @@ describe('AppContainer State Management', () => {
         },
       } as unknown as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: settingsAllHidden });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsAllHidden });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('handles settings with memory usage enabled', async () => {
@@ -465,9 +541,13 @@ describe('AppContainer State Management', () => {
         },
       } as unknown as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: settingsWithMemory });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsWithMemory });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -475,9 +555,13 @@ describe('AppContainer State Management', () => {
     it.each(['1.0.0', '2.1.3-beta', '3.0.0-nightly'])(
       'handles version format: %s',
       async (version) => {
-        const { unmount } = renderAppContainer({ version });
+        let unmount: () => void;
+        await act(async () => {
+          const result = renderAppContainer({ version });
+          unmount = result.unmount;
+        });
         await waitFor(() => expect(capturedUIState).toBeTruthy());
-        unmount();
+        unmount!();
       },
     );
   });
@@ -499,9 +583,13 @@ describe('AppContainer State Management', () => {
         merged: {},
       } as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: undefinedSettings });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: undefinedSettings });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -830,12 +918,16 @@ describe('AppContainer State Management', () => {
   describe('Quota and Fallback Integration', () => {
     it('passes a null proQuotaRequest to UIStateContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert that the context value is as expected
         expect(capturedUIState.proQuotaRequest).toBeNull();
       });
-      unmount();
+      unmount!();
     });
 
     it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
@@ -851,12 +943,16 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert: The mock request is correctly passed through the context
         expect(capturedUIState.proQuotaRequest).toEqual(mockRequest);
       });
-      unmount();
+      unmount!();
     });
 
     it('passes the handleProQuotaChoice function to UIActionsContext', async () => {
@@ -868,7 +964,11 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert: The action in the context is the mock handler we provided
         expect(capturedUIActions.handleProQuotaChoice).toBe(mockHandler);
@@ -879,14 +979,20 @@ describe('AppContainer State Management', () => {
         capturedUIActions.handleProQuotaChoice('retry_later');
       });
       expect(mockHandler).toHaveBeenCalledWith('retry_later');
-      unmount();
+      unmount!();
     });
   });
 
   describe('Terminal Title Update Feature', () => {
     beforeEach(() => {
       // Reset mock stdout for each test
-      mockStdout = { write: vi.fn() };
+      mocks.mockStdout.write.mockClear();
+    });
+
+    it('verifies useStdout is mocked', async () => {
+      const { useStdout } = await import('ink');
+      const { stdout } = useStdout();
+      expect(stdout).toBe(mocks.mockStdout);
     });
 
     it('should not update terminal title when showStatusInTitle is false', () => {
@@ -909,9 +1015,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -936,9 +1043,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that no title-related writes occurred
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(0);
       unmount();
     });
@@ -974,9 +1082,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with thought subject
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1014,9 +1123,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with default Idle text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
@@ -1055,9 +1165,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with confirmation text
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
@@ -1096,9 +1207,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title is padded to exactly 80 characters
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
       const expectedTitle = shortTitle.padEnd(80, ' ');
@@ -1141,9 +1253,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that the correct ANSI escape sequence is used
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
@@ -1183,9 +1296,10 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Check that title was updated with CLI_TITLE value
-      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
+
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
         `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
@@ -1283,13 +1397,17 @@ describe('AppContainer State Management', () => {
         activePtyId: 'some-id',
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
       const lastCall =
         resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
       // Check the height argument specifically
       expect(lastCall[2]).toBe(1);
-      unmount();
+      unmount!();
     });
   });
 
@@ -1493,7 +1611,7 @@ describe('AppContainer State Management', () => {
     };
 
     beforeEach(() => {
-      mockStdout.write.mockClear();
+      mocks.mockStdout.write.mockClear();
       mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
         handleGlobalKeypress = callback;
       });
@@ -1518,7 +1636,7 @@ describe('AppContainer State Management', () => {
     ])('$modeName', ({ isAlternateMode, shouldEnable }) => {
       it(`should ${shouldEnable ? 'toggle' : 'NOT toggle'} mouse off when Ctrl+S is pressed`, async () => {
         await setupCopyModeTest(isAlternateMode);
-        mockStdout.write.mockClear(); // Clear initial enable call
+        mocks.mockStdout.write.mockClear(); // Clear initial enable call
 
         act(() => {
           handleGlobalKeypress({
@@ -1544,7 +1662,7 @@ describe('AppContainer State Management', () => {
       if (shouldEnable) {
         it('should toggle mouse back on when Ctrl+S is pressed again', async () => {
           await setupCopyModeTest(isAlternateMode);
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Turn it on (disable mouse)
           act(() => {
@@ -1596,7 +1714,7 @@ describe('AppContainer State Management', () => {
           });
           rerender();
 
-          mockStdout.write.mockClear();
+          (writeToStdout as Mock).mockClear();
 
           // Press any other key
           act(() => {
@@ -1628,11 +1746,15 @@ describe('AppContainer State Management', () => {
         closeModelDialog: vi.fn(),
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(capturedUIState.isModelDialogOpen).toBe(true);
-      unmount();
+      unmount!();
     });
 
     it('should provide model dialog actions in the UIActionsContext', async () => {
@@ -1644,7 +1766,11 @@ describe('AppContainer State Management', () => {
         closeModelDialog: mockCloseModelDialog,
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Verify that the actions are correctly passed through context
@@ -1652,28 +1778,36 @@ describe('AppContainer State Management', () => {
         capturedUIActions.closeModelDialog();
       });
       expect(mockCloseModelDialog).toHaveBeenCalled();
-      unmount();
+      unmount!();
     });
   });
 
   describe('CoreEvents Integration', () => {
     it('subscribes to UserFeedback and drains backlog on mount', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(mockCoreEvents.on).toHaveBeenCalledWith(
         CoreEvent.UserFeedback,
         expect.any(Function),
       );
-      expect(mockCoreEvents.drainFeedbackBacklog).toHaveBeenCalledTimes(1);
-      unmount();
+      expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
+      unmount!();
     });
 
     it('unsubscribes from UserFeedback on unmount', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
-      unmount();
+      unmount!();
 
       expect(mockCoreEvents.off).toHaveBeenCalledWith(
         CoreEvent.UserFeedback,
@@ -1682,7 +1816,11 @@ describe('AppContainer State Management', () => {
     });
 
     it('adds history item when UserFeedback event is received', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Get the registered handler
@@ -1707,14 +1845,18 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
-      unmount();
+      unmount!();
     });
 
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         expect(capturedUIState?.currentModel).toBe('initial-model');
       });
@@ -1726,13 +1868,30 @@ describe('AppContainer State Management', () => {
       expect(handler).toBeDefined();
 
       // Act: Simulate ModelChanged event
+      // Update config mock to return new model since the handler reads from config
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('new-model');
       act(() => {
         handler({ model: 'new-model' });
       });
 
       // Assert: Verify model is updated
       expect(capturedUIState.currentModel).toBe('new-model');
-      unmount();
+      unmount!();
+    });
+
+    it('provides activeHooks from useHookDisplayState', async () => {
+      const mockHooks = [{ name: 'hook1', eventName: 'event1' }];
+      mockedUseHookDisplayState.mockReturnValue(mockHooks);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.activeHooks).toEqual(mockHooks);
+      unmount!();
     });
   });
 
@@ -1755,10 +1914,14 @@ describe('AppContainer State Management', () => {
       });
 
       // The main assertion is that the render does not throw.
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
       await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      unmount();
+      unmount!();
     });
   });
   describe('Banner Text', () => {
@@ -1768,10 +1931,14 @@ describe('AppContainer State Management', () => {
         authType: AuthType.USE_GEMINI,
         apiKey: 'fake-key',
       });
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         expect(capturedUIState.bannerData.defaultText).toBeDefined();
-        unmount();
+        unmount!();
       });
     });
   });
@@ -1782,7 +1949,7 @@ describe('AppContainer State Management', () => {
     // Helper to extract arguments from the useGeminiStream hook call
     // This isolates the positional argument dependency to a single location
     const extractUseGeminiStreamArgs = (args: unknown[]) => ({
-      onCancelSubmit: args[14] as (shouldRestorePrompt?: boolean) => void,
+      onCancelSubmit: args[13] as (shouldRestorePrompt?: boolean) => void,
     });
 
     beforeEach(() => {
@@ -1794,7 +1961,11 @@ describe('AppContainer State Management', () => {
     });
 
     it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
@@ -1807,17 +1978,22 @@ describe('AppContainer State Management', () => {
 
       expect(mockSetText).toHaveBeenCalledWith('');
 
-      unmount();
+      unmount!();
     });
 
     it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
-      mockedUseLogger.mockReturnValue({
-        getPreviousUserMessages: vi
-          .fn()
-          .mockResolvedValue(['previous message']),
+      // Mock useInputHistoryStore to provide input history
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: ['previous message'],
+        addInput: vi.fn(),
+        initializeFromLogger: vi.fn(),
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() =>
         expect(capturedUIState.userMessages).toContain('previous message'),
       );
@@ -1832,64 +2008,89 @@ describe('AppContainer State Management', () => {
 
       expect(mockSetText).toHaveBeenCalledWith('previous message');
 
-      unmount();
+      unmount!();
     });
 
-    it('correctly restores prompt even if userMessages is stale (race condition fix)', async () => {
-      // Setup initial history with one message
-      const initialHistory = [{ type: 'user', text: 'Previous Prompt' }];
-      mockedUseHistory.mockReturnValue({
-        history: initialHistory,
-        addItem: vi.fn(),
-        updateItem: vi.fn(),
-        clearItems: vi.fn(),
-        loadHistory: vi.fn(),
+    it('input history is independent from conversation history (survives /clear)', async () => {
+      // This test verifies that input history (used for up-arrow navigation) is maintained
+      // separately from conversation history and survives /clear operations.
+      const mockAddInput = vi.fn();
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: ['first prompt', 'second prompt'],
+        addInput: mockAddInput,
+        initializeFromLogger: vi.fn(),
       });
 
-      // Mock logger to resolve so userMessages gets populated
-      mockedUseLogger.mockReturnValue({
-        getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+      let rerender: (tree: ReactElement) => void;
+      let unmount;
+      await act(async () => {
+        const result = renderAppContainer();
+        rerender = result.rerender;
+        unmount = result.unmount;
       });
 
-      const { unmount, rerender } = renderAppContainer();
-
-      // Wait for userMessages to be populated with 'Previous Prompt'
+      // Verify userMessages is populated from inputHistory
       await waitFor(() =>
-        expect(capturedUIState.userMessages).toContain('Previous Prompt'),
+        expect(capturedUIState.userMessages).toContain('first prompt'),
       );
+      expect(capturedUIState.userMessages).toContain('second prompt');
 
-      // Simulate a new prompt being added (e.g., user sent it, but it overflowed)
-      const newPrompt = 'Current Prompt that Overflowed';
-      const newHistory = [...initialHistory, { type: 'user', text: newPrompt }];
-
+      // Clear the conversation history (simulating /clear command)
+      const mockClearItems = vi.fn();
       mockedUseHistory.mockReturnValue({
-        history: newHistory,
+        history: [],
         addItem: vi.fn(),
         updateItem: vi.fn(),
-        clearItems: vi.fn(),
+        clearItems: mockClearItems,
         loadHistory: vi.fn(),
       });
 
-      // Rerender to reflect the history change.
-      // This triggers the effect to update userMessages, but it's async.
-      rerender(getAppContainer());
+      await act(async () => {
+        // Rerender to apply the new mock.
+        rerender(getAppContainer());
+      });
 
-      const { onCancelSubmit } = extractUseGeminiStreamArgs(
-        mockedUseGeminiStream.mock.lastCall!,
+      // Verify that userMessages still contains the input history
+      // (it should not be affected by clearing conversation history)
+      expect(capturedUIState.userMessages).toContain('first prompt');
+      expect(capturedUIState.userMessages).toContain('second prompt');
+
+      unmount!();
+    });
+  });
+
+  describe('Regression Tests', () => {
+    it('does not refresh static on startup if banner text is empty', async () => {
+      // Mock banner text to be empty strings
+      vi.spyOn(mockConfig, 'getBannerTextNoCapacityIssues').mockResolvedValue(
+        '',
+      );
+      vi.spyOn(mockConfig, 'getBannerTextCapacityIssues').mockResolvedValue('');
+
+      // Clear previous calls
+      mocks.mockStdout.write.mockClear();
+
+      let compUnmount: () => void = () => {};
+      await act(async () => {
+        const { unmount } = renderAppContainer();
+        compUnmount = unmount;
+      });
+
+      // Allow async effects to run
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Wait for fetchBannerTexts to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Check that clearTerminal was NOT written to stdout
+      const clearTerminalCalls = mocks.mockStdout.write.mock.calls.filter(
+        (call: unknown[]) => call[0] === ansiEscapes.clearTerminal,
       );
 
-      // Call onCancelSubmit immediately (simulating the race condition where
-      // the overflow event comes in before the effect updates userMessages)
-      act(() => {
-        onCancelSubmit(true);
-      });
-
-      // With the fix, it should wait for userMessages to update and then set the new prompt
-      await waitFor(() => {
-        expect(mockSetText).toHaveBeenCalledWith(newPrompt);
-      });
-
-      unmount();
+      expect(clearTerminalCalls).toHaveLength(0);
+      compUnmount();
     });
   });
 });

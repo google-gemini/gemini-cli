@@ -12,8 +12,18 @@ import {
   useTextBuffer,
   type TextBuffer,
 } from '../components/shared/text-buffer.js';
+import { clearApiKey } from '@google/gemini-cli-core';
 
 // Mocks
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    clearApiKey: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
@@ -37,7 +47,8 @@ describe('ApiAuthDialog', () => {
   let mockBuffer: TextBuffer;
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
+    vi.stubEnv('GEMINI_API_KEY', '');
     mockBuffer = {
       text: '',
       lines: [''],
@@ -78,38 +89,35 @@ describe('ApiAuthDialog', () => {
     );
   });
 
-  it('calls onSubmit when the text input is submitted', () => {
-    mockBuffer.text = 'submitted-key';
-    render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
-    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-
-    keypressHandler({
-      name: 'return',
+  it.each([
+    {
+      keyName: 'return',
       sequence: '\r',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-    });
+      expectedCall: onSubmit,
+      args: ['submitted-key'],
+    },
+    { keyName: 'escape', sequence: '\u001b', expectedCall: onCancel, args: [] },
+  ])(
+    'calls $expectedCall.name when $keyName is pressed',
+    ({ keyName, sequence, expectedCall, args }) => {
+      mockBuffer.text = 'submitted-key'; // Set for the onSubmit case
+      render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
+      // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
+      // calls[1] is the TextInput's useKeypress (typing handler)
+      const keypressHandler = mockedUseKeypress.mock.calls[1][0];
 
-    expect(onSubmit).toHaveBeenCalledWith('submitted-key');
-  });
+      keypressHandler({
+        name: keyName,
+        sequence,
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: false,
+      });
 
-  it('calls onCancel when the text input is cancelled', () => {
-    render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
-    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-
-    keypressHandler({
-      name: 'escape',
-      sequence: '\u001b',
-      ctrl: false,
-      meta: false,
-      shift: false,
-      paste: false,
-    });
-
-    expect(onCancel).toHaveBeenCalled();
-  });
+      expect(expectedCall).toHaveBeenCalledWith(...args);
+    },
+  );
 
   it('displays an error message', () => {
     const { lastFrame } = render(
@@ -121,5 +129,21 @@ describe('ApiAuthDialog', () => {
     );
 
     expect(lastFrame()).toContain('Invalid API Key');
+  });
+
+  it('calls clearApiKey and clears buffer when Ctrl+C is pressed', async () => {
+    render(<ApiAuthDialog onSubmit={onSubmit} onCancel={onCancel} />);
+    // calls[0] is the ApiAuthDialog's useKeypress (Ctrl+C handler)
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await keypressHandler({
+      name: 'c',
+      ctrl: true,
+      meta: false,
+      shift: false,
+    });
+
+    expect(clearApiKey).toHaveBeenCalled();
+    expect(mockBuffer.setText).toHaveBeenCalledWith('');
   });
 });

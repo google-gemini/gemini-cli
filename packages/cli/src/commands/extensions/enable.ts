@@ -14,6 +14,7 @@ import {
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 interface EnableArgs {
   name: string;
@@ -69,7 +70,7 @@ export const enableCommand: CommandModule = {
           argv.scope &&
           !Object.values(SettingScope)
             .map((s) => s.toLowerCase())
-            .includes((argv.scope as string).toLowerCase())
+            .includes(argv.scope.toLowerCase())
         ) {
           throw new Error(
             `Invalid scope: ${argv.scope}. Please use one of ${Object.values(
@@ -86,5 +87,6 @@ export const enableCommand: CommandModule = {
       name: argv['name'] as string,
       scope: argv['scope'] as string,
     });
+    await exitCli();
   },
 };

@@ -168,7 +168,23 @@ function renderSections(sections: Map<string, DocEntry[]>) {
     for (const entry of entries) {
       lines.push(`- **\`${entry.path}\`** (${entry.type}):`);
       lines.push(`  - **Description:** ${entry.description}`);
-      lines.push(`  - **Default:** \`${escapeBackticks(entry.defaultValue)}\``);
+
+      if (entry.defaultValue.includes('\n')) {
+        lines.push('  - **Default:**');
+        lines.push('');
+        lines.push('    ```json');
+        lines.push(
+          entry.defaultValue
+            .split('\n')
+            .map((line) => `    ${line}`)
+            .join('\n'),
+        );
+        lines.push('    ```');
+      } else {
+        lines.push(
+          `  - **Default:** \`${escapeBackticks(entry.defaultValue)}\``,
+        );
+      }
 
       if (entry.enumValues && entry.enumValues.length > 0) {
         const values = entry.enumValues

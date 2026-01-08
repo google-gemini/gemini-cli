@@ -74,6 +74,7 @@ vi.mock('node:process', () => {
     exit: mockProcessExit,
     platform: 'sunos',
     cwd: () => '/fake/dir',
+    env: {},
   } as unknown as NodeJS.Process;
   return {
     ...mockProcess,
@@ -190,6 +191,7 @@ describe('useSlashCommandProcessor', () => {
             openEditorDialog: vi.fn(),
             openPrivacyNotice: vi.fn(),
             openSettingsDialog: vi.fn(),
+            openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
@@ -243,7 +245,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).not.toHaveBeenCalled();
     });
 
     it('should call console.clear if alternate buffer is not active', async () => {
@@ -261,7 +262,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).toHaveBeenCalled();
     });
   });
 
@@ -1119,7 +1119,7 @@ describe('useSlashCommandProcessor', () => {
 
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
-    await act(() => {
+    act(() => {
       appEvents.emit('extensionsStarting');
     });
     await waitFor(() =>

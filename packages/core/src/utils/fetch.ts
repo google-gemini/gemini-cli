@@ -22,8 +22,9 @@ export class FetchError extends Error {
   constructor(
     message: string,
     public code?: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'FetchError';
   }
 }
@@ -51,7 +52,7 @@ export async function fetchWithTimeout(
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
     }
-    throw new FetchError(getErrorMessage(error));
+    throw new FetchError(getErrorMessage(error), undefined, { cause: error });
   } finally {
     clearTimeout(timeoutId);
   }

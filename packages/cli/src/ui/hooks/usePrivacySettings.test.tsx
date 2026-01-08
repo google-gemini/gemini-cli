@@ -7,11 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import type {
-  Config,
-  CodeAssistServer,
-  LoadCodeAssistResponse,
-} from '@google/gemini-cli-core';
+import type { Config, CodeAssistServer } from '@google/gemini-cli-core';
 import { UserTierId, getCodeAssistServer } from '@google/gemini-cli-core';
 import { usePrivacySettings } from './usePrivacySettings.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -65,10 +61,7 @@ describe('usePrivacySettings', () => {
     // Mock paid tier response
     vi.mocked(getCodeAssistServer).mockReturnValue({
       projectId: 'test-project-id',
-      loadCodeAssist: () =>
-        ({
-          currentTier: { id: UserTierId.STANDARD },
-        }) as unknown as LoadCodeAssistResponse,
+      userTier: UserTierId.STANDARD,
     } as unknown as CodeAssistServer);
 
     const { result } = renderPrivacySettingsHook();
@@ -84,10 +77,7 @@ describe('usePrivacySettings', () => {
 
   it('should throw error when CodeAssistServer has no projectId', async () => {
     vi.mocked(getCodeAssistServer).mockReturnValue({
-      loadCodeAssist: () =>
-        ({
-          currentTier: { id: UserTierId.FREE },
-        }) as unknown as LoadCodeAssistResponse,
+      userTier: UserTierId.FREE,
     } as unknown as CodeAssistServer);
 
     const { result } = renderPrivacySettingsHook();
@@ -110,10 +100,7 @@ describe('usePrivacySettings', () => {
       setCodeAssistGlobalUserSetting: vi.fn().mockResolvedValue({
         freeTierDataCollectionOptin: false,
       }),
-      loadCodeAssist: () =>
-        ({
-          currentTier: { id: UserTierId.FREE },
-        }) as unknown as LoadCodeAssistResponse,
+      userTier: UserTierId.FREE,
     } as unknown as CodeAssistServer;
     vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
 

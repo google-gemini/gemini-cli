@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ThinkingLevel } from '@google/genai';
 import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { DEFAULT_THINKING_MODE } from './models.js';
 
@@ -26,13 +27,30 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         generateContentConfig: {
           thinkingConfig: {
             includeThoughts: true,
-            // TODO(joshualitt): Introduce new bases for Gemini 3 models to use
-            // thinkingLevel instead.
-            thinkingBudget: DEFAULT_THINKING_MODE,
           },
           temperature: 1,
           topP: 0.95,
           topK: 64,
+        },
+      },
+    },
+    'chat-base-2.5': {
+      extends: 'chat-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingBudget: DEFAULT_THINKING_MODE,
+          },
+        },
+      },
+    },
+    'chat-base-3': {
+      extends: 'chat-base',
+      modelConfig: {
+        generateContentConfig: {
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
         },
       },
     },
@@ -42,25 +60,31 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     // TODO(joshualitt): Introduce internal base configs for the various models,
     // note: we will have to think carefully about names.
     'gemini-3-pro-preview': {
-      extends: 'chat-base',
+      extends: 'chat-base-3',
       modelConfig: {
         model: 'gemini-3-pro-preview',
       },
     },
+    'gemini-3-flash-preview': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3-flash-preview',
+      },
+    },
     'gemini-2.5-pro': {
-      extends: 'chat-base',
+      extends: 'chat-base-2.5',
       modelConfig: {
         model: 'gemini-2.5-pro',
       },
     },
     'gemini-2.5-flash': {
-      extends: 'chat-base',
+      extends: 'chat-base-2.5',
       modelConfig: {
         model: 'gemini-2.5-flash',
       },
     },
     'gemini-2.5-flash-lite': {
-      extends: 'chat-base',
+      extends: 'chat-base-2.5',
       modelConfig: {
         model: 'gemini-2.5-flash-lite',
       },
@@ -165,5 +189,45 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
+    'chat-compression-3-pro': {
+      modelConfig: {
+        model: 'gemini-3-pro-preview',
+      },
+    },
+    'chat-compression-3-flash': {
+      modelConfig: {
+        model: 'gemini-3-flash-preview',
+      },
+    },
+    'chat-compression-2.5-pro': {
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
+    },
+    'chat-compression-2.5-flash': {
+      modelConfig: {
+        model: 'gemini-2.5-flash',
+      },
+    },
+    'chat-compression-2.5-flash-lite': {
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite',
+      },
+    },
+    'chat-compression-default': {
+      modelConfig: {
+        model: 'gemini-2.5-pro',
+      },
+    },
   },
+  overrides: [
+    {
+      match: { model: 'chat-base', isRetry: true },
+      modelConfig: {
+        generateContentConfig: {
+          temperature: 1,
+        },
+      },
+    },
+  ],
 };

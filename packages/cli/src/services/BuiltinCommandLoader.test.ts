@@ -75,9 +75,13 @@ vi.mock('../ui/commands/modelCommand.js', () => ({
 }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
+vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
+vi.mock('../ui/commands/skillsCommand.js', () => ({
+  skillsCommand: { name: 'skills' },
+}));
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -95,9 +99,15 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
-      getUseModelRouter: () => false,
-      getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -168,48 +178,16 @@ describe('BuiltinCommandLoader', () => {
     expect(permissionsCmd).toBeUndefined();
   });
 
-  it('should include modelCommand when getUseModelRouter is true', async () => {
-    const mockConfigWithModelRouter = {
-      ...mockConfig,
-      getUseModelRouter: () => true,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithModelRouter);
-    const commands = await loader.loadCommands(new AbortController().signal);
-    const modelCmd = commands.find((c) => c.name === 'model');
-    expect(modelCmd).toBeDefined();
-  });
-
-  it('should not include modelCommand when getUseModelRouter is false', async () => {
-    const mockConfigWithoutModelRouter = {
-      ...mockConfig,
-      getUseModelRouter: () => false,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutModelRouter);
-    const commands = await loader.loadCommands(new AbortController().signal);
-    const modelCmd = commands.find((c) => c.name === 'model');
-    expect(modelCmd).toBeUndefined();
-  });
-
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
-      getEnableMessageBusIntegration: () => true,
+      getEnableHooks: () => false,
+      getMcpEnabled: () => true,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
     const policiesCmd = commands.find((c) => c.name === 'policies');
     expect(policiesCmd).toBeDefined();
-  });
-
-  it('should exclude policies command when message bus integration is disabled', async () => {
-    const mockConfigWithoutMessageBus = {
-      ...mockConfig,
-      getEnableMessageBusIntegration: () => false,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
-    const commands = await loader.loadCommands(new AbortController().signal);
-    const policiesCmd = commands.find((c) => c.name === 'policies');
-    expect(policiesCmd).toBeUndefined();
   });
 });
 
@@ -220,10 +198,16 @@ describe('BuiltinCommandLoader profile', () => {
     vi.resetModules();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
-      getUseModelRouter: () => false,
       getCheckpointingEnabled: () => false,
-      getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
+      getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 

@@ -14,7 +14,8 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -48,25 +49,17 @@ export const useFolderTrust = (
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
-      const trustedFolders = loadTrustedFolders();
+      const trustLevelMap: Record<FolderTrustChoice, TrustLevel> = {
+        [FolderTrustChoice.TRUST_FOLDER]: TrustLevel.TRUST_FOLDER,
+        [FolderTrustChoice.TRUST_PARENT]: TrustLevel.TRUST_PARENT,
+        [FolderTrustChoice.DO_NOT_TRUST]: TrustLevel.DO_NOT_TRUST,
+      };
+
+      const trustLevel = trustLevelMap[choice];
+      if (!trustLevel) return;
+
       const cwd = process.cwd();
-      let trustLevel: TrustLevel;
-
-      const wasTrusted = isTrusted ?? true;
-
-      switch (choice) {
-        case FolderTrustChoice.TRUST_FOLDER:
-          trustLevel = TrustLevel.TRUST_FOLDER;
-          break;
-        case FolderTrustChoice.TRUST_PARENT:
-          trustLevel = TrustLevel.TRUST_PARENT;
-          break;
-        case FolderTrustChoice.DO_NOT_TRUST:
-          trustLevel = TrustLevel.DO_NOT_TRUST;
-          break;
-        default:
-          return;
-      }
+      const trustedFolders = loadTrustedFolders();
 
       try {
         trustedFolders.setValue(cwd, trustLevel);
@@ -75,8 +68,9 @@ export const useFolderTrust = (
           'error',
           'Failed to save trust settings. Exiting Gemini CLI.',
         );
-        setTimeout(() => {
-          process.exit(1);
+        setTimeout(async () => {
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_CONFIG_ERROR);
         }, 100);
         return;
       }
@@ -84,11 +78,15 @@ export const useFolderTrust = (
       const currentIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
-      setIsTrusted(currentIsTrusted);
-      onTrustChange(currentIsTrusted);
 
-      const needsRestart = wasTrusted !== currentIsTrusted;
-      if (needsRestart) {
+      onTrustChange(currentIsTrusted);
+      setIsTrusted(currentIsTrusted);
+
+      // logic: we restart if the trust state *effectively* changes from the previous state.
+      // previous state was `isTrusted`. If undefined, we assume false (untrusted).
+      const wasTrusted = isTrusted ?? false;
+
+      if (wasTrusted !== currentIsTrusted) {
         setIsRestarting(true);
         setIsFolderTrustDialogOpen(true);
       } else {

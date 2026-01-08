@@ -18,6 +18,9 @@ import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
@@ -59,7 +62,6 @@ export const DialogManager = ({
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
-        userTier={uiState.userTier}
       />
     );
   }
@@ -137,8 +139,12 @@ export const DialogManager = ({
         <SettingsDialog
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={() => process.exit(0)}
+          onRestartRequest={async () => {
+            await runExitCleanup();
+            process.exit(RELAUNCH_EXIT_CODE);
+          }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
+          config={config}
         />
       </Box>
     );
@@ -159,6 +165,7 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <ApiAuthDialog
+          key={uiState.apiKeyDefaultValue}
           onSubmit={uiActions.handleApiKeySubmit}
           onCancel={uiActions.handleApiKeyCancel}
           error={uiState.authError}
@@ -201,6 +208,16 @@ export const DialogManager = ({
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
+      />
+    );
+  }
+  if (uiState.isSessionBrowserOpen) {
+    return (
+      <SessionBrowser
+        config={config}
+        onResumeSession={uiActions.handleResumeSession}
+        onDeleteSession={uiActions.handleDeleteSession}
+        onExit={uiActions.closeSessionBrowser}
       />
     );
   }

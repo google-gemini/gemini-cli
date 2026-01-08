@@ -18,9 +18,13 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolErrorType,
   ApprovalMode,
+  HookSystem,
+  PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
 } from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/mock-tool.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('executeToolCall', () => {
   let mockToolRegistry: ToolRegistry;
@@ -59,15 +63,23 @@ describe('executeToolCall', () => {
       getTruncateToolOutputThreshold: () =>
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
+      getActiveModel: () => PREVIEW_GEMINI_MODEL,
       getGeminiClient: () => null, // No client needed for these tests
-      getEnableMessageBusIntegration: () => false,
       getMessageBus: () => null,
-      getPolicyEngine: () => null,
+      getPolicyEngine: () => ({
+        check: async () => ({ decision: PolicyDecision.ALLOW }),
+      }),
       isInteractive: () => false,
+      getExperiments: () => {},
+      getEnableHooks: () => false,
     } as unknown as Config;
 
+    // Use proper MessageBus mocking for Phase 3 preparation
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
     abortController = new AbortController();
   });
 
@@ -312,12 +324,10 @@ describe('executeToolCall', () => {
           functionResponse: {
             name: 'testTool',
             id: 'call6',
-            response: {
-              output: 'Binary content of type image/png was processed.',
-            },
+            response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [imageDataPart],
           },
         },
-        imageDataPart,
       ],
     });
   });

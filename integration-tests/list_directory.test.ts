@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it } from 'vitest';
+import { describe, it, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
   poll,
@@ -15,9 +15,18 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('list_directory', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to list a directory', async () => {
-    const rig = new TestRig();
-    rig.setup('should be able to list a directory');
+    await rig.setup('should be able to list a directory', {
+      settings: { tools: { core: ['list_directory'] } },
+    });
     rig.createFile('file1.txt', 'file 1 content');
     rig.mkdir('subdir');
     rig.sync();
@@ -36,7 +45,7 @@ describe('list_directory', () => {
 
     const prompt = `Can you list the files in the current directory.`;
 
-    const result = await rig.run(prompt);
+    const result = await rig.run({ args: prompt });
 
     try {
       await rig.expectToolCallSuccess(['list_directory']);

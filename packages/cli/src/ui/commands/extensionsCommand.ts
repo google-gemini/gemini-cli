@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, listExtensions } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  listExtensions,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
@@ -20,16 +24,43 @@ import {
 } from './types.js';
 import open from 'open';
 import process from 'node:process';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { theme } from '../semantic-colors.js';
+import { stat } from 'node:fs/promises';
+
+function showMessageIfNoExtensions(
+  context: CommandContext,
+  extensions: unknown[],
+): boolean {
+  if (extensions.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      },
+      Date.now(),
+    );
+    return true;
+  }
+  return false;
+}
 
 async function listAction(context: CommandContext) {
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (showMessageIfNoExtensions(context, extensions)) {
+    return;
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
   context.ui.addItem(historyItem, Date.now());
@@ -56,13 +87,20 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     (resolve) => (resolveUpdateComplete = resolve),
   );
 
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
+    : [];
+
+  if (showMessageIfNoExtensions(context, extensions)) {
+    return Promise.resolve();
+  }
+
   const historyItem: HistoryItemExtensionsList = {
     type: MessageType.EXTENSIONS_LIST,
-    extensions: context.services.config
-      ? listExtensions(context.services.config)
-      : [],
+    extensions,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
   updateComplete.then((updateInfos) => {
     if (updateInfos.length === 0) {
       context.ui.addItem(
@@ -135,6 +173,11 @@ async function restartAction(
       },
       Date.now(),
     );
+    return;
+  }
+
+  const extensions = extensionLoader.getExtensions();
+  if (showMessageIfNoExtensions(context, extensions)) {
     return;
   }
 
@@ -394,6 +437,217 @@ async function enableAction(context: CommandContext, args: string) {
   }
 }
 
+async function installAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const source = args.trim();
+  if (!source) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions install <source>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  // Validate that the source is either a valid URL or a valid file path.
+  let isValid = false;
+  try {
+    // Check if it's a valid URL.
+    new URL(source);
+    isValid = true;
+  } catch {
+    // If not a URL, check for characters that are disallowed in file paths
+    // and could be used for command injection.
+    if (!/[;&|`'"]/.test(source)) {
+      isValid = true;
+    }
+  }
+
+  if (!isValid) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Invalid source: ${source}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Installing extension from "${source}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    const installMetadata = await inferInstallMetadata(source);
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${extension.name}" installed successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to install extension from "${source}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
+async function linkAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const sourceFilepath = args.trim();
+  if (!sourceFilepath) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions link <source>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+  if (/[;&|`'"]/.test(sourceFilepath)) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Source file path contains disallowed characters: ${sourceFilepath}`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    await stat(sourceFilepath);
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Invalid source: ${sourceFilepath}`,
+      },
+      Date.now(),
+    );
+    debugLogger.error(
+      `Failed to stat path "${sourceFilepath}": ${getErrorMessage(error)}`,
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Linking extension from "${sourceFilepath}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    const installMetadata: ExtensionInstallMetadata = {
+      source: sourceFilepath,
+      type: 'link',
+    };
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${extension.name}" linked successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to link extension from "${sourceFilepath}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
+async function uninstallAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
+    );
+    return;
+  }
+
+  const name = args.trim();
+  if (!name) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Usage: /extensions uninstall <extension-name>`,
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: `Uninstalling extension "${name}"...`,
+    },
+    Date.now(),
+  );
+
+  try {
+    await extensionLoader.uninstallExtension(name, false);
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `Extension "${name}" uninstalled successfully.`,
+      },
+      Date.now(),
+    );
+  } catch (error) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension "${name}": ${getErrorMessage(
+          error,
+        )}`,
+      },
+      Date.now(),
+    );
+  }
+}
+
 /**
  * Exported for testing.
  */
@@ -439,6 +693,7 @@ const listExtensionsCommand: SlashCommand = {
   name: 'list',
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: listAction,
 };
 
@@ -446,6 +701,7 @@ const updateExtensionsCommand: SlashCommand = {
   name: 'update',
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: updateAction,
   completion: completeExtensions,
 };
@@ -454,6 +710,7 @@ const disableCommand: SlashCommand = {
   name: 'disable',
   description: 'Disable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: disableAction,
   completion: completeExtensionsAndScopes,
 };
@@ -462,14 +719,41 @@ const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable an extension',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: enableAction,
   completion: completeExtensionsAndScopes,
+};
+
+const installCommand: SlashCommand = {
+  name: 'install',
+  description: 'Install an extension from a git repo or local path',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: installAction,
+};
+
+const linkCommand: SlashCommand = {
+  name: 'link',
+  description: 'Link an extension from a local path',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: linkAction,
+};
+
+const uninstallCommand: SlashCommand = {
+  name: 'uninstall',
+  description: 'Uninstall an extension',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: uninstallAction,
+  completion: completeExtensions,
 };
 
 const exploreExtensionsCommand: SlashCommand = {
   name: 'explore',
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: exploreAction,
 };
 
@@ -477,6 +761,7 @@ const restartCommand: SlashCommand = {
   name: 'restart',
   description: 'Restart all extensions',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: restartAction,
   completion: completeExtensions,
 };
@@ -485,12 +770,19 @@ export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
   const conditionalCommands = enableExtensionReloading
-    ? [disableCommand, enableCommand]
+    ? [
+        disableCommand,
+        enableCommand,
+        installCommand,
+        uninstallCommand,
+        linkCommand,
+      ]
     : [];
   return {
     name: 'extensions',
     description: 'Manage extensions',
     kind: CommandKind.BUILT_IN,
+    autoExecute: false,
     subCommands: [
       listExtensionsCommand,
       updateExtensionsCommand,

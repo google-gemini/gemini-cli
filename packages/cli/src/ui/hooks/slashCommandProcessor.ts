@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  createElement,
+} from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -44,7 +50,11 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
-import { useAlternateBuffer } from './useAlternateBuffer.js';
+import {
+  LogoutConfirmationDialog,
+  LogoutChoice,
+} from '../components/LogoutConfirmationDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -52,6 +62,7 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openSessionBrowser: () => void;
   openModelDialog: () => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
@@ -84,7 +95,6 @@ export const useSlashCommandProcessor = (
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
-  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -200,9 +210,6 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          if (!alternateBuffer) {
-            console.clear();
-          }
           refreshStatic();
           setBannerVisible(false);
         },
@@ -226,7 +233,6 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
-      alternateBuffer,
       config,
       settings,
       gitService,
@@ -257,6 +263,7 @@ export const useSlashCommandProcessor = (
       reloadCommands();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const ideClient = await IdeClient.getInstance();
       ideClient.addStatusChangeListener(listener);
@@ -277,6 +284,7 @@ export const useSlashCommandProcessor = (
     appEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       (async () => {
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
@@ -289,6 +297,7 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       const commandService = await CommandService.create(
         [
@@ -396,6 +405,22 @@ export const useSlashCommandProcessor = (
                     Date.now(),
                   );
                   return { type: 'handled' };
+                case 'logout':
+                  // Show logout confirmation dialog with Login/Exit options
+                  setCustomDialog(
+                    createElement(LogoutConfirmationDialog, {
+                      onSelect: async (choice: LogoutChoice) => {
+                        setCustomDialog(null);
+                        if (choice === LogoutChoice.LOGIN) {
+                          actions.openAuthDialog();
+                        } else {
+                          await runExitCleanup();
+                          process.exit(0);
+                        }
+                      },
+                    }),
+                  );
+                  return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
                     case 'auth':
@@ -409,6 +434,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'privacy':
                       actions.openPrivacyNotice();
+                      return { type: 'handled' };
+                    case 'sessionBrowser':
+                      actions.openSessionBrowser();
                       return { type: 'handled' };
                     case 'settings':
                       actions.openSettingsDialog();

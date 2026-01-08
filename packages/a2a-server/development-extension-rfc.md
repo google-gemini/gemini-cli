@@ -153,7 +153,7 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 
-// ToolCall is the central message represeting a tool's execution lifecycle.
+// ToolCall is the central message representing a tool's execution lifecycle.
 // The entire object is sent from the agent to client on every update.
 message ToolCall {
   // A unique identifier, assigned by the agent
@@ -197,7 +197,7 @@ enum ToolCallStatus {
   CANCELLED = 5;
 }
 
-// ToolOuput represents the final, successful, output of a tool
+// ToolOutput represents the final, successful, output of a tool
 message ToolOutput {
   oneof result {
     string text = 1;

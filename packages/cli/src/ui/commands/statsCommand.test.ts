@@ -10,6 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import type { Config } from '@google/gemini-cli-core';
 
 describe('statsCommand', () => {
   let mockContext: CommandContext;
@@ -30,6 +31,7 @@ describe('statsCommand', () => {
   it('should display general session stats when run with no subcommand', () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
@@ -44,12 +46,33 @@ describe('statsCommand', () => {
     );
   });
 
+  it('should fetch and display quota if config is available', async () => {
+    if (!statsCommand.action) throw new Error('Command has no action');
+
+    const mockQuota = { buckets: [] };
+    const mockRefreshUserQuota = vi.fn().mockResolvedValue(mockQuota);
+    mockContext.services.config = {
+      refreshUserQuota: mockRefreshUserQuota,
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
+
+    expect(mockRefreshUserQuota).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quotas: mockQuota,
+      }),
+      expect.any(Number),
+    );
+  });
+
   it('should display model stats when using the "model" subcommand', () => {
     const modelSubCommand = statsCommand.subCommands?.find(
       (sc) => sc.name === 'model',
     );
     if (!modelSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     modelSubCommand.action(mockContext, '');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -66,6 +89,7 @@ describe('statsCommand', () => {
     );
     if (!toolsSubCommand?.action) throw new Error('Subcommand has no action');
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     toolsSubCommand.action(mockContext, '');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
