@@ -1745,4 +1745,115 @@ describe('runNonInteractive', () => {
     );
     expect(getWrittenOutput()).toContain('Done');
   });
+
+  it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop',
+      },
+    };
+
+    // Mock tool execution returning STOP_EXECUTION
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason from hook'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Executing tool...' },
+      toolCallEvent,
+    ];
+
+    // Setup the mock to return events for the first call.
+    // We expect the loop to terminate after the tool execution.
+    // If it doesn't, it might call sendMessageStream again, which we'll assert against.
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents([]));
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop',
+    });
+
+    expect(mockCoreExecuteToolCall).toHaveBeenCalled();
+
+    // The key assertion: sendMessageStream should have been called ONLY ONCE (initial user input).
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop',
+        prompt_id: 'prompt-id-stop',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        'Agent execution stopped: Stopped by hook\n',
+      );
+      // Should exit without calling sendMessageStream again
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle AgentExecutionBlocked event', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by hook' },
+        },
+        { type: GeminiEventType.Content, value: 'Final answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block',
+        prompt_id: 'prompt-id-block',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[WARNING] Agent execution blocked: Blocked by hook\n',
+      );
+      // sendMessageStream is called once, recursion is internal to it and transparent to the caller
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+      expect(getWrittenOutput()).toBe('Final answer\n');
+    });
+  });
 });

@@ -79,6 +79,9 @@ vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
+vi.mock('../ui/commands/skillsCommand.js', () => ({
+  skillsCommand: { name: 'skills' },
+}));
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -98,6 +101,12 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -172,6 +181,7 @@ describe('BuiltinCommandLoader', () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
       getEnableHooks: () => false,
+      getMcpEnabled: () => true,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -190,6 +200,12 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 

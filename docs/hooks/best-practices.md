@@ -4,128 +4,6 @@ This guide covers security considerations, performance optimization, debugging
 techniques, and privacy considerations for developing and deploying hooks in
 Gemini CLI.
 
-## Security considerations
-
-### Validate all inputs
-
-Never trust data from hooks without validation. Hook inputs may contain
-user-provided data that could be malicious:
-
-```bash
-#!/usr/bin/env bash
-input=$(cat)
-
-# Validate JSON structure
-if ! echo "$input" | jq empty 2>/dev/null; then
-  echo "Invalid JSON input" >&2
-  exit 1
-fi
-
-# Validate required fields
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
-if [ -z "$tool_name" ]; then
-  echo "Missing tool_name field" >&2
-  exit 1
-fi
-```
-
-### Use timeouts
-
-Set reasonable timeouts to prevent hooks from hanging indefinitely:
-
-```json
-{
-  "hooks": {
-    "BeforeTool": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "slow-validator",
-            "type": "command",
-            "command": "./hooks/validate.sh",
-            "timeout": 5000
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-**Recommended timeouts:**
-
-- Fast validation: 1000-5000ms
-- Network requests: 10000-30000ms
-- Heavy computation: 30000-60000ms
-
-### Limit permissions
-
-Run hooks with minimal required permissions:
-
-```bash
-#!/usr/bin/env bash
-# Don't run as root
-if [ "$EUID" -eq 0 ]; then
-  echo "Hook should not run as root" >&2
-  exit 1
-fi
-
-# Check file permissions before writing
-if [ -w "$file_path" ]; then
-  # Safe to write
-else
-  echo "Insufficient permissions" >&2
-  exit 1
-fi
-```
-
-### Scan for secrets
-
-Use `BeforeTool` hooks to prevent committing sensitive data:
-
-```javascript
-const SECRET_PATTERNS = [
-  /api[_-]?key\s*[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/i,
-  /password\s*[:=]\s*['"]?[^\s'"]{8,}['"]?/i,
-  /secret\s*[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/i,
-  /AKIA[0-9A-Z]{16}/, // AWS access key
-  /ghp_[a-zA-Z0-9]{36}/, // GitHub personal access token
-  /sk-[a-zA-Z0-9]{48}/, // OpenAI API key
-];
-
-function containsSecret(content) {
-  return SECRET_PATTERNS.some((pattern) => pattern.test(content));
-}
-```
-
-### Review external scripts
-
-Always review hook scripts from untrusted sources before enabling them:
-
-```bash
-# Review before installing
-cat third-party-hook.sh | less
-
-# Check for suspicious patterns
-grep -E 'curl|wget|ssh|eval' third-party-hook.sh
-
-# Verify hook source
-ls -la third-party-hook.sh
-```
-
-### Sandbox untrusted hooks
-
-For maximum security, consider running untrusted hooks in isolated environments:
-
-```bash
-# Run hook in Docker container
-docker run --rm \
-  -v "$GEMINI_PROJECT_DIR:/workspace:ro" \
-  -i untrusted-hook-image \
-  /hook-script.sh < input.json
-```
-
 ## Performance
 
 ### Keep hooks fast
@@ -140,11 +18,13 @@ const data2 = await fetch(url2).then((r) => r.json());
 const data3 = await fetch(url3).then((r) => r.json());
 
 // Prefer parallel operations for better performance
-const [data1, data2, data3] = await Promise.all([
-  fetch(url1).then((r) => r.json()),
-  fetch(url2).then((r) => r.json()),
-  fetch(url3).then((r) => r.json()),
-]);
+// Start requests concurrently
+const p1 = fetch(url1).then((r) => r.json());
+const p2 = fetch(url2).then((r) => r.json());
+const p3 = fetch(url3).then((r) => r.json());
+
+// Wait for all results
+const [data1, data2, data3] = await Promise.all([p1, p2, p3]);
 ```
 
 ### Cache expensive operations
@@ -712,6 +592,176 @@ echo "GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}" >> .gemini/hook-env.log
 if [ -f "$GEMINI_PROJECT_DIR/.env" ]; then
   source "$GEMINI_PROJECT_DIR/.env"
 fi
+```
+
+## Using Hooks Securely
+
+### Threat Model
+
+Understanding where hooks come from and what they can do is critical for secure
+usage.
+
+| Hook Source                   | Description                                                                                                                |
+| :---------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| **System**                    | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
+| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                         |
+| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
+| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
+
+#### Project Hook Security
+
+When you open a project with hooks defined in `.gemini/settings.json`:
+
+1. **Detection**: Gemini CLI detects the hooks.
+2. **Identification**: A unique identity is generated for each hook based on its
+   `name` and `command`.
+3. **Warning**: If this specific hook identity has not been seen before, a
+   **warning** is displayed.
+4. **Execution**: The hook is executed (unless specific security settings block
+   it).
+5. **Trust**: The hook is marked as "trusted" for this project.
+
+> [!IMPORTANT] **Modification Detection**: If the `command` string of a project
+> hook is changed (e.g., by a `git pull`), its identity changes. Gemini CLI will
+> treat it as a **new, untrusted hook** and warn you again. This prevents
+> malicious actors from silently swapping a verified command for a malicious
+> one.
+
+### Risks
+
+| Risk                         | Description                                                                                                                          |
+| :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| **Arbitrary Code Execution** | Hooks run as your user. They can do anything you can do (delete files, install software).                                            |
+| **Data Exfiltration**        | A hook could read your input (prompts), output (code), or environment variables (`GEMINI_API_KEY`) and send them to a remote server. |
+| **Prompt Injection**         | Malicious content in a file or web page could trick an LLM into running a tool that triggers a hook in an unexpected way.            |
+
+### Mitigation Strategies
+
+#### Verify the source
+
+**Verify the source** of any project hooks or extensions before enabling them.
+
+- For open-source projects, a quick review of the hook scripts is recommended.
+- For extensions, ensure you trust the author or publisher (e.g., verified
+  publishers, well-known community members).
+- Be cautious with obfuscated scripts or compiled binaries from unknown sources.
+
+#### Sanitize Environment
+
+Hooks inherit the environment of the Gemini CLI process, which may include
+sensitive API keys. Gemini CLI attempts to sanitize sensitive variables, but you
+should be cautious.
+
+- **Avoid printing environment variables** to stdout/stderr unless necessary.
+- **Use `.env` files** to securely manage sensitive variables, ensuring they are
+  excluded from version control.
+
+**System Administrators:** You can enforce environment variable redaction by
+default in the system configuration (e.g., `/etc/gemini-cli/settings.json`):
+
+```json
+{
+  "security": {
+    "environmentVariableRedaction": {
+      "enabled": true,
+      "blocked": ["MY_SECRET_KEY"],
+      "allowed": ["SAFE_VAR"]
+    }
+  }
+}
+```
+
+## Authoring Secure Hooks
+
+When writing your own hooks, follow these practices to ensure they are robust
+and secure.
+
+### Validate all inputs
+
+Never trust data from hooks without validation. Hook inputs often come from the
+LLM or user prompts, which can be manipulated.
+
+```bash
+#!/usr/bin/env bash
+input=$(cat)
+
+# Validate JSON structure
+if ! echo "$input" | jq empty 2>/dev/null; then
+  echo "Invalid JSON input" >&2
+  exit 1
+fi
+
+# Validate tool_name explicitly
+tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+if [[ "$tool_name" != "write_file" && "$tool_name" != "read_file" ]]; then
+  echo "Unexpected tool: $tool_name" >&2
+  exit 1
+fi
+```
+
+### Use timeouts
+
+Prevent denial-of-service (hanging agents) by enforcing timeouts. Gemini CLI
+defaults to 60 seconds, but you should set stricter limits for fast hooks.
+
+```json
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "fast-validator",
+            "command": "./hooks/validate.sh",
+            "timeout": 5000 // 5 seconds
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Limit permissions
+
+Run hooks with minimal required permissions:
+
+```bash
+#!/usr/bin/env bash
+# Don't run as root
+if [ "$EUID" -eq 0 ]; then
+  echo "Hook should not run as root" >&2
+  exit 1
+fi
+
+# Check file permissions before writing
+if [ -w "$file_path" ]; then
+  # Safe to write
+else
+  echo "Insufficient permissions" >&2
+  exit 1
+fi
+```
+
+### Example: Secret Scanner
+
+Use `BeforeTool` hooks to prevent committing sensitive data. This is a powerful
+pattern for enhancing security in your workflow.
+
+```javascript
+const SECRET_PATTERNS = [
+  /api[_-]?key\s*[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/i,
+  /password\s*[:=]\s*['"]?[^\s'"]{8,}['"]?/i,
+  /secret\s*[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/i,
+  /AKIA[0-9A-Z]{16}/, // AWS access key
+  /ghp_[a-zA-Z0-9]{36}/, // GitHub personal access token
+  /sk-[a-zA-Z0-9]{48}/, // OpenAI API key
+];
+
+function containsSecret(content) {
+  return SECRET_PATTERNS.some((pattern) => pattern.test(content));
+}
 ```
 
 ## Privacy considerations

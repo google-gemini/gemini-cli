@@ -1075,12 +1075,12 @@ const SETTINGS_SCHEMA = {
       },
       enableHooks: {
         type: 'boolean',
-        label: 'Enable Hooks System',
+        label: 'Enable Hooks System (Experimental)',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
+          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
         showInDialog: false,
       },
     },
@@ -1125,15 +1125,6 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
       },
     },
-  },
-  useSmartEdit: {
-    type: 'boolean',
-    label: 'Use Smart Edit',
-    category: 'Advanced',
-    requiresRestart: false,
-    default: true,
-    description: 'Enable the smart-edit tool instead of the replace tool.',
-    showInDialog: false,
   },
   useWriteTodos: {
     type: 'boolean',
@@ -1383,6 +1374,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
+      skills: {
+        type: 'boolean',
+        label: 'Agent Skills',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable Agent Skills (experimental).',
+        showInDialog: true,
+      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',
@@ -1443,22 +1443,32 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      introspectionAgentSettings: {
+      useOSC52Paste: {
+        type: 'boolean',
+        label: 'Use OSC 52 Paste',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
+        showInDialog: true,
+      },
+      cliHelpAgentSettings: {
         type: 'object',
-        label: 'Introspection Agent Settings',
+        label: 'CLI Help Agent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
-        description: 'Configuration for Introspection Agent.',
+        description: 'Configuration for CLI Help Agent.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Introspection Agent',
+            label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
-            description: 'Enable the Introspection Agent.',
+            default: true,
+            description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
         },
@@ -1501,6 +1511,29 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  skills: {
+    type: 'object',
+    label: 'Skills',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for agent skills.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled skills.',
+        showInDialog: false,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
+      },
+    },
+  },
+
   hooks: {
     type: 'object',
     label: 'Hooks',
@@ -1511,6 +1544,16 @@ const SETTINGS_SCHEMA = {
       'Hook configurations for intercepting and customizing agent behavior.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
+        showInDialog: false,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Hooks',
@@ -1525,6 +1568,15 @@ const SETTINGS_SCHEMA = {
           description: 'Hook command name',
         },
         mergeStrategy: MergeStrategy.UNION,
+      },
+      notifications: {
+        type: 'boolean',
+        label: 'Hook Notifications',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: true,
+        description: 'Show visual indicators when hooks are executing.',
+        showInDialog: true,
       },
       BeforeTool: {
         type: 'array',
@@ -1664,6 +1716,74 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  admin: {
+    type: 'object',
+    label: 'Admin',
+    category: 'Admin',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings configured remotely by enterprise admins.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.REPLACE,
+    properties: {
+      secureModeEnabled: {
+        type: 'boolean',
+        label: 'Secure Mode Enabled',
+        category: 'Admin',
+        requiresRestart: false,
+        default: false,
+        description: 'If true, disallows yolo mode from being used.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+      },
+      extensions: {
+        type: 'object',
+        label: 'Extensions Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'Extensions-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Extensions Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description:
+              'If false, disallows extensions from being installed or used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
+      mcp: {
+        type: 'object',
+        label: 'MCP Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'MCP-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'MCP Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description: 'If false, disallows MCP servers from being used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
     },
   },
 } as const satisfies SettingsSchema;
@@ -2015,3 +2135,11 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
+
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
+export function getEnableHooks(settings: Settings): boolean {
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
+}

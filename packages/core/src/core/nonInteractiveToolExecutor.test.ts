@@ -20,6 +20,7 @@ import {
   ApprovalMode,
   HookSystem,
   PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
 } from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -63,10 +64,11 @@ describe('executeToolCall', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getActiveModel: () => PREVIEW_GEMINI_MODEL,
-      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
       getMessageBus: () => null,
-      getPolicyEngine: () => null,
+      getPolicyEngine: () => ({
+        check: async () => ({ decision: PolicyDecision.ALLOW }),
+      }),
       isInteractive: () => false,
       getExperiments: () => {},
       getEnableHooks: () => false,
