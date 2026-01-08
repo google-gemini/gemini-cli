@@ -53,7 +53,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { getEnableHooks } from './settingsSchema.js';
+import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -292,7 +292,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   }
 
   // Register hooks command if hooks are enabled
-  if (getEnableHooks(settings)) {
+  if (getEnableHooksUI(settings)) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -520,7 +520,6 @@ export async function loadCliConfig(
         'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
-    approvalMode = ApprovalMode.DEFAULT;
   } else if (approvalMode === ApprovalMode.YOLO) {
     debugLogger.warn(
       'YOLO mode is enabled. All tool calls will be automatically approved.',
@@ -733,8 +732,7 @@ export async function loadCliConfig(
     },
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
-    introspectionAgentSettings:
-      settings.experimental?.introspectionAgentSettings,
+    cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
@@ -742,6 +740,7 @@ export async function loadCliConfig(
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: getEnableHooks(settings),
+    enableHooksUI: getEnableHooksUI(settings),
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
