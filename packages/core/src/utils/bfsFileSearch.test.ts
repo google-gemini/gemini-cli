@@ -131,6 +131,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: true,
           respectGeminiIgnore: true,
+          customIgnoreFilePath: undefined,
         },
       });
 
@@ -154,6 +155,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: false,
           respectGeminiIgnore: true,
+          customIgnoreFilePath: undefined,
         },
       });
 
@@ -183,6 +185,7 @@ describe('bfsFileSearch', () => {
         fileFilteringOptions: {
           respectGitIgnore: false,
           respectGeminiIgnore: false,
+          customIgnoreFilePath: undefined,
         },
       });
 
@@ -316,6 +319,7 @@ describe('bfsFileSearchSync', () => {
       fileFilteringOptions: {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
+        customIgnoreFilePath: undefined,
       },
     });
 

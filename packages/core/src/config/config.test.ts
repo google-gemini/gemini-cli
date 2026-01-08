@@ -623,6 +623,28 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
+  it('should set customIgnoreFilePath from params', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        customIgnoreFilePath: '/path/to/ignore/file',
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePath()).toBe('/path/to/ignore/file');
+  });
+
+  it('should set customIgnoreFilePath to undefined if not provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePath()).toBeUndefined();
+  });
+
   it('should initialize WorkspaceContext with includeDirectories', () => {
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {

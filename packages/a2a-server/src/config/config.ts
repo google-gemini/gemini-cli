@@ -88,6 +88,7 @@ export async function loadConfig(
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      customIgnoreFilePath: process.env['CUSTOM_IGNORE_FILE_PATH'] ?? undefined,
     },
     ideMode: false,
     folderTrust,
