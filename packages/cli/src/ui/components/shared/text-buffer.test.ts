@@ -52,6 +52,7 @@ const initialState: TextBufferState = {
   viewportHeight: 24,
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
+  pastedContent: {},
 };
 
 describe('textBufferReducer', () => {
@@ -143,6 +144,19 @@ describe('textBufferReducer', () => {
       const state = textBufferReducer(initialState, action, options);
       expect(state.lines).toEqual(['hello']);
       expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('add_pasted_content action', () => {
+    it('should add content to pastedContent Record', () => {
+      const action: TextBufferAction = {
+        type: 'add_pasted_content',
+        payload: { id: '[Pasted Text #1]', text: 'large content' },
+      };
+      const state = textBufferReducer(initialState, action);
+      expect(state.pastedContent).toEqual({
+        '[Pasted Text #1]': 'large content',
+      });
     });
   });
 
@@ -535,6 +549,27 @@ describe('useTextBuffer', () => {
       const state = getBufferState(result);
       expect(state.text).toBe('a-NEW-bc');
       expect(state.cursor).toEqual([0, 6]);
+    });
+
+    it('insert: should use placeholder for large text paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeText = '1\n2\n3\n4\n5\n6';
+      act(() => result.current.insert(largeText, { paste: true }));
+      const state = getBufferState(result);
+      expect(state.text).toBe('[Pasted Text #1]');
+      expect(result.current.pastedContent['[Pasted Text #1]']).toBe(largeText);
+    });
+
+    it('insert: should NOT use placeholder for large text if NOT a paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeText = '1\n2\n3\n4\n5\n6';
+      act(() => result.current.insert(largeText, { paste: false }));
+      const state = getBufferState(result);
+      expect(state.text).toBe(largeText);
     });
 
     it('newline: should create a new line and move cursor', () => {
@@ -1321,10 +1356,11 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       });
 
       const state = getBufferState(result);
-      // Check that the text is the result of three concatenations.
-      expect(state.lines).toStrictEqual(
-        (longText + longText + longText).split('\n'),
-      );
+      // Check that the text is the result of three concatenations of placeholders.
+      expect(state.lines).toStrictEqual([
+        '[Pasted Text #1][Pasted Text #1][Pasted Text #1]',
+      ]);
+      expect(result.current.pastedContent['[Pasted Text #1]']).toBe(longText);
       const expectedCursorPos = offsetToLogicalPos(
         state.text,
         state.text.length,

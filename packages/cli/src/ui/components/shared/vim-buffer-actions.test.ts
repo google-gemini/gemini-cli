@@ -34,6 +34,7 @@ const createTestState = (
   viewportHeight: 24,
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
+  pastedContent: {},
 });
 
 describe('vim-buffer-actions', () => {

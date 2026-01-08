@@ -218,13 +218,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      let processedValue = submittedValue;
+      if (buffer.pastedContent) {
+        // Replace placeholders like [Pasted Text #1] with actual content
+        // We use a regex that matches the ID format
+        const regex = /\[Pasted Text #(\d+)\]/g;
+        processedValue = processedValue.replace(
+          regex,
+          (match) => buffer.pastedContent[match] || match,
+        );
+      }
+
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(processedValue);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -357,8 +368,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        const offset = buffer.getOffset();
-        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+        buffer.insert(textToInsert, { paste: true });
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
@@ -1170,7 +1180,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'paste'
                       ? theme.text.accent
                       : theme.text.primary;
 

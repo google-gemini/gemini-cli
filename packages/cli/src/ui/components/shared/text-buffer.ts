@@ -28,6 +28,9 @@ import type { Key } from '../../contexts/KeypressContext.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
+const LARGE_PASTE_LINE_THRESHOLD = 5;
+const LARGE_PASTE_CHAR_THRESHOLD = 500;
+
 export type Direction =
   | 'left'
   | 'right'
@@ -1112,6 +1115,7 @@ export interface TextBufferState {
   viewportWidth: number;
   viewportHeight: number;
   visualLayout: VisualLayout;
+  pastedContent: Record<string, string>;
 }
 
 const historyLimit = 100;
@@ -1132,6 +1136,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -1290,6 +1295,17 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+      };
+    }
+
+    case 'add_pasted_content': {
+      const { id, text } = action.payload;
+      return {
+        ...state,
+        pastedContent: {
+          ...state.pastedContent,
+          [id]: text,
+        },
       };
     }
 
@@ -1853,6 +1869,7 @@ export function useTextBuffer({
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       visualLayout,
+      pastedContent: {},
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -1869,6 +1886,7 @@ export function useTextBuffer({
     selectionAnchor,
     visualLayout,
     transformationsByLine,
+    pastedContent,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -1922,11 +1940,51 @@ export function useTextBuffer({
     }
   }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
+  const addPastedContent = useCallback(
+    (content: string): string => {
+      // Find the next available ID
+      let idNum = 1;
+      while (pastedContent[`[Pasted Text #${idNum}]`]) {
+        idNum++;
+      }
+      const id = `[Pasted Text #${idNum}]`;
+      dispatch({ type: 'add_pasted_content', payload: { id, text: content } });
+      return id;
+    },
+    [pastedContent],
+  );
+
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
+      if (typeof ch !== 'string') {
+        return;
+      }
       if (!singleLine && /[\n\r]/.test(ch)) {
+        if (paste) {
+          const lineCount = ch.split('\n').length;
+          if (
+            lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+            ch.length > LARGE_PASTE_CHAR_THRESHOLD
+          ) {
+            const id = addPastedContent(ch);
+            dispatch({ type: 'insert', payload: id });
+            return;
+          }
+        }
         dispatch({ type: 'insert', payload: ch });
         return;
+      }
+
+      if (paste) {
+        const lineCount = ch.split('\n').length;
+        if (
+          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          ch.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          const id = addPastedContent(ch);
+          dispatch({ type: 'insert', payload: id });
+          return;
+        }
       }
 
       const minLengthToInferAsDragDrop = 3;
@@ -1965,7 +2023,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive, singleLine],
+    [isValidPath, shellModeActive, singleLine, addPastedContent],
   );
 
   const newline = useCallback((): void => {
@@ -2385,6 +2443,7 @@ export function useTextBuffer({
       cursor: [cursorRow, cursorCol],
       preferredCol,
       selectionAnchor,
+      pastedContent,
 
       allVisualLines: visualLines,
       viewportVisualLines: renderedVisualLines,
@@ -2396,6 +2455,7 @@ export function useTextBuffer({
       transformationsByLine,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2455,6 +2515,7 @@ export function useTextBuffer({
       cursorCol,
       preferredCol,
       selectionAnchor,
+      pastedContent,
       visualLines,
       renderedVisualLines,
       visualCursor,
@@ -2465,6 +2526,7 @@ export function useTextBuffer({
       transformationsByLine,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2532,6 +2594,7 @@ export interface TextBuffer {
    */
   preferredCol: number | null; // Preferred visual column
   selectionAnchor: [number, number] | null; // Logical selection anchor
+  pastedContent: Record<string, string>;
 
   // Visual state (handles wrapping)
   allVisualLines: string[]; // All visual lines for the current text and viewport width.
@@ -2568,6 +2631,7 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string, opts?: { paste?: boolean }) => void;
+  addPastedContent: (text: string) => string;
   newline: () => void;
   backspace: () => void;
   del: () => void;

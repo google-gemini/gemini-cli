@@ -173,6 +173,8 @@ describe('InputPrompt', () => {
       visualToTransformedMap: [0],
       transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
+      pastedContent: {},
+      addPastedContent: vi.fn().mockReturnValue('[Pasted Text #1]'),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -243,6 +245,8 @@ describe('InputPrompt', () => {
       enabled: false,
       checking: false,
     });
+
+    vi.mocked(clipboardy.read).mockResolvedValue('');
 
     props = {
       buffer: mockBuffer,
@@ -628,10 +632,9 @@ describe('InputPrompt', () => {
 
       await waitFor(() => {
         expect(clipboardy.read).toHaveBeenCalled();
-        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-          expect.any(Number),
-          expect.any(Number),
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
           'pasted text',
+          expect.objectContaining({ paste: true }),
         );
       });
       unmount();

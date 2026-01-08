@@ -67,6 +67,7 @@ const createMockTextBufferState = (
       transformedToLogicalMaps: lines.map(() => []),
       visualToTransformedMap: [],
     },
+    pastedContent: {},
     ...partial,
   };
 };
