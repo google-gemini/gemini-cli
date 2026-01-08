@@ -824,6 +824,15 @@ export class Config {
     await this.geminiClient.initialize();
   }
 
+  /**
+   * Disposes of resources held by the config.
+   */
+  async dispose(): Promise<void> {
+    if (this.mcpClientManager) {
+      await this.mcpClientManager.stop();
+    }
+  }
+
   getContentGenerator(): ContentGenerator {
     return this.contentGenerator;
   }

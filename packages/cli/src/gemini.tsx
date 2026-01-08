@@ -477,6 +477,9 @@ export async function main() {
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);
 
+    // Ensure MCP servers are stopped on exit
+    registerCleanup(() => config.dispose());
+
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus);
