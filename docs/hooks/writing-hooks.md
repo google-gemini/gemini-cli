@@ -1040,5 +1040,5 @@ To package hooks as an extension, follow the
 
 - [Hooks Reference](index.md) - Complete API reference and configuration
 - [Best Practices](best-practices.md) - Security, performance, and debugging
-- [Configuration](../cli/configuration.md) - Gemini CLI settings
+- [Configuration](../get-started/configuration.md) - Gemini CLI settings
 - [Custom Commands](../cli/custom-commands.md) - Create custom commands
