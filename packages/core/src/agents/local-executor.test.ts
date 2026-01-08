@@ -100,6 +100,10 @@ vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
 }));
 
+vi.mock('../utils/version.js', () => ({
+  getVersion: vi.fn().mockResolvedValue('1.2.3'),
+}));
+
 vi.mock('../utils/environmentContext.js');
 
 vi.mock('../telemetry/loggers.js', () => ({
@@ -265,8 +269,13 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
-    parentToolRegistry = new ToolRegistry(mockConfig);
-    parentToolRegistry.registerTool(new LSTool(mockConfig));
+    parentToolRegistry = new ToolRegistry(
+      mockConfig,
+      mockConfig.getMessageBus(),
+    );
+    parentToolRegistry.registerTool(
+      new LSTool(mockConfig, mockConfig.getMessageBus()),
+    );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );

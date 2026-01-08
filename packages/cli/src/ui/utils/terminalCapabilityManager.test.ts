@@ -21,6 +21,10 @@ vi.mock('@google/gemini-cli-core', () => ({
   },
   enableKittyKeyboardProtocol: vi.fn(),
   disableKittyKeyboardProtocol: vi.fn(),
+  enableModifyOtherKeys: vi.fn(),
+  disableModifyOtherKeys: vi.fn(),
+  enableBracketedPasteMode: vi.fn(),
+  disableBracketedPasteMode: vi.fn(),
 }));
 
 describe('TerminalCapabilityManager', () => {
@@ -173,5 +177,135 @@ describe('TerminalCapabilityManager', () => {
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(true);
+  });
+
+  describe('modifyOtherKeys detection', () => {
+    it('should detect modifyOtherKeys support (level 2)', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate modifyOtherKeys level 2 response: \x1b[>4;2m
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+    });
+
+    it('should not enable modifyOtherKeys for level 0', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate modifyOtherKeys level 0 response: \x1b[>4;0m
+      stdin.emit('data', Buffer.from('\x1b[>4;0m'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isModifyOtherKeysEnabled()).toBe(false);
+    });
+
+    it('should prefer Kitty over modifyOtherKeys', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate both Kitty and modifyOtherKeys responses
+      stdin.emit('data', Buffer.from('\x1b[?1u'));
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isKittyProtocolEnabled()).toBe(true);
+      expect(manager.isModifyOtherKeysEnabled()).toBe(false);
+    });
+
+    it('should enable modifyOtherKeys when Kitty not supported', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate only modifyOtherKeys response (no Kitty)
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+      expect(manager.isKittyProtocolEnabled()).toBe(false);
+    });
+
+    it('should handle split modifyOtherKeys response chunks', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Split response: \x1b[>4;2m
+      stdin.emit('data', Buffer.from('\x1b[>4;'));
+      stdin.emit('data', Buffer.from('2m'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+    });
+
+    it('should detect modifyOtherKeys with other capabilities', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      stdin.emit('data', Buffer.from('\x1b]11;rgb:1a1a/1a1a/1a1a\x1b\\')); // background color
+      stdin.emit('data', Buffer.from('\x1bP>|tmux\x1b\\')); // Terminal name
+      stdin.emit('data', Buffer.from('\x1b[>4;2m')); // modifyOtherKeys
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+
+      expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
+      expect(manager.getTerminalName()).toBe('tmux');
+      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+    });
+  });
+
+  describe('bracketed paste detection', () => {
+    it('should detect bracketed paste support (mode set)', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate bracketed paste response: \x1b[?2004;1$y
+      stdin.emit('data', Buffer.from('\x1b[?2004;1$y'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isBracketedPasteSupported()).toBe(true);
+      expect(manager.isBracketedPasteEnabled()).toBe(true);
+    });
+
+    it('should detect bracketed paste support (mode reset)', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate bracketed paste response: \x1b[?2004;2$y
+      stdin.emit('data', Buffer.from('\x1b[?2004;2$y'));
+      // Complete detection with DA1
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isBracketedPasteSupported()).toBe(true);
+      expect(manager.isBracketedPasteEnabled()).toBe(true);
+    });
+
+    it('should not enable bracketed paste if not supported', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Complete detection with DA1 only
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+      expect(manager.isBracketedPasteSupported()).toBe(false);
+      expect(manager.isBracketedPasteEnabled()).toBe(false);
+    });
   });
 });

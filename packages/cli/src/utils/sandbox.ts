@@ -5,12 +5,11 @@
  */
 
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
-import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
-import { USER_SETTINGS_DIR } from '../config/settings.js';
 import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import {
@@ -18,6 +17,7 @@ import {
   debugLogger,
   FatalSandboxError,
   GEMINI_DIR,
+  homedir,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -82,7 +82,7 @@ export async function start_sandbox(
         '-D',
         `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
         '-D',
-        `HOME_DIR=${fs.realpathSync(os.homedir())}`,
+        `HOME_DIR=${fs.realpathSync(homedir())}`,
         '-D',
         `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
       ];
@@ -251,7 +251,9 @@ export async function start_sandbox(
     }
 
     // stop if image is missing
-    if (!(await ensureSandboxImageIsPresent(config.command, image))) {
+    if (
+      !(await ensureSandboxImageIsPresent(config.command, image, cliConfig))
+    ) {
       const remedy =
         image === LOCAL_DEV_SANDBOX_IMAGE_NAME
           ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
@@ -286,18 +288,23 @@ export async function start_sandbox(
 
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
-    const userSettingsDirOnHost = USER_SETTINGS_DIR;
+    const userHomeDirOnHost = homedir();
     const userSettingsDirInSandbox = getContainerPath(
       `/home/node/${GEMINI_DIR}`,
     );
-    if (!fs.existsSync(userSettingsDirOnHost)) {
-      fs.mkdirSync(userSettingsDirOnHost);
+    if (!fs.existsSync(userHomeDirOnHost)) {
+      fs.mkdirSync(userHomeDirOnHost, { recursive: true });
     }
+    const userSettingsDirOnHost = path.join(userHomeDirOnHost, GEMINI_DIR);
+    if (!fs.existsSync(userSettingsDirOnHost)) {
+      fs.mkdirSync(userSettingsDirOnHost, { recursive: true });
+    }
+
     args.push(
       '--volume',
       `${userSettingsDirOnHost}:${userSettingsDirInSandbox}`,
     );
-    if (userSettingsDirInSandbox !== userSettingsDirOnHost) {
+    if (userSettingsDirInSandbox !== getContainerPath(userSettingsDirOnHost)) {
       args.push(
         '--volume',
         `${userSettingsDirOnHost}:${getContainerPath(userSettingsDirOnHost)}`,
@@ -307,8 +314,16 @@ export async function start_sandbox(
     // mount os.tmpdir() as os.tmpdir() inside container
     args.push('--volume', `${os.tmpdir()}:${getContainerPath(os.tmpdir())}`);
 
+    // mount homedir() as homedir() inside container
+    if (userHomeDirOnHost !== os.homedir()) {
+      args.push(
+        '--volume',
+        `${userHomeDirOnHost}:${getContainerPath(userHomeDirOnHost)}`,
+      );
+    }
+
     // mount gcloud config directory if it exists
-    const gcloudConfigDir = path.join(os.homedir(), '.config', 'gcloud');
+    const gcloudConfigDir = path.join(homedir(), '.config', 'gcloud');
     if (fs.existsSync(gcloudConfigDir)) {
       args.push(
         '--volume',
@@ -583,7 +598,7 @@ export async function start_sandbox(
       // necessary on Linux to ensure the user exists within the
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
-      const homeDir = getContainerPath(os.homedir());
+      const homeDir = getContainerPath(homedir());
 
       const setupUserCommands = [
         // Use -f with groupadd to avoid errors if the group already exists.
@@ -604,7 +619,7 @@ export async function start_sandbox(
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
       // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${os.homedir()}`);
+      args.push('--env', `HOME=${homedir()}`);
     }
 
     // push container image name
@@ -718,8 +733,12 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
   });
 }
 
-async function pullImage(sandbox: string, image: string): Promise<boolean> {
-  console.info(`Attempting to pull image ${image} using ${sandbox}...`);
+async function pullImage(
+  sandbox: string,
+  image: string,
+  cliConfig?: Config,
+): Promise<boolean> {
+  debugLogger.debug(`Attempting to pull image ${image} using ${sandbox}...`);
   return new Promise((resolve) => {
     const args = ['pull', image];
     const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
@@ -727,11 +746,14 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     let stderrData = '';
 
     const onStdoutData = (data: Buffer) => {
-      console.info(data.toString().trim()); // Show pull progress
+      if (cliConfig?.getDebugMode() || process.env['DEBUG']) {
+        debugLogger.log(data.toString().trim()); // Show pull progress
+      }
     };
 
     const onStderrData = (data: Buffer) => {
       stderrData += data.toString();
+      // eslint-disable-next-line no-console
       console.error(data.toString().trim()); // Show pull errors/info from the command itself
     };
 
@@ -745,7 +767,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
 
     const onClose = (code: number | null) => {
       if (code === 0) {
-        console.info(`Successfully pulled image ${image}.`);
+        debugLogger.log(`Successfully pulled image ${image}.`);
         cleanup();
         resolve(true);
       } else {
@@ -788,6 +810,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
 async function ensureSandboxImageIsPresent(
   sandbox: string,
   image: string,
+  cliConfig?: Config,
 ): Promise<boolean> {
   debugLogger.log(`Checking for sandbox image: ${image}`);
   if (await imageExists(sandbox, image)) {
@@ -801,7 +824,7 @@ async function ensureSandboxImageIsPresent(
     return false;
   }
 
-  if (await pullImage(sandbox, image)) {
+  if (await pullImage(sandbox, image, cliConfig)) {
     // After attempting to pull, check again to be certain
     if (await imageExists(sandbox, image)) {
       debugLogger.log(`Sandbox image ${image} is now available after pulling.`);

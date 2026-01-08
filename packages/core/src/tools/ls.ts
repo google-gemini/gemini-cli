@@ -73,7 +73,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     params: LSToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -259,7 +259,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
 
   constructor(
     private config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       LSTool.Name,
@@ -300,9 +300,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
         required: ['dir_path'],
         type: 'object',
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
@@ -330,14 +330,14 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
 
   protected createInvocation(
     params: LSToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<LSToolParams, ToolResult> {
     return new LSToolInvocation(
       this.config,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

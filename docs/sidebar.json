@@ -89,6 +89,10 @@
         "slug": "docs/cli/session-management"
       },
       {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
+      },
+      {
         "label": "Settings",
         "slug": "docs/cli/settings"
       },
@@ -115,6 +119,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
