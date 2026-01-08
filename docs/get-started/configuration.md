@@ -851,9 +851,9 @@ their corresponding top-level category object in your `settings.json` file.
     (useful for remote sessions).
   - **Default:** `false`
 
-- **`experimental.introspectionAgentSettings.enabled`** (boolean):
-  - **Description:** Enable the Introspection Agent.
-  - **Default:** `false`
+- **`experimental.cliHelpAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the CLI Help Agent.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `skills`

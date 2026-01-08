@@ -1018,6 +1018,24 @@ const SECRET_PATTERNS = [
 ];
 ```
 
+## Packaging as an extension
+
+While project-level hooks are great for specific repositories, you might want to
+share your hooks across multiple projects or with other users. You can do this
+by packaging your hooks as a [Gemini CLI extension](../extensions/index.md).
+
+Packaging as an extension provides:
+
+- **Easy distribution:** Share hooks via a git repository or GitHub release.
+- **Centralized management:** Install, update, and disable hooks using
+  `gemini extensions` commands.
+- **Version control:** Manage hook versions separately from your project code.
+- **Variable substitution:** Use `${extensionPath}` and `${process.execPath}`
+  for portable, cross-platform scripts.
+
+To package hooks as an extension, follow the
+[extensions hook documentation](../extensions/index.md#hooks).
+
 ## Learn more
 
 - [Hooks Reference](index.md) - Complete API reference and configuration

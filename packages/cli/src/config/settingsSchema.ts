@@ -1453,22 +1453,22 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
       },
-      introspectionAgentSettings: {
+      cliHelpAgentSettings: {
         type: 'object',
-        label: 'Introspection Agent Settings',
+        label: 'CLI Help Agent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
-        description: 'Configuration for Introspection Agent.',
+        description: 'Configuration for CLI Help Agent.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Introspection Agent',
+            label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
-            description: 'Enable the Introspection Agent.',
+            default: true,
+            description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
         },
@@ -2136,8 +2136,10 @@ type InferSettings<T extends SettingsSchema> = {
 
 export type Settings = InferSettings<SettingsSchemaType>;
 
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
 export function getEnableHooks(settings: Settings): boolean {
-  return (
-    (settings.tools?.enableHooks ?? true) && (settings.hooks?.enabled ?? false)
-  );
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
 }

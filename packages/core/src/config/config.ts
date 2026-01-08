@@ -151,7 +151,7 @@ export interface ResolvedExtensionSetting {
   sensitive: boolean;
 }
 
-export interface IntrospectionAgentSettings {
+export interface CliHelpAgentSettings {
   enabled?: boolean;
 }
 
@@ -333,7 +333,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  introspectionAgentSettings?: IntrospectionAgentSettings;
+  cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -344,6 +344,7 @@ export interface ConfigParameters {
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
+  enableHooksUI?: boolean;
   experiments?: Experiments;
   hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
@@ -460,7 +461,7 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
+  private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -470,6 +471,7 @@ export class Config {
   private readonly disableYoloMode: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
+  private readonly enableHooksUI: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
@@ -603,6 +605,7 @@ export class Config {
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? false;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
@@ -618,8 +621,8 @@ export class Config {
         DEFAULT_THINKING_MODE,
       model: params.codebaseInvestigatorSettings?.model,
     };
-    this.introspectionAgentSettings = {
-      enabled: params.introspectionAgentSettings?.enabled ?? false,
+    this.cliHelpAgentSettings = {
+      enabled: params.cliHelpAgentSettings?.enabled ?? true,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1671,12 +1674,16 @@ export class Config {
     return this.enableHooks;
   }
 
+  getEnableHooksUI(): boolean {
+    return this.enableHooksUI;
+  }
+
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
 
-  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
-    return this.introspectionAgentSettings;
+  getCliHelpAgentSettings(): CliHelpAgentSettings {
+    return this.cliHelpAgentSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1747,7 +1754,8 @@ export class Config {
     // Register DelegateToAgentTool if agents are enabled
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled
+      this.getCodebaseInvestigatorSettings().enabled ||
+      this.getCliHelpAgentSettings().enabled
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();

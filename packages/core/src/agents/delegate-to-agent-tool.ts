@@ -12,14 +12,15 @@ import {
   type ToolInvocation,
   type ToolResult,
   BaseToolInvocation,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import type { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import type { AgentInputs } from './types.js';
 
 type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
@@ -166,6 +167,22 @@ class DelegateInvocation extends BaseToolInvocation<
     return `Delegating to agent '${this.params.agent_name}'`;
   }
 
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const definition = this.registry.getDefinition(this.params.agent_name);
+    if (!definition || definition.kind !== 'remote') {
+      return super.shouldConfirmExecute(abortSignal);
+    }
+
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
+    const invocation = this.buildSubInvocation(
+      definition,
+      agentArgs as AgentInputs,
+    );
+    return invocation.shouldConfirmExecute(abortSignal);
+  }
+
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
@@ -173,26 +190,29 @@ class DelegateInvocation extends BaseToolInvocation<
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition) {
       throw new Error(
-        `Agent '${this.params.agent_name}' exists in the tool definition but could not be found in the registry.`,
+        `Agent '${this.params.agent_name}' not found in registry.`,
       );
     }
 
-    // Extract arguments (everything except agent_name)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { agent_name, ...agentArgs } = this.params;
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
+    const invocation = this.buildSubInvocation(
+      definition,
+      agentArgs as AgentInputs,
+    );
 
-    // Delegate the creation of the specific invocation (Local or Remote) to the wrapper.
-    // This centralizes the logic and ensures consistent handling.
+    return invocation.execute(signal, updateOutput);
+  }
+
+  private buildSubInvocation(
+    definition: AgentDefinition,
+    agentArgs: AgentInputs,
+  ): ToolInvocation<AgentInputs, ToolResult> {
     const wrapper = new SubagentToolWrapper(
       definition,
       this.config,
       this.messageBus,
     );
 
-    // We could skip extra validation here if we trust the Registry's schema,
-    // but build() will do a safety check anyway.
-    const invocation = wrapper.build(agentArgs as AgentInputs);
-
-    return invocation.execute(signal, updateOutput);
+    return wrapper.build(agentArgs);
   }
 }

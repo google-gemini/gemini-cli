@@ -209,6 +209,7 @@ describe('AgentRegistry', () => {
       const disabledConfig = makeFakeConfig({
         enableAgents: false,
         codebaseInvestigatorSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
 
@@ -220,26 +221,24 @@ describe('AgentRegistry', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should register introspection agent if enabled', async () => {
-      const config = makeFakeConfig({
-        introspectionAgentSettings: { enabled: true },
-      });
+    it('should register CLI help agent by default', async () => {
+      const config = makeFakeConfig();
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
-      expect(registry.getDefinition('introspection_agent')).toBeDefined();
+      expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
-    it('should NOT register introspection agent if disabled', async () => {
+    it('should NOT register CLI help agent if disabled', async () => {
       const config = makeFakeConfig({
-        introspectionAgentSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       });
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
-      expect(registry.getDefinition('introspection_agent')).toBeUndefined();
+      expect(registry.getDefinition('cli_help')).toBeUndefined();
     });
   });
 
