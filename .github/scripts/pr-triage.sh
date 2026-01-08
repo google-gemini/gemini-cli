@@ -19,15 +19,26 @@ process_pr() {
     local PR_NUMBER=$1
     echo "🔄 Processing PR #${PR_NUMBER}"
 
-    # Get PR details: closing issue and draft status
+    # Get PR details: closing issue, draft status, body and labels
     local PR_DATA
-    if ! PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences,isDraft 2>/dev/null); then
+    if ! PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences,isDraft,body,labels 2>/dev/null); then
         echo "   ⚠️ Could not fetch data for PR #${PR_NUMBER}"
         return 0
     fi
 
     local ISSUE_NUMBER
     ISSUE_NUMBER=$(echo "${PR_DATA}" | jq -r '.closingIssuesReferences[0].number // empty')
+
+    # If no closing issue found, check body for references (e.g. #123)
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        local REFERENCED_ISSUE
+        # Search for # followed by digits, not preceded by alphanumeric chars
+        REFERENCED_ISSUE=$(echo "${PR_DATA}" | jq -r '.body // empty' | grep -oE '(^|[^a-zA-Z0-9])#[0-9]+([^a-zA-Z0-9]|$)' | head -n 1 | grep -oE '[0-9]+' || echo "")
+        if [[ -n "${REFERENCED_ISSUE}" ]]; then
+            ISSUE_NUMBER="${REFERENCED_ISSUE}"
+            echo "🔗 Found referenced issue #${ISSUE_NUMBER} in PR body"
+        fi
+    fi
 
     local IS_DRAFT
     IS_DRAFT=$(echo "${PR_DATA}" | jq -r '.isDraft')
@@ -74,13 +85,10 @@ process_pr() {
             ISSUE_LABELS=$(echo "${gh_output}" | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo "")
         fi
 
-        # Get PR labels
-        echo "📥 Fetching labels from PR #${PR_NUMBER}"
+        # Get PR labels from already fetched PR_DATA
+        echo "📥 Extracting labels from PR #${PR_NUMBER}"
         local PR_LABELS=""
-        if ! PR_LABELS=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo ""); then
-            echo "   ⚠️ Could not fetch PR labels"
-            PR_LABELS=""
-        fi
+        PR_LABELS=$(echo "${PR_DATA}" | jq -r '.labels[].name // empty' | tr '\n' ',' | sed 's/,$//' || echo "")
 
         echo "   Issue labels (area/priority): ${ISSUE_LABELS}"
         echo "   PR labels: ${PR_LABELS}"

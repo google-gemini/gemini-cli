@@ -258,6 +258,128 @@ describe('HookEventHandler', () => {
         expect.stringContaining('F12'),
       );
     });
+
+    it('should fire BeforeTool event with MCP context when provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const mcpContext = {
+        server_name: 'my-mcp-server',
+        tool_name: 'read_file',
+        command: 'npx',
+        args: ['-y', '@my-org/mcp-server'],
+      };
+
+      const result = await hookEventHandler.fireBeforeToolEvent(
+        'my-mcp-server__read_file',
+        { path: '/etc/passwd' },
+        mcpContext,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.BeforeTool,
+        expect.objectContaining({
+          session_id: 'test-session',
+          cwd: '/test/project',
+          hook_event_name: 'BeforeTool',
+          tool_name: 'my-mcp-server__read_file',
+          tool_input: { path: '/etc/passwd' },
+          mcp_context: mcpContext,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
+
+    it('should not include mcp_context when not provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireBeforeToolEvent('EditTool', {
+        file: 'test.txt',
+      });
+
+      const callArgs = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][2];
+      expect(callArgs).not.toHaveProperty('mcp_context');
+    });
   });
 
   describe('fireAfterToolEvent', () => {
@@ -318,6 +440,78 @@ describe('HookEventHandler', () => {
           tool_name: 'EditTool',
           tool_input: toolInput,
           tool_response: toolResponse,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
+
+    it('should fire AfterTool event with MCP context when provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const toolInput = { path: '/etc/passwd' };
+      const toolResponse = { success: true, content: 'File content' };
+      const mcpContext = {
+        server_name: 'my-mcp-server',
+        tool_name: 'read_file',
+        url: 'https://mcp.example.com',
+      };
+
+      const result = await hookEventHandler.fireAfterToolEvent(
+        'my-mcp-server__read_file',
+        toolInput,
+        toolResponse,
+        mcpContext,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterTool,
+        expect.objectContaining({
+          tool_name: 'my-mcp-server__read_file',
+          tool_input: toolInput,
+          tool_response: toolResponse,
+          mcp_context: mcpContext,
         }),
         expect.any(Function),
         expect.any(Function),

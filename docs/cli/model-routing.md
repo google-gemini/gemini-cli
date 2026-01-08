@@ -1,4 +1,4 @@
-## Model routing
+# Model routing
 
 Gemini CLI includes a model routing feature that automatically switches to a
 fallback model in case of a model failure. This feature is enabled by default
