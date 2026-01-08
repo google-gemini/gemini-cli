@@ -29,6 +29,7 @@ import type {
   SessionEndReason,
   PreCompressTrigger,
   HookExecutionResult,
+  McpToolContext,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -58,9 +59,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function validateBeforeToolInput(input: Record<string, unknown>): {
   toolName: string;
   toolInput: Record<string, unknown>;
+  mcpContext?: McpToolContext;
 } {
   const toolName = input['tool_name'];
   const toolInput = input['tool_input'];
+  const mcpContext = input['mcp_context'];
   if (typeof toolName !== 'string') {
     throw new Error(
       'Invalid input for BeforeTool hook event: tool_name must be a string',
@@ -71,7 +74,16 @@ function validateBeforeToolInput(input: Record<string, unknown>): {
       'Invalid input for BeforeTool hook event: tool_input must be an object',
     );
   }
-  return { toolName, toolInput };
+  if (mcpContext !== undefined && !isObject(mcpContext)) {
+    throw new Error(
+      'Invalid input for BeforeTool hook event: mcp_context must be an object',
+    );
+  }
+  return {
+    toolName,
+    toolInput,
+    mcpContext: mcpContext as McpToolContext | undefined,
+  };
 }
 
 /**
@@ -81,10 +93,12 @@ function validateAfterToolInput(input: Record<string, unknown>): {
   toolName: string;
   toolInput: Record<string, unknown>;
   toolResponse: Record<string, unknown>;
+  mcpContext?: McpToolContext;
 } {
   const toolName = input['tool_name'];
   const toolInput = input['tool_input'];
   const toolResponse = input['tool_response'];
+  const mcpContext = input['mcp_context'];
   if (typeof toolName !== 'string') {
     throw new Error(
       'Invalid input for AfterTool hook event: tool_name must be a string',
@@ -100,7 +114,17 @@ function validateAfterToolInput(input: Record<string, unknown>): {
       'Invalid input for AfterTool hook event: tool_response must be an object',
     );
   }
-  return { toolName, toolInput, toolResponse };
+  if (mcpContext !== undefined && !isObject(mcpContext)) {
+    throw new Error(
+      'Invalid input for AfterTool hook event: mcp_context must be an object',
+    );
+  }
+  return {
+    toolName,
+    toolInput,
+    toolResponse,
+    mcpContext: mcpContext as McpToolContext | undefined,
+  };
 }
 
 /**
@@ -313,11 +337,13 @@ export class HookEventHandler {
   async fireBeforeToolEvent(
     toolName: string,
     toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
   ): Promise<AggregatedHookResult> {
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
       tool_input: toolInput,
+      ...(mcpContext && { mcp_context: mcpContext }),
     };
 
     const context: HookEventContext = { toolName };
@@ -332,12 +358,14 @@ export class HookEventHandler {
     toolName: string,
     toolInput: Record<string, unknown>,
     toolResponse: Record<string, unknown>,
+    mcpContext?: McpToolContext,
   ): Promise<AggregatedHookResult> {
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
       tool_name: toolName,
       tool_input: toolInput,
       tool_response: toolResponse,
+      ...(mcpContext && { mcp_context: mcpContext }),
     };
 
     const context: HookEventContext = { toolName };
@@ -725,18 +753,23 @@ export class HookEventHandler {
       // Route to appropriate event handler based on eventName
       switch (request.eventName) {
         case HookEventName.BeforeTool: {
-          const { toolName, toolInput } =
+          const { toolName, toolInput, mcpContext } =
             validateBeforeToolInput(enrichedInput);
-          result = await this.fireBeforeToolEvent(toolName, toolInput);
+          result = await this.fireBeforeToolEvent(
+            toolName,
+            toolInput,
+            mcpContext,
+          );
           break;
         }
         case HookEventName.AfterTool: {
-          const { toolName, toolInput, toolResponse } =
+          const { toolName, toolInput, toolResponse, mcpContext } =
             validateAfterToolInput(enrichedInput);
           result = await this.fireAfterToolEvent(
             toolName,
             toolInput,
             toolResponse,
+            mcpContext,
           );
           break;
         }
