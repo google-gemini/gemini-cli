@@ -338,6 +338,152 @@ describe('createContentGenerator', () => {
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
+
+  it('should pass apiVersion to GoogleGenAI when GOOGLE_GENAI_API_VERSION is set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GENAI_API_VERSION', 'v1');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+      apiVersion: 'v1',
+    });
+  });
+
+  it('should not include apiVersion when GOOGLE_GENAI_API_VERSION is not set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+    });
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        apiVersion: expect.any(String),
+      }),
+    );
+  });
+
+  it('should not include apiVersion when GOOGLE_GENAI_API_VERSION is an empty string', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GENAI_API_VERSION', '');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+    });
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        apiVersion: expect.any(String),
+      }),
+    );
+  });
+
+  it('should pass apiVersion for Vertex AI when GOOGLE_GENAI_API_VERSION is set', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GENAI_API_VERSION', 'v1alpha');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        vertexai: true,
+        authType: AuthType.USE_VERTEX_AI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: true,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+        }),
+      },
+      apiVersion: 'v1alpha',
+    });
+  });
 });
 
 describe('createContentGeneratorConfig', () => {
