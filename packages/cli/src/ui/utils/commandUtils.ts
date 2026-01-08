@@ -72,7 +72,7 @@ const pickTty = (): TtyTarget => {
     try {
       const devTty = fs.createWriteStream('/dev/tty');
       // Prevent unhandled 'error' events from crashing the process.
-      // Must be attached immediately to catch synchronous errors.
+// It must be attached immediately to handle async errors emitted upon creation.
       devTty.on('error', () => {});
       return { stream: devTty, closeAfter: true };
     } catch {
