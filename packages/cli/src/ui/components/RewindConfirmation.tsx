@@ -91,7 +91,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
         >
           <Text color={theme.text.primary}>
             {stats.fileCount === 1
-              ? `File: ${stats.firstFileName}`
+              ? `File: ${stats.details?.at(0)?.fileName}`
               : `${stats.fileCount} files affected`}
           </Text>
           <Box flexDirection="row">
