@@ -2798,4 +2798,122 @@ describe('useGeminiStream', () => {
       });
     });
   });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event with systemMessage', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: {
+              reason: 'hook-reason',
+              systemMessage: 'Custom stop message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Custom stop message',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionStopped event by falling back to reason when systemMessage is missing', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: { reason: 'Stopped by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Stopped by hook',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event with systemMessage', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: {
+              reason: 'hook-reason',
+              systemMessage: 'Custom block message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Custom block message',
+          },
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event by falling back to reason when systemMessage is missing', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: { reason: 'Blocked by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Blocked by hook',
+          },
+          expect.any(Number),
+        );
+      });
+    });
+  });
 });

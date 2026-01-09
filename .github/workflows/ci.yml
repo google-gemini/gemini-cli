@@ -50,6 +50,8 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    env:
+      GEMINI_LINT_TEMP_DIR: '${{ github.workspace }}/.gemini-linters'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -63,8 +65,20 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'Cache Linters'
+        uses: 'actions/cache@v4'
+        with:
+          path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
+          key: "${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles('scripts/lint.js') }}"
+
       - name: 'Install dependencies'
         run: 'npm ci'
+
+      - name: 'Cache ESLint'
+        uses: 'actions/cache@v4'
+        with:
+          path: '.eslintcache'
+          key: "${{ runner.os }}-eslint-${{ hashFiles('package-lock.json', 'eslint.config.js') }}"
 
       - name: 'Validate NOTICES.txt'
         run: 'git diff --exit-code packages/vscode-ide-companion/NOTICES.txt'
@@ -111,10 +125,9 @@ jobs:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
   test_linux:
-    name: 'Test (Linux)'
+    name: 'Test (Linux) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
-      - 'lint'
       - 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
@@ -127,6 +140,9 @@ jobs:
           - '20.x'
           - '22.x'
           - '24.x'
+        shard:
+          - 'cli'
+          - 'others'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -146,7 +162,14 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npm run test:ci'
+        run: |
+          if [[ "${{ matrix.shard }}" == "cli" ]]; then
+            npm run test:ci --workspace @google/gemini-cli
+          else
+            # Explicitly list non-cli packages to ensure they are sharded correctly
+            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present
+            npm run test:scripts
+          fi
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -162,7 +185,7 @@ jobs:
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          name: 'Test Results (Node ${{ matrix.node-version }})'
+          name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
           path: 'packages/*/junit.xml'
           reporter: 'java-junit'
           fail-on-error: 'false'
@@ -172,14 +195,13 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
+          name: 'test-results-fork-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
           path: 'packages/*/junit.xml'
 
   test_mac:
-    name: 'Test (Mac)'
-    runs-on: '${{ matrix.os }}'
+    name: 'Test (Mac) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
+    runs-on: 'macos-latest'
     needs:
-      - 'lint'
       - 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
@@ -189,12 +211,13 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        os:
-          - 'macos-latest'
         node-version:
           - '20.x'
           - '22.x'
           - '24.x'
+        shard:
+          - 'cli'
+          - 'others'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -214,7 +237,14 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npm run test:ci -- --coverage.enabled=false'
+        run: |
+          if [[ "${{ matrix.shard }}" == "cli" ]]; then
+            npm run test:ci --workspace @google/gemini-cli -- --coverage.enabled=false
+          else
+            # Explicitly list non-cli packages to ensure they are sharded correctly
+            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:scripts
+          fi
 
       - name: 'Bundle'
         run: 'npm run bundle'
@@ -230,7 +260,7 @@ jobs:
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          name: 'Test Results (Node ${{ matrix.node-version }})'
+          name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
           path: 'packages/*/junit.xml'
           reporter: 'java-junit'
           fail-on-error: 'false'
@@ -240,7 +270,7 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
+          name: 'test-results-fork-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
           path: 'packages/*/junit.xml'
 
       - name: 'Upload coverage reports'
@@ -248,7 +278,7 @@ jobs:
           ${{ always() }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
+          name: 'coverage-reports-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
           path: 'packages/*/coverage'
 
   codeql:

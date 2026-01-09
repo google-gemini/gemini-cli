@@ -19,24 +19,51 @@ process_pr() {
     local PR_NUMBER=$1
     echo "🔄 Processing PR #${PR_NUMBER}"
 
-    # Get closing issue number with error handling
-    local ISSUE_NUMBER
-    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null); then
-        echo "   ⚠️ Could not fetch closing issue for PR #${PR_NUMBER}"
+    # Get PR details: closing issue, draft status, body and labels
+    local PR_DATA
+    if ! PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences,isDraft,body,labels 2>/dev/null); then
+        echo "   ⚠️ Could not fetch data for PR #${PR_NUMBER}"
+        return 0
     fi
 
+    local ISSUE_NUMBER
+    ISSUE_NUMBER=$(echo "${PR_DATA}" | jq -r '.closingIssuesReferences[0].number // empty')
+
+    # If no closing issue found, check body for references (e.g. #123)
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
-        if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
-            echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
+        local REFERENCED_ISSUE
+        # Search for # followed by digits, not preceded by alphanumeric chars
+        REFERENCED_ISSUE=$(echo "${PR_DATA}" | jq -r '.body // empty' | grep -oE '(^|[^a-zA-Z0-9])#[0-9]+([^a-zA-Z0-9]|$)' | head -n 1 | grep -oE '[0-9]+' || echo "")
+        if [[ -n "${REFERENCED_ISSUE}" ]]; then
+            ISSUE_NUMBER="${REFERENCED_ISSUE}"
+            echo "🔗 Found referenced issue #${ISSUE_NUMBER} in PR body"
         fi
-        # Add PR number to the list
-        if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
-            PRS_NEEDING_COMMENT="${PR_NUMBER}"
+    fi
+
+    local IS_DRAFT
+    IS_DRAFT=$(echo "${PR_DATA}" | jq -r '.isDraft')
+
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        if [[ "${IS_DRAFT}" == "true" ]]; then
+            echo "📝 PR #${PR_NUMBER} is a draft and has no linked issue, skipping status/need-issue label"
+            # Remove status/need-issue label if it was previously added
+            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --remove-label "status/need-issue" 2>/dev/null; then
+                echo "   status/need-issue label not present or could not be removed"
+            fi
+            echo "needs_comment=false" >> "${GITHUB_OUTPUT}"
         else
-            PRS_NEEDING_COMMENT="${PRS_NEEDING_COMMENT},${PR_NUMBER}"
+            echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
+            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
+                echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
+            fi
+            # Add PR number to the list
+            if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
+                PRS_NEEDING_COMMENT="${PR_NUMBER}"
+            else
+                PRS_NEEDING_COMMENT="${PRS_NEEDING_COMMENT},${PR_NUMBER}"
+            fi
+            echo "needs_comment=true" >> "${GITHUB_OUTPUT}"
         fi
-        echo "needs_comment=true" >> "${GITHUB_OUTPUT}"
     else
         echo "🔗 Found linked issue #${ISSUE_NUMBER}"
 
@@ -46,33 +73,35 @@ process_pr() {
         fi
 
         # Get issue labels
-        echo "📥 Fetching labels from issue #${ISSUE_NUMBER}"
+        echo "📥 Fetching area and priority labels from issue #${ISSUE_NUMBER}"
         local ISSUE_LABELS=""
-        if ! ISSUE_LABELS=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo ""); then
+        local gh_output
+        if ! gh_output=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null); then
             echo "   ⚠️ Could not fetch issue #${ISSUE_NUMBER} (may not exist or be in different repo)"
             ISSUE_LABELS=""
+        else
+            # If grep finds no matches, it exits with 1, which pipefail would treat as an error.
+            # `|| echo ""` ensures the command succeeds with an empty string in that case.
+            ISSUE_LABELS=$(echo "${gh_output}" | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo "")
         fi
 
-        # Get PR labels
-        echo "📥 Fetching labels from PR #${PR_NUMBER}"
+        # Get PR labels from already fetched PR_DATA
+        echo "📥 Extracting labels from PR #${PR_NUMBER}"
         local PR_LABELS=""
-        if ! PR_LABELS=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo ""); then
-            echo "   ⚠️ Could not fetch PR labels"
-            PR_LABELS=""
-        fi
+        PR_LABELS=$(echo "${PR_DATA}" | jq -r '.labels[].name // empty' | tr '\n' ',' | sed 's/,$//' || echo "")
 
-        echo "   Issue labels: ${ISSUE_LABELS}"
+        echo "   Issue labels (area/priority): ${ISSUE_LABELS}"
         echo "   PR labels: ${PR_LABELS}"
 
         # Convert comma-separated strings to arrays
         local ISSUE_LABEL_ARRAY PR_LABEL_ARRAY
         IFS=',' read -ra ISSUE_LABEL_ARRAY <<< "${ISSUE_LABELS}"
-        IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS}"
+        IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS:-}"
 
         # Find labels to add (on issue but not on PR)
         local LABELS_TO_ADD=""
         for label in "${ISSUE_LABEL_ARRAY[@]}"; do
-            if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]} " != *" ${label} "* ]]; then
+            if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]:-}" != *" ${label} "* ]]; then
                 if [[ -z "${LABELS_TO_ADD}" ]]; then
                     LABELS_TO_ADD="${label}"
                 else
