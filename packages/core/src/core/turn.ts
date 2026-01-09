@@ -264,6 +264,22 @@ export class Turn {
           continue; // Skip to the next event in the stream
         }
 
+        if (streamEvent.type === 'agent_execution_stopped') {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: { reason: streamEvent.reason },
+          };
+          return;
+        }
+
+        if (streamEvent.type === 'agent_execution_blocked') {
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: { reason: streamEvent.reason },
+          };
+          continue;
+        }
+
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
