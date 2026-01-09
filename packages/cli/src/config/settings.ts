@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir, platform } from 'node:os';
+import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -16,6 +16,7 @@ import {
   getErrorMessage,
   Storage,
   coreEvents,
+  homedir,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -91,6 +92,7 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
+  experimentalSkills: 'experimental.skills',
   extensionManagement: 'experimental.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
@@ -423,6 +425,24 @@ export function migrateSettingsToV1(
   return v1Settings;
 }
 
+export function getDefaultsFromSchema(
+  schema: SettingsSchema = getSettingsSchema(),
+): Settings {
+  const defaults: Record<string, unknown> = {};
+  for (const key in schema) {
+    const definition = schema[key];
+    if (definition.properties) {
+      const childDefaults = getDefaultsFromSchema(definition.properties);
+      if (Object.keys(childDefaults).length > 0) {
+        defaults[key] = childDefaults;
+      }
+    } else if (definition.default !== undefined) {
+      defaults[key] = definition.default;
+    }
+  }
+  return defaults as Settings;
+}
+
 function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -431,16 +451,18 @@ function mergeSettings(
   isTrusted: boolean,
 ): Settings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+  const schemaDefaults = getDefaultsFromSchema();
 
   // Settings are merged with the following precedence (last one wins for
   // single values):
-  // 1. System Defaults
-  // 2. User Settings
-  // 3. Workspace Settings
-  // 4. System Settings (as overrides)
+  // 1. Schema Defaults (Built-in)
+  // 2. System Defaults
+  // 3. User Settings
+  // 4. Workspace Settings
+  // 5. System Settings (as overrides)
   return customDeepMerge(
     getMergeStrategyForPath,
-    {}, // Start with an empty object
+    schemaDefaults,
     systemDefaults,
     user,
     safeWorkspace,
@@ -513,6 +535,7 @@ export class LoadedSettings {
     setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
+    coreEvents.emitSettingsChanged();
   }
 }
 

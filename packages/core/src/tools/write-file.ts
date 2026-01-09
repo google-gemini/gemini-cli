@@ -149,7 +149,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -346,9 +346,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const displayResult: FileDiff = {
         fileDiff,
         fileName,
+        filePath: this.resolvedPath,
         originalContent: correctedContentResult.originalContent,
         newContent: correctedContentResult.correctedContent,
         diffStat,
+        isNewFile,
       };
 
       return {
@@ -409,7 +411,7 @@ export class WriteFileTool
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       WriteFileTool.Name,
@@ -432,9 +434,9 @@ export class WriteFileTool
         required: ['file_path', 'content'],
         type: 'object',
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
@@ -475,11 +477,12 @@ export class WriteFileTool
 
   protected createInvocation(
     params: WriteFileToolParams,
+    messageBus: MessageBus,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
     return new WriteFileToolInvocation(
       this.config,
       params,
-      this.messageBus,
+      messageBus ?? this.messageBus,
       this.name,
       this.displayName,
     );

@@ -38,6 +38,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
@@ -46,6 +47,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { HookSystem } from '../hooks/hookSystem.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 
 vi.mock('../services/chatCompressionService.js');
@@ -251,7 +253,6 @@ describe('Gemini Client (client.ts)', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
-      getUseSmartEdit: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
@@ -397,6 +398,10 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
         getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversation: vi.fn().mockReturnValue(null),
+          getConversationFilePath: vi.fn().mockReturnValue(null),
+        }),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
 
@@ -616,6 +621,34 @@ describe('Gemini Client (client.ts)', () => {
         originalTokenCount: 50,
         newTokenCount: 50,
       });
+    });
+
+    it('should resume the session file when compression succeeds', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockConversation = { some: 'conversation' };
+      const mockFilePath = '/tmp/session.json';
+
+      // Override the mock to return values
+      const mockRecordingService = {
+        getConversation: vi.fn().mockReturnValue(mockConversation),
+        getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+      };
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue(
+        mockRecordingService as unknown as ChatRecordingService,
+      );
+
+      await client.tryCompressChat('prompt-id', false);
+
+      expect(client['startChat']).toHaveBeenCalledWith(
+        expect.anything(), // newHistory
+        {
+          conversation: mockConversation,
+          filePath: mockFilePath,
+        },
+      );
     });
   });
 
@@ -2781,6 +2814,136 @@ ${JSON.stringify(
 
         expect(client['hookStateMap'].has('old-id')).toBe(false);
         expect(client['hookStateMap'].has('new-id')).toBe(true);
+      });
+
+      it('should stop execution in BeforeAgent when hook returns continue: false', async () => {
+        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped by hook',
+        } as DefaultHookOutput);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const request = [{ text: 'Hello' }];
+        const stream = client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        });
+        expect(mockChat.addHistory).toHaveBeenCalledWith({
+          role: 'user',
+          parts: request,
+        });
+        expect(mockTurnRunFn).not.toHaveBeenCalled();
+      });
+
+      it('should block execution in BeforeAgent when hook returns decision: block', async () => {
+        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => true,
+          getEffectiveReason: () => 'Blocked by hook',
+        } as DefaultHookOutput);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const request = [{ text: 'Hello' }];
+        const stream = client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: {
+            reason: 'Blocked by hook',
+          },
+        });
+        expect(mockChat.addHistory).not.toHaveBeenCalled();
+        expect(mockTurnRunFn).not.toHaveBeenCalled();
+      });
+
+      it('should stop execution in AfterAgent when hook returns continue: false', async () => {
+        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireAfterAgentHook).mockResolvedValue({
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped after agent',
+        } as DefaultHookOutput);
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Hello' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped after agent' },
+        });
+        // sendMessageStream should not recurse
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+      });
+
+      it('should yield AgentExecutionBlocked and recurse in AfterAgent when hook returns decision: block', async () => {
+        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
+        vi.mocked(fireAfterAgentHook)
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Please explain',
+          } as DefaultHookOutput)
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+          } as DefaultHookOutput);
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Please explain' },
+        });
+        // Should have called turn run twice (original + re-prompt)
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Please explain' }],
+          expect.anything(),
+        );
       });
     });
   });
