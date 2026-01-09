@@ -1534,6 +1534,29 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  agents: {
+    type: 'object',
+    label: 'Agents',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for agents.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Agents',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled agents.',
+        showInDialog: false,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
+      },
+    },
+  },
+
   hooks: {
     type: 'object',
     label: 'Hooks',

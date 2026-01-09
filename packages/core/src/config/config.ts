@@ -354,11 +354,15 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
+  disabledAgents?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
-  onReload?: () => Promise<{ disabledSkills?: string[] }>;
+  onReload?: () => Promise<{
+    disabledSkills?: string[];
+    disabledAgents?: string[];
+  }>;
 }
 
 export class Config {
@@ -486,12 +490,16 @@ export class Config {
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
-    | (() => Promise<{ disabledSkills?: string[] }>)
+    | (() => Promise<{
+        disabledSkills?: string[];
+        disabledAgents?: string[];
+      }>)
     | undefined;
 
   private readonly enableAgents: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
+  private disabledAgents: string[];
 
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
@@ -564,6 +572,7 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
+    this.disabledAgents = params.disabledAgents ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
@@ -1573,6 +1582,22 @@ export class Config {
     await this.updateSystemInstructionIfInitialized();
   }
 
+  /**
+   * Reloads agents by re-discovering them.
+   */
+  async reloadAgents(): Promise<void> {
+    if (!this.enableAgents) {
+      return;
+    }
+
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      this.disabledAgents = refreshed.disabledAgents ?? [];
+    }
+
+    await this.agentRegistry.initialize();
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -1812,6 +1837,13 @@ export class Config {
    */
   getDisabledHooks(): string[] {
     return this.disabledHooks;
+  }
+
+  /**
+   * Get disabled agents list
+   */
+  getDisabledAgents(): string[] {
+    return this.disabledAgents;
   }
 
   /**

@@ -46,6 +46,7 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
+    this.agents.clear();
     this.loadBuiltInAgents();
 
     coreEvents.on(CoreEvent.ModelChanged, () => {
@@ -185,6 +186,15 @@ export class AgentRegistry {
       return;
     }
 
+    if (this.config.getDisabledAgents().includes(definition.name)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
     // Basic validation
     if (!definition.name || !definition.description) {
       debugLogger.warn(
@@ -248,6 +258,15 @@ export class AgentRegistry {
     definition: AgentDefinition<TOutput>,
   ): Promise<void> {
     if (definition.kind !== 'remote') {
+      return;
+    }
+
+    if (this.config.getDisabledAgents().includes(definition.name)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
       return;
     }
 

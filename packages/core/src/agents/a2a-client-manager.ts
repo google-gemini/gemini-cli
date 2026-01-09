@@ -64,8 +64,8 @@ export class A2AClientManager {
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
-    if (this.clients.has(name)) {
-      throw new Error(`Agent with name '${name}' is already loaded.`);
+    if (this.clients.has(name) && this.agentCards.has(name)) {
+      return this.agentCards.get(name)!;
     }
 
     let fetchImpl: typeof fetch = fetch;
