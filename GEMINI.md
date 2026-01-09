@@ -81,6 +81,14 @@ tests, aim to follow existing patterns. Key conventions include:
 
 The main branch for this project is called "main"
 
+### Creating Pull Requests
+
+When asked to create a pull request, always search for and read the repository's
+pull request template (typically found in `.github/pull_request_template.md`).
+Ensure the PR description follows the structure and requirements defined in the
+template. If the template includes a checklist, ensure it is accurately
+reflected in the PR body.
+
 ## JavaScript/TypeScript
 
 When contributing to this React, Node, and TypeScript codebase, please
