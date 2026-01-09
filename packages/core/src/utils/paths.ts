@@ -9,6 +9,11 @@ import os from 'node:os';
 import process from 'node:process';
 import * as crypto from 'node:crypto';
 
+/**
+ * Utility functions for path manipulation and OS-specific directory resolution.
+ * Consolidated to ensure consistent behavior across the CLI.
+ */
+
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 
