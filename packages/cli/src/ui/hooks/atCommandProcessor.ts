@@ -155,6 +155,7 @@ export async function handleAtCommand({
   const pathSpecsToRead: string[] = [];
   const resourceAttachments: DiscoveredMCPResource[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
+  const agentsFound: string[] = [];
   const fileLabelsForDisplay: string[] = [];
   const absoluteToRelativePathMap = new Map<string, string>();
   const ignoredByReason: Record<string, string[]> = {
@@ -206,6 +207,14 @@ export async function handleAtCommand({
       // Decide if this is a fatal error for the whole command or just skip this @ part
       // For now, let's be strict and fail the command if one @path is malformed.
       return { processedQuery: null, error: errMsg };
+    }
+
+    // Check if this is an Agent reference
+    const agentRegistry = config.getAgentRegistry?.();
+    if (agentRegistry?.getDefinition(pathName)) {
+      agentsFound.push(pathName);
+      atPathToResolvedSpecMap.set(originalAtPath, pathName);
+      continue;
     }
 
     // Check if this is an MCP resource reference (serverName:uri format)
@@ -420,7 +429,11 @@ export async function handleAtCommand({
   }
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-  if (pathSpecsToRead.length === 0 && resourceAttachments.length === 0) {
+  if (
+    pathSpecsToRead.length === 0 &&
+    resourceAttachments.length === 0 &&
+    agentsFound.length === 0
+  ) {
     onDebugMessage('No valid file paths found in @ commands to read.');
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
@@ -434,6 +447,13 @@ export async function handleAtCommand({
   }
 
   const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
+
+  if (agentsFound.length > 0) {
+    const agentNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentsFound.join(
+      ', ',
+    )}. Please use the 'delegate_to_agent' tool to delegate the task to the selected agent(s).\n</system_note>\n`;
+    processedQueryParts.push({ text: agentNudge });
+  }
 
   const resourcePromises = resourceAttachments.map(async (resource) => {
     const uri = resource.uri;
