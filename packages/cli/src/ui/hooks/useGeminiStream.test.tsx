@@ -3018,6 +3018,136 @@ describe('useGeminiStream', () => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
     });
+
+    it('should await retry submitQuery when user disables loop detection (race condition fix)', async () => {
+      // This tests the fix for the race condition where the retry submitQuery was
+      // called fire-and-forget after user clicked "disable" in the loop detection dialog.
+      // Since streamingState was Idle at that point, the guard at line 946 didn't block
+      // concurrent requests, allowing user prompts to race with the retry.
+      // See: https://github.com/google-gemini/gemini-cli/issues/16144 (related)
+
+      const mockLoopDetectionService = {
+        disableForSession: vi.fn(),
+      };
+      const mockClient = {
+        ...new MockedGeminiClientClass(mockConfig),
+        getLoopDetectionService: () => mockLoopDetectionService,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+      // Track request order and timing
+      const requestOrder: string[] = [];
+      let resolveRetryPromise: () => void;
+      const retryPromise = new Promise<void>((resolve) => {
+        resolveRetryPromise = resolve;
+      });
+
+      // First call: returns LoopDetected
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('first-request:start');
+        return (async function* () {
+          requestOrder.push('first-request:loopdetected');
+          yield { type: ServerGeminiEventType.LoopDetected };
+        })();
+      });
+
+      // Second call: retry after user clicks "disable" - this is slow
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('retry-request:start');
+        return (async function* () {
+          await retryPromise; // Wait until we explicitly resolve
+          requestOrder.push('retry-request:finished');
+          yield { type: ServerGeminiEventType.Content, value: 'Retry success' };
+          yield { type: ServerGeminiEventType.Finished, text: '' };
+        })();
+      });
+
+      // Third call: user's new prompt (should be blocked/queued)
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('user-prompt:start');
+        return (async function* () {
+          requestOrder.push('user-prompt:finished');
+          yield { type: ServerGeminiEventType.Content, value: 'New prompt' };
+          yield { type: ServerGeminiEventType.Finished, text: '' };
+        })();
+      });
+
+      const { result } = renderTestHook();
+
+      // Send first query that triggers loop detection
+      await act(async () => {
+        await result.current.submitQuery('original query');
+      });
+
+      // Wait for loop detection confirmation request
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // At this point, streamingState should be Idle (which is the bug!)
+      // The fix should ensure streamingState stays Responding during retry
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+
+      // User clicks "disable" - this triggers the retry
+      // Start the completion promise but don't await it yet
+      const completionPromise = act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'disable',
+        });
+      });
+
+      // Give time for retry to start but NOT complete
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Verify retry has started
+      expect(requestOrder).toContain('retry-request:start');
+      // Verify retry has NOT finished
+      expect(requestOrder).not.toContain('retry-request:finished');
+
+      // Try to send a new user prompt while retry is in progress
+      // This simulates a fast user typing immediately after clicking "disable"
+      const userPromptPromise = act(async () => {
+        await result.current.submitQuery('new user prompt');
+      });
+
+      // Give time for the user prompt to potentially start
+      await new Promise((r) => setTimeout(r, 10));
+
+      // THE FIX: After awaiting submitQuery in onComplete:
+      // - streamingState should be Responding during retry
+      // - The guard at line 946 should block the user prompt
+      // - User prompt should NOT start until retry finishes
+
+      // BEFORE FIX: Both retry and user prompt would be racing
+      // AFTER FIX: User prompt waits for retry to complete
+
+      // Now resolve the retry
+      resolveRetryPromise!();
+
+      // Wait for everything to complete
+      await completionPromise;
+      await userPromptPromise;
+
+      // Verify the correct order: retry must complete before user prompt starts
+      await waitFor(() => {
+        expect(requestOrder).toContain('retry-request:finished');
+      });
+
+      // Check that retry finished BEFORE user prompt started
+      // (This is the assertion that will fail on buggy code)
+      const retryFinishIndex = requestOrder.indexOf('retry-request:finished');
+      const userPromptStartIndex = requestOrder.indexOf('user-prompt:start');
+
+      // If user-prompt was properly blocked, either:
+      // 1. It started after retry finished (retryFinishIndex < userPromptStartIndex)
+      // 2. Or it was dropped entirely (userPromptStartIndex === -1)
+      if (userPromptStartIndex !== -1) {
+        expect(retryFinishIndex).toBeLessThan(userPromptStartIndex);
+      }
+
+      // Clean up mock implementations to not affect subsequent tests
+      mockSendMessageStream.mockReset();
+    });
   });
 
   describe('Agent Execution Events', () => {

@@ -117,6 +117,8 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  // Ref for synchronous blocking of concurrent queries (React state updates are batched)
+  const isRespondingRef = useRef<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -215,8 +217,10 @@ export const useGeminiStream = (
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
+    isRespondingRef.current = true;
     await done;
     setIsResponding(false);
+    isRespondingRef.current = false;
   }, []);
   const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
     useShellCommandProcessor(
@@ -251,6 +255,7 @@ export const useGeminiStream = (
         Date.now(),
       );
       setIsResponding(false);
+      isRespondingRef.current = false;
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
   }, [activeShellPtyId, addItem]);
@@ -374,6 +379,7 @@ export const useGeminiStream = (
           Date.now(),
         );
         setIsResponding(false);
+        isRespondingRef.current = false;
       }
     }
 
@@ -617,6 +623,7 @@ export const useGeminiStream = (
         userMessageTimestamp,
       );
       setIsResponding(false);
+      isRespondingRef.current = false;
       setThought(null); // Reset thought when user cancels
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, setThought],
@@ -807,6 +814,7 @@ export const useGeminiStream = (
         userMessageTimestamp,
       );
       setIsResponding(false);
+      isRespondingRef.current = false;
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
   );
@@ -942,9 +950,12 @@ export const useGeminiStream = (
           spanMetadata.input = query;
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
+          // Block concurrent non-continuation queries using both state and ref
+          // (ref provides synchronous check since React state updates are batched)
           if (
             (streamingState === StreamingState.Responding ||
-              streamingState === StreamingState.WaitingForConfirmation) &&
+              streamingState === StreamingState.WaitingForConfirmation ||
+              isRespondingRef.current) &&
             !options?.isContinuation
           )
             return;
@@ -995,6 +1006,7 @@ export const useGeminiStream = (
             }
 
             setIsResponding(true);
+            isRespondingRef.current = true;
             setInitError(null);
 
             // Store query and prompt_id for potential retry on loop detection
@@ -1025,7 +1037,7 @@ export const useGeminiStream = (
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
                 setLoopDetectionConfirmationRequest({
-                  onComplete: (result: {
+                  onComplete: async (result: {
                     userSelection: 'disable' | 'keep';
                   }) => {
                     setLoopDetectionConfirmationRequest(null);
@@ -1044,8 +1056,9 @@ export const useGeminiStream = (
                       );
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                        submitQuery(
+                        // Await submitQuery to ensure retry completes before user can send another prompt
+                        // This prevents race conditions where user prompts could race with retry
+                        await submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
@@ -1085,6 +1098,7 @@ export const useGeminiStream = (
             } finally {
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
+                isRespondingRef.current = false;
               }
             }
           });
@@ -1228,6 +1242,7 @@ export const useGeminiStream = (
           Date.now(),
         );
         setIsResponding(false);
+        isRespondingRef.current = false;
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
           (toolCall) => toolCall.request.callId,
@@ -1254,6 +1269,7 @@ export const useGeminiStream = (
           );
         }
         setIsResponding(false);
+        isRespondingRef.current = false;
 
         if (geminiClient) {
           // We need to manually add the function responses to the history
