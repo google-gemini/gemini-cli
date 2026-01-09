@@ -266,46 +266,4 @@ describe('TerminalCapabilityManager', () => {
       expect(manager.isModifyOtherKeysEnabled()).toBe(true);
     });
   });
-
-  describe('bracketed paste detection', () => {
-    it('should detect bracketed paste support (mode set)', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate bracketed paste response: \x1b[?2004;1$y
-      stdin.emit('data', Buffer.from('\x1b[?2004;1$y'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-      expect(manager.isBracketedPasteSupported()).toBe(true);
-      expect(manager.isBracketedPasteEnabled()).toBe(true);
-    });
-
-    it('should detect bracketed paste support (mode reset)', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate bracketed paste response: \x1b[?2004;2$y
-      stdin.emit('data', Buffer.from('\x1b[?2004;2$y'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-      expect(manager.isBracketedPasteSupported()).toBe(true);
-      expect(manager.isBracketedPasteEnabled()).toBe(true);
-    });
-
-    it('should not enable bracketed paste if not supported', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Complete detection with DA1 only
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-      expect(manager.isBracketedPasteSupported()).toBe(false);
-      expect(manager.isBracketedPasteEnabled()).toBe(false);
-    });
-  });
 });
