@@ -837,13 +837,26 @@ class EditToolInvocation
         typeof displayResult !== 'string' &&
         displayResult.fileDiff
       ) {
-        const MAX_LLM_DIFF_CHARS = 2000;
+        const MAX_LLM_DIFF_LINES = 50;
+
+        const diffLines = displayResult.fileDiff.split('\n');
+
         let diffForLlm = displayResult.fileDiff;
-        if (diffForLlm.length > MAX_LLM_DIFF_CHARS) {
-          diffForLlm =
-            diffForLlm.substring(0, MAX_LLM_DIFF_CHARS) +
-            '\n... (diff truncated) ...';
+
+        if (diffLines.length > MAX_LLM_DIFF_LINES) {
+          const headLines = 25;
+
+          const tailLines = 5;
+
+          diffForLlm = [
+            ...diffLines.slice(0, headLines),
+
+            `... (${diffLines.length - (headLines + tailLines)} lines omitted) ...`,
+
+            ...diffLines.slice(-tailLines),
+          ].join('\n');
         }
+
         llmSuccessMessageParts.push(`\n\`\`\`diff\n${diffForLlm}\n\`\`\``);
       }
 
