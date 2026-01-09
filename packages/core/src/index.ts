@@ -167,6 +167,9 @@ export * from './hooks/index.js';
 // Export hook types
 export * from './hooks/types.js';
 
+// Export agent types
+export * from './agents/types.js';
+
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
