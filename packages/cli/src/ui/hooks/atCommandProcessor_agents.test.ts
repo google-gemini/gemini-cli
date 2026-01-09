@@ -156,7 +156,7 @@ describe('handleAtCommand with Agents', () => {
         typeof p === 'object' &&
         p !== null &&
         'text' in p &&
-        (p as { text: string }).text.includes('(System Note:'),
+        (p as { text: string }).text.includes('<system_note>'),
     );
     expect(nudgePart).toBeDefined();
     if (nudgePart && typeof nudgePart === 'object' && 'text' in nudgePart) {
@@ -198,7 +198,7 @@ describe('handleAtCommand with Agents', () => {
         typeof p === 'object' &&
         p !== null &&
         'text' in p &&
-        (p as { text: string }).text.includes('(System Note:'),
+        (p as { text: string }).text.includes('<system_note>'),
     );
     expect(nudgePart).toBeDefined();
     if (nudgePart && typeof nudgePart === 'object' && 'text' in nudgePart) {
@@ -234,7 +234,7 @@ describe('handleAtCommand with Agents', () => {
         typeof p === 'object' &&
         p !== null &&
         'text' in p &&
-        (p as { text: string }).text.includes('(System Note:'),
+        (p as { text: string }).text.includes('<system_note>'),
     );
     expect(nudgePart).toBeUndefined();
   });
