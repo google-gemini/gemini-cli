@@ -142,11 +142,12 @@ function classifyValidationRequiredError(
     validationLink = validationLinkInfo.url;
     validationDescription = validationLinkInfo.description;
 
-    // Look for "Learn more" link (usually second link)
+    // Look for "Learn more" link (usually second link, not the first one)
     const learnMoreLink = helpDetail.links.find(
-      (link) =>
-        link.description.toLowerCase().includes('learn more') ||
-        link.url.includes('support.google.com'),
+      (link, index) =>
+        index > 0 && // Skip the first link which is the validation link
+        (link.description.toLowerCase().trim() === 'learn more' ||
+          link.url.includes('support.google.com')),
     );
     if (learnMoreLink) {
       learnMoreUrl = learnMoreLink.url;
