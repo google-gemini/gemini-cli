@@ -278,6 +278,29 @@ function createDataListener(keypressHandler: KeypressHandler) {
   let timeoutId: NodeJS.Timeout;
   return (data: string) => {
     clearTimeout(timeoutId);
+
+    // Detect unbracketed pastes: multiple characters arriving at once
+    // that aren't escape sequences or already bracketed.
+    // This handles terminals (like VSCode on Windows) that paste without
+    // bracketed paste mode markers.
+    const hasPasteMarkers = data.includes('\x1B[200~');
+    const startsWithEsc = data.startsWith('\x1B');
+    const isLikelyPaste = !hasPasteMarkers && !startsWithEsc && data.length > 1;
+
+    if (isLikelyPaste) {
+      keypressHandler({
+        name: '',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: true,
+        insertable: true,
+        sequence: data,
+      });
+      return;
+    }
+
+    // Normal character-by-character processing
     for (const char of data) {
       parser.next(char);
     }
