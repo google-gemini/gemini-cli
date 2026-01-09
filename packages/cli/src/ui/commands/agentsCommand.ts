@@ -4,10 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
+import type {
+  SlashCommand,
+  CommandContext,
+  SlashCommandActionReturn,
+} from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
+
+async function listAction(
+  context: CommandContext,
+  _args: string,
+): Promise<SlashCommandActionReturn | void> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    };
+  }
+
+  const agents = agentRegistry.getAllDefinitions().map((def) => ({
+    name: def.name,
+    displayName: def.displayName,
+    description: def.description,
+    kind: def.kind,
+  }));
+
+  const agentsListItem: HistoryItemAgentsList = {
+    type: MessageType.AGENTS_LIST,
+    agents,
+  };
+
+  context.ui.addItem(agentsListItem, Date.now());
+
+  return;
+}
 
 async function enableAction(context: CommandContext, args: string) {
   const { config, settings } = context.services;
@@ -88,6 +131,14 @@ function completeAgentsToDisable(context: CommandContext, partialArg: string) {
   return allAgents.filter((name) => name.startsWith(partialArg));
 }
 
+const listCommand: SlashCommand = {
+  name: 'list',
+  description: 'List available local and remote agents',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: listAction,
+};
+
 const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a disabled agent',
@@ -111,40 +162,6 @@ export const agentsCommand: SlashCommand = {
   description: 'List available local and remote agents',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  subCommands: [enableCommand, disableCommand],
-  action: async (context: CommandContext) => {
-    const { config } = context.services;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Config not loaded.',
-      };
-    }
-
-    const agentRegistry = config.getAgentRegistry();
-    if (!agentRegistry) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Agent registry not found.',
-      };
-    }
-
-    const agents = agentRegistry.getAllDefinitions().map((def) => ({
-      name: def.name,
-      displayName: def.displayName,
-      description: def.description,
-      kind: def.kind,
-    }));
-
-    const agentsListItem: HistoryItemAgentsList = {
-      type: MessageType.AGENTS_LIST,
-      agents,
-    };
-
-    context.ui.addItem(agentsListItem, Date.now());
-
-    return;
-  },
+  subCommands: [listCommand, enableCommand, disableCommand],
+  action: listAction,
 };
