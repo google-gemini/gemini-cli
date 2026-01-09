@@ -187,32 +187,27 @@ export function SettingsDialog({
     }
 
     const loadEffectiveDefaults = async () => {
-      const defaults = new Map<string, SettingsValue>();
       const keys = getDialogSettingKeys();
-
-      for (const key of keys) {
-        if (key === 'model.compressionThreshold') {
-          try {
-            const effectiveDefault = await getEffectiveDefaultValue(
-              key,
-              config,
-            );
-            defaults.set(key, effectiveDefault);
-          } catch (error) {
-            // Fall back to schema default if experiment check fails
-            debugLogger.log(
-              `[SettingsDialog] Error loading effective default for ${key}:`,
-              error instanceof Error ? error.message : String(error),
-            );
-            const schemaDefault = getDefaultValue(key);
-            defaults.set(key, schemaDefault);
+      const entries = await Promise.all(
+        keys.map(async (key) => {
+          // Only async operations go through getEffectiveDefaultValue
+          if (key === 'model.compressionThreshold') {
+            try {
+              const value = await getEffectiveDefaultValue(key, config);
+              return [key, value] as [string, SettingsValue];
+            } catch (_error) {
+              // Fall back to schema default if experiment check fails
+              debugLogger.log(
+                `[SettingsDialog] Error loading effective default for ${key}, using schema default`,
+              );
+              return [key, getDefaultValue(key)] as [string, SettingsValue];
+            }
           }
-        } else {
-          defaults.set(key, getDefaultValue(key));
-        }
-      }
-
-      setEffectiveDefaults(defaults);
+          // Synchronous defaults don't need to be wrapped in async
+          return [key, getDefaultValue(key)] as [string, SettingsValue];
+        }),
+      );
+      setEffectiveDefaults(new Map(entries));
     };
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
