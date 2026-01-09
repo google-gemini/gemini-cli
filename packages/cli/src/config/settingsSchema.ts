@@ -465,7 +465,8 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description:
+              'Hides the remaining context window percentage. Requires hideModelInfo and hideFooter to be false.',
             showInDialog: true,
           },
         },

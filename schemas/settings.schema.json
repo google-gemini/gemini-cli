@@ -252,8 +252,8 @@
             },
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "description": "Hides the remaining context window percentage. Requires hideModelInfo and hideFooter to be false.",
+              "markdownDescription": "Hides the remaining context window percentage. Requires hideModelInfo and hideFooter to be false.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
