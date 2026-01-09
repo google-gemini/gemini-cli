@@ -13,6 +13,26 @@ export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 
 /**
+ * Returns the home directory.
+ * If GEMINI_CLI_HOME environment variable is set, it returns its value.
+ * Otherwise, it returns the user's home directory.
+ */
+export function homedir(): string {
+  const envHome = process.env['GEMINI_CLI_HOME'];
+  if (envHome) {
+    return envHome;
+  }
+  return os.homedir();
+}
+
+/**
+ * Returns the operating system's default directory for temporary files.
+ */
+export function tmpdir(): string {
+  return os.tmpdir();
+}
+
+/**
  * Special characters that need to be escaped in file paths for shell compatibility.
  * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
  * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
