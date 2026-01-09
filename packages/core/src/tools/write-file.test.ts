@@ -665,7 +665,6 @@ describe('WriteFileTool', () => {
         abortSignal,
         false,
       );
-
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
       );
@@ -724,9 +723,7 @@ describe('WriteFileTool', () => {
         abortSignal,
         false,
       );
-
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
-
       const writtenContent = await fsService.readTextFile(filePath);
       expect(writtenContent).toBe(correctedProposedContent);
       const display = result.returnDisplay as FileDiff;
