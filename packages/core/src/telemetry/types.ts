@@ -39,6 +39,7 @@ import {
   toSystemInstruction,
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
+import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -290,13 +291,17 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         this.tool_type = 'native';
       }
 
+      const fileDiff = getFileDiffFromResultDisplay(
+        call.response.resultDisplay,
+      );
+
       if (
         call.status === 'success' &&
         typeof call.response.resultDisplay === 'object' &&
         call.response.resultDisplay !== null &&
-        'diffStat' in call.response.resultDisplay
+        fileDiff
       ) {
-        const diffStat = call.response.resultDisplay.diffStat;
+        const diffStat = fileDiff.diffStat;
         if (diffStat) {
           this.metadata = {
             model_added_lines: diffStat.model_added_lines,

@@ -93,6 +93,22 @@ expect.extend({
         `event ${received} ${isNot ? 'has' : 'does not have'} the metadata key ${key}`,
     };
   },
+
+  toHaveGwsExperiments(received: LogEventEntry[], exps: number[]) {
+    const { isNot } = this;
+    const gwsExperiment = received[0].exp?.gws_experiment;
+
+    const pass =
+      gwsExperiment !== undefined &&
+      gwsExperiment.length === exps.length &&
+      gwsExperiment.every((val, idx) => val === exps[idx]);
+
+    return {
+      pass,
+      message: () =>
+        `exp.gws_experiment ${JSON.stringify(gwsExperiment)} does${isNot ? '' : ' not'} match ${JSON.stringify(exps)}`,
+    };
+  },
 });
 
 vi.mock('../../utils/userAccountManager.js');
@@ -850,19 +866,53 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logExperiments', () => {
-    it('logs an event with gws_experiment field containing exp ids', () => {
+    it('async path includes exp.gws_experiment field with experiment IDs', async () => {
       const { logger } = setup();
-      const event = new AgentStartEvent('agent-123', 'TestAgent');
+      const event = logger!.createLogEvent(EventNames.START_SESSION, []);
 
-      logger?.logAgentStartEvent(event);
+      await logger?.enqueueLogEventAfterExperimentsLoadAsync(event);
+      await vi.runAllTimersAsync();
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
-      expect(events[0]).toHaveEventName(EventNames.AGENT_START);
+      expect(events[0]).toHaveEventName(EventNames.START_SESSION);
+      // Both metadata and exp.gws_experiment should be populated
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
         '123,456,789',
       ]);
+      expect(events[0]).toHaveGwsExperiments([123, 456, 789]);
+    });
+
+    it('async path includes empty gws_experiment array when no experiments', async () => {
+      const { logger } = setup({
+        config: {
+          experiments: {
+            experimentIds: [],
+          },
+        } as unknown as Partial<ConfigParameters>,
+      });
+      const event = logger!.createLogEvent(EventNames.START_SESSION, []);
+
+      await logger?.enqueueLogEventAfterExperimentsLoadAsync(event);
+      await vi.runAllTimersAsync();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveGwsExperiments([]);
+    });
+
+    it('non-async path does not include exp.gws_experiment field', () => {
+      const { logger } = setup();
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      // logAgentStartEvent uses the non-async enqueueLogEvent path
+      logger?.logAgentStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      // exp.gws_experiment should NOT be present for non-async events
+      expect(events[0][0].exp).toBeUndefined();
     });
   });
 

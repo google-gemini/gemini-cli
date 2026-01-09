@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.24.0-nightly.20251227.37be16243",
+  "version": "0.25.0-nightly.20260107.59a18e710",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.24.0-nightly.20251227.37be16243"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.25.0-nightly.20260107.59a18e710"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -46,7 +46,7 @@
     "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
-    "lint": "eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts",
+    "lint": "eslint . --cache",
     "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
@@ -133,6 +133,7 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
+    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "lint-staged": {

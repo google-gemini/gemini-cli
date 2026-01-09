@@ -11,10 +11,10 @@ import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
+  homedir,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { logger } from '../utils/logger.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
@@ -39,7 +39,7 @@ interface ExtensionConfig {
 export function loadExtensions(workspaceDir: string): GeminiCLIExtension[] {
   const allExtensions = [
     ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(os.homedir()),
+    ...loadExtensionsFromDir(homedir()),
   ];
 
   const uniqueExtensions: GeminiCLIExtension[] = [];

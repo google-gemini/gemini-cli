@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
@@ -23,7 +23,7 @@ export class Storage {
   }
 
   static getGlobalGeminiDir(): string {
-    const homeDir = os.homedir();
+    const homeDir = homedir();
     if (!homeDir) {
       return path.join(os.tmpdir(), GEMINI_DIR);
     }

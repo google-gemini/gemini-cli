@@ -46,6 +46,11 @@ project hook (identified by its name and command), but it is **your
 responsibility** to review these hooks (and any installed extensions) before
 trusting them.
 
+> [!NOTE] Extension hooks are subject to a mandatory security warning and
+> consent flow during extension installation or update if hooks are detected.
+> You must explicitly approve the installation or update of any extension that
+> contains hooks.
+
 See [Security Considerations](best-practices.md#using-hooks-securely) for a
 detailed threat model and mitigation strategies.
 
@@ -444,7 +449,8 @@ numbers run first):
 2.  **User settings:** `~/.gemini/settings.json`
 3.  **System settings:** `/etc/gemini-cli/settings.json`
 4.  **Extensions:** Internal hooks defined by installed extensions (lowest
-    priority)
+    priority). See [Extensions documentation](../extensions/index.md#hooks) for
+    details on how extensions define and configure hooks.
 
 #### Deduplication and shadowing
 
@@ -683,5 +689,6 @@ matchers:
 - [Best Practices](best-practices.md) - Security, performance, and debugging
 - [Custom Commands](../cli/custom-commands.md) - Create reusable prompt
   shortcuts
-- [Configuration](../cli/configuration.md) - Gemini CLI configuration options
+- [Configuration](../get-started/configuration.md) - Gemini CLI configuration
+  options
 - [Hooks Design Document](../hooks-design.md) - Technical architecture details
