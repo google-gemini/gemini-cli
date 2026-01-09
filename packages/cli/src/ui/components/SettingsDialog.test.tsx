@@ -104,7 +104,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {

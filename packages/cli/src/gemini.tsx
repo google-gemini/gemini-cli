@@ -17,10 +17,17 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
+<<<<<<< HEAD
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
 } from './config/settings.js';
+=======
+  loadTrustedFolders,
+  type TrustedFoldersError,
+} from './config/trustedFolders.js';
+import { loadSettings, SettingScope } from './config/settings.js';
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -90,9 +97,7 @@ import {
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
-import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
@@ -299,6 +304,7 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+<<<<<<< HEAD
   const migrateHandle = startupProfiler.start('migrate_settings');
   migrateDeprecatedSettings(
     settings,
@@ -312,6 +318,21 @@ export async function main() {
     }),
   );
   migrateHandle?.end();
+=======
+  // Report settings errors once during startup
+  settings.errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error.message);
+  });
+
+  const trustedFolders = loadTrustedFolders();
+  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+    coreEvents.emitFeedback(
+      'warning',
+      `Error in ${error.path}: ${error.message}`,
+    );
+  });
+
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
   await cleanupCheckpoints();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');

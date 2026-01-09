@@ -10,7 +10,6 @@ import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
-  debugLogger,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -30,14 +29,12 @@ import {
   getSettingsSchema,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
+import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
-import type { ExtensionManager } from './extension-manager.js';
 import {
   validateSettings,
   formatValidationError,
 } from './settings-validation.js';
-import { SettingPaths } from './settingPaths.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -66,6 +63,7 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
+<<<<<<< HEAD
 const MIGRATE_V2_OVERWRITE = true;
 
 const MIGRATION_MAP: Record<string, string> = {
@@ -139,6 +137,8 @@ const MIGRATION_MAP: Record<string, string> = {
   vimMode: 'general.vimMode',
 };
 
+=======
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
 export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
@@ -267,6 +267,7 @@ function setNestedProperty(
   current[lastKey] = value;
 }
 
+<<<<<<< HEAD
 export function needsMigration(settings: Record<string, unknown>): boolean {
   // A file needs migration if it contains any top-level key that is moved to a
   // nested location in V2.
@@ -421,6 +422,24 @@ export function migrateSettingsToV1(
   }
 
   return v1Settings;
+=======
+export function getDefaultsFromSchema(
+  schema: SettingsSchema = getSettingsSchema(),
+): Settings {
+  const defaults: Record<string, unknown> = {};
+  for (const key in schema) {
+    const definition = schema[key];
+    if (definition.properties) {
+      const childDefaults = getDefaultsFromSchema(definition.properties);
+      if (Object.keys(childDefaults).length > 0) {
+        defaults[key] = childDefaults;
+      }
+    } else if (definition.default !== undefined) {
+      defaults[key] = definition.default;
+    }
+  }
+  return defaults as Settings;
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
 }
 
 function mergeSettings(
@@ -455,14 +474,22 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     isTrusted: boolean,
+<<<<<<< HEAD
     migratedInMemoryScopes: Set<SettingScope>,
+=======
+    errors: SettingsError[] = [],
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
     this.isTrusted = isTrusted;
+<<<<<<< HEAD
     this.migratedInMemoryScopes = migratedInMemoryScopes;
+=======
+    this.errors = errors;
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
     this._merged = this.computeMergedSettings();
   }
 
@@ -471,7 +498,11 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
+<<<<<<< HEAD
   readonly migratedInMemoryScopes: Set<SettingScope>;
+=======
+  readonly errors: SettingsError[];
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
 
   private _merged: Settings;
 
@@ -620,7 +651,6 @@ export function loadSettings(
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
-  const migratedInMemoryScopes = new Set<SettingScope>();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -641,10 +671,7 @@ export function loadSettings(
     workspaceDir,
   ).getWorkspaceSettingsPath();
 
-  const loadAndMigrate = (
-    filePath: string,
-    scope: SettingScope,
-  ): { settings: Settings; rawJson?: string } => {
+  const load = (filePath: string): { settings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -662,33 +689,9 @@ export function loadSettings(
           return { settings: {} };
         }
 
-        let settingsObject = rawSettings as Record<string, unknown>;
-        if (needsMigration(settingsObject)) {
-          const migratedSettings = migrateSettingsToV2(settingsObject);
-          if (migratedSettings) {
-            if (MIGRATE_V2_OVERWRITE) {
-              try {
-                fs.renameSync(filePath, `${filePath}.orig`);
-                fs.writeFileSync(
-                  filePath,
-                  JSON.stringify(migratedSettings, null, 2),
-                  'utf-8',
-                );
-              } catch (e) {
-                coreEvents.emitFeedback(
-                  'error',
-                  'Failed to migrate settings file.',
-                  e,
-                );
-              }
-            } else {
-              migratedInMemoryScopes.add(scope);
-            }
-            settingsObject = migratedSettings;
-          }
-        }
+        const settingsObject = rawSettings as Record<string, unknown>;
 
-        // Validate settings structure with Zod after migration
+        // Validate settings structure with Zod
         const validationResult = validateSettings(settingsObject);
         if (!validationResult.success && validationResult.error) {
           const errorMessage = formatValidationError(
@@ -713,22 +716,16 @@ export function loadSettings(
     return { settings: {} };
   };
 
-  const systemResult = loadAndMigrate(systemSettingsPath, SettingScope.System);
-  const systemDefaultsResult = loadAndMigrate(
-    systemDefaultsPath,
-    SettingScope.SystemDefaults,
-  );
-  const userResult = loadAndMigrate(USER_SETTINGS_PATH, SettingScope.User);
+  const systemResult = load(systemSettingsPath);
+  const systemDefaultsResult = load(systemDefaultsPath);
+  const userResult = load(USER_SETTINGS_PATH);
 
   let workspaceResult: { settings: Settings; rawJson?: string } = {
     settings: {} as Settings,
     rawJson: undefined,
   };
   if (realWorkspaceDir !== realHomeDir) {
-    workspaceResult = loadAndMigrate(
-      workspaceSettingsPath,
-      SettingScope.Workspace,
-    );
+    workspaceResult = load(workspaceSettingsPath);
   }
 
   const systemOriginalSettings = structuredClone(systemResult.settings);
@@ -816,34 +813,12 @@ export function loadSettings(
       rawJson: workspaceResult.rawJson,
     },
     isTrusted,
+<<<<<<< HEAD
     migratedInMemoryScopes,
+=======
+    settingsErrors,
+>>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
   );
-}
-
-export function migrateDeprecatedSettings(
-  loadedSettings: LoadedSettings,
-  extensionManager: ExtensionManager,
-): void {
-  const processScope = (scope: LoadableSettingScope) => {
-    const settings = loadedSettings.forScope(scope).settings;
-    if (settings.extensions?.disabled) {
-      debugLogger.log(
-        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
-      );
-      for (const extension of settings.extensions.disabled ?? []) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        extensionManager.disableExtension(extension, scope);
-      }
-
-      const newExtensionsValue = { ...settings.extensions };
-      newExtensionsValue.disabled = undefined;
-
-      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
-    }
-  };
-
-  processScope(SettingScope.User);
-  processScope(SettingScope.Workspace);
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
@@ -854,12 +829,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    let settingsToSave = settingsFile.originalSettings;
-    if (!MIGRATE_V2_OVERWRITE) {
-      settingsToSave = migrateSettingsToV1(
-        settingsToSave as Record<string, unknown>,
-      ) as Settings;
-    }
+    const settingsToSave = settingsFile.originalSettings;
 
     // Use the format-preserving update function
     updateSettingsFilePreservingFormat(
