@@ -6,10 +6,31 @@
 
 import path from 'node:path';
 import os from 'node:os';
+import process from 'node:process';
 import * as crypto from 'node:crypto';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
+
+/**
+ * Returns the home directory.
+ * If GEMINI_CLI_HOME environment variable is set, it returns its value.
+ * Otherwise, it returns the user's home directory.
+ */
+export function homedir(): string {
+  const envHome = process.env['GEMINI_CLI_HOME'];
+  if (envHome) {
+    return envHome;
+  }
+  return os.homedir();
+}
+
+/**
+ * Returns the operating system's default directory for temporary files.
+ */
+export function tmpdir(): string {
+  return os.tmpdir();
+}
 
 /**
  * Special characters that need to be escaped in file paths for shell compatibility.
@@ -24,7 +45,7 @@ export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
  * @returns The tildeified path.
  */
 export function tildeifyPath(path: string): string {
-  const homeDir = os.homedir();
+  const homeDir = homedir();
   if (path.startsWith(homeDir)) {
     return path.replace(homeDir, '~');
   }
