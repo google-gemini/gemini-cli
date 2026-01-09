@@ -507,95 +507,47 @@ describe('editor utils', () => {
   });
 
   describe('allowEditorTypeInSandbox', () => {
-    it('should allow vim in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('vim')).toBe(true);
-    });
+    const guiEditors: EditorType[] = [
+      'vscode',
+      'vscodium',
+      'windsurf',
+      'cursor',
+      'zed',
+      'antigravity',
+    ];
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
 
-    it('should allow vim when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('vim')).toBe(true);
-    });
+    it.each(terminalEditors)(
+      'should allow terminal editor %s in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'true');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      },
+    );
 
-    it('should allow emacs in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
-    });
+    it.each(terminalEditors)(
+      'should allow terminal editor %s when not in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'false');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      },
+    );
 
-    it('should allow emacs when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
-    });
+    it.each(guiEditors)(
+      'should not allow gui editor %s in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'true');
+        expect(allowEditorTypeInSandbox(editor)).toBe(false);
+      },
+    );
 
-    it('should allow neovim in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('neovim')).toBe(true);
-    });
-
-    it('should allow neovim when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('neovim')).toBe(true);
-    });
-
-    it('should allow hx in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('hx')).toBe(true);
-    });
-
-    it('should allow hx when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('hx')).toBe(true);
-    });
-
-    it('should not allow vscode in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('vscode')).toBe(false);
-    });
-
-    it('should allow vscode when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('vscode')).toBe(true);
-    });
-
-    it('should not allow vscodium in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('vscodium')).toBe(false);
-    });
-
-    it('should allow vscodium when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('vscodium')).toBe(true);
-    });
-
-    it('should not allow windsurf in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('windsurf')).toBe(false);
-    });
-
-    it('should allow windsurf when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('windsurf')).toBe(true);
-    });
-
-    it('should not allow cursor in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('cursor')).toBe(false);
-    });
-
-    it('should allow cursor when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('cursor')).toBe(true);
-    });
-
-    it('should not allow zed in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'true');
-      expect(allowEditorTypeInSandbox('zed')).toBe(false);
-    });
-
-    it('should allow zed when not in sandbox mode', () => {
-      vi.stubEnv('GEMINI_SANDBOX', 'false');
-      expect(allowEditorTypeInSandbox('zed')).toBe(true);
-    });
+    it.each(guiEditors)(
+      'should allow gui editor %s when not in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'false');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      },
+    );
   });
 
   describe('isEditorAvailable', () => {
