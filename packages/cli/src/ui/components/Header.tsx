@@ -14,11 +14,15 @@ import {
   shortAsciiLogoIde,
   longAsciiLogoIde,
   tinyAsciiLogoIde,
+  shortAsciiLogoCompact,
+  longAsciiLogoCompact,
+  tinyAsciiLogoCompact,
 } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
 import { useSnowfall } from '../hooks/useSnowfall.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -31,24 +35,61 @@ export const Header: React.FC<HeaderProps> = ({
   version,
   nightly,
 }) => {
+  const { merged: settings } = useSettings();
+  const compact = settings.ui?.compact;
   const { columns: terminalWidth } = useTerminalSize();
   const isIde = getTerminalProgram();
   let displayTitle;
-  const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
-  const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
+
+  const longLogo = compact
+    ? longAsciiLogoCompact
+    : isIde
+      ? longAsciiLogoIde
+      : longAsciiLogo;
+  const shortLogo = compact
+    ? shortAsciiLogoCompact
+    : isIde
+      ? shortAsciiLogoIde
+      : shortAsciiLogo;
+  const tinyLogo = compact
+    ? tinyAsciiLogoCompact
+    : isIde
+      ? tinyAsciiLogoIde
+      : tinyAsciiLogo;
+
+  const widthOfLongLogo = getAsciiArtWidth(longLogo);
+  const widthOfShortLogo = getAsciiArtWidth(shortLogo);
 
   if (customAsciiArt) {
     displayTitle = customAsciiArt;
   } else if (terminalWidth >= widthOfLongLogo) {
-    displayTitle = isIde ? longAsciiLogoIde : longAsciiLogo;
+    displayTitle = longLogo;
   } else if (terminalWidth >= widthOfShortLogo) {
-    displayTitle = isIde ? shortAsciiLogoIde : shortAsciiLogo;
+    displayTitle = shortLogo;
   } else {
-    displayTitle = isIde ? tinyAsciiLogoIde : tinyAsciiLogo;
+    displayTitle = tinyLogo;
   }
 
   const artWidth = getAsciiArtWidth(displayTitle);
   const title = useSnowfall(displayTitle);
+
+  if (compact) {
+    return (
+      <Box
+        alignItems="flex-end"
+        flexDirection="row"
+        flexShrink={0}
+        marginBottom={1}
+      >
+        <ThemedGradient>{title}</ThemedGradient>
+        {nightly && (
+          <Box paddingLeft={2}>
+            <ThemedGradient>v{version}</ThemedGradient>
+          </Box>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box

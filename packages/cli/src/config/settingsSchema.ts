@@ -524,6 +524,15 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      compact: {
+        type: 'boolean',
+        label: 'Compact UI',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable a more compact UI layout.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',

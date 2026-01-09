@@ -302,6 +302,13 @@
           "default": false,
           "type": "boolean"
         },
+        "compact": {
+          "title": "Compact UI",
+          "description": "Enable a more compact UI layout.",
+          "markdownDescription": "Enable a more compact UI layout.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",

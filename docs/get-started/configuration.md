@@ -243,6 +243,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.compact`** (boolean):
+  - **Description:** Enable a more compact UI layout.
+  - **Default:** `false`
+
 - **`ui.incrementalRendering`** (boolean):
   - **Description:** Enable incremental rendering for the UI. This option will
     reduce flickering but may cause rendering artifacts. Only supported when

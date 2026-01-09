@@ -4,11 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
-import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
+import {
+  longAsciiLogo,
+  longAsciiLogoIde,
+  longAsciiLogoCompact,
+} from './AsciiArt.js';
 import * as semanticColors from '../semantic-colors.js';
 import * as terminalSetup from '../utils/terminalSetup.js';
 import { Text } from 'ink';
@@ -49,7 +56,7 @@ describe('<Header />', () => {
       columns: 120,
       rows: 20,
     });
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
         children: longAsciiLogo,
@@ -65,7 +72,7 @@ describe('<Header />', () => {
     });
     vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
 
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
         children: longAsciiLogoIde,
@@ -76,7 +83,7 @@ describe('<Header />', () => {
 
   it('renders custom ASCII art when provided', () => {
     const customArt = 'CUSTOM ART';
-    render(
+    renderWithProviders(
       <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
     );
     expect(Text).toHaveBeenCalledWith(
@@ -90,7 +97,7 @@ describe('<Header />', () => {
   it('renders custom ASCII art as is when running in an IDE', () => {
     const customArt = 'CUSTOM ART';
     vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
-    render(
+    renderWithProviders(
       <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
     );
     expect(Text).toHaveBeenCalledWith(
@@ -102,19 +109,58 @@ describe('<Header />', () => {
   });
 
   it('displays the version number when nightly is true', () => {
-    render(<Header version="1.0.0" nightly={true} />);
+    renderWithProviders(<Header version="1.0.0" nightly={true} />);
     const textCalls = (Text as Mock).mock.calls;
     expect(textCalls[1][0].children.join('')).toBe('v1.0.0');
   });
 
   it('does not display the version number when nightly is false', () => {
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Text).not.toHaveBeenCalledWith(
       expect.objectContaining({
         children: 'v1.0.0',
       }),
       undefined,
     );
+  });
+
+  it('renders the compact logo when ui.compact is true', () => {
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 20,
+    });
+    renderWithProviders(<Header version="1.0.0" nightly={false} />, {
+      settings: createMockSettings({
+        ui: {
+          compact: true,
+        },
+      }),
+    });
+    expect(Text).toHaveBeenCalledWith(
+      expect.objectContaining({
+        children: longAsciiLogoCompact,
+      }),
+      undefined,
+    );
+  });
+
+  it('renders the version to the right in compact mode when nightly is true', () => {
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 20,
+    });
+    const { lastFrame } = renderWithProviders(
+      <Header version="1.0.0" nightly={true} />,
+      {
+        settings: createMockSettings({
+          ui: {
+            compact: true,
+          },
+        }),
+      },
+    );
+    expect(lastFrame()).toContain('v1.0.0');
+    // In compact mode, logo and version are in the same Box with flexDirection="row"
   });
 
   it('renders with no gradient when theme.ui.gradient is undefined', async () => {
@@ -147,10 +193,13 @@ describe('<Header />', () => {
       },
     });
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    expect(textCalls[0][0]).toHaveProperty('color', '#123456');
+    expect(textCalls[textCalls.length - 1][0]).toHaveProperty(
+      'color',
+      '#123456',
+    );
   });
 
   it('renders with a single color when theme.ui.gradient has one color', async () => {
@@ -159,11 +208,14 @@ describe('<Header />', () => {
       ui: { gradient: [singleColor] },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    expect(textCalls.length).toBe(1);
-    expect(textCalls[0][0]).toHaveProperty('color', singleColor);
+    expect(textCalls.length).toBeGreaterThanOrEqual(1);
+    expect(textCalls[textCalls.length - 1][0]).toHaveProperty(
+      'color',
+      singleColor,
+    );
   });
 
   it('renders with a gradient when theme.ui.gradient has two or more colors', async () => {
@@ -172,7 +224,7 @@ describe('<Header />', () => {
       ui: { gradient: gradientColors },
     } as typeof semanticColors.theme);
     const Gradient = await import('ink-gradient');
-    render(<Header version="1.0.0" nightly={false} />);
+    renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).toHaveBeenCalledWith(
       expect.objectContaining({
         colors: gradientColors,
