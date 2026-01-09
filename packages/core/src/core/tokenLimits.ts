@@ -27,8 +27,6 @@ export function tokenLimit(model: Model): TokenCount {
     case DEFAULT_GEMINI_FLASH_MODEL:
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
       return 1_048_576;
-    case 'gemini-2.0-flash-preview-image-generation':
-      return 32_000;
     default:
       return DEFAULT_TOKEN_LIMIT;
   }
