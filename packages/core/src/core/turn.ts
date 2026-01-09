@@ -28,10 +28,7 @@ import { InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import {
-  getCitations,
-  getFunctionCalls,
-} from '../utils/generateContentResponseUtilities.js';
+import { getCitations } from '../utils/generateContentResponseUtilities.js';
 
 import {
   type ToolCallRequestInfo,
@@ -232,7 +229,6 @@ export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
-  private yieldedToolCallIds = new Set<string>();
   finishReason: FinishReason | undefined = undefined;
 
   constructor(
@@ -247,7 +243,6 @@ export class Turn {
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
-      this.yieldedToolCallIds.clear();
       // Note: This assumes `sendMessageStream` yields events like
       // { type: StreamEventType.RETRY } or { type: StreamEventType.CHUNK, value: GenerateContentResponse }
       const responseStream = await this.chat.sendMessageStream(
@@ -265,10 +260,6 @@ export class Turn {
 
         // Handle the new RETRY event
         if (streamEvent.type === 'retry') {
-          this.debugResponses = [];
-          this.yieldedToolCallIds.clear();
-          this.pendingCitations.clear();
-          this.finishReason = undefined;
           yield { type: GeminiEventType.Retry };
           continue; // Skip to the next event in the stream
         }
@@ -281,35 +272,25 @@ export class Turn {
 
         const traceId = resp.responseId;
 
-        const candidate = resp.candidates?.[0];
-        if (candidate?.content?.parts) {
-          for (const part of candidate.content.parts) {
-            if (part.thought) {
-              const thought = parseThought(part.text ?? '');
-              yield {
-                type: GeminiEventType.Thought,
-                value: thought,
-                traceId,
-              };
-            } else if (part.text) {
-              yield {
-                type: GeminiEventType.Content,
-                value: part.text,
-                traceId,
-              };
-            }
-          }
+        const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
+        if (thoughtPart?.thought) {
+          const thought = parseThought(thoughtPart.text ?? '');
+          yield {
+            type: GeminiEventType.Thought,
+            value: thought,
+            traceId,
+          };
+          continue;
+        }
+
+        const text = getResponseText(resp);
+        if (text) {
+          yield { type: GeminiEventType.Content, value: text, traceId };
         }
 
         // Handle function calls (requesting tool execution)
-        const functionCalls = getFunctionCalls(resp) ?? [];
+        const functionCalls = resp.functionCalls ?? [];
         for (const fnCall of functionCalls) {
-          // IDs are already ensured by geminiChat.ts
-          if (this.yieldedToolCallIds.has(fnCall.id!)) {
-            continue;
-          }
-          this.yieldedToolCallIds.add(fnCall.id!);
-
           const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {
             yield event;
@@ -391,7 +372,9 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const callId = fnCall.id!;
+    const callId =
+      fnCall.id ??
+      `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
 

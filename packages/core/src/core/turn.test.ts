@@ -116,27 +116,18 @@ describe('Turn', () => {
         yield {
           type: StreamEventType.CHUNK,
           value: {
-            candidates: [
+            functionCalls: [
               {
-                content: {
-                  parts: [
-                    {
-                      functionCall: {
-                        id: 'fc1',
-                        name: 'tool1',
-                        args: { arg1: 'val1' },
-                      },
-                    },
-                    {
-                      functionCall: {
-                        name: 'tool2',
-                        args: { arg2: 'val2' },
-                        id: 'dummy-id',
-                      }, // No ID
-                    },
-                  ],
-                },
+                id: 'fc1',
+                name: 'tool1',
+                args: { arg1: 'val1' },
+                isClientInitiated: false,
               },
+              {
+                name: 'tool2',
+                args: { arg2: 'val2' },
+                isClientInitiated: false,
+              }, // No ID
             ],
           } as unknown as GenerateContentResponse,
         };
@@ -175,7 +166,9 @@ describe('Turn', () => {
           isClientInitiated: false,
         }),
       );
-      expect(event2.value.callId).toEqual('dummy-id');
+      expect(event2.value.callId).toEqual(
+        expect.stringMatching(/^tool2-\d{13}-\w{10,}$/),
+      );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);
     });
@@ -281,34 +274,12 @@ describe('Turn', () => {
         yield {
           type: StreamEventType.CHUNK,
           value: {
-            candidates: [
-              {
-                content: {
-                  parts: [
-                    {
-                      functionCall: {
-                        id: 'fc1',
-                        name: undefined,
-                        args: { arg1: 'val1' },
-                      },
-                    },
-                    {
-                      functionCall: {
-                        id: 'fc2',
-                        name: 'tool2',
-                        args: undefined,
-                      },
-                    },
-                    {
-                      functionCall: {
-                        id: 'fc3',
-                        name: undefined,
-                        args: undefined,
-                      },
-                    },
-                  ],
-                },
-              },
+            candidates: [],
+            functionCalls: [
+              // Add `id` back to the mock to match what the code expects
+              { id: 'fc1', name: undefined, args: { arg1: 'val1' } },
+              { id: 'fc2', name: 'tool2', args: undefined },
+              { id: 'fc3', name: undefined, args: undefined },
             ],
           },
         };

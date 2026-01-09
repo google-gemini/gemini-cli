@@ -147,17 +147,11 @@ const MOCK_TOOL_NOT_ALLOWED = new MockTool({ name: 'write_file_interactive' });
 const createMockResponseChunk = (
   parts: Part[],
   functionCalls?: FunctionCall[],
-) => {
-  const finalParts = [...parts];
-  if (functionCalls && functionCalls.length > 0) {
-    for (const call of functionCalls) {
-      finalParts.push({ functionCall: call });
-    }
-  }
-  return {
-    candidates: [{ index: 0, content: { role: 'model', parts: finalParts } }],
-  } as unknown as GenerateContentResponse;
-};
+): GenerateContentResponse =>
+  ({
+    candidates: [{ index: 0, content: { role: 'model', parts } }],
+    ...(functionCalls && functionCalls.length > 0 ? { functionCalls } : {}),
+  }) as unknown as GenerateContentResponse;
 
 /**
  * Helper to mock a single turn of model response in the stream.

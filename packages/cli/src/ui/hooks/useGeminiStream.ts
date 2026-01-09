@@ -836,8 +836,6 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
-      let turnSuccessful = true;
-
       for await (const event of stream) {
         switch (event.type) {
           case ServerGeminiEventType.Thought:
@@ -855,25 +853,21 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
             );
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
             );
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value, userMessageTimestamp);
@@ -884,14 +878,12 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.ContextWindowWillOverflow:
             handleContextWindowWillOverflowEvent(
               event.value.estimatedRequestTokenCount,
               event.value.remainingTokenCount,
             );
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.Finished:
             handleFinishedEvent(event, userMessageTimestamp);
@@ -906,21 +898,10 @@ export const useGeminiStream = (
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
             loopDetectedRef.current = true;
-            turnSuccessful = false;
             break;
           case ServerGeminiEventType.Retry:
-            geminiMessageBuffer = '';
-            setThought(null);
-            toolCallRequests.length = 0;
-            if (
-              pendingHistoryItemRef.current?.type === 'gemini' ||
-              pendingHistoryItemRef.current?.type === 'gemini_content'
-            ) {
-              setPendingHistoryItem(null);
-            }
-            break;
           case ServerGeminiEventType.InvalidStream:
-            turnSuccessful = false;
+            // Will add the missing logic later
             break;
           default: {
             // enforces exhaustive switch-case
@@ -929,7 +910,7 @@ export const useGeminiStream = (
           }
         }
       }
-      if (turnSuccessful && toolCallRequests.length > 0) {
+      if (toolCallRequests.length > 0) {
         scheduleToolCalls(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
