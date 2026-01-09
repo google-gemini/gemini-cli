@@ -13,11 +13,13 @@ import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
+  SkillDefinition,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary };
+export type { ThoughtSummary, SkillDefinition };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -206,6 +208,22 @@ export type HistoryItemToolsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
+export type HistoryItemSkillsList = HistoryItemBase & {
+  type: 'skills_list';
+  skills: SkillDefinition[];
+  showDescriptions: boolean;
+};
+
+export type AgentDefinitionJson = Pick<
+  AgentDefinition,
+  'name' | 'displayName' | 'description' | 'kind'
+>;
+
+export type HistoryItemAgentsList = HistoryItemBase & {
+  type: 'agents_list';
+  agents: AgentDefinitionJson[];
+};
+
 // JSON-friendly types for using as a simple data model showing info about an
 // MCP Server.
 export interface JsonMcpTool {
@@ -284,6 +302,8 @@ export type HistoryItemWithoutId =
   | HistoryItemCompression
   | HistoryItemExtensionsList
   | HistoryItemToolsList
+  | HistoryItemSkillsList
+  | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemHooksList;
@@ -306,6 +326,8 @@ export enum MessageType {
   COMPRESSION = 'compression',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
+  SKILLS_LIST = 'skills_list',
+  AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HOOKS_LIST = 'hooks_list',
@@ -408,4 +430,11 @@ export interface ConfirmationRequest {
 
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+}
+
+export interface ActiveHook {
+  name: string;
+  eventName: string;
+  index?: number;
+  total?: number;
 }

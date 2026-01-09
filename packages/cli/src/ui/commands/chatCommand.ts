@@ -26,7 +26,7 @@ import type {
   ChatDetail,
 } from '../types.js';
 import { MessageType } from '../types.js';
-import type { Content } from '@google/genai';
+import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 
 const getSavedChatTags = async (
   context: CommandContext,
@@ -272,38 +272,6 @@ const deleteCommand: SlashCommand = {
   },
 };
 
-export function serializeHistoryToMarkdown(history: Content[]): string {
-  return history
-    .map((item) => {
-      const text =
-        item.parts
-          ?.map((part) => {
-            if (part.text) {
-              return part.text;
-            }
-            if (part.functionCall) {
-              return `**Tool Command**:\n\`\`\`json\n${JSON.stringify(
-                part.functionCall,
-                null,
-                2,
-              )}\n\`\`\``;
-            }
-            if (part.functionResponse) {
-              return `**Tool Response**:\n\`\`\`json\n${JSON.stringify(
-                part.functionResponse,
-                null,
-                2,
-              )}\n\`\`\``;
-            }
-            return '';
-          })
-          .join('') || '';
-      const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
-    })
-    .join('\n\n---\n\n');
-}
-
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
@@ -348,15 +316,8 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    let content = '';
-    if (extension === '.json') {
-      content = JSON.stringify(history, null, 2);
-    } else {
-      content = serializeHistoryToMarkdown(history);
-    }
-
     try {
-      await fsPromises.writeFile(filePath, content);
+      await exportHistoryToFile({ history, filePath });
       return {
         type: 'message',
         messageType: 'info',

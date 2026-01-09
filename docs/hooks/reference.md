@@ -46,6 +46,16 @@ specific event.
 - `tool_input`: (`object`) The arguments passed to the tool.
 - `tool_response`: (`object`, **AfterTool only**) The raw output from the tool
   execution.
+- `mcp_context`: (`object`, **optional**) Present only for MCP tool invocations.
+  Contains server identity information:
+  - `server_name`: (`string`) The configured name of the MCP server.
+  - `tool_name`: (`string`) The original tool name from the MCP server.
+  - `command`: (`string`, optional) For stdio transport, the command used to
+    start the server.
+  - `args`: (`string[]`, optional) For stdio transport, the command arguments.
+  - `cwd`: (`string`, optional) For stdio transport, the working directory.
+  - `url`: (`string`, optional) For SSE/HTTP transport, the server URL.
+  - `tcp`: (`string`, optional) For WebSocket transport, the TCP address.
 
 #### Agent Events (`BeforeAgent`, `AfterAgent`)
 

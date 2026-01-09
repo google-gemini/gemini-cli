@@ -1128,18 +1128,11 @@
           "default": 1000,
           "type": "number"
         },
-        "enableMessageBusIntegration": {
-          "title": "Enable Message Bus Integration",
-          "description": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.",
-          "markdownDescription": "Enable policy-based tool confirmation via message bus integration. When enabled, tools automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "enableHooks": {
-          "title": "Enable Hooks System",
-          "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",
-          "markdownDescription": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "title": "Enable Hooks System (Experimental)",
+          "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
+          "markdownDescription": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         }
       },
@@ -1178,13 +1171,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "useSmartEdit": {
-      "title": "Use Smart Edit",
-      "description": "Enable the smart-edit tool instead of the replace tool.",
-      "markdownDescription": "Enable the smart-edit tool instead of the replace tool.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
-      "default": true,
-      "type": "boolean"
     },
     "useWriteTodos": {
       "title": "Use WriteTodos",
@@ -1380,6 +1366,13 @@
           "default": false,
           "type": "boolean"
         },
+        "skills": {
+          "title": "Agent Skills",
+          "description": "Enable Agent Skills (experimental).",
+          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",
@@ -1425,18 +1418,25 @@
           },
           "additionalProperties": false
         },
-        "introspectionAgentSettings": {
-          "title": "Introspection Agent Settings",
-          "description": "Configuration for Introspection Agent.",
-          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+        "useOSC52Paste": {
+          "title": "Use OSC 52 Paste",
+          "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
+          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "cliHelpAgentSettings": {
+          "title": "CLI Help Agent Settings",
+          "description": "Configuration for CLI Help Agent.",
+          "markdownDescription": "Configuration for CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Introspection Agent",
-              "description": "Enable the Introspection Agent.",
-              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "title": "Enable CLI Help Agent",
+              "description": "Enable the CLI Help Agent.",
+              "markdownDescription": "Enable the CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
@@ -1475,6 +1475,26 @@
       },
       "additionalProperties": false
     },
+    "skills": {
+      "title": "Skills",
+      "description": "Settings for agent skills.",
+      "markdownDescription": "Settings for agent skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "title": "Disabled Skills",
+          "description": "List of disabled skills.",
+          "markdownDescription": "List of disabled skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "hooks": {
       "title": "Hooks",
       "description": "Hook configurations for intercepting and customizing agent behavior.",
@@ -1482,6 +1502,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Hooks",
+          "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Hooks",
           "description": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.",
@@ -1491,6 +1518,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "notifications": {
+          "title": "Hook Notifications",
+          "description": "Show visual indicators when hooks are executing.",
+          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
         },
         "BeforeTool": {
           "title": "Before Tool Hooks",
@@ -1574,6 +1608,57 @@
         "type": "array",
         "items": {}
       }
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Settings configured remotely by enterprise admins.",
+      "markdownDescription": "Settings configured remotely by enterprise admins.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "secureModeEnabled": {
+          "title": "Secure Mode Enabled",
+          "description": "If true, disallows yolo mode from being used.",
+          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "extensions": {
+          "title": "Extensions Settings",
+          "description": "Extensions-specific admin settings.",
+          "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Extensions Enabled",
+              "description": "If false, disallows extensions from being installed or used.",
+              "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcp": {
+          "title": "MCP Settings",
+          "description": "MCP-specific admin settings.",
+          "markdownDescription": "MCP-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "MCP Enabled",
+              "description": "If false, disallows MCP servers from being used.",
+              "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {

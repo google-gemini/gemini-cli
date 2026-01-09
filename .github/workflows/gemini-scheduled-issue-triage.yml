@@ -45,11 +45,11 @@ jobs:
 
           echo '🔍 Finding issues without labels...'
           NO_LABEL_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue no:label' --json number,title,body)"
+            --search 'is:open is:issue no:label' --limit 10 --json number,title,body)"
 
           echo '🏷️ Finding issues that need triage...'
           NEED_TRIAGE_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search "is:open is:issue label:\"status/need-triage\""  --limit 1000 --json number,title,body)"
+            --search "is:open is:issue label:\"status/need-triage\"" --limit 10 --json number,title,body)"
 
           echo '🔄 Merging and deduplicating issues...'
           ISSUES="$(echo "${NO_LABEL_ISSUES}" "${NEED_TRIAGE_ISSUES}" | jq -c -s 'add | unique_by(.number)')"

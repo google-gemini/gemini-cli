@@ -58,6 +58,9 @@ import { CommandKind } from '../ui/commands/types.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
+vi.mock('../ui/commands/agentsCommand.js', () => ({
+  agentsCommand: { name: 'agents' },
+}));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
 vi.mock('../ui/commands/chatCommand.js', () => ({ chatCommand: {} }));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
@@ -79,6 +82,9 @@ vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
+vi.mock('../ui/commands/skillsCommand.js', () => ({
+  skillsCommand: { name: 'skills' },
+}));
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -96,9 +102,16 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
-      getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -172,8 +185,8 @@ describe('BuiltinCommandLoader', () => {
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
       ...mockConfig,
-      getEnableMessageBusIntegration: () => true,
       getEnableHooks: () => false,
+      getMcpEnabled: () => true,
     } as unknown as Config;
     const loader = new BuiltinCommandLoader(mockConfigWithMessageBus);
     const commands = await loader.loadCommands(new AbortController().signal);
@@ -181,16 +194,20 @@ describe('BuiltinCommandLoader', () => {
     expect(policiesCmd).toBeDefined();
   });
 
-  it('should exclude policies command when message bus integration is disabled', async () => {
-    const mockConfigWithoutMessageBus = {
-      ...mockConfig,
-      getEnableMessageBusIntegration: () => false,
-      getEnableHooks: () => false,
-    } as unknown as Config;
-    const loader = new BuiltinCommandLoader(mockConfigWithoutMessageBus);
+  it('should include agents command when agents are enabled', async () => {
+    mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
-    const policiesCmd = commands.find((c) => c.name === 'policies');
-    expect(policiesCmd).toBeUndefined();
+    const agentsCmd = commands.find((c) => c.name === 'agents');
+    expect(agentsCmd).toBeDefined();
+  });
+
+  it('should exclude agents command when agents are disabled', async () => {
+    mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const agentsCmd = commands.find((c) => c.name === 'agents');
+    expect(agentsCmd).toBeUndefined();
   });
 });
 
@@ -202,9 +219,16 @@ describe('BuiltinCommandLoader profile', () => {
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: () => false,
-      getEnableMessageBusIntegration: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
+      getMcpEnabled: vi.fn().mockReturnValue(true),
+      getSkillManager: vi.fn().mockReturnValue({
+        getAllSkills: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 

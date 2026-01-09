@@ -19,7 +19,7 @@ import type {
   ToolResult,
   Config,
   ToolRegistry,
-  AnyToolInvocation,
+  MessageBus,
 } from '../index.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -30,6 +30,7 @@ import {
   Kind,
   ApprovalMode,
   HookSystem,
+  PolicyDecision,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -38,8 +39,8 @@ import {
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
-import { isShellInvocationAllowlisted } from '../utils/shell-permissions.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import type { PolicyEngine } from '../policy/policy-engine.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -48,7 +49,10 @@ vi.mock('fs/promises', () => ({
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
     super(
       TestApprovalTool.Name,
       'TestApprovalTool',
@@ -59,13 +63,17 @@ class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
         required: ['id'],
         type: 'object',
       },
+      messageBus,
     );
   }
 
-  protected createInvocation(params: {
-    id: string;
-  }): ToolInvocation<{ id: string }, ToolResult> {
-    return new TestApprovalInvocation(this.config, params);
+  protected createInvocation(
+    params: { id: string },
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ): ToolInvocation<{ id: string }, ToolResult> {
+    return new TestApprovalInvocation(this.config, params, messageBus);
   }
 }
 
@@ -76,8 +84,9 @@ class TestApprovalInvocation extends BaseToolInvocation<
   constructor(
     private config: Config,
     params: { id: string },
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -124,8 +133,9 @@ class AbortDuringConfirmationInvocation extends BaseToolInvocation<
     private readonly abortController: AbortController,
     private readonly abortError: Error,
     params: Record<string, unknown>,
+    messageBus: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   override async shouldConfirmExecute(
@@ -151,6 +161,7 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
   constructor(
     private readonly abortController: AbortController,
     private readonly abortError: Error,
+    messageBus: MessageBus,
   ) {
     super(
       'abortDuringConfirmationTool',
@@ -161,16 +172,21 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
         type: 'object',
         properties: {},
       },
+      messageBus,
     );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
     return new AbortDuringConfirmationInvocation(
       this.abortController,
       this.abortError,
       params,
+      messageBus,
     );
   }
 }
@@ -255,16 +271,38 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
     getActiveModel: () => DEFAULT_GEMINI_MODEL,
-    getUseSmartEdit: () => false,
     getGeminiClient: () => null,
-    getEnableMessageBusIntegration: () => false,
-    getMessageBus: () => null,
+    getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
-    getPolicyEngine: () => null,
     getExperiments: () => {},
   } as unknown as Config;
 
-  return { ...baseConfig, ...overrides } as Config;
+  const finalConfig = { ...baseConfig, ...overrides } as Config;
+
+  // Patch the policy engine to use the final config if not overridden
+  if (!overrides.getPolicyEngine) {
+    finalConfig.getPolicyEngine = () =>
+      ({
+        check: async (toolCall: { name: string; args: object }) => {
+          // Mock simple policy logic for tests
+          const mode = finalConfig.getApprovalMode();
+          if (mode === ApprovalMode.YOLO) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          const allowed = finalConfig.getAllowedTools();
+          if (
+            allowed &&
+            (allowed.includes(toolCall.name) ||
+              allowed.some((p) => toolCall.name.startsWith(p)))
+          ) {
+            return { decision: PolicyDecision.ALLOW };
+          }
+          return { decision: PolicyDecision.ASK_USER };
+        },
+      }) as unknown as PolicyEngine;
+  }
+
+  return finalConfig;
 }
 
 describe('CoreToolScheduler', () => {
@@ -534,6 +572,7 @@ describe('CoreToolScheduler', () => {
     const declarativeTool = new AbortDuringConfirmationTool(
       abortController,
       abortError,
+      createMockMessageBus(),
     );
 
     const mockToolRegistry = {
@@ -555,7 +594,7 @@ describe('CoreToolScheduler', () => {
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
-      isInteractive: () => false,
+      isInteractive: () => true,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -711,6 +750,17 @@ describe('CoreToolScheduler with payload', () => {
       );
     }
 
+    // After internal update, the tool should be awaiting approval again with the NEW content.
+    const updatedAwaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+
+    // Now confirm for real to execute.
+    await updatedAwaitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.ProceedOnce,
+    );
+
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
       expect(onAllToolCallsComplete).toHaveBeenCalled();
@@ -729,8 +779,8 @@ class MockEditToolInvocation extends BaseToolInvocation<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor(params: Record<string, unknown>) {
-    super(params);
+  constructor(params: Record<string, unknown>, messageBus: MessageBus) {
+    super(params, messageBus);
   }
 
   getDescription(): string {
@@ -765,20 +815,30 @@ class MockEditTool extends BaseDeclarativeTool<
   Record<string, unknown>,
   ToolResult
 > {
-  constructor() {
-    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+  constructor(messageBus: MessageBus) {
+    super(
+      'mockEditTool',
+      'mockEditTool',
+      'A mock edit tool',
+      Kind.Edit,
+      {},
+      messageBus,
+    );
   }
 
   protected createInvocation(
     params: Record<string, unknown>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new MockEditToolInvocation(params);
+    return new MockEditToolInvocation(params, messageBus);
   }
 }
 
 describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
-    const mockEditTool = new MockEditTool();
+    const mockEditTool = new MockEditTool(createMockMessageBus());
     const mockToolRegistry = {
       getTool: () => mockEditTool,
       getFunctionDeclarations: () => [],
@@ -1167,15 +1227,6 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should require approval for a chained shell command even when prefix is allowlisted', async () => {
-    expect(
-      isShellInvocationAllowlisted(
-        {
-          params: { command: 'git status && rm -rf /tmp/should-not-run' },
-        } as unknown as AnyToolInvocation,
-        ['run_shell_command(git)'],
-      ),
-    ).toBe(false);
-
     const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Shell command executed',
       returnDisplay: 'Shell command executed',
@@ -1224,6 +1275,10 @@ describe('CoreToolScheduler request queueing', () => {
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
+      getPolicyEngine: () =>
+        ({
+          check: async () => ({ decision: PolicyDecision.ASK_USER }),
+        }) as unknown as PolicyEngine,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -1347,7 +1402,7 @@ describe('CoreToolScheduler request queueing', () => {
       .fn()
       .mockReturnValue(new HookSystem(mockConfig));
 
-    const testTool = new TestApprovalTool(mockConfig);
+    const testTool = new TestApprovalTool(mockConfig, mockMessageBus);
     const toolRegistry = {
       getTool: () => testTool,
       getFunctionDeclarations: () => [],

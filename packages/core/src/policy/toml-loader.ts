@@ -44,6 +44,7 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  allow_redirection: z.boolean().optional(),
 });
 
 /**
@@ -198,7 +199,7 @@ function validateShellCommandSyntax(
  * @returns The escaped string.
  */
 export function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  return str.replace(/[.*+?^${}()|[\\]/g, '\\$&'); // $& means the whole matched string
 }
 
 /**
@@ -499,6 +500,7 @@ export async function loadPoliciesFromToml(
             argsPattern,
             commandPattern,
             modes,
+            allowRedirection: (item).allow_redirection,
           }),
         );
         rules.push(...parsedRules);

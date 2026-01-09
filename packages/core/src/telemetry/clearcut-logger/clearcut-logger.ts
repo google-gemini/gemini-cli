@@ -31,8 +31,8 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
@@ -89,8 +89,8 @@ export enum EventNames {
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
-  SMART_EDIT_STRATEGY = 'smart_edit_strategy',
-  SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  EDIT_STRATEGY = 'edit_strategy',
+  EDIT_CORRECTION = 'edit_correction',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
@@ -106,6 +106,9 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  exp?: {
+    gws_experiment: number[];
+  };
 }
 
 export interface EventValue {
@@ -250,7 +253,7 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
-  enqueueHelper(event: LogEvent): void {
+  enqueueHelper(event: LogEvent, experimentIds?: number[]): void {
     // Manually handle overflow for FixedDeque, which throws when full.
     const wasAtCapacity = this.events.size >= MAX_EVENTS;
 
@@ -258,12 +261,18 @@ export class ClearcutLogger {
       this.events.shift(); // Evict oldest element to make space.
     }
 
-    this.events.push([
-      {
-        event_time_ms: Date.now(),
-        source_extension_json: safeJsonStringify(event),
-      },
-    ]);
+    const logEventEntry: LogEventEntry = {
+      event_time_ms: Date.now(),
+      source_extension_json: safeJsonStringify(event),
+    };
+
+    if (experimentIds !== undefined) {
+      logEventEntry.exp = {
+        gws_experiment: experimentIds,
+      };
+    }
+
+    this.events.push([logEventEntry]);
 
     if (wasAtCapacity && this.config?.getDebugMode()) {
       debugLogger.debug(
@@ -277,7 +286,7 @@ export class ClearcutLogger {
       this.enqueueHelper(event);
     } catch (error) {
       if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
+        debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
       }
     }
   }
@@ -298,12 +307,10 @@ export class ClearcutLogger {
           event.event_metadata = [[...event.event_metadata[0], ...exp_id_data]];
         }
 
-        this.enqueueHelper(event);
+        this.enqueueHelper(event, experiments?.experimentIds);
       });
     } catch (error) {
-      if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
-      }
+      debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
     }
   }
 
@@ -435,7 +442,7 @@ export class ClearcutLogger {
         };
       } else {
         if (this.config?.getDebugMode()) {
-          console.error(
+          debugLogger.warn(
             `Error flushing log events: HTTP ${response.status}: ${response.statusText}`,
           );
         }
@@ -445,7 +452,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
-        console.error('Error flushing log events:', e as Error);
+        debugLogger.warn('Error flushing log events:', e as Error);
       }
 
       // Re-queue failed events for retry
@@ -1237,31 +1244,27 @@ export class ClearcutLogger {
     });
   }
 
-  logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
+  logEditStrategyEvent(event: EditStrategyEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_STRATEGY,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_STRATEGY,
         value: event.strategy,
       },
     ];
 
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.SMART_EDIT_STRATEGY, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_STRATEGY, data));
     this.flushIfNeeded();
   }
 
-  logSmartEditCorrectionEvent(event: SmartEditCorrectionEvent): void {
+  logEditCorrectionEvent(event: EditCorrectionEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_CORRECTION,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_CORRECTION,
         value: event.correction,
       },
     ];
 
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_CORRECTION, data));
     this.flushIfNeeded();
   }
 

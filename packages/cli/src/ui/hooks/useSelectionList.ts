@@ -7,6 +7,7 @@
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface SelectionListItem<T> {
   key: string;
@@ -198,7 +199,7 @@ function selectionListReducer(
 
     default: {
       const exhaustiveCheck: never = action;
-      console.error(`Unknown selection list action: ${exhaustiveCheck}`);
+      debugLogger.warn(`Unknown selection list action: ${exhaustiveCheck}`);
       return state;
     }
   }

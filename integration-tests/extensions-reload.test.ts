@@ -95,7 +95,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated list
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
@@ -110,9 +113,9 @@ describe('extension reloading', () => {
       // Update the extension, expect the list to update, and mcp servers as well.
       await run.sendKeys('\u0015/extensions update test-extension');
       await run.expectText('/extensions update test-extension');
-      await run.sendKeys('\r');
+      await run.type('\r');
       await new Promise((resolve) => setTimeout(resolve, 500));
-      await run.sendKeys('\r');
+      await run.type('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
@@ -123,7 +126,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated extension version
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/extensions list\r'),
+        async () => {
+          await run.sendText('/extensions list');
+          await run.type('\r');
+        },
         () =>
           stripAnsi(run.output).includes(
             'test-extension (v0.0.2) - active (updated)',
@@ -133,7 +139,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated mcp tool
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
@@ -146,7 +155,7 @@ describe('extension reloading', () => {
       );
 
       await run.sendText('/quit');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Clean things up.
       await serverA.stop();
