@@ -198,14 +198,6 @@ export class LoggingContentGenerator implements ContentGenerator {
           serverDetails,
         );
 
-        if (req.model === PREVIEW_GEMINI_MODEL) {
-          throw new TerminalQuotaError('Simulated quota exceeded', {
-            code: 429,
-            message: 'Simulated quota exceeded',
-            details: [],
-          });
-        }
-
         try {
           const response = await this.wrapped.generateContent(
             req,
