@@ -14,30 +14,11 @@ import {
   isCombiningMark,
   findNextWordAcrossLines,
   findPrevWordAcrossLines,
-  findWordEndInLine,
   findNextBigWordAcrossLines,
   findPrevBigWordAcrossLines,
-  findBigWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 import { assumeExhaustive } from '@google/gemini-cli-core';
-
-// Check if we're at the end of a base word (on the last base character)
-// Returns true if current position has a base character followed only by combining marks until non-word
-function isAtEndOfBaseWord(lineCodePoints: string[], col: number): boolean {
-  if (!isWordCharStrict(lineCodePoints[col])) return false;
-
-  // Look ahead to see if we have only combining marks followed by non-word
-  let i = col + 1;
-
-  // Skip any combining marks
-  while (i < lineCodePoints.length && isCombiningMark(lineCodePoints[i])) {
-    i++;
-  }
-
-  // If we hit end of line or non-word character, we were at end of base word
-  return i >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[i]);
-}
 
 export type VimAction = Extract<
   TextBufferAction,
@@ -103,14 +84,9 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, delete/change to end of current word or line
+          // No more words, delete/change to end of line
           const currentLine = lines[endRow] || '';
-          const wordEnd = findWordEndInLine(currentLine, endCol);
-          if (wordEnd !== null) {
-            endCol = wordEnd + 1; // Include the character at word end
-          } else {
-            endCol = cpLen(currentLine);
-          }
+          endCol = cpLen(currentLine);
           break;
         }
       }
@@ -146,14 +122,9 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, delete/change to end of current word or line
+          // No more words, delete/change to end of line
           const currentLine = lines[endRow] || '';
-          const wordEnd = findBigWordEndInLine(currentLine, endCol);
-          if (wordEnd !== null) {
-            endCol = wordEnd + 1; // Include the character at word end
-          } else {
-            endCol = cpLen(currentLine);
-          }
+          endCol = cpLen(currentLine);
           break;
         }
       }
@@ -752,37 +723,6 @@ export function handleVimAction(
       let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        // Special handling for the first iteration when we're at end of word
-        if (i === 0) {
-          const currentLine = lines[row] || '';
-          const lineCodePoints = toCodePoints(currentLine);
-
-          // Check if we're at the end of a word (on the last base character)
-          const atEndOfWord =
-            col < lineCodePoints.length &&
-            isWordCharStrict(lineCodePoints[col]) &&
-            (col + 1 >= lineCodePoints.length ||
-              !isWordCharWithCombining(lineCodePoints[col + 1]) ||
-              // Or if we're on a base char followed only by combining marks until non-word
-              (isWordCharStrict(lineCodePoints[col]) &&
-                isAtEndOfBaseWord(lineCodePoints, col)));
-
-          if (atEndOfWord) {
-            // We're already at end of word, find next word end
-            const nextWord = findNextWordAcrossLines(
-              lines,
-              row,
-              col + 1,
-              false,
-            );
-            if (nextWord) {
-              row = nextWord.row;
-              col = nextWord.col;
-              continue;
-            }
-          }
-        }
-
         const wordEnd = findNextWordAcrossLines(lines, row, col, false);
         if (wordEnd) {
           row = wordEnd.row;
@@ -806,38 +746,6 @@ export function handleVimAction(
       let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        // Special handling for the first iteration when we're at end of word
-        if (i === 0) {
-          const currentLine = lines[row] || '';
-          const lineCodePoints = toCodePoints(currentLine);
-
-          // Check if we're at the end of a big word (non-whitespace followed by whitespace or EOL)
-          // We must be on a non-whitespace character.
-          // Note: isWhitespace handles regular spaces.
-          // This logic mimics standard vim 'E': if at end of word, go to end of NEXT word.
-
-          const isBigWordChar =
-            col < lineCodePoints.length && !/\s/.test(lineCodePoints[col]);
-          const nextIsWhitespaceOrEOL =
-            col + 1 >= lineCodePoints.length ||
-            /\s/.test(lineCodePoints[col + 1]);
-
-          if (isBigWordChar && nextIsWhitespaceOrEOL) {
-            // We're already at end of big word, find next big word end
-            const nextWord = findNextBigWordAcrossLines(
-              lines,
-              row,
-              col + 1,
-              false,
-            );
-            if (nextWord) {
-              row = nextWord.row;
-              col = nextWord.col;
-              continue;
-            }
-          }
-        }
-
         const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
         if (wordEnd) {
           row = wordEnd.row;
