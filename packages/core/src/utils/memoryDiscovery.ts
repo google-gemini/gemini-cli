@@ -272,7 +272,10 @@ async function readGeminiMdFiles(
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
           // Check if it's a directory (EISDIR error) - skip silently
-          if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'EISDIR') {
+          if (
+            error instanceof Error &&
+            (error as NodeJS.ErrnoException).code === 'EISDIR'
+          ) {
             if (debugMode) {
               logger.debug(
                 `Skipping directory ${filePath} (expected file). Using parent directory for memory discovery instead.`,
@@ -555,8 +558,11 @@ export async function loadServerHierarchicalMemory(
     );
   return {
     memoryContent: combinedInstructions,
-    fileCount: contentsWithPaths.length,
-    filePaths,
+    fileCount: contentsWithPaths.filter((c) => typeof c.content === 'string')
+      .length,
+    filePaths: contentsWithPaths
+      .filter((c) => typeof c.content === 'string')
+      .map((c) => c.filePath),
   };
 }
 
