@@ -19,7 +19,6 @@ import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
-import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
@@ -187,30 +186,6 @@ function bufferBackslashEnter(
   bufferer.next(); // prime the generator so it starts listening.
 
   return (key: Key) => bufferer.next(key);
-}
-
-/**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
- *
- * This is to accommodate older terminals that paste text without bracketing.
- */
-function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
-  let lastKeyTime = 0;
-  return (key: Key) => {
-    const now = Date.now();
-    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: '',
-        sequence: '\r',
-        insertable: true,
-      });
-    } else {
-      keypressHandler(key);
-    }
-    lastKeyTime = now;
-  };
 }
 
 /**
@@ -661,9 +636,6 @@ export function KeypressProvider({
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
-    if (!terminalCapabilityManager.isBracketedPasteEnabled()) {
-      processor = bufferFastReturn(processor);
-    }
     processor = bufferBackslashEnter(processor);
     processor = bufferPaste(processor);
     let dataListener = createDataListener(processor);
