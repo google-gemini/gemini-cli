@@ -126,6 +126,15 @@ export function convertToFunctionResponse(
     debugLogger.warn(
       `Model ${model} does not support multimodal function responses. Sibling parts will be omitted to prevent API errors in parallel function calling.`,
     );
+    // If binary parts were omitted, update the response text to avoid misleading the model
+    if (
+      textParts.length === 0 &&
+      (inlineDataParts.length > 0 || fileDataParts.length > 0)
+    ) {
+      part.functionResponse!.response = {
+        output: `Binary content was provided but omitted because model '${model}' does not support it in function responses.`,
+      };
+    }
   }
 
   return [part];

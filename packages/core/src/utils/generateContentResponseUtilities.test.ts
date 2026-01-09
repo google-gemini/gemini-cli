@@ -212,12 +212,15 @@ describe('generateContentResponseUtilities', () => {
         llmContent,
         DEFAULT_GEMINI_MODEL,
       );
+      // Binary content is omitted for non-multimodal models, so message should reflect that
       expect(result).toEqual([
         {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content was provided but omitted because model '${DEFAULT_GEMINI_MODEL}' does not support it in function responses.`,
+            },
           },
         },
       ]);
