@@ -33,20 +33,28 @@ const getKeychainStorageName = (
   extensionName: string,
   extensionId: string,
   scope: ExtensionSettingScope,
+  workspaceDir?: string,
 ): string => {
   const base = `Gemini CLI Extensions ${extensionName} ${extensionId}`;
   if (scope === ExtensionSettingScope.WORKSPACE) {
-    return `${base} ${process.cwd()}`;
+    if (!workspaceDir) {
+      throw new Error('Workspace directory is required for workspace scope');
+    }
+    return `${base} ${workspaceDir}`;
   }
   return base;
 };
 
-const getEnvFilePath = (
+export const getEnvFilePath = (
   extensionName: string,
   scope: ExtensionSettingScope,
+  workspaceDir?: string,
 ): string => {
   if (scope === ExtensionSettingScope.WORKSPACE) {
-    return path.join(process.cwd(), EXTENSION_SETTINGS_FILENAME);
+    if (!workspaceDir) {
+      throw new Error('Workspace directory is required for workspace scope');
+    }
+    return path.join(workspaceDir, EXTENSION_SETTINGS_FILENAME);
   }
   return new ExtensionStorage(extensionName).getEnvFilePath();
 };
@@ -143,12 +151,13 @@ export async function getScopedEnvContents(
   extensionConfig: ExtensionConfig,
   extensionId: string,
   scope: ExtensionSettingScope,
+  workspaceDir?: string,
 ): Promise<Record<string, string>> {
   const { name: extensionName } = extensionConfig;
   const keychain = new KeychainTokenStorage(
-    getKeychainStorageName(extensionName, extensionId, scope),
+    getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );
-  const envFilePath = getEnvFilePath(extensionName, scope);
+  const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let customEnv: Record<string, string> = {};
   if (fsSync.existsSync(envFilePath)) {
     const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
@@ -171,6 +180,7 @@ export async function getScopedEnvContents(
 export async function getEnvContents(
   extensionConfig: ExtensionConfig,
   extensionId: string,
+  workspaceDir: string,
 ): Promise<Record<string, string>> {
   if (!extensionConfig.settings || extensionConfig.settings.length === 0) {
     return Promise.resolve({});
@@ -185,6 +195,7 @@ export async function getEnvContents(
     extensionConfig,
     extensionId,
     ExtensionSettingScope.WORKSPACE,
+    workspaceDir,
   );
 
   return { ...userSettings, ...workspaceSettings };
@@ -196,6 +207,7 @@ export async function updateSetting(
   settingKey: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   scope: ExtensionSettingScope,
+  workspaceDir?: string,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
@@ -214,7 +226,7 @@ export async function updateSetting(
 
   const newValue = await requestSetting(settingToUpdate);
   const keychain = new KeychainTokenStorage(
-    getKeychainStorageName(extensionName, extensionId, scope),
+    getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );
 
   if (settingToUpdate.sensitive) {
@@ -224,7 +236,7 @@ export async function updateSetting(
 
   // For non-sensitive settings, we need to read the existing .env file,
   // update the value, and write it back, preserving any other values.
-  const envFilePath = getEnvFilePath(extensionName, scope);
+  const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let envContent = '';
   if (fsSync.existsSync(envFilePath)) {
     envContent = await fs.readFile(envFilePath, 'utf-8');
@@ -302,13 +314,18 @@ async function clearSettings(
 export async function getMissingSettings(
   extensionConfig: ExtensionConfig,
   extensionId: string,
+  workspaceDir: string,
 ): Promise<ExtensionSetting[]> {
   const { settings } = extensionConfig;
   if (!settings || settings.length === 0) {
     return [];
   }
 
-  const existingSettings = await getEnvContents(extensionConfig, extensionId);
+  const existingSettings = await getEnvContents(
+    extensionConfig,
+    extensionId,
+    workspaceDir,
+  );
   const missingSettings: ExtensionSetting[] = [];
 
   for (const setting of settings) {
