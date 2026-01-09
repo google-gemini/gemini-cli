@@ -802,7 +802,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: `Agent execution stopped: ${systemMessage ?? reason}`,
+          text: `Agent execution stopped: ${systemMessage?.trim() || reason}`,
         },
         userMessageTimestamp,
       );
@@ -820,7 +820,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.WARNING,
-          text: `Agent execution blocked: ${systemMessage ?? reason}`,
+          text: `Agent execution blocked: ${systemMessage?.trim() || reason}`,
         },
         userMessageTimestamp,
       );
