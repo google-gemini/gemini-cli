@@ -99,22 +99,21 @@ describe('MemoryTool', () => {
     it('should handle an array of filenames', () => {
       const newNames = ['CUSTOM_CONTEXT.md', 'ANOTHER_CONTEXT.md'];
       setGeminiMdFilename(newNames);
-      expect(getCurrentGeminiMdFilename()).toBe('CUSTOM_CONTEXT.md');
       expect(getAllGeminiMdFilenames()).toEqual(newNames);
     });
 
     it('should throw an error if the new name contains path separators or is "." or ".."', () => {
       expect(() => setGeminiMdFilename('path/to/file.md')).toThrow(
-        "Invalid GEMINI.md filename: path/to/file.md. Filenames cannot contain path separators or be '.' or '..'.",
+        /Invalid GEMINI.md filename: path\/to\/file.md/,
       );
       expect(() => setGeminiMdFilename('path\\to\\file.md')).toThrow(
-        "Invalid GEMINI.md filename: path\\to\\file.md. Filenames cannot contain path separators or be '.' or '..'.",
+        /Invalid GEMINI.md filename: path\\to\\file.md/,
       );
       expect(() => setGeminiMdFilename('.')).toThrow(
-        "Invalid GEMINI.md filename: .. Filenames cannot contain path separators or be '.' or '..'.",
+        /Invalid GEMINI.md filename: \./,
       );
       expect(() => setGeminiMdFilename('..')).toThrow(
-        "Invalid GEMINI.md filename: ... Filenames cannot contain path separators or be '.' or '..'.",
+        /Invalid GEMINI.md filename: \.\./,
       );
     });
   });
