@@ -1014,6 +1014,123 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should await submitQuery before marking tools as submitted (race condition fix)', async () => {
+    // This tests the fix for the race condition where markToolsAsSubmitted was
+    // called BEFORE submitQuery completed, allowing user prompts to race ahead
+    // of tool responses and causing unrecoverable 400 errors.
+    // See: https://github.com/google-gemini/gemini-cli/issues/16144
+
+    const toolCallResponseParts: PartListUnion = [{ text: 'tool response' }];
+
+    const completedTool = {
+      request: {
+        callId: 'race-test-call',
+        name: 'test_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race-test',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false,
+      response: {
+        callId: 'race-test-call',
+        responseParts: toolCallResponseParts,
+        errorType: undefined,
+      },
+      tool: { displayName: 'TestTool' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    // Track the order of operations
+    const callOrder: string[] = [];
+    let resolveStreamPromise: () => void;
+    const streamPromise = new Promise<void>((resolve) => {
+      resolveStreamPromise = resolve;
+    });
+
+    // Mock sendMessageStream to be a slow async operation
+    mockSendMessageStream.mockImplementation(() => {
+      callOrder.push('sendMessageStream:start');
+      return (async function* () {
+        await streamPromise; // Wait until we explicitly resolve
+        callOrder.push('sendMessageStream:end');
+        yield { type: ServerGeminiEventType.Finished, text: '' };
+      })();
+    });
+
+    // Track when markToolsAsSubmitted is called
+    mockMarkToolsAsSubmitted.mockImplementation((callIds: string[]) => {
+      callOrder.push(`markToolsAsSubmitted:${callIds.join(',')}`);
+    });
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [completedTool],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Start tool completion (this will call submitQuery -> sendMessageStream)
+    const completionPromise = act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete([completedTool] as TrackedToolCall[]);
+      }
+    });
+
+    // Give time for sendMessageStream to start but NOT complete
+    await new Promise((r) => setTimeout(r, 10));
+
+    // At this point, sendMessageStream should have started but not finished
+    // markToolsAsSubmitted should NOT have been called yet (the fix!)
+    expect(callOrder).toContain('sendMessageStream:start');
+    expect(callOrder).not.toContain('markToolsAsSubmitted:race-test-call');
+
+    // Now resolve the stream
+    resolveStreamPromise!();
+    await completionPromise;
+
+    // After stream completes, markToolsAsSubmitted should be called
+    await waitFor(() => {
+      expect(callOrder).toContain('markToolsAsSubmitted:race-test-call');
+    });
+
+    // Verify the correct order: stream must complete before marking
+    const streamEndIndex = callOrder.indexOf('sendMessageStream:end');
+    const markIndex = callOrder.indexOf('markToolsAsSubmitted:race-test-call');
+    expect(streamEndIndex).toBeLessThan(markIndex);
+  });
+
   it('should not flicker streaming state to Idle between tool completion and submission', async () => {
     const toolCallResponseParts: PartListUnion = [
       { text: 'tool 1 final response' },
