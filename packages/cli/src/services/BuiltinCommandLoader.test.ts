@@ -58,6 +58,9 @@ import { CommandKind } from '../ui/commands/types.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
+vi.mock('../ui/commands/agentsCommand.js', () => ({
+  agentsCommand: { name: 'agents' },
+}));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
 vi.mock('../ui/commands/chatCommand.js', () => ({ chatCommand: {} }));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
@@ -101,7 +104,10 @@ describe('BuiltinCommandLoader', () => {
       getFolderTrust: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
       isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
@@ -187,6 +193,22 @@ describe('BuiltinCommandLoader', () => {
     const policiesCmd = commands.find((c) => c.name === 'policies');
     expect(policiesCmd).toBeDefined();
   });
+
+  it('should include agents command when agents are enabled', async () => {
+    mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const agentsCmd = commands.find((c) => c.name === 'agents');
+    expect(agentsCmd).toBeDefined();
+  });
+
+  it('should exclude agents command when agents are disabled', async () => {
+    mockConfig.isAgentsEnabled = vi.fn().mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const agentsCmd = commands.find((c) => c.name === 'agents');
+    expect(agentsCmd).toBeUndefined();
+  });
 });
 
 describe('BuiltinCommandLoader profile', () => {
@@ -199,7 +221,10 @@ describe('BuiltinCommandLoader profile', () => {
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
+      getEnableHooksUI: () => false,
+      getExtensionsEnabled: vi.fn().mockReturnValue(true),
       isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
