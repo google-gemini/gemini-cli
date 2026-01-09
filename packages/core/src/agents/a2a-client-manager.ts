@@ -105,6 +105,15 @@ export class A2AClientManager {
   }
 
   /**
+   * Invalidates all cached clients and agent cards.
+   */
+  clearCache(): void {
+    this.clients.clear();
+    this.agentCards.clear();
+    debugLogger.debug('[A2AClientManager] Cache cleared.');
+  }
+
+  /**
    * Sends a message to a loaded agent.
    * @param agentName The name of the agent to send the message to.
    * @param message The message content.
