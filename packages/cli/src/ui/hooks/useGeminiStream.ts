@@ -799,11 +799,10 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      const text = `Agent execution stopped: ${systemMessage ?? reason}`;
       addItem(
         {
           type: MessageType.INFO,
-          text,
+          text: `Agent execution stopped: ${systemMessage ?? reason}`,
         },
         userMessageTimestamp,
       );
@@ -818,11 +817,10 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      const text = `Agent execution blocked: ${systemMessage ?? reason}`;
       addItem(
         {
           type: MessageType.WARNING,
-          text,
+          text: `Agent execution blocked: ${systemMessage ?? reason}`,
         },
         userMessageTimestamp,
       );
