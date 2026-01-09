@@ -123,6 +123,11 @@ import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
+import { persistentState } from '../utils/persistentState.js';
+import {
+  shouldPromptForTerminalSetup,
+  terminalSetup,
+} from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import {
   WARNING_PROMPT_DURATION_MS,
@@ -418,6 +423,67 @@ export const AppContainer = (props: AppContainerProps) => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     initializeFromLogger(logger);
   }, [logger, initializeFromLogger]);
+
+  // One-time prompt to suggest running /terminal-setup when it would help.
+  useEffect(() => {
+    if (
+      !isConfigInitialized ||
+      !config.isInteractive() ||
+      !process.stdin.isTTY
+    ) {
+      return;
+    }
+
+    const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
+    if (hasBeenPrompted) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      const shouldPrompt = await shouldPromptForTerminalSetup();
+      if (!shouldPrompt || cancelled) return;
+
+      // Record that we've shown the prompt so it never appears again.
+      persistentState.set('terminalSetupPromptShown', true);
+
+      const consentText =
+        'Would you like to run `/terminal-setup` to configure Shift+Enter and Ctrl+Enter for multiline input in this terminal?';
+
+      const confirmed = await requestConsentInteractive(
+        consentText,
+        addConfirmUpdateExtensionRequest,
+      );
+
+      if (!confirmed || cancelled) return;
+
+      const result = await terminalSetup();
+      if (cancelled) return;
+
+      historyManager.addItem(
+        {
+          type: result.success ? 'info' : 'error',
+          text:
+            result.message +
+            (result.success && result.requiresRestart
+              ? '\n\nPlease restart your terminal for the changes to take effect.'
+              : ''),
+        },
+        Date.now(),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isConfigInitialized,
+    config,
+    addConfirmUpdateExtensionRequest,
+    historyManager,
+  ]);
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {

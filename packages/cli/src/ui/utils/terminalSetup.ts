@@ -321,6 +321,92 @@ async function configureAntigravity(): Promise<TerminalSetupResult> {
 }
 
 /**
+ * Determines whether it is useful to prompt the user to run /terminal-setup
+ * in the current environment.
+ *
+ * Returns true when:
+ * - Kitty/modifyOtherKeys keyboard protocol is not already enabled, and
+ * - We're running inside a supported terminal (VS Code, Cursor, Windsurf, Antigravity), and
+ * - The keybindings file either does not exist or does not already contain both
+ *   of our Shift+Enter and Ctrl+Enter bindings.
+ */
+export async function shouldPromptForTerminalSetup(): Promise<boolean> {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
+    return false;
+  }
+
+  const terminal = await detectTerminal();
+  if (!terminal) {
+    return false;
+  }
+
+  let appName: string;
+  switch (terminal) {
+    case 'vscode':
+      appName = 'Code';
+      break;
+    case 'cursor':
+      appName = 'Cursor';
+      break;
+    case 'windsurf':
+      appName = 'Windsurf';
+      break;
+    case 'antigravity':
+      appName = 'Antigravity';
+      break;
+    default:
+      return false;
+  }
+
+  const configDir = getVSCodeStyleConfigDir(appName);
+  if (!configDir) {
+    return false;
+  }
+
+  const keybindingsFile = path.join(configDir, 'keybindings.json');
+
+  try {
+    const content = await fs.readFile(keybindingsFile, 'utf8');
+    const cleanContent = stripJsonComments(content);
+    const parsedContent = JSON.parse(cleanContent);
+
+    if (!Array.isArray(parsedContent)) {
+      return true;
+    }
+
+    const hasOurShiftEnter = parsedContent.some((kb) => {
+      const binding = kb as {
+        command?: string;
+        args?: { text?: string };
+        key?: string;
+      };
+      return (
+        binding.key === 'shift+enter' &&
+        binding.command === 'workbench.action.terminal.sendSequence' &&
+        binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+      );
+    });
+
+    const hasOurCtrlEnter = parsedContent.some((kb) => {
+      const binding = kb as {
+        command?: string;
+        args?: { text?: string };
+        key?: string;
+      };
+      return (
+        binding.key === 'ctrl+enter' &&
+        binding.command === 'workbench.action.terminal.sendSequence' &&
+        binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+      );
+    });
+
+    return !(hasOurShiftEnter && hasOurCtrlEnter);
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Main terminal setup function that detects and configures the current terminal.
  *
  * This function:
