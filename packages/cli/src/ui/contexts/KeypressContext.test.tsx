@@ -224,40 +224,60 @@ describe('KeypressContext', () => {
     });
   });
 
-  describe('Tab and Backspace handling', () => {
+  describe('Tab, Backspace, and Space handling', () => {
     it.each([
       {
         name: 'Tab key',
-        sequence: '\x1b[9u',
+        inputSequence: '\x1b[9u',
         expected: { name: 'tab', shift: false },
       },
       {
         name: 'Shift+Tab',
-        sequence: '\x1b[9;2u',
+        inputSequence: '\x1b[9;2u',
         expected: { name: 'tab', shift: true },
       },
       {
         name: 'Backspace',
-        sequence: '\x1b[127u',
+        inputSequence: '\x1b[127u',
         expected: { name: 'backspace', meta: false },
       },
       {
         name: 'Option+Backspace',
-        sequence: '\x1b[127;3u',
+        inputSequence: '\x1b[127;3u',
         expected: { name: 'backspace', meta: true },
       },
       {
         name: 'Ctrl+Backspace',
-        sequence: '\x1b[127;5u',
+        inputSequence: '\x1b[127;5u',
         expected: { name: 'backspace', ctrl: true },
+      },
+      {
+        name: 'Shift+Space',
+        inputSequence: '\x1b[32;2u',
+        expected: {
+          name: 'space',
+          shift: true,
+          insertable: true,
+          sequence: ' ',
+        },
+      },
+      {
+        name: 'Ctrl+Space',
+        inputSequence: '\x1b[32;5u',
+        expected: {
+          name: 'space',
+          ctrl: true,
+          insertable: false,
+          sequence: '\x1b[32;5u',
+        },
       },
     ])(
       'should recognize $name in kitty protocol',
-      async ({ sequence, expected }) => {
+      async ({ inputSequence, expected }) => {
         const { keyHandler } = setupKeypressTest();
 
         act(() => {
-          stdin.write(sequence);
+          stdin.write(inputSequence);
         });
 
         expect(keyHandler).toHaveBeenCalledWith(
