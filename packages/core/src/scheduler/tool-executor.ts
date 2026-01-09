@@ -99,6 +99,7 @@ export class ToolExecutor {
               shellExecutionConfig,
               setPidCallback,
               this.config,
+              call.inputModification,
             );
           } else {
             promise = executeToolWithHooks(
@@ -112,6 +113,7 @@ export class ToolExecutor {
               shellExecutionConfig,
               undefined,
               this.config,
+              call.inputModification,
             );
           }
 

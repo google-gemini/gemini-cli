@@ -35,6 +35,11 @@ export interface ToolCallResponseInfo {
   contentLength?: number;
 }
 
+export interface InputModificationInfo {
+  wasModified: boolean;
+  modifiedKeys: string[];
+}
+
 export type ValidatingToolCall = {
   status: 'validating';
   request: ToolCallRequestInfo;
@@ -42,6 +47,7 @@ export type ValidatingToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type ScheduledToolCall = {
@@ -51,6 +57,7 @@ export type ScheduledToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type ErroredToolCall = {
@@ -60,6 +67,7 @@ export type ErroredToolCall = {
   tool?: AnyDeclarativeTool;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type SuccessfulToolCall = {
@@ -70,6 +78,7 @@ export type SuccessfulToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type ExecutingToolCall = {
@@ -81,6 +90,7 @@ export type ExecutingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;
+  inputModification?: InputModificationInfo;
 };
 
 export type CancelledToolCall = {
@@ -91,6 +101,7 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type WaitingToolCall = {
@@ -101,6 +112,7 @@ export type WaitingToolCall = {
   confirmationDetails: ToolCallConfirmationDetails;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  inputModification?: InputModificationInfo;
 };
 
 export type Status = ToolCall['status'];

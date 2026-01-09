@@ -15,6 +15,7 @@ import {
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -24,7 +25,10 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { fireToolNotificationHook } from './coreToolHookTriggers.js';
+import {
+  fireToolNotificationHook,
+  fireBeforeToolHook,
+} from './coreToolHookTriggers.js';
 import {
   type ToolCall,
   type ValidatingToolCall,
@@ -570,7 +574,8 @@ export class CoreToolScheduler {
 
     // This logic is moved from the old `for` loop in `_schedule`.
     if (toolCall.status === 'validating') {
-      const { request: reqInfo, invocation } = toolCall;
+      const { request: reqInfo } = toolCall;
+      let { invocation } = toolCall;
 
       try {
         if (signal.aborted) {
@@ -583,6 +588,87 @@ export class CoreToolScheduler {
           // The completion check will handle the cascade.
           await this.checkAndNotifyCompletion(signal);
           return;
+        }
+
+        const messageBus = this.config.getMessageBus();
+        const hooksEnabled = this.config.getEnableHooks();
+        let hookDecision: string | undefined = undefined;
+        let hookSystemMessage: string | undefined = undefined;
+
+        // Fire BeforeTool hook
+        if (hooksEnabled && messageBus) {
+          const beforeOutput = await fireBeforeToolHook(
+            messageBus,
+            reqInfo.name,
+            invocation.params as Record<string, unknown>,
+          );
+
+          if (beforeOutput?.shouldStopExecution()) {
+            const reason = beforeOutput.getEffectiveReason();
+            this.setStatusInternal(
+              reqInfo.callId,
+              'error',
+              signal,
+              createErrorResponse(
+                reqInfo,
+                new Error(`Agent execution stopped by hook: ${reason}`),
+                ToolErrorType.STOP_EXECUTION,
+              ),
+            );
+            await this.checkAndNotifyCompletion(signal);
+            return;
+          }
+
+          const blockingError = beforeOutput?.getBlockingError();
+          if (blockingError?.blocked) {
+            this.setStatusInternal(
+              reqInfo.callId,
+              'error',
+              signal,
+              createErrorResponse(
+                reqInfo,
+                new Error(`Tool execution blocked: ${blockingError.reason}`),
+                ToolErrorType.EXECUTION_FAILED,
+              ),
+            );
+            await this.checkAndNotifyCompletion(signal);
+            return;
+          }
+
+          hookDecision = beforeOutput?.decision;
+          hookSystemMessage = beforeOutput?.systemMessage;
+
+          if (beforeOutput instanceof BeforeToolHookOutput) {
+            const modifiedInput = beforeOutput.getModifiedToolInput();
+            if (modifiedInput) {
+              Object.assign(invocation.params, modifiedInput);
+              // Recreate invocation to validate and update derived state
+              const invocationOrError = this.buildInvocation(
+                toolCall.tool,
+                invocation.params,
+              );
+              if (invocationOrError instanceof Error) {
+                this.setStatusInternal(
+                  reqInfo.callId,
+                  'error',
+                  signal,
+                  createErrorResponse(
+                    reqInfo,
+                    invocationOrError,
+                    ToolErrorType.INVALID_TOOL_PARAMS,
+                  ),
+                );
+                await this.checkAndNotifyCompletion(signal);
+                return;
+              }
+              invocation = invocationOrError;
+              toolCall.invocation = invocation;
+              toolCall.inputModification = {
+                wasModified: true,
+                modifiedKeys: Object.keys(modifiedInput),
+              };
+            }
+          }
         }
 
         // Policy Check using PolicyEngine
@@ -611,90 +697,104 @@ export class CoreToolScheduler {
           return;
         }
 
-        if (decision === PolicyDecision.ALLOW) {
+        const confirmationDetails =
+          await invocation.shouldConfirmExecute(signal);
+
+        const requiresConfirmation =
+          !!confirmationDetails ||
+          hookDecision === 'ask' ||
+          decision === PolicyDecision.ASK_USER;
+
+        if (!requiresConfirmation) {
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
         } else {
-          // PolicyDecision.ASK_USER
+          // PolicyDecision.ASK_USER or Hook 'ask'
 
-          // We need confirmation details to show to the user
-          const confirmationDetails =
-            await invocation.shouldConfirmExecute(signal);
-
-          if (!confirmationDetails) {
-            this.setToolCallOutcome(
-              reqInfo.callId,
-              ToolConfirmationOutcome.ProceedAlways,
-            );
-            this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
-          } else {
-            if (!this.config.isInteractive()) {
-              throw new Error(
-                `Tool execution for "${
-                  toolCall.tool.displayName || toolCall.tool.name
-                }" requires user confirmation, which is not supported in non-interactive mode.`,
-              );
-            }
-
-            // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
-            if (hooksEnabled && messageBus) {
-              await fireToolNotificationHook(messageBus, confirmationDetails);
-            }
-
-            // Allow IDE to resolve confirmation
-            if (
-              confirmationDetails.type === 'edit' &&
-              confirmationDetails.ideConfirmation
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              confirmationDetails.ideConfirmation.then((resolution) => {
-                if (resolution.status === 'accepted') {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.ProceedOnce,
-                    signal,
-                  );
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.Cancel,
-                    signal,
-                  );
-                }
-              });
-            }
-
-            const originalOnConfirm = confirmationDetails.onConfirm;
-            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-              ...confirmationDetails,
-              onConfirm: (
-                outcome: ToolConfirmationOutcome,
-                payload?: ToolConfirmationPayload,
-              ) =>
-                this.handleConfirmationResponse(
-                  reqInfo.callId,
-                  originalOnConfirm,
-                  outcome,
-                  signal,
-                  payload,
-                ),
-            };
-            this.setStatusInternal(
-              reqInfo.callId,
-              'awaiting_approval',
-              signal,
-              wrappedConfirmationDetails,
+          if (!this.config.isInteractive()) {
+            throw new Error(
+              `Tool execution for "${
+                toolCall.tool.displayName || toolCall.tool.name
+              }" requires user confirmation, which is not supported in non-interactive mode.`,
             );
           }
+
+          // Construct valid confirmation details if they don't exist (e.g. forced by 'ask')
+          const finalConfirmationDetails: ToolCallConfirmationDetails =
+            confirmationDetails || {
+              type: 'info',
+              title: `Confirm: ${
+                toolCall.tool.displayName || toolCall.tool.name
+              }`,
+              prompt: `Tool execution was flagged for confirmation.`,
+              onConfirm: async () => {},
+              systemMessage: hookSystemMessage,
+            };
+
+          // Ensure system message is attached if provided by hook
+          if (hookSystemMessage && !finalConfirmationDetails.systemMessage) {
+            finalConfirmationDetails.systemMessage = hookSystemMessage;
+          }
+
+          // Fire Notification hook before showing confirmation to user
+          if (hooksEnabled && messageBus) {
+            await fireToolNotificationHook(
+              messageBus,
+              finalConfirmationDetails,
+            );
+          }
+
+          // Allow IDE to resolve confirmation
+          if (
+            finalConfirmationDetails.type === 'edit' &&
+            finalConfirmationDetails.ideConfirmation
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            finalConfirmationDetails.ideConfirmation.then((resolution) => {
+              if (resolution.status === 'accepted') {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  finalConfirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.ProceedOnce,
+                  signal,
+                );
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  finalConfirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.Cancel,
+                  signal,
+                );
+              }
+            });
+          }
+
+          const originalOnConfirm = finalConfirmationDetails.onConfirm;
+          const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+            ...finalConfirmationDetails,
+            onConfirm: (
+              outcome: ToolConfirmationOutcome,
+              payload?: ToolConfirmationPayload,
+            ) =>
+              this.handleConfirmationResponse(
+                reqInfo.callId,
+                originalOnConfirm,
+                outcome,
+                signal,
+                payload,
+              ),
+          };
+          this.setStatusInternal(
+            reqInfo.callId,
+            'awaiting_approval',
+            signal,
+            wrappedConfirmationDetails,
+          );
         }
       } catch (error) {
         if (signal.aborted) {

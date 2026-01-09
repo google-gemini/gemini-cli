@@ -371,6 +371,15 @@ export const ToolConfirmationMessage: React.FC<
         {bodyContent}
       </Box>
 
+      {/* System Message */}
+      {confirmationDetails.systemMessage && (
+        <Box marginBottom={1} flexShrink={0}>
+          <Text color={theme.status.warning}>
+            [System] {confirmationDetails.systemMessage}
+          </Text>
+        </Box>
+      )}
+
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
         <Text color={theme.text.primary}>{question}</Text>
