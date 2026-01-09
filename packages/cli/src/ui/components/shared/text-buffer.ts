@@ -578,6 +578,7 @@ interface UndoHistoryEntry {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  pastedContent: Record<string, string>;
 }
 
 function calculateInitialCursorPosition(
@@ -1129,6 +1130,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
+    pastedContent: { ...currentState.pastedContent },
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -1683,6 +1685,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1700,6 +1703,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1788,21 +1792,7 @@ export function textBufferReducer(
   action: TextBufferAction,
   options: TextBufferOptions = {},
 ): TextBufferState {
-  let newState = textBufferReducerLogic(state, action, options);
-
-  // Clean up orphaned pastedContent entries when text changes
-  const pastedContentKeys = Object.keys(newState.pastedContent);
-  if (newState.lines !== state.lines && pastedContentKeys.length > 0) {
-    const newText = newState.lines.join('\n');
-    const cleaned = Object.fromEntries(
-      Object.entries(newState.pastedContent).filter(([id]) =>
-        newText.includes(id),
-      ),
-    );
-    if (Object.keys(cleaned).length !== pastedContentKeys.length) {
-      newState = { ...newState, pastedContent: cleaned };
-    }
-  }
+  const newState = textBufferReducerLogic(state, action, options);
 
   const newTransformedLines =
     newState.lines !== state.lines
