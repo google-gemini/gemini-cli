@@ -190,7 +190,6 @@ export function SettingsDialog({
       const keys = getDialogSettingKeys();
       const entries = await Promise.all(
         keys.map(async (key) => {
-          // Only async operations go through getEffectiveDefaultValue
           if (key === 'model.compressionThreshold') {
             try {
               const value = await getEffectiveDefaultValue(key, config);
@@ -203,7 +202,6 @@ export function SettingsDialog({
               return [key, getDefaultValue(key)] as [string, SettingsValue];
             }
           }
-          // Synchronous defaults don't need to be wrapped in async
           return [key, getDefaultValue(key)] as [string, SettingsValue];
         }),
       );
