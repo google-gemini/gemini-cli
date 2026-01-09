@@ -141,3 +141,8 @@ available combinations.
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
   the numbered radio option and confirm when the full number is entered.
+
+## Vim Mode
+
+If you have [Vim mode](./vim-mode.md) enabled, a wide range of standard Vim
+navigation and editing commands are available.
