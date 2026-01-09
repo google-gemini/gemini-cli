@@ -165,6 +165,12 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  // Use ref to avoid stale closure in initialization useEffect
+  // This allows the effect to access current historyManager without re-running on every history change
+  const historyManagerRef = useRef(historyManager);
+  useEffect(() => {
+    historyManagerRef.current = historyManager;
+  });
   useMemoryMonitor(historyManager);
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
@@ -309,7 +315,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
         if (result) {
           if (result.systemMessage) {
-            historyManager.addItem(
+            historyManagerRef.current.addItem(
               {
                 type: MessageType.INFO,
                 text: result.systemMessage,
@@ -347,12 +353,7 @@ export const AppContainer = (props: AppContainerProps) => {
         await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
       }
     });
-    // Disable the dependencies check here. historyManager gets flagged
-    // but we don't want to react to changes to it because each new history
-    // item, including the ones from the start session hook will cause a
-    // re-render and an error when we try to reload config.
-    //
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // historyManager accessed via ref to avoid re-running on every history change
   }, [config, resumedSessionData]);
 
   useEffect(
