@@ -53,6 +53,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -291,7 +292,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   }
 
   // Register hooks command if hooks are enabled
-  if (settings?.tools?.enableHooks) {
+  if (getEnableHooksUI(settings)) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -504,14 +505,21 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode) {
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
-      debugLogger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      if (settings.admin?.secureModeEnabled) {
+        debugLogger.error(
+          'YOLO mode is disabled by "secureModeEnabled" setting.',
+        );
+      } else {
+        debugLogger.error(
+          'YOLO mode is disabled by the "disableYolo" setting.',
+        );
+      }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode when it is disabled by settings',
+        'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
-    approvalMode = ApprovalMode.DEFAULT;
   } else if (approvalMode === ApprovalMode.YOLO) {
     debugLogger.warn(
       'YOLO mode is enabled. All tool calls will be automatically approved.',
@@ -627,6 +635,9 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+  const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -645,12 +656,18 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: settings.mcp?.serverCommand,
-    mcpServers: settings.mcpServers,
-    allowedMcpServers: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
-    blockedMcpServers: argv.allowedMcpServerNames
-      ? undefined
-      : settings.mcp?.excluded,
+    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
+    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnabled,
+    extensionsEnabled,
+    allowedMcpServers: mcpEnabled
+      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      : undefined,
+    blockedMcpServers: mcpEnabled
+      ? argv.allowedMcpServerNames
+        ? undefined
+        : settings.mcp?.excluded
+      : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
     enableEnvironmentVariableRedaction:
@@ -659,7 +676,8 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    disableYoloMode: settings.security?.disableYoloMode,
+    disableYoloMode:
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -714,16 +732,16 @@ export async function loadCliConfig(
     },
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
-    introspectionAgentSettings:
-      settings.experimental?.introspectionAgentSettings,
     generalSubagentSettings: settings.experimental?.generalSubagentSettings,
+    cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.tools?.enableHooks,
+    enableHooks: getEnableHooks(settings),
+    enableHooksUI: getEnableHooksUI(settings),
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
