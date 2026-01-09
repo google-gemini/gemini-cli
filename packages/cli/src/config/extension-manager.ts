@@ -800,8 +800,7 @@ Would you like to attempt to install via "git clone" instead?`,
     return output;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async disableExtension(name: string, scope: any) {
+  async disableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
@@ -836,8 +835,7 @@ Would you like to attempt to install via "git clone" instead?`,
    * Enables an existing extension for a given scope, and starts it if
    * appropriate.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async enableExtension(name: string, scope: any) {
+  async enableExtension(name: string, scope: SettingScope) {
     if (
       scope === SettingScope.System ||
       scope === SettingScope.SystemDefaults
