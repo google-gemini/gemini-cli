@@ -375,6 +375,51 @@ export async function main() {
     }
   }
 
+  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
+    projectHooks: settings.workspace.settings.hooks,
+  });
+
+  // Refresh auth to fetch remote admin settings from CCPA and before entering
+  // the sandbox because the sandbox will interfere with the Oauth2 web
+  // redirect.
+  if (
+    settings.merged.security?.auth?.selectedType &&
+    !settings.merged.security?.auth?.useExternal
+  ) {
+    try {
+      if (partialConfig.isInteractive()) {
+        const err = validateAuthMethod(
+          settings.merged.security.auth.selectedType,
+        );
+        if (err) {
+          throw new Error(err);
+        }
+
+        await partialConfig.refreshAuth(
+          settings.merged.security.auth.selectedType,
+        );
+      } else {
+        const authType = await validateNonInteractiveAuth(
+          settings.merged.security?.auth?.selectedType,
+          settings.merged.security?.auth?.useExternal,
+          partialConfig,
+          settings,
+        );
+        await partialConfig.refreshAuth(authType);
+      }
+    } catch (err) {
+      debugLogger.error('Error authenticating:', err);
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+    }
+  }
+
+  const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
+  // Set remote admin settings if returned from CCPA.
+  if (remoteAdminSettings) {
+    settings.setRemoteAdminSettings(remoteAdminSettings);
+  }
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.advanced?.autoConfigureMemory
@@ -388,45 +433,6 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
-      const partialConfig = await loadCliConfig(
-        settings.merged,
-        sessionId,
-        argv,
-        { projectHooks: settings.workspace.settings.hooks },
-      );
-
-      if (
-        settings.merged.security?.auth?.selectedType &&
-        !settings.merged.security?.auth?.useExternal
-      ) {
-        try {
-          if (partialConfig.isInteractive()) {
-            // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
-            const err = validateAuthMethod(
-              settings.merged.security.auth.selectedType,
-            );
-            if (err) {
-              throw new Error(err);
-            }
-
-            await partialConfig.refreshAuth(
-              settings.merged.security.auth.selectedType,
-            );
-          } else {
-            const authType = await validateNonInteractiveAuth(
-              settings.merged.security?.auth?.selectedType,
-              settings.merged.security?.auth?.useExternal,
-              partialConfig,
-              settings,
-            );
-            await partialConfig.refreshAuth(authType);
-          }
-        } catch (err) {
-          debugLogger.error('Error authenticating:', err);
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-        }
-      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
@@ -588,7 +594,7 @@ export async function main() {
     let input = config.getQuestion();
     const startupWarnings = [
       ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings()),
+      ...(await getUserStartupWarnings(settings.merged)),
     ];
 
     // Handle --resume flag
