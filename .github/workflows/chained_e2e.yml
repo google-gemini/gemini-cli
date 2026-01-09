@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'workflow'
   merge_group:
   workflow_run:
     workflows: ['Trigger E2E']
@@ -18,7 +19,7 @@ on:
         required: true
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.event.workflow_run.head_branch || github.ref }}'
+  group: 'e2e-${{ github.head_ref || github.event.workflow_run.head_branch || github.ref }}'
   cancel-in-progress: |-
     ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
@@ -30,18 +31,17 @@ jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     permissions: 'read-all'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
       - id: 'merge-queue-e2e-skipper'
         uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
-        with:
-          secret: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+        # with:  # Removed for fork testing
     continue-on-error: true
 
   download_repo_name:
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     if: "${{github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'}}"
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
@@ -89,7 +89,7 @@ jobs:
 
   parse_run_context:
     name: 'Parse run context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     needs: 'download_repo_name'
     if: 'always()'
     outputs:
@@ -107,7 +107,7 @@ jobs:
           echo "SHA=$SHA" >> "$GITHUB_OUTPUT"
 
   set_pending_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     permissions: 'write-all'
     needs:
       - 'parse_run_context'
@@ -120,7 +120,7 @@ jobs:
           allowForks: 'true'
           repo: '${{ github.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          token: '${{ github.token }}'
           status: 'pending'
           context: 'E2E (Chained)'
 
@@ -129,7 +129,7 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
@@ -223,7 +223,7 @@ jobs:
       - 'parse_run_context'
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: 'windows-latest'
     continue-on-error: true
 
     steps:
@@ -285,7 +285,7 @@ jobs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'merge_queue_skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check E2E test results'
         run: |
@@ -297,7 +297,7 @@ jobs:
           echo "All required E2E jobs passed!"
 
   set_workflow_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     permissions: 'write-all'
     if: 'always()'
     needs:
