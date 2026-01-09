@@ -1077,7 +1077,7 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Disable LLM Correction',
         category: 'Tools',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description: oneLine`
           Disable LLM-based error correction for edit tools.

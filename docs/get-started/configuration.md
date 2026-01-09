@@ -689,6 +689,7 @@ their corresponding top-level category object in your `settings.json` file.
     enabled, tools will fail immediately if exact string matches are not found,
     instead of attempting to self-correct.
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
   - **Description:** Enable the hooks system for intercepting and customizing

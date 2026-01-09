@@ -459,26 +459,17 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         filePath,
-
         originalContent,
-
         {
           old_string: originalContent,
-
           new_string: proposedContent,
-
           file_path: filePath,
         },
-
         mockGeminiClientInstance,
-
         mockBaseLlmClientInstance,
-
         abortSignal,
-
         false,
       );
-
       expect(confirmation).toEqual(
         expect.objectContaining({
           title: `Confirm Write: ${path.basename(filePath)}`,
@@ -670,11 +661,8 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
         proposedContent,
-
         mockBaseLlmClientInstance,
-
         abortSignal,
-
         false,
       );
 
@@ -725,23 +713,15 @@ describe('WriteFileTool', () => {
 
       expect(mockEnsureCorrectEdit).toHaveBeenCalledWith(
         filePath,
-
         initialContent,
-
         {
           old_string: initialContent,
-
           new_string: proposedContent,
-
           file_path: filePath,
         },
-
         mockGeminiClientInstance,
-
         mockBaseLlmClientInstance,
-
         abortSignal,
-
         false,
       );
 
