@@ -54,5 +54,11 @@ gha-creds-*.json
 # Log files
 patch_output.log
 
+# Agent work and session notes
+situacion-nuevo-agente.md
+github-bot.md
+esta-aceptada-del-todo-o-no-borrar-al-leer.md
+*.txt
+
 .genkit
 .gemini-clipboard/
