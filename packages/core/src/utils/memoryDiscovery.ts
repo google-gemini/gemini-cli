@@ -7,14 +7,13 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, homedir } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -253,6 +252,18 @@ async function readGeminiMdFiles(
     const batchPromises = batch.map(
       async (filePath): Promise<GeminiFileContent> => {
         try {
+          // Check if path is a directory before attempting to read
+          const stats = await fs.lstat(filePath);
+          if (stats.isDirectory()) {
+            // Skip directories silently - they're valid memory folders
+            if (debugMode) {
+              logger.debug(
+                `Skipping directory ${filePath} (expected file). Using parent directory for memory discovery instead.`,
+              );
+            }
+            return { filePath, content: null };
+          }
+
           const content = await fs.readFile(filePath, 'utf-8');
 
           // Process imports in the content
@@ -543,9 +554,12 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     importFormat,
   );
+  const validContents = contentsWithPaths.filter(
+    (item) => item.content !== null,
+  );
   // Pass CWD for relative path display in concatenated content
   const combinedInstructions = concatenateInstructions(
-    contentsWithPaths,
+    validContents,
     currentWorkingDirectory,
   );
   if (debugMode)
@@ -558,11 +572,8 @@ export async function loadServerHierarchicalMemory(
     );
   return {
     memoryContent: combinedInstructions,
-    fileCount: contentsWithPaths.filter((c) => typeof c.content === 'string')
-      .length,
-    filePaths: contentsWithPaths
-      .filter((c) => typeof c.content === 'string')
-      .map((c) => c.filePath),
+    fileCount: validContents.length,
+    filePaths: validContents.map((item) => item.filePath),
   };
 }
 
