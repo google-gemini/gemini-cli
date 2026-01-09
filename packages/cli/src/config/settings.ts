@@ -10,7 +10,6 @@ import { platform, homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
-  debugLogger,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -32,7 +31,6 @@ import {
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
-import type { ExtensionManager } from './extension-manager.js';
 import {
   validateSettings,
   formatValidationError,
@@ -578,32 +576,6 @@ export function loadSettings(
     isTrusted,
     settingsErrors,
   );
-}
-
-export function migrateDeprecatedSettings(
-  loadedSettings: LoadedSettings,
-  extensionManager: ExtensionManager,
-): void {
-  const processScope = (scope: LoadableSettingScope) => {
-    const settings = loadedSettings.forScope(scope).settings;
-    if (settings.extensions?.disabled) {
-      debugLogger.log(
-        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
-      );
-      for (const extension of settings.extensions.disabled ?? []) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        extensionManager.disableExtension(extension, scope);
-      }
-
-      const newExtensionsValue = { ...settings.extensions };
-      newExtensionsValue.disabled = undefined;
-
-      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
-    }
-  };
-
-  processScope(SettingScope.User);
-  processScope(SettingScope.Workspace);
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {

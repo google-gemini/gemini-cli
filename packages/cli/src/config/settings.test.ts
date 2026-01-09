@@ -66,14 +66,11 @@ import {
   getSystemSettingsPath,
   getSystemDefaultsPath,
   type Settings,
-  migrateDeprecatedSettings,
-  SettingScope,
   saveSettings,
   type SettingsFile,
   getDefaultsFromSchema,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
-import { ExtensionManager } from './extension-manager.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -1602,138 +1599,6 @@ describe('Settings Loading and Merging', () => {
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
-    });
-  });
-
-  describe('migrateDeprecatedSettings', () => {
-    let mockFsExistsSync: Mock;
-    let mockFsReadFileSync: Mock;
-
-    beforeEach(() => {
-      vi.resetAllMocks();
-      mockFsExistsSync = vi.mocked(fs.existsSync);
-      mockFsExistsSync.mockReturnValue(true);
-      mockFsReadFileSync = vi.mocked(fs.readFileSync);
-      mockFsReadFileSync.mockReturnValue('{}');
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
-        isTrusted: true,
-        source: undefined,
-      });
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should migrate disabled extensions from user and workspace settings', () => {
-      const userSettingsContent = {
-        extensions: {
-          disabled: ['user-ext-1', 'shared-ext'],
-        },
-      };
-      const workspaceSettingsContent = {
-        extensions: {
-          disabled: ['workspace-ext-1', 'shared-ext'],
-        },
-      };
-
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-          return JSON.stringify(workspaceSettingsContent);
-        return '{}';
-      });
-
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
-      const mockDisableExtension = vi.spyOn(
-        extensionManager,
-        'disableExtension',
-      );
-      mockDisableExtension.mockImplementation(async () => {});
-
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
-
-      // Check user settings migration
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'user-ext-1',
-        SettingScope.User,
-      );
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'shared-ext',
-        SettingScope.User,
-      );
-
-      // Check workspace settings migration
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'workspace-ext-1',
-        SettingScope.Workspace,
-      );
-      expect(mockDisableExtension).toHaveBeenCalledWith(
-        'shared-ext',
-        SettingScope.Workspace,
-      );
-
-      // Check that setValue was called to remove the deprecated setting
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'extensions',
-        {
-          disabled: undefined,
-        },
-      );
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.Workspace,
-        'extensions',
-        {
-          disabled: undefined,
-        },
-      );
-    });
-
-    it('should not do anything if there are no deprecated settings', () => {
-      const userSettingsContent = {
-        extensions: {
-          enabled: ['user-ext-1'],
-        },
-      };
-      const workspaceSettingsContent = {
-        someOtherSetting: 'value',
-      };
-
-      mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
-        if (p === USER_SETTINGS_PATH)
-          return JSON.stringify(userSettingsContent);
-        if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-          return JSON.stringify(workspaceSettingsContent);
-        return '{}';
-      });
-
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
-      const extensionManager = new ExtensionManager({
-        settings: loadedSettings.merged,
-        workspaceDir: MOCK_WORKSPACE_DIR,
-        requestConsent: vi.fn(),
-        requestSetting: vi.fn(),
-      });
-      const mockDisableExtension = vi.spyOn(
-        extensionManager,
-        'disableExtension',
-      );
-      mockDisableExtension.mockImplementation(async () => {});
-
-      migrateDeprecatedSettings(loadedSettings, extensionManager);
-
-      expect(mockDisableExtension).not.toHaveBeenCalled();
-      expect(setValueSpy).not.toHaveBeenCalled();
     });
   });
 
