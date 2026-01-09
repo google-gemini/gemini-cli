@@ -4,11 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { DefaultHookOutput } from '@google/gemini-cli-core';
 import {
   uiTelemetryService,
-  fireSessionEndHook,
-  fireSessionStartHook,
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
@@ -30,12 +27,9 @@ export const clearCommand: SlashCommand = {
       ?.getGeminiClient()
       ?.getChat()
       .getChatRecordingService();
-    const messageBus = config?.getMessageBus();
 
     // Fire SessionEnd hook before clearing
-    if (config?.getEnableHooks() && messageBus) {
-      await fireSessionEndHook(messageBus, SessionEndReason.Clear);
-    }
+    await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Clear);
 
     if (geminiClient) {
       context.ui.setDebugMessage('Clearing terminal and resetting chat.');
@@ -54,10 +48,9 @@ export const clearCommand: SlashCommand = {
     }
 
     // Fire SessionStart hook after clearing
-    let result: DefaultHookOutput | undefined;
-    if (config?.getEnableHooks() && messageBus) {
-      result = await fireSessionStartHook(messageBus, SessionStartSource.Clear);
-    }
+    const result = await config
+      ?.getHookSystem()
+      ?.fireSessionStartEvent(SessionStartSource.Clear);
 
     // Give the event loop a chance to process any pending telemetry operations
     // This ensures logger.emit() calls have fully propagated to the BatchLogRecordProcessor
@@ -72,11 +65,11 @@ export const clearCommand: SlashCommand = {
     uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
 
-    if (result?.systemMessage) {
+    if (result?.finalOutput?.systemMessage) {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: result.systemMessage,
+          text: result.finalOutput.systemMessage,
         },
         Date.now(),
       );
