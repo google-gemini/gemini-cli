@@ -794,15 +794,16 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionStoppedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number) => {
+    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
+      const text = `Agent execution stopped: ${systemMessage ?? reason}`;
       addItem(
         {
           type: MessageType.INFO,
-          text: `Agent execution stopped: ${reason}`,
+          text,
         },
         userMessageTimestamp,
       );
@@ -812,15 +813,16 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number) => {
+    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
+      const text = `Agent execution blocked: ${systemMessage ?? reason}`;
       addItem(
         {
           type: MessageType.WARNING,
-          text: `Agent execution blocked: ${reason}`,
+          text,
         },
         userMessageTimestamp,
       );
@@ -861,12 +863,14 @@ export const useGeminiStream = (
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
+              event.value.systemMessage,
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
+              event.value.systemMessage,
             );
             break;
           case ServerGeminiEventType.ChatCompressed:
