@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { coreEvents } from '@google/gemini-cli-core';
 import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -87,11 +88,15 @@ export function useSessionResume({
       // Use async IIFE to properly await the async callback
       // This ensures chat is fully initialized before user can send prompts
       void (async () => {
-        await loadHistoryForResume(
-          historyData.uiHistory,
-          historyData.clientHistory,
-          resumedSessionData,
-        );
+        try {
+          await loadHistoryForResume(
+            historyData.uiHistory,
+            historyData.clientHistory,
+            resumedSessionData,
+          );
+        } catch (error) {
+          coreEvents.emitFeedback('error', 'Error resuming session:', error);
+        }
       })();
     }
   }, [
