@@ -31,6 +31,10 @@ import { handleVimAction } from './vim-buffer-actions.js';
 const LARGE_PASTE_LINE_THRESHOLD = 5;
 const LARGE_PASTE_CHAR_THRESHOLD = 500;
 
+// Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
+export const PASTED_TEXT_PLACEHOLDER_REGEX =
+  /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
 export type Direction =
   | 'left'
   | 'right'
@@ -1241,6 +1245,7 @@ function textBufferReducerLogic(
         cursorRow: lastNewLineIndex,
         cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
         preferredCol: null,
+        pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
     }
 
@@ -1941,13 +1946,19 @@ export function useTextBuffer({
   }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
   const addPastedContent = useCallback(
-    (content: string): string => {
-      // Find the next available ID
-      let idNum = 1;
-      while (pastedContent[`[Pasted Text #${idNum}]`]) {
-        idNum++;
+    (content: string, lineCount: number): string => {
+      const base =
+        lineCount > LARGE_PASTE_LINE_THRESHOLD
+          ? `[Pasted Text: ${lineCount} lines]`
+          : `[Pasted Text: ${content.length} chars]`;
+
+      let id = base;
+      let suffix = 2;
+      while (pastedContent[id]) {
+        id = base.replace(']', ` #${suffix}]`);
+        suffix++;
       }
-      const id = `[Pasted Text #${idNum}]`;
+
       dispatch({ type: 'add_pasted_content', payload: { id, text: content } });
       return id;
     },
@@ -1959,21 +1970,6 @@ export function useTextBuffer({
       if (typeof ch !== 'string') {
         return;
       }
-      if (!singleLine && /[\n\r]/.test(ch)) {
-        if (paste) {
-          const lineCount = ch.split('\n').length;
-          if (
-            lineCount > LARGE_PASTE_LINE_THRESHOLD ||
-            ch.length > LARGE_PASTE_CHAR_THRESHOLD
-          ) {
-            const id = addPastedContent(ch);
-            dispatch({ type: 'insert', payload: id });
-            return;
-          }
-        }
-        dispatch({ type: 'insert', payload: ch });
-        return;
-      }
 
       if (paste) {
         const lineCount = ch.split('\n').length;
@@ -1981,10 +1977,15 @@ export function useTextBuffer({
           lineCount > LARGE_PASTE_LINE_THRESHOLD ||
           ch.length > LARGE_PASTE_CHAR_THRESHOLD
         ) {
-          const id = addPastedContent(ch);
+          const id = addPastedContent(ch, lineCount);
           dispatch({ type: 'insert', payload: id });
           return;
         }
+      }
+
+      if (!singleLine && /[\n\r]/.test(ch)) {
+        dispatch({ type: 'insert', payload: ch });
+        return;
       }
 
       const minLengthToInferAsDragDrop = 3;
@@ -2631,7 +2632,7 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string, opts?: { paste?: boolean }) => void;
-  addPastedContent: (text: string) => string;
+  addPastedContent: (text: string, lineCount: number) => string;
   newline: () => void;
   backspace: () => void;
   del: () => void;

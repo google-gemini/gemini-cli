@@ -79,8 +79,11 @@ describe('InputPrompt Large Paste', () => {
       getOffset: vi.fn().mockReturnValue(0),
       // New props
       pastedContent: {},
-      addPastedContent: vi.fn((text) => {
-        const id = '[Pasted Text #1]';
+      addPastedContent: vi.fn((text, lineCount) => {
+        const id =
+          lineCount > 5
+            ? `[Pasted Text: ${lineCount} lines]`
+            : `[Pasted Text: ${text.length} chars]`;
         mockBuffer.pastedContent[id] = text;
         return id;
       }),
@@ -239,7 +242,7 @@ describe('InputPrompt Large Paste', () => {
   it('should replace placeholder with actual content on submit', async () => {
     // Setup buffer to have the placeholder
     const largeText = '1\n2\n3\n4\n5\n6';
-    const id = '[Pasted Text #1]';
+    const id = '[Pasted Text: 6 lines]';
     mockBuffer.text = `Check this: ${id}`;
     mockBuffer.pastedContent = { [id]: largeText };
 

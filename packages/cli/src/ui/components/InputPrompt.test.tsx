@@ -174,7 +174,7 @@ describe('InputPrompt', () => {
       transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
       pastedContent: {},
-      addPastedContent: vi.fn().mockReturnValue('[Pasted Text #1]'),
+      addPastedContent: vi.fn().mockReturnValue('[Pasted Text: 6 lines]'),
     } as unknown as TextBuffer;
 
     mockShellHistory = {

@@ -12,7 +12,10 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
+import {
+  logicalPosToOffset,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -220,11 +223,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (submittedValue: string) => {
       let processedValue = submittedValue;
       if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text #1] with actual content
-        // We use a regex that matches the ID format
-        const regex = /\[Pasted Text #(\d+)\]/g;
+        // Replace placeholders like [Pasted Text: 6 lines] with actual content
+        PASTED_TEXT_PLACEHOLDER_REGEX.lastIndex = 0;
         processedValue = processedValue.replace(
-          regex,
+          PASTED_TEXT_PLACEHOLDER_REGEX,
           (match) => buffer.pastedContent[match] || match,
         );
       }

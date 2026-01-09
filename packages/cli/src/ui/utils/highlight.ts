@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Transformation } from '../components/shared/text-buffer.js';
+import {
+  type Transformation,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
 
 export type HighlightToken = {
@@ -13,12 +16,14 @@ export type HighlightToken = {
 };
 
 // Matches slash commands (e.g., /help), @ references (files or MCP resource URIs),
-// and large paste placeholders (e.g., [Pasted Text #1]).
+// and large paste placeholders (e.g., [Pasted Text: 6 lines]).
 // The @ pattern uses a negated character class to support URIs like `@file:///example.txt`
 // which contain colons. It matches any character except delimiters: comma, whitespace,
 // semicolon, common punctuation, and brackets.
-const HIGHLIGHT_REGEX =
-  /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+|\[Pasted Text #\d+\])/g;
+const HIGHLIGHT_REGEX = new RegExp(
+  `(^/[a-zA-Z0-9_-]+|@(?:\\\\ |[^,\\s;!?()\\[\\]{}])+|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  'g',
+);
 
 export function parseInputForHighlighting(
   text: string,

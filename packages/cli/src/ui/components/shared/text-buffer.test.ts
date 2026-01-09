@@ -151,11 +151,11 @@ describe('textBufferReducer', () => {
     it('should add content to pastedContent Record', () => {
       const action: TextBufferAction = {
         type: 'add_pasted_content',
-        payload: { id: '[Pasted Text #1]', text: 'large content' },
+        payload: { id: '[Pasted Text: 6 lines]', text: 'large content' },
       };
       const state = textBufferReducer(initialState, action);
       expect(state.pastedContent).toEqual({
-        '[Pasted Text #1]': 'large content',
+        '[Pasted Text: 6 lines]': 'large content',
       });
     });
   });
@@ -558,8 +558,10 @@ describe('useTextBuffer', () => {
       const largeText = '1\n2\n3\n4\n5\n6';
       act(() => result.current.insert(largeText, { paste: true }));
       const state = getBufferState(result);
-      expect(state.text).toBe('[Pasted Text #1]');
-      expect(result.current.pastedContent['[Pasted Text #1]']).toBe(largeText);
+      expect(state.text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
     });
 
     it('insert: should NOT use placeholder for large text if NOT a paste', () => {
@@ -1357,10 +1359,14 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
       const state = getBufferState(result);
       // Check that the text is the result of three concatenations of placeholders.
+      // All three use the same placeholder because React batches the state updates
+      // within the same act() block, so pastedContent isn't updated between inserts.
       expect(state.lines).toStrictEqual([
-        '[Pasted Text #1][Pasted Text #1][Pasted Text #1]',
+        '[Pasted Text: 8 lines][Pasted Text: 8 lines][Pasted Text: 8 lines]',
       ]);
-      expect(result.current.pastedContent['[Pasted Text #1]']).toBe(longText);
+      expect(result.current.pastedContent['[Pasted Text: 8 lines]']).toBe(
+        longText,
+      );
       const expectedCursorPos = offsetToLogicalPos(
         state.text,
         state.text.length,
