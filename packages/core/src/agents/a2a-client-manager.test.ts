@@ -162,6 +162,20 @@ describe('A2AClientManager', () => {
         "[A2AClientManager] Loaded agent 'TestAgent' from http://test.agent/card",
       );
     });
+
+    it('should clear the cache', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      expect(manager.getAgentCard('TestAgent')).toBeDefined();
+      expect(manager.getClient('TestAgent')).toBeDefined();
+
+      manager.clearCache();
+
+      expect(manager.getAgentCard('TestAgent')).toBeUndefined();
+      expect(manager.getClient('TestAgent')).toBeUndefined();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        '[A2AClientManager] Cache cleared.',
+      );
+    });
   });
 
   describe('sendMessage', () => {
