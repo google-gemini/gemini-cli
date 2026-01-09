@@ -174,15 +174,21 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
 
   // If we're already at the end of a word (including punctuation sequences), advance to next word
   // This includes both regular word endings and script boundaries
+  let nextBaseCharIdx = i + 1;
+  while (
+    nextBaseCharIdx < chars.length &&
+    isCombiningMark(chars[nextBaseCharIdx])
+  ) {
+    nextBaseCharIdx++;
+  }
+
   const atEndOfWordChar =
     i < chars.length &&
     isWordCharWithCombining(chars[i]) &&
-    (i + 1 >= chars.length ||
-      !isWordCharWithCombining(chars[i + 1]) ||
+    (nextBaseCharIdx >= chars.length ||
+      !isWordCharStrict(chars[nextBaseCharIdx]) ||
       (isWordCharStrict(chars[i]) &&
-        i + 1 < chars.length &&
-        isWordCharStrict(chars[i + 1]) &&
-        isDifferentScript(chars[i], chars[i + 1])));
+        isDifferentScript(chars[i], chars[nextBaseCharIdx])));
 
   const atEndOfPunctuation =
     i < chars.length &&
@@ -195,6 +201,10 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
   if (atEndOfWordChar || atEndOfPunctuation) {
     // We're at the end of a word or punctuation sequence, move forward to find next word
     i++;
+    // Skip any combining marks that belong to the word we just finished
+    while (i < chars.length && isCombiningMark(chars[i])) {
+      i++;
+    }
     // Skip whitespace to find next word or punctuation
     while (i < chars.length && isWhitespace(chars[i])) {
       i++;
