@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
@@ -79,7 +79,7 @@ try {
   console.log(`🚀 Running telemetry script for target: ${target}.`);
   const env = { ...process.env };
 
-  execSync(`node ${scriptPath}`, {
+  execFileSync('node', [scriptPath], {
     stdio: 'inherit',
     cwd: projectRoot,
     env,
