@@ -108,6 +108,20 @@ export class McpClientManager {
     ) {
       return false;
     }
+
+    // Check enablement callbacks for session/file-based enable/disable
+    const callbacks = this.cliConfig.getMcpEnablementCallbacks();
+    if (callbacks) {
+      // Session disable takes precedence
+      if (callbacks.isSessionDisabled(name)) {
+        return false;
+      }
+      // Check file-based enablement
+      if (!callbacks.isFileEnabled(name)) {
+        return false;
+      }
+    }
+
     return true;
   }
 

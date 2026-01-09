@@ -1,0 +1,347 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { Storage, coreEvents } from '@google/gemini-cli-core';
+
+/**
+ * Stored in JSON file - represents persistent enablement state.
+ */
+export interface McpServerEnablementState {
+  enabled: boolean;
+}
+
+/**
+ * File config format - map of server ID to enablement state.
+ */
+export interface McpServerEnablementConfig {
+  [serverId: string]: McpServerEnablementState;
+}
+
+/**
+ * For UI display - combines file and session state.
+ */
+export interface McpServerDisplayState {
+  /** Effective state (considering session override) */
+  enabled: boolean;
+  /** True if disabled via --session flag */
+  isSessionDisabled: boolean;
+  /** True if disabled in file */
+  isPersistentDisabled: boolean;
+}
+
+/**
+ * Callback types for enablement checks (passed from CLI to core).
+ */
+export interface EnablementCallbacks {
+  isSessionDisabled: (serverId: string) => boolean;
+  isFileEnabled: (serverId: string) => boolean;
+}
+
+/**
+ * Result of canLoadServer check.
+ */
+export interface ServerLoadResult {
+  allowed: boolean;
+  reason?: string;
+  blockType?: 'admin' | 'allowlist' | 'excludelist' | 'session' | 'enablement';
+}
+
+/**
+ * Normalize a server ID to canonical lowercase form.
+ */
+export function normalizeServerId(serverId: string): string {
+  return serverId.toLowerCase().trim();
+}
+
+/**
+ * Check if a server ID is in a settings list (with backward compatibility).
+ * Handles case-insensitive matching and plain name fallback for ext: servers.
+ */
+export function isInSettingsList(
+  serverId: string,
+  list: string[],
+): { found: boolean; deprecationWarning?: string } {
+  const normalizedId = normalizeServerId(serverId);
+  const normalizedList = list.map(normalizeServerId);
+
+  // Exact canonical match
+  if (normalizedList.includes(normalizedId)) {
+    return { found: true };
+  }
+
+  // Backward compat: for ext: servers, check if plain name matches
+  if (normalizedId.startsWith('ext:')) {
+    const plainName = normalizedId.split(':').pop();
+    if (plainName && normalizedList.includes(plainName)) {
+      return {
+        found: true,
+        deprecationWarning:
+          `Settings reference '${plainName}' matches extension server '${serverId}'. ` +
+          `Update your settings to use the full identifier '${serverId}' instead.`,
+      };
+    }
+  }
+
+  return { found: false };
+}
+
+/**
+ * Single source of truth for whether a server can be loaded.
+ * Used by: isAllowedMcpServer(), connectServer(), CLI handlers, slash handlers.
+ *
+ * Uses callbacks instead of direct enablementManager reference to keep
+ * packages/core independent of packages/cli.
+ */
+export function canLoadServer(
+  serverId: string,
+  config: {
+    adminMcpEnabled: boolean;
+    allowedList?: string[];
+    excludedList?: string[];
+    enablement?: EnablementCallbacks;
+  },
+): ServerLoadResult {
+  const normalizedId = normalizeServerId(serverId);
+
+  // 1. Admin kill switch
+  if (!config.adminMcpEnabled) {
+    return {
+      allowed: false,
+      reason:
+        'MCP servers are disabled by administrator. Check admin settings or contact your admin.',
+      blockType: 'admin',
+    };
+  }
+
+  // 2. Allowlist check
+  if (config.allowedList && config.allowedList.length > 0) {
+    const { found, deprecationWarning } = isInSettingsList(
+      normalizedId,
+      config.allowedList,
+    );
+    if (deprecationWarning) {
+      coreEvents.emitFeedback('warning', deprecationWarning);
+    }
+    if (!found) {
+      return {
+        allowed: false,
+        reason: `Server '${serverId}' is not in mcp.allowed list. Add it to settings.json mcp.allowed array to enable.`,
+        blockType: 'allowlist',
+      };
+    }
+  }
+
+  // 3. Excludelist check
+  if (config.excludedList) {
+    const { found, deprecationWarning } = isInSettingsList(
+      normalizedId,
+      config.excludedList,
+    );
+    if (deprecationWarning) {
+      coreEvents.emitFeedback('warning', deprecationWarning);
+    }
+    if (found) {
+      return {
+        allowed: false,
+        reason: `Server '${serverId}' is blocked by mcp.excluded. Remove it from settings.json mcp.excluded array to enable.`,
+        blockType: 'excludelist',
+      };
+    }
+  }
+
+  // 4. Session disable check (before file-based enablement)
+  if (config.enablement?.isSessionDisabled(normalizedId)) {
+    return {
+      allowed: false,
+      reason: `Server '${serverId}' is disabled for this session. Run 'gemini mcp enable ${serverId} --session' to clear.`,
+      blockType: 'session',
+    };
+  }
+
+  // 5. File-based enablement check
+  if (config.enablement && !config.enablement.isFileEnabled(normalizedId)) {
+    return {
+      allowed: false,
+      reason: `Server '${serverId}' is disabled. Run 'gemini mcp enable ${serverId}' to enable.`,
+      blockType: 'enablement',
+    };
+  }
+
+  return { allowed: true };
+}
+
+const MCP_ENABLEMENT_FILENAME = 'mcp-server-enablement.json';
+
+/**
+ * McpServerEnablementManager
+ *
+ * Manages the enabled/disabled state of MCP servers.
+ * Uses a simplified format compared to ExtensionEnablementManager.
+ * Supports both persistent (file) and session-only (in-memory) states.
+ */
+export class McpServerEnablementManager {
+  private configFilePath: string;
+  private configDir: string;
+  private sessionDisabled: Set<string> = new Set();
+
+  constructor() {
+    this.configDir = Storage.getGlobalGeminiDir();
+    this.configFilePath = path.join(this.configDir, MCP_ENABLEMENT_FILENAME);
+  }
+
+  /**
+   * Normalize a server ID to canonical lowercase form.
+   */
+  private normalize(serverId: string): string {
+    return normalizeServerId(serverId);
+  }
+
+  /**
+   * Check if server is enabled in FILE (persistent config only).
+   * Does NOT include session state.
+   */
+  isFileEnabled(serverName: string): boolean {
+    const normalizedName = this.normalize(serverName);
+    const config = this.readConfig();
+    const state = config[normalizedName];
+    // Default: enabled if not in file
+    return state?.enabled ?? true;
+  }
+
+  /**
+   * Check if server is session-disabled.
+   */
+  isSessionDisabled(serverName: string): boolean {
+    return this.sessionDisabled.has(this.normalize(serverName));
+  }
+
+  /**
+   * Check effective enabled state (combines file + session).
+   * Convenience method; canLoadServer() uses separate callbacks for granular blockType.
+   */
+  isEffectivelyEnabled(serverName: string): boolean {
+    const normalizedName = this.normalize(serverName);
+    if (this.sessionDisabled.has(normalizedName)) {
+      return false;
+    }
+    return this.isFileEnabled(normalizedName);
+  }
+
+  /**
+   * Enable a server persistently.
+   * Removes the server from config file (defaults to enabled).
+   */
+  enable(serverName: string): void {
+    const normalizedName = this.normalize(serverName);
+    const config = this.readConfig();
+
+    // Remove from config (default is enabled)
+    if (config[normalizedName]) {
+      delete config[normalizedName];
+      this.writeConfig(config);
+    }
+  }
+
+  /**
+   * Disable a server persistently.
+   * Adds server to config file with enabled: false.
+   */
+  disable(serverName: string): void {
+    const normalizedName = this.normalize(serverName);
+    const config = this.readConfig();
+    config[normalizedName] = { enabled: false };
+    this.writeConfig(config);
+  }
+
+  /**
+   * Disable a server for current session only (in-memory).
+   * Triggered by --session flag.
+   */
+  disableForSession(serverName: string): void {
+    this.sessionDisabled.add(this.normalize(serverName));
+  }
+
+  /**
+   * Clear session disable for a server.
+   * Falls back to file-based state.
+   */
+  clearSessionDisable(serverName: string): void {
+    this.sessionDisabled.delete(this.normalize(serverName));
+  }
+
+  /**
+   * Get display state for a specific server (for UI).
+   */
+  getDisplayState(serverName: string): McpServerDisplayState {
+    const normalizedName = this.normalize(serverName);
+    const isSessionDisabled = this.sessionDisabled.has(normalizedName);
+    const isPersistentDisabled = !this.isFileEnabled(normalizedName);
+
+    return {
+      enabled: !isSessionDisabled && !isPersistentDisabled,
+      isSessionDisabled,
+      isPersistentDisabled,
+    };
+  }
+
+  /**
+   * Get all display states (for UI listing).
+   * Returns map of serverId -> McpServerDisplayState.
+   */
+  getAllDisplayStates(
+    serverIds: string[],
+  ): Record<string, McpServerDisplayState> {
+    const result: Record<string, McpServerDisplayState> = {};
+    for (const serverId of serverIds) {
+      result[this.normalize(serverId)] = this.getDisplayState(serverId);
+    }
+    return result;
+  }
+
+  /**
+   * Get enablement callbacks for passing to core.
+   */
+  getEnablementCallbacks(): EnablementCallbacks {
+    return {
+      isSessionDisabled: (id) => this.isSessionDisabled(id),
+      isFileEnabled: (id) => this.isFileEnabled(id),
+    };
+  }
+
+  /**
+   * Read config from disk.
+   */
+  private readConfig(): McpServerEnablementConfig {
+    try {
+      const content = fs.readFileSync(this.configFilePath, 'utf-8');
+      return JSON.parse(content) as McpServerEnablementConfig;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return {};
+      }
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to read MCP server enablement config.',
+        error,
+      );
+      return {};
+    }
+  }
+
+  /**
+   * Write config to disk.
+   */
+  private writeConfig(config: McpServerEnablementConfig): void {
+    fs.mkdirSync(this.configDir, { recursive: true });
+    fs.writeFileSync(this.configFilePath, JSON.stringify(config, null, 2));
+  }
+}
