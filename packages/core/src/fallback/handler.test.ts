@@ -76,6 +76,11 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getPreviewFeatures: vi.fn(() => false),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    getAutoFallback: vi.fn(() => ({
+      enabled: false,
+      type: 'gemini-api-key' as const,
+    })),
+    refreshAuth: vi.fn(),
     ...overrides,
   }) as unknown as Config;
 
@@ -166,6 +171,7 @@ describe('handleFallback', () => {
         MOCK_PRO_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         undefined,
+        { status: 'not-attempted' },
       );
     });
 
@@ -230,6 +236,7 @@ describe('handleFallback', () => {
         DEFAULT_GEMINI_FLASH_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         undefined,
+        { status: 'not-attempted' },
       );
     });
 
@@ -320,6 +327,7 @@ describe('handleFallback', () => {
         MOCK_PRO_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         terminalError,
+        { status: 'not-attempted' },
       );
     });
 
@@ -350,6 +358,7 @@ describe('handleFallback', () => {
         MOCK_PRO_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         retryableError,
+        { status: 'not-attempted' },
       );
     });
 
@@ -375,6 +384,7 @@ describe('handleFallback', () => {
         DEFAULT_GEMINI_FLASH_MODEL,
         DEFAULT_GEMINI_FLASH_MODEL,
         undefined,
+        { status: 'not-attempted' },
       );
     });
 
@@ -420,6 +430,182 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Auto-fallback auth logic', () => {
+    let authPolicyConfig: Config;
+    let authHandler: Mock<FallbackModelHandler>;
+    const OLD_ENV = process.env;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      process.env = { ...OLD_ENV };
+      authHandler = vi.fn().mockResolvedValue('retry_once');
+      authPolicyConfig = createMockConfig();
+      vi.mocked(authPolicyConfig.getFallbackModelHandler).mockReturnValue(
+        authHandler,
+      );
+      vi.mocked(authPolicyConfig.getModelAvailabilityService).mockReturnValue(
+        createAvailabilityServiceMock({
+          selectedModel: FALLBACK_MODEL,
+          skipped: [],
+        }),
+      );
+    });
+
+    afterEach(() => {
+      process.env = OLD_ENV;
+    });
+
+    it('should pass autoFallbackStatus with success when Gemini API key fallback succeeds', async () => {
+      process.env['GEMINI_API_KEY'] = 'test-key';
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'gemini-api-key',
+      });
+      vi.mocked(authPolicyConfig.refreshAuth).mockResolvedValue(undefined);
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).toHaveBeenCalledWith(
+        AuthType.USE_GEMINI,
+      );
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'success', authType: 'gemini-api-key' },
+      );
+    });
+
+    it('should pass autoFallbackStatus with success when Vertex AI fallback succeeds', async () => {
+      process.env['GOOGLE_CLOUD_PROJECT'] = 'test-project';
+      process.env['GOOGLE_CLOUD_LOCATION'] = 'us-central1';
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'vertex-ai',
+      });
+      vi.mocked(authPolicyConfig.refreshAuth).mockResolvedValue(undefined);
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).toHaveBeenCalledWith(
+        AuthType.USE_VERTEX_AI,
+      );
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'success', authType: 'vertex-ai' },
+      );
+    });
+
+    it('should pass missing-env-vars status when Gemini API key is not set', async () => {
+      delete process.env['GEMINI_API_KEY'];
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'gemini-api-key',
+      });
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).not.toHaveBeenCalled();
+      // When no fallback model is available, the handler is called with the same model
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'missing-env-vars', authType: 'gemini-api-key' },
+      );
+    });
+
+    it('should pass missing-env-vars status when Vertex AI env vars are not set', async () => {
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+      delete process.env['GOOGLE_CLOUD_LOCATION'];
+      delete process.env['GOOGLE_API_KEY'];
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'vertex-ai',
+      });
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).not.toHaveBeenCalled();
+      // When no fallback model is available, the handler is called with the same model
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'missing-env-vars', authType: 'vertex-ai' },
+      );
+    });
+
+    it('should pass not-attempted status when refreshAuth throws an error', async () => {
+      process.env['GEMINI_API_KEY'] = 'test-key';
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'gemini-api-key',
+      });
+      const authError = new Error('Auth failed');
+      vi.mocked(authPolicyConfig.refreshAuth).mockRejectedValue(authError);
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(debugLogger.warn).toHaveBeenCalledWith(
+        'Auto-fallback to Gemini API key failed:',
+        authError,
+      );
+      // When no fallback model is available, the handler is called with the same model
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'not-attempted' },
+      );
+    });
+
+    it('should pass not-attempted status when auto-fallback is not enabled', async () => {
+      process.env['GEMINI_API_KEY'] = 'test-key';
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: false,
+        type: 'gemini-api-key',
+      });
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).not.toHaveBeenCalled();
+      // When no fallback model is available, the handler is called with the same model
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'not-attempted' },
+      );
+    });
+
+    it('should recognize GOOGLE_API_KEY as valid for Vertex AI', async () => {
+      process.env['GOOGLE_API_KEY'] = 'test-key';
+      delete process.env['GOOGLE_CLOUD_PROJECT'];
+      delete process.env['GOOGLE_CLOUD_LOCATION'];
+      vi.mocked(authPolicyConfig.getAutoFallback).mockReturnValue({
+        enabled: true,
+        type: 'vertex-ai',
+      });
+      vi.mocked(authPolicyConfig.refreshAuth).mockResolvedValue(undefined);
+
+      await handleFallback(authPolicyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      expect(authPolicyConfig.refreshAuth).toHaveBeenCalledWith(
+        AuthType.USE_VERTEX_AI,
+      );
+      // When no fallback model is available, the handler is called with the same model
+      expect(authHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        MOCK_PRO_MODEL,
+        undefined,
+        { status: 'success', authType: 'vertex-ai' },
+      );
     });
   });
 });

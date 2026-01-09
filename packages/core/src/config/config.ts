@@ -358,6 +358,10 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   onModelChange?: (model: string) => void;
+  autoFallback?: {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  };
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   onReload?: () => Promise<{ disabledSkills?: string[] }>;
@@ -498,6 +502,10 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
+  private readonly autoFallback: {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  };
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
 
   constructor(params: ConfigParameters) {
@@ -658,6 +666,10 @@ export class Config {
     this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
+    this.autoFallback = params.autoFallback ?? {
+      enabled: false,
+      type: 'gemini-api-key',
+    };
     this.onReload = params.onReload;
 
     if (params.contextFileName) {
@@ -923,6 +935,13 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getAutoFallback(): {
+    enabled: boolean;
+    type: 'gemini-api-key' | 'vertex-ai';
+  } {
+    return this.autoFallback;
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {

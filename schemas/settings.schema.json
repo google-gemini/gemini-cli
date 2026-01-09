@@ -1285,6 +1285,33 @@
               "description": "Whether to use an external authentication flow.",
               "markdownDescription": "Whether to use an external authentication flow.\n\n- Category: `Security`\n- Requires restart: `yes`",
               "type": "boolean"
+            },
+            "autoFallback": {
+              "title": "Auto Fallback",
+              "description": "Automatically switch to an alternative auth method when OAuth quota is exceeded.",
+              "markdownDescription": "Automatically switch to an alternative auth method when OAuth quota is exceeded.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `{\n  \"enabled\": false,\n  \"type\": \"gemini-api-key\"\n}`",
+              "default": {
+                "enabled": false,
+                "type": "gemini-api-key"
+              },
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "title": "Enable Auto Fallback",
+                  "description": "Automatically fall back to API key or Vertex AI when OAuth quota is exceeded.",
+                  "markdownDescription": "Automatically fall back to API key or Vertex AI when OAuth quota is exceeded.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+                  "default": false,
+                  "type": "boolean"
+                },
+                "type": {
+                  "title": "Fallback Type",
+                  "description": "The type of authentication to fall back to when OAuth quota is exceeded.",
+                  "markdownDescription": "The type of authentication to fall back to when OAuth quota is exceeded.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `gemini-api-key`",
+                  "default": "gemini-api-key",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

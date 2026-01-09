@@ -9,15 +9,23 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 
+type DialogChoice =
+  | 'retry_later'
+  | 'retry_once'
+  | 'retry_always'
+  | 'upgrade'
+  | 'gemini-api-key'
+  | 'vertex-ai';
+
 interface ProQuotaDialogProps {
   failedModel: string;
   fallbackModel: string;
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
-  onChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
-  ) => void;
+  onChoice: (choice: DialogChoice) => void;
+  hasVertexAI?: boolean;
+  hasApiKey?: boolean;
 }
 
 export function ProQuotaDialog({
@@ -27,19 +35,22 @@ export function ProQuotaDialog({
   isTerminalQuotaError,
   isModelNotFoundError,
   onChoice,
+  hasVertexAI,
+  hasApiKey,
 }: ProQuotaDialogProps): React.JSX.Element {
-  let items;
+  let items: Array<{ label: string; value: DialogChoice; key: string }>;
+
   // Do not provide a fallback option if failed model and fallbackmodel are same.
   if (failedModel === fallbackModel) {
     items = [
       {
         label: 'Keep trying',
-        value: 'retry_once' as const,
+        value: 'retry_once',
         key: 'retry_once',
       },
       {
         label: 'Stop',
-        value: 'retry_later' as const,
+        value: 'retry_later',
         key: 'retry_later',
       },
     ];
@@ -48,17 +59,17 @@ export function ProQuotaDialog({
     items = [
       {
         label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
+        value: 'retry_always',
         key: 'retry_always',
       },
       {
         label: 'Upgrade for higher limits',
-        value: 'upgrade' as const,
+        value: 'upgrade',
         key: 'upgrade',
       },
       {
         label: `Stop`,
-        value: 'retry_later' as const,
+        value: 'retry_later',
         key: 'retry_later',
       },
     ];
@@ -67,25 +78,39 @@ export function ProQuotaDialog({
     items = [
       {
         label: 'Keep trying',
-        value: 'retry_once' as const,
+        value: 'retry_once',
         key: 'retry_once',
       },
       {
         label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
+        value: 'retry_always',
         key: 'retry_always',
       },
       {
         label: 'Stop',
-        value: 'retry_later' as const,
+        value: 'retry_later',
         key: 'retry_later',
       },
     ];
   }
 
-  const handleSelect = (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
-  ) => {
+  if (hasApiKey) {
+    items.unshift({
+      label: 'Always fallback to Gemini API key',
+      value: 'gemini-api-key',
+      key: 'gemini-api-key',
+    });
+  }
+
+  if (hasVertexAI) {
+    items.unshift({
+      label: 'Always fallback to Vertex AI',
+      value: 'vertex-ai',
+      key: 'vertex-ai',
+    });
+  }
+
+  const handleSelect = (choice: DialogChoice) => {
     onChoice(choice);
   };
 

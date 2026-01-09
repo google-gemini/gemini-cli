@@ -767,6 +767,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`security.auth.autoFallback.enabled`** (boolean):
+  - **Description:** Automatically fall back to API key or Vertex AI when OAuth
+    quota is exceeded.
+  - **Default:** `false`
+
+- **`security.auth.autoFallback.type`** (string):
+  - **Description:** The type of authentication to fall back to when OAuth quota
+    is exceeded.
+  - **Default:** `"gemini-api-key"`
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
