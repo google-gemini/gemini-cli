@@ -526,36 +526,12 @@ export const findNextBigWordAcrossLines = (
     return { row: cursorRow, col: colInCurrentLine };
   }
 
+  let firstEmptyRow: number | null = null;
+
   // Search subsequent lines
   for (let row = cursorRow + 1; row < lines.length; row++) {
     const line = lines[row] || '';
     const chars = toCodePoints(line);
-
-    // For empty lines, if we haven't found any words yet, return the empty line
-    if (chars.length === 0) {
-      // Check if there are any words in later lines
-      let hasWordsInLaterLines = false;
-      for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
-        const laterLine = lines[laterRow] || '';
-        const laterChars = toCodePoints(laterLine);
-        let firstNonWhitespace = 0;
-        while (
-          firstNonWhitespace < laterChars.length &&
-          isWhitespace(laterChars[firstNonWhitespace])
-        ) {
-          firstNonWhitespace++;
-        }
-        if (firstNonWhitespace < laterChars.length) {
-          hasWordsInLaterLines = true;
-          break;
-        }
-      }
-
-      if (!hasWordsInLaterLines) {
-        return { row, col: 0 };
-      }
-      continue;
-    }
 
     // Find first non-whitespace
     let firstNonWhitespace = 0;
@@ -567,6 +543,7 @@ export const findNextBigWordAcrossLines = (
     }
 
     if (firstNonWhitespace < chars.length) {
+      // Found a non-whitespace character (start of a big word)
       if (searchForWordStart) {
         return { row, col: firstNonWhitespace };
       } else {
@@ -575,7 +552,17 @@ export const findNextBigWordAcrossLines = (
           return { row, col: endCol };
         }
       }
+    } else {
+      // Line is empty or whitespace only
+      if (firstEmptyRow === null) {
+        firstEmptyRow = row;
+      }
     }
+  }
+
+  // If we found no more words, but did find an empty line, stop there
+  if (firstEmptyRow !== null) {
+    return { row: firstEmptyRow, col: 0 };
   }
 
   return null;
