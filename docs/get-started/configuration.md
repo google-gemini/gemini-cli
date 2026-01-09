@@ -863,6 +863,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+#### `agents`
+
+- **`agents.disabled`** (array):
+  - **Description:** List of disabled agents.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `hooks`
 
 - **`hooks.enabled`** (boolean):
