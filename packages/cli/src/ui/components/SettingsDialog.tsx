@@ -30,6 +30,7 @@ import {
   requiresRestart,
   getRestartRequiredFromModified,
   getDefaultValue,
+  getEffectiveDefaultValue,
   setPendingSettingValueAny,
   getNestedValue,
   getEffectiveValue,
@@ -173,6 +174,50 @@ export function SettingsDialog({
   const [_restartRequiredSettings, setRestartRequiredSettings] = useState<
     Set<string>
   >(new Set());
+
+  // Cache effective default values (including experiment values)
+  const [effectiveDefaults, setEffectiveDefaults] = useState<
+    Map<string, SettingsValue>
+  >(new Map());
+
+  // Load effective default values when config is available
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    const loadEffectiveDefaults = async () => {
+      const defaults = new Map<string, SettingsValue>();
+      const keys = getDialogSettingKeys();
+
+      for (const key of keys) {
+        if (key === 'model.compressionThreshold') {
+          try {
+            const effectiveDefault = await getEffectiveDefaultValue(
+              key,
+              config,
+            );
+            defaults.set(key, effectiveDefault);
+          } catch (error) {
+            // Fall back to schema default if experiment check fails
+            debugLogger.log(
+              `[SettingsDialog] Error loading effective default for ${key}:`,
+              error instanceof Error ? error.message : String(error),
+            );
+            const schemaDefault = getDefaultValue(key);
+            defaults.set(key, schemaDefault);
+          }
+        } else {
+          defaults.set(key, getDefaultValue(key));
+        }
+      }
+
+      setEffectiveDefaults(defaults);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    loadEffectiveDefaults();
+  }, [config]);
 
   useEffect(() => {
     // Base settings for selected scope
@@ -743,7 +788,10 @@ export function SettingsDialog({
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
           const currentSetting = items[activeSettingIndex];
           if (currentSetting) {
-            const defaultValue = getDefaultValue(currentSetting.value);
+            // Use effective default (from experiment if available) or schema default
+            const defaultValue =
+              effectiveDefaults.get(currentSetting.value) ??
+              getDefaultValue(currentSetting.value);
             const defType = currentSetting.type;
             if (defType === 'boolean') {
               const booleanDefaultValue =
@@ -963,7 +1011,10 @@ export function SettingsDialog({
                 const path = item.value.split('.');
                 const currentValue = getNestedValue(pendingSettings, path);
 
-                const defaultValue = getDefaultValue(item.value);
+                // Use effective default (from experiment if available) or schema default
+                const defaultValue =
+                  effectiveDefaults.get(item.value) ??
+                  getDefaultValue(item.value);
 
                 if (currentValue !== undefined && currentValue !== null) {
                   displayValue = String(currentValue);
