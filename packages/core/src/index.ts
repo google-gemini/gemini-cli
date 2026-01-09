@@ -65,6 +65,7 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
 export { PolicyDecision, ApprovalMode } from './policy/types.js';
@@ -165,6 +166,9 @@ export * from './hooks/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export agent types
+export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';
