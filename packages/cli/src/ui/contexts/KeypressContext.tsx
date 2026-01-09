@@ -85,6 +85,7 @@ const KEY_INFO_MAP: Record<
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
   '[127u': { name: 'backspace' },
+  '[32u': { name: 'space' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
   '[b': { name: 'down', shift: true },
@@ -515,7 +516,6 @@ function* emitKeys(
     } else if (ch === ' ') {
       name = 'space';
       meta = escaped;
-      insertable = true;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
@@ -551,6 +551,13 @@ function* emitKeys(
     } else {
       // Any other character is considered printable.
       insertable = true;
+    }
+
+    // Consolidate space handling: normalize sequence for all space encodings.
+    // Space is only insertable when Ctrl is not pressed.
+    if (name === 'space') {
+      insertable = !ctrl;
+      sequence = ' ';
     }
 
     if (
