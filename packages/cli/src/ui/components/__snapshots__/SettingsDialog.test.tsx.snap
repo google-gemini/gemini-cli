@@ -29,7 +29,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -75,7 +75,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -121,7 +121,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                     false*  │
 │    Hide the window title bar                                                                     │
@@ -167,7 +167,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -213,7 +213,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -259,7 +259,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -305,7 +305,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                     false*  │
 │    Hide the window title bar                                                                     │
@@ -351,7 +351,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      false  │
 │    Hide the window title bar                                                                     │
@@ -397,7 +397,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
-│    The format of the CLI output.                                                                 │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │    Hide Window Title                                                                      true*  │
 │    Hide the window title bar                                                                     │
