@@ -142,6 +142,16 @@ describe('<ExtensionsList />', () => {
           value: '1000',
           envVar: 'MAX_TOKENS',
           sensitive: false,
+          scope: 'user' as const,
+          source: '/path/to/.env',
+        },
+        {
+          name: 'model',
+          value: 'gemini-pro',
+          envVar: 'MODEL',
+          sensitive: false,
+          scope: 'workspace' as const,
+          source: 'Keychain',
         },
       ],
     };
@@ -151,7 +161,8 @@ describe('<ExtensionsList />', () => {
     const output = lastFrame();
     expect(output).toContain('settings:');
     expect(output).toContain('- sensitiveApiKey: ***');
-    expect(output).toContain('- maxTokens: 1000');
+    expect(output).toContain('- maxTokens: 1000 (User - /path/to/.env)');
+    expect(output).toContain('- model: gemini-pro (Workspace - Keychain)');
     unmount();
   });
 });

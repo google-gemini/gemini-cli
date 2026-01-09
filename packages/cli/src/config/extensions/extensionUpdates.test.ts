@@ -154,7 +154,11 @@ describe('extensionUpdates', () => {
       );
       await userKeychain.setSecret('VAR2', 'val2');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
 
@@ -166,7 +170,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s1');
     });
@@ -181,7 +189,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s2');
     });
@@ -201,7 +213,11 @@ describe('extensionUpdates', () => {
       );
       fs.writeFileSync(workspaceEnvPath, 'VAR1=val1');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
   });
