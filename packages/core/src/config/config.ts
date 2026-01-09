@@ -149,6 +149,8 @@ export interface ResolvedExtensionSetting {
   envVar: string;
   value: string;
   sensitive: boolean;
+  scope?: 'user' | 'workspace';
+  source?: string;
 }
 
 export interface CliHelpAgentSettings {
