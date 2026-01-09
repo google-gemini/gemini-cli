@@ -215,6 +215,7 @@ describe('gemini.tsx main function cleanup', () => {
       getUsageStatisticsEnabled: vi.fn(() => false),
       setTerminalBackground: vi.fn(),
       refreshAuth: vi.fn(),
+      getRemoteAdminSettings: vi.fn(() => undefined),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {

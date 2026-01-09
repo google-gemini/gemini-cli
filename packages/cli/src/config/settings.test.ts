@@ -2476,6 +2476,187 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
+  describe('LoadedSettings and remote admin settings', () => {
+    it('should prioritize remote admin settings over file-based admin settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        admin: {
+          // These should be ignored
+          secureModeEnabled: true,
+          mcp: { enabled: false },
+          extensions: { enabled: false },
+        },
+        // A non-admin setting to ensure it's still processed
+        ui: { theme: 'system-theme' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // 1. Verify that on initial load, file-based admin settings are ignored
+      //    and schema defaults are used instead.
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false); // default: false
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // default: true
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // default: true
+      expect(loadedSettings.merged.ui?.theme).toBe('system-theme'); // non-admin setting should be loaded
+
+      // 2. Now, set remote admin settings.
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+        mcpSetting: { mcpEnabled: false },
+        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+      });
+
+      // 3. Verify that remote admin settings take precedence.
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      // non-admin setting should remain unchanged
+      expect(loadedSettings.merged.ui?.theme).toBe('system-theme');
+    });
+
+    it('should set remote admin settings and recompute merged settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        admin: {
+          secureModeEnabled: false,
+          mcp: { enabled: false },
+          extensions: { enabled: false },
+        },
+        ui: { theme: 'initial-theme' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      // Ensure initial state from defaults (as file-based admin settings are ignored)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+
+      const newRemoteSettings = {
+        secureModeEnabled: true,
+        mcpSetting: { mcpEnabled: false },
+        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+      };
+
+      loadedSettings.setRemoteAdminSettings(newRemoteSettings);
+
+      // Verify that remote admin settings are applied
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      // Non-admin settings should remain untouched
+      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+
+      // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
+      // and missing properties revert to schema defaults.
+      loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+    });
+
+    it('should correctly handle undefined remote admin settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        ui: { theme: 'initial-theme' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      // Should have default admin settings
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({}); // Set empty remote settings
+
+      // Admin settings should revert to defaults because there are no remote overrides
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+    });
+
+    it('should correctly handle missing properties in remote admin settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        admin: {
+          secureModeEnabled: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      // Ensure initial state from defaults (as file-based admin settings are ignored)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+
+      // Set remote settings with only secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+      });
+
+      // Verify secureModeEnabled is updated, others remain defaults
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+
+      // Set remote settings with only mcpSetting.mcpEnabled
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: { mcpEnabled: false },
+      });
+
+      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+
+      // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+      });
+
+      // Verify extensionsEnabled is updated, others remain defaults
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+    });
+  });
+
   describe('getDefaultsFromSchema', () => {
     it('should extract defaults from a schema', () => {
       const mockSchema = {
