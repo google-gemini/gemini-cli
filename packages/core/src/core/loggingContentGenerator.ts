@@ -32,9 +32,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
-import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
-import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 
 interface StructuredError {
   status: number;
@@ -267,14 +265,6 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.config,
           serverDetails,
         );
-
-        if (req.model === PREVIEW_GEMINI_MODEL) {
-          throw new TerminalQuotaError('Simulated quota exceeded', {
-            code: 429,
-            message: 'Simulated quota exceeded',
-            details: [],
-          });
-        }
 
         let stream: AsyncGenerator<GenerateContentResponse>;
         try {
