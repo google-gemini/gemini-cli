@@ -82,4 +82,40 @@ describe('agentsCommand', () => {
       expect.any(Number),
     );
   });
+
+  it('should reload the agent registry when refresh subcommand is called', async () => {
+    const reloadSpy = vi.fn().mockResolvedValue(undefined);
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      reload: reloadSpy,
+    });
+
+    const refreshCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'refresh',
+    );
+    expect(refreshCommand).toBeDefined();
+
+    const result = await refreshCommand!.action!(mockContext, '');
+
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Agents refreshed successfully.',
+    });
+  });
+
+  it('should show an error if agent registry is not available during refresh', async () => {
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue(undefined);
+
+    const refreshCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'refresh',
+    );
+    const result = await refreshCommand!.action!(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    });
+  });
 });

@@ -59,8 +59,6 @@ import {
   startupProfiler,
   SessionStartSource,
   SessionEndReason,
-  fireSessionStartHook,
-  fireSessionEndHook,
   generateSummary,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -294,38 +292,31 @@ export const AppContainer = (props: AppContainerProps) => {
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
-      // Fire SessionStart hook through MessageBus (only if hooks are enabled)
-      // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
-      const hooksEnabled = config.getEnableHooks();
-      const hookMessageBus = config.getMessageBus();
-      if (hooksEnabled && hookMessageBus) {
-        const sessionStartSource = resumedSessionData
-          ? SessionStartSource.Resume
-          : SessionStartSource.Startup;
-        const result = await fireSessionStartHook(
-          hookMessageBus,
-          sessionStartSource,
-        );
+      const sessionStartSource = resumedSessionData
+        ? SessionStartSource.Resume
+        : SessionStartSource.Startup;
+      const result = await config
+        .getHookSystem()
+        ?.fireSessionStartEvent(sessionStartSource);
 
-        if (result) {
-          if (result.systemMessage) {
-            historyManager.addItem(
-              {
-                type: MessageType.INFO,
-                text: result.systemMessage,
-              },
-              Date.now(),
-            );
-          }
+      if (result?.finalOutput) {
+        if (result.finalOutput?.systemMessage) {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: result.finalOutput.systemMessage,
+            },
+            Date.now(),
+          );
+        }
 
-          const additionalContext = result.getAdditionalContext();
-          const geminiClient = config.getGeminiClient();
-          if (additionalContext && geminiClient) {
-            await geminiClient.addHistory({
-              role: 'user',
-              parts: [{ text: additionalContext }],
-            });
-          }
+        const additionalContext = result.finalOutput.getAdditionalContext();
+        const geminiClient = config.getGeminiClient();
+        if (additionalContext && geminiClient) {
+          await geminiClient.addHistory({
+            role: 'user',
+            parts: [{ text: additionalContext }],
+          });
         }
       }
 
@@ -341,11 +332,7 @@ export const AppContainer = (props: AppContainerProps) => {
       await ideClient.disconnect();
 
       // Fire SessionEnd hook on cleanup (only if hooks are enabled)
-      const hooksEnabled = config.getEnableHooks();
-      const hookMessageBus = config.getMessageBus();
-      if (hooksEnabled && hookMessageBus) {
-        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
-      }
+      await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
     // Disable the dependencies check here. historyManager gets flagged
     // but we don't want to react to changes to it because each new history
