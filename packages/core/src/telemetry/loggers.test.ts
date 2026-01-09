@@ -1053,6 +1053,7 @@ describe('loggers', () => {
           resultDisplay: {
             fileDiff: 'diff',
             fileName: 'file.txt',
+            filePath: 'file.txt',
             originalContent: 'old content',
             newContent: 'new content',
             diffStat: {
