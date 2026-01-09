@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
@@ -198,6 +201,36 @@ describe('<AppHeader />', () => {
     );
 
     expect(lastFrame()).not.toContain('First line\\nSecond line');
+    unmount();
+  });
+
+  it('should render in compact mode', () => {
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      history: [],
+      bannerData: {
+        defaultText: '',
+        warningText: '',
+      },
+      nightly: true,
+    };
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        uiState,
+        settings: createMockSettings({
+          ui: {
+            compact: true,
+          },
+        }),
+      },
+    );
+
+    expect(lastFrame()).toContain('Tips for getting started:');
+    expect(lastFrame()).toContain('v1.0.0');
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 });

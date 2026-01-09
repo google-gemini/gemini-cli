@@ -59,7 +59,7 @@ describe('<Header />', () => {
     renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
-        children: longAsciiLogo,
+        children: longAsciiLogo.trim(),
       }),
       undefined,
     );
@@ -75,7 +75,7 @@ describe('<Header />', () => {
     renderWithProviders(<Header version="1.0.0" nightly={false} />);
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
-        children: longAsciiLogoIde,
+        children: longAsciiLogoIde.trim(),
       }),
       undefined,
     );
@@ -138,13 +138,13 @@ describe('<Header />', () => {
     });
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
-        children: longAsciiLogoCompact,
+        children: longAsciiLogoCompact.trim(),
       }),
       undefined,
     );
   });
 
-  it('renders the version to the right in compact mode when nightly is true', () => {
+  it('renders the version under the logo in compact mode when nightly is true', () => {
     vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
       columns: 120,
       rows: 20,
@@ -160,7 +160,7 @@ describe('<Header />', () => {
       },
     );
     expect(lastFrame()).toContain('v1.0.0');
-    // In compact mode, logo and version are in the same Box with flexDirection="row"
+    // In compact mode, logo and version are in the same Box with flexDirection="column"
   });
 
   it('renders with no gradient when theme.ui.gradient is undefined', async () => {

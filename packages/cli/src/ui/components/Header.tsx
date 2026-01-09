@@ -70,26 +70,10 @@ export const Header: React.FC<HeaderProps> = ({
     displayTitle = tinyLogo;
   }
 
+  displayTitle = displayTitle.trim();
+
   const artWidth = getAsciiArtWidth(displayTitle);
   const title = useSnowfall(displayTitle);
-
-  if (compact) {
-    return (
-      <Box
-        alignItems="flex-end"
-        flexDirection="row"
-        flexShrink={0}
-        marginBottom={1}
-      >
-        <ThemedGradient>{title}</ThemedGradient>
-        {nightly && (
-          <Box paddingLeft={2}>
-            <ThemedGradient>v{version}</ThemedGradient>
-          </Box>
-        )}
-      </Box>
-    );
-  }
 
   return (
     <Box
