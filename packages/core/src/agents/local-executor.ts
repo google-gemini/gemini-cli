@@ -738,10 +738,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let submittedOutput: string | null = null;
     let taskCompleted = false;
 
-    // We'll collect promises for the tool executions
-    const toolExecutionPromises: Array<Promise<Part[] | void>> = [];
-    // And we'll need a place to store the synchronous results (like complete_task or blocked calls)
-    const syncResponseParts: Part[] = [];
+    // Track results by index to preserve the original function call order.
+    // Each entry will be either a resolved Part[] or a Promise<Part[] | void>.
+    const resultsByIndex: Array<Part[] | Promise<Part[] | void>> = [];
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
@@ -757,13 +756,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // We already have a completion from this turn. Ignore subsequent ones.
           const error =
             'Task already marked complete in this turn. Ignoring duplicate call.';
-          syncResponseParts.push({
-            functionResponse: {
-              name: TASK_COMPLETE_TOOL_NAME,
-              response: { error },
-              id: callId,
+          resultsByIndex[index] = [
+            {
+              functionResponse: {
+                name: TASK_COMPLETE_TOOL_NAME,
+                response: { error },
+                id: callId,
+              },
             },
-          });
+          ];
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: functionCall.name,
@@ -784,13 +785,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             if (!validationResult.success) {
               taskCompleted = false; // Validation failed, revoke completion
               const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
-              syncResponseParts.push({
-                functionResponse: {
-                  name: TASK_COMPLETE_TOOL_NAME,
-                  response: { error },
-                  id: callId,
+              resultsByIndex[index] = [
+                {
+                  functionResponse: {
+                    name: TASK_COMPLETE_TOOL_NAME,
+                    response: { error },
+                    id: callId,
+                  },
                 },
-              });
+              ];
               this.emitActivity('ERROR', {
                 context: 'tool_call',
                 name: functionCall.name,
@@ -808,13 +811,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
                   ? outputValue
                   : JSON.stringify(outputValue, null, 2);
             }
-            syncResponseParts.push({
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { result: 'Output submitted and task completed.' },
-                id: callId,
+            resultsByIndex[index] = [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { result: 'Output submitted and task completed.' },
+                  id: callId,
+                },
               },
-            });
+            ];
             this.emitActivity('TOOL_CALL_END', {
               name: functionCall.name,
               output: 'Output submitted and task completed.',
@@ -823,13 +828,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Failed to provide required output.
             taskCompleted = false; // Revoke completion status
             const error = `Missing required argument '${outputName}' for completion.`;
-            syncResponseParts.push({
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
+            resultsByIndex[index] = [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
               },
-            });
+            ];
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: functionCall.name,
@@ -848,13 +855,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               typeof resultArg === 'string'
                 ? resultArg
                 : JSON.stringify(resultArg, null, 2);
-            syncResponseParts.push({
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { status: 'Result submitted and task completed.' },
-                id: callId,
+            resultsByIndex[index] = [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { status: 'Result submitted and task completed.' },
+                  id: callId,
+                },
               },
-            });
+            ];
             this.emitActivity('TOOL_CALL_END', {
               name: functionCall.name,
               output: 'Result submitted and task completed.',
@@ -864,13 +873,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             taskCompleted = false; // Revoke completion
             const error =
               'Missing required "result" argument. You must provide your findings when calling complete_task.';
-            syncResponseParts.push({
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
+            resultsByIndex[index] = [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
               },
-            });
+            ];
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: functionCall.name,
@@ -887,13 +898,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
-        syncResponseParts.push({
-          functionResponse: {
-            name: functionCall.name as string,
-            id: callId,
-            response: { error },
+        resultsByIndex[index] = [
+          {
+            functionResponse: {
+              name: functionCall.name as string,
+              id: callId,
+              response: { error },
+            },
           },
-        });
+        ];
 
         this.emitActivity('ERROR', {
           context: 'tool_call_unauthorized',
@@ -913,8 +926,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         prompt_id: promptId,
       };
 
-      // Create a promise for the tool execution
-      const executionPromise = (async () => {
+      // Create a promise for the tool execution (stored at this index)
+      resultsByIndex[index] = (async () => {
         const agentContext = Object.create(this.runtimeContext);
         agentContext.getToolRegistry = () => this.toolRegistry;
         agentContext.getApprovalMode = () => ApprovalMode.YOLO;
@@ -940,16 +953,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         return toolResponse.responseParts;
       })();
-
-      toolExecutionPromises.push(executionPromise);
     }
 
-    // Wait for all tool executions to complete
-    const asyncResults = await Promise.all(toolExecutionPromises);
+    // Resolve all results (promises and immediate values) in original order
+    const resolvedResults = await Promise.all(
+      resultsByIndex.map((entry) => Promise.resolve(entry)),
+    );
 
-    // Combine all response parts
-    const toolResponseParts: Part[] = [...syncResponseParts];
-    for (const result of asyncResults) {
+    // Combine all response parts in original function call order
+    const toolResponseParts: Part[] = [];
+    for (const result of resolvedResults) {
       if (result) {
         toolResponseParts.push(...result);
       }
