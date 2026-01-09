@@ -172,9 +172,12 @@ export class McpClientManager {
       }
       return;
     }
-    // User-disabled servers: don't start, but don't add to blocked list either
-    // They'll show as "Disabled" in the UI via enablementState
+    // User-disabled servers: disconnect if running, don't start
     if (this.isDisabledByUser(name)) {
+      const existing = this.clients.get(name);
+      if (existing) {
+        return this.disconnectClient(name);
+      }
       return;
     }
     if (!this.cliConfig.isTrustedFolder()) {
@@ -316,19 +319,21 @@ export class McpClientManager {
   }
 
   /**
-   * Restarts all active MCP Clients.
+   * Restarts all MCP servers (including newly enabled ones).
    */
   async restart(): Promise<void> {
     await Promise.all(
-      Array.from(this.clients.entries()).map(async ([name, client]) => {
-        try {
-          await this.maybeDiscoverMcpServer(name, client.getServerConfig());
-        } catch (error) {
-          debugLogger.error(
-            `Error restarting client '${name}': ${getErrorMessage(error)}`,
-          );
-        }
-      }),
+      Array.from(this.allServerConfigs.entries()).map(
+        async ([name, config]) => {
+          try {
+            await this.maybeDiscoverMcpServer(name, config);
+          } catch (error) {
+            debugLogger.error(
+              `Error restarting client '${name}': ${getErrorMessage(error)}`,
+            );
+          }
+        },
+      ),
     );
   }
 
@@ -336,11 +341,11 @@ export class McpClientManager {
    * Restart a single MCP server by name.
    */
   async restartServer(name: string) {
-    const client = this.clients.get(name);
-    if (!client) {
+    const config = this.allServerConfigs.get(name);
+    if (!config) {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
-    await this.maybeDiscoverMcpServer(name, client.getServerConfig());
+    await this.maybeDiscoverMcpServer(name, config);
   }
 
   /**

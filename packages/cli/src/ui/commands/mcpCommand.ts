@@ -434,7 +434,6 @@ async function handleEnableDisable(
   }
 
   const msg = `MCP server '${name}' ${enable ? 'enabled' : 'disabled'}${isSession ? ' for this session' : ''}.`;
-  context.ui.addItem({ type: 'info', text: msg }, Date.now());
 
   const mcpClientManager = config.getMcpClientManager();
   if (mcpClientManager) {
