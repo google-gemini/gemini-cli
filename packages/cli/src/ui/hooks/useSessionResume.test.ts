@@ -62,7 +62,7 @@ describe('useSessionResume', () => {
       expect(result.current.loadHistoryForResume).toBeInstanceOf(Function);
     });
 
-    it('should clear history and add items when loading history', () => {
+    it('should clear history and add items when loading history', async () => {
       const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const uiHistory: HistoryItemWithoutId[] = [
@@ -86,8 +86,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume(
+      await act(async () => {
+        await result.current.loadHistoryForResume(
           uiHistory,
           clientHistory,
           resumedData,
@@ -116,7 +116,7 @@ describe('useSessionResume', () => {
       );
     });
 
-    it('should not load history if Gemini client is not initialized', () => {
+    it('should not load history if Gemini client is not initialized', async () => {
       const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
@@ -141,8 +141,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume(
+      await act(async () => {
+        await result.current.loadHistoryForResume(
           uiHistory,
           clientHistory,
           resumedData,
@@ -154,7 +154,7 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
-    it('should handle empty history arrays', () => {
+    it('should handle empty history arrays', async () => {
       const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const resumedData: ResumedSessionData = {
@@ -168,8 +168,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume([], [], resumedData);
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
       });
 
       expect(mockHistoryManager.clearItems).toHaveBeenCalled();
@@ -439,6 +439,79 @@ describe('useSessionResume', () => {
 
       // But UI history should have both
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('race condition prevention', () => {
+    /**
+     * Regression test for session resume race condition.
+     *
+     * Before the fix: loadHistoryForResume called resumeChat fire-and-forget.
+     * If user started typing before resumeChat completed, they'd hit uninitialized
+     * chat state because resumeChat initializes this.chat via startChat().
+     *
+     * After the fix: loadHistoryForResume awaits resumeChat, ensuring chat is
+     * fully initialized before the function returns.
+     */
+    it('should await resumeChat before loadHistoryForResume completes', async () => {
+      // Track when resumeChat completes
+      let resumeChatResolved = false;
+      let resolveResumeChat: () => void;
+
+      // Mock resumeChat to be slow (simulates async chat initialization)
+      mockGeminiClient.resumeChat.mockImplementation(() => new Promise<void>((resolve) => {
+          resolveResumeChat = () => {
+            resumeChatResolved = true;
+            resolve();
+          };
+        }));
+
+      const { result } = renderHook(() => useSessionResume(getDefaultProps()));
+
+      const uiHistory: HistoryItemWithoutId[] = [
+        { type: 'user', text: 'Hello' },
+      ];
+      const clientHistory = [
+        { role: 'user' as const, parts: [{ text: 'Hello' }] },
+      ];
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'race-test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      // Start loadHistoryForResume (should await resumeChat)
+      let loadHistoryResolved = false;
+      const loadPromise = result.current
+        .loadHistoryForResume(uiHistory, clientHistory, resumedData)
+        .then(() => {
+          loadHistoryResolved = true;
+        });
+
+      // Give time for any synchronous work to complete
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // CRITICAL ASSERTION: loadHistoryForResume should NOT have resolved yet
+      // because resumeChat hasn't completed
+      expect(resumeChatResolved).toBe(false);
+      expect(loadHistoryResolved).toBe(false);
+
+      // Now resolve resumeChat
+      await act(async () => {
+        resolveResumeChat!();
+        await loadPromise;
+      });
+
+      // Now both should be resolved
+      expect(resumeChatResolved).toBe(true);
+      expect(loadHistoryResolved).toBe(true);
     });
   });
 });
