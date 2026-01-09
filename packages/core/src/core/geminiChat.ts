@@ -54,6 +54,10 @@ import {
   fireBeforeModelHook,
   fireBeforeToolSelectionHook,
 } from './geminiChatHookTriggers.js';
+import {
+  ensureStableFunctionCallIds,
+  ensureActiveLoopHasThoughtSignatures,
+} from '../utils/generateContentResponseUtilities.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -81,8 +85,6 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 2, // 1 initial call + 1 retry
   initialDelayMs: 500,
 };
-
-export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -287,7 +289,6 @@ export class GeminiChat {
 
     // Add user content to history ONCE before any attempts.
     this.history.push(userContent);
-    const requestContents = this.getHistory(true);
 
     const streamWithRetries = async function* (
       this: GeminiChat,
@@ -313,7 +314,6 @@ export class GeminiChat {
             isConnectionPhase = true;
             const stream = await this.makeApiCallAndProcessStream(
               currentConfigKey,
-              requestContents,
               prompt_id,
               signal,
             );
@@ -380,13 +380,9 @@ export class GeminiChat {
 
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
-    requestContents: Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
-
     // Track final request parameters for AfterModel hooks
     const {
       model: availabilityFinalModel,
@@ -398,7 +394,6 @@ export class GeminiChat {
     let currentGenerateContentConfig: GenerateContentConfig =
       newAvailabilityConfig;
     let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
-    let lastContentsToUse: Content[] = requestContents;
 
     const getAvailabilityContext = createAvailabilityContextProvider(
       this.config,
@@ -442,9 +437,11 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = isPreviewModel(modelToUse)
-        ? contentsForPreviewModel
-        : requestContents;
+      const requestContents = this.getHistory(true);
+      const contentsToUse = this.prepareHistoryForModel(
+        requestContents,
+        modelToUse,
+      );
 
       // Fire BeforeModel and BeforeToolSelection hooks if enabled
       const hooksEnabled = this.config.getEnableHooks();
@@ -480,7 +477,13 @@ export class GeminiChat {
           beforeModelResult.modifiedContents &&
           Array.isArray(beforeModelResult.modifiedContents)
         ) {
-          contentsToUse = beforeModelResult.modifiedContents as Content[];
+          // We must be careful not to mutate contentsToUse directly if it's
+          // shared, but here it's fresh from prepareHistoryForModel.
+          contentsToUse.splice(
+            0,
+            contentsToUse.length,
+            ...(beforeModelResult.modifiedContents as Content[]),
+          );
         }
 
         // Fire BeforeToolSelection hook
@@ -508,7 +511,6 @@ export class GeminiChat {
       // Track final request parameters for AfterModel hooks
       lastModelToUse = modelToUse;
       lastConfig = config;
-      lastContentsToUse = contentsToUse;
 
       return this.config.getContentGenerator().generateContentStream(
         {
@@ -538,7 +540,7 @@ export class GeminiChat {
     const originalRequest: GenerateContentParameters = {
       model: lastModelToUse,
       config: lastConfig,
-      contents: lastContentsToUse,
+      contents: this.getHistory(true),
     };
 
     return this.processStreamResponse(
@@ -546,6 +548,32 @@ export class GeminiChat {
       streamResponse,
       originalRequest,
     );
+  }
+
+  /**
+   * Prepares the conversation history for a specific model, ensuring compatibility.
+   * - If using a Gemini 3 (preview) model, adds thought signatures to the active loop.
+   * - If using a non-preview model (like Gemini 2.5), strips all thought signatures.
+   */
+  private prepareHistoryForModel(history: Content[], model: string): Content[] {
+    if (isPreviewModel(model)) {
+      return ensureActiveLoopHasThoughtSignatures(history);
+    }
+
+    // For non-preview models, strip thought signatures from all parts
+    return history.map((content) => {
+      if (!content.parts) return content;
+      return {
+        ...content,
+        parts: content.parts.map((part) => {
+          if (part && typeof part === 'object' && 'thoughtSignature' in part) {
+            const { thoughtSignature: _, ...newPart } = part as any;
+            return newPart;
+          }
+          return part;
+        }),
+      };
+    });
   }
 
   /**
@@ -615,55 +643,6 @@ export class GeminiChat {
     });
   }
 
-  // To ensure our requests validate, the first function call in every model
-  // turn within the active loop must have a `thoughtSignature` property.
-  // If we do not do this, we will get back 400 errors from the API.
-  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
-      const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
-
-    if (activeLoopStartIndex === -1) {
-      return requestContents;
-    }
-
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
-    // thoughtSignature property. If it does not we replace the function call
-    // with a copy that uses the synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
-      const content = newContents[i];
-      if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
-          if (part.functionCall) {
-            if (!part.thoughtSignature) {
-              newParts[j] = {
-                ...part,
-                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
-              };
-              newContents[i] = {
-                ...content,
-                parts: newParts,
-              };
-            }
-            break; // Only consider the first function call
-          }
-        }
-      }
-    }
-    return newContents;
-  }
-
   setTools(tools: Tool[]): void {
     this.tools = tools;
   }
@@ -702,6 +681,7 @@ export class GeminiChat {
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
+    const seenFunctionCallIds = new Set<string>();
 
     let hasToolCall = false;
     let finishReason: FinishReason | undefined;
@@ -715,19 +695,34 @@ export class GeminiChat {
       }
 
       if (isValidResponse(chunk)) {
+        // Assign stable IDs to function calls in the chunk before any processing
+        ensureStableFunctionCallIds(chunk);
+
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
             this.recordThoughtFromContent(content);
           }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
-          }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+          for (const part of content.parts) {
+            if (part.functionCall) {
+              hasToolCall = true;
+              // Deduplicate tool calls in history to handle cumulative chunks
+              if (!seenFunctionCallIds.has(part.functionCall.id!)) {
+                seenFunctionCallIds.add(part.functionCall.id!);
+                modelResponseParts.push(part);
+              }
+            } else if (part.thought) {
+              // Thoughts are often cumulative or repeated in some stream modes.
+              // For now we push them all, but consolidation will handle text.
+              modelResponseParts.push(part);
+            } else if (part.text) {
+              modelResponseParts.push(part);
+            } else {
+              modelResponseParts.push(part);
+            }
+          }
         }
       }
 
@@ -760,10 +755,31 @@ export class GeminiChat {
       const lastPart = consolidatedParts[consolidatedParts.length - 1];
       if (
         lastPart?.text &&
+        part.text &&
         isValidNonThoughtTextPart(lastPart) &&
         isValidNonThoughtTextPart(part)
       ) {
-        lastPart.text += part.text;
+        // If this part is a cumulative repetition of the last one, don't append.
+        // This is a naive check for cumulative chunks.
+        if (part.text.startsWith(lastPart.text)) {
+          lastPart.text = part.text;
+        } else {
+          lastPart.text += part.text;
+        }
+      } else if (part.thought && lastPart?.thought) {
+        // Consolidate thoughts if they are text-based and cumulative
+        if (
+          typeof part.text === 'string' &&
+          typeof lastPart.text === 'string'
+        ) {
+          if (part.text.startsWith(lastPart.text)) {
+            lastPart.text = part.text;
+          } else {
+            lastPart.text += part.text;
+          }
+        } else {
+          consolidatedParts.push(part);
+        }
       } else {
         consolidatedParts.push(part);
       }

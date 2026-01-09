@@ -21,6 +21,7 @@ import {
   getErrorMessage,
   isWithinRoot,
   getErrorStatus,
+  getFunctionCalls,
   MCPServerConfig,
   DiscoveredMCPTool,
   StreamEventType,
@@ -325,8 +326,12 @@ export class Session {
             }
           }
 
-          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
-            functionCalls.push(...resp.value.functionCalls);
+          const calls =
+            resp.type === StreamEventType.CHUNK
+              ? getFunctionCalls(resp.value)
+              : undefined;
+          if (calls) {
+            functionCalls.push(...calls);
           }
         }
 

@@ -47,6 +47,7 @@ import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
+import { getFunctionCalls } from '../utils/generateContentResponseUtilities.js';
 import { getVersion } from '../utils/version.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -655,8 +656,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Collect any function calls requested by the model.
-        if (chunk.functionCalls) {
-          functionCalls.push(...chunk.functionCalls);
+        const calls = getFunctionCalls(chunk);
+        if (calls) {
+          functionCalls.push(...calls);
         }
 
         // Handle text response (non-thought text)
