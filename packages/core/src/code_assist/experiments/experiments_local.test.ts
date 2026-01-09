@@ -12,7 +12,12 @@ import type { ListExperimentsResponse } from './types.js';
 import type { ClientMetadata } from '../types.js';
 
 // Mock dependencies
-vi.mock('node:fs');
+vi.mock('node:fs', () => ({
+  promises: {
+    readFile: vi.fn(),
+  },
+  readFileSync: vi.fn(),
+}));
 vi.mock('node:os');
 vi.mock('../server.js');
 vi.mock('./client_metadata.js', () => ({
@@ -44,12 +49,12 @@ describe('experiments with GEMINI_EXP', () => {
       flags: [{ flagId: 111, boolValue: true }],
       experimentIds: [999],
     });
-    vi.mocked(fs.readFileSync).mockReturnValue(mockFileContent);
+    vi.mocked(fs.promises.readFile).mockResolvedValue(mockFileContent);
 
     const { getExperiments } = await import('./experiments.js');
     const experiments = await getExperiments(mockServer);
 
-    expect(fs.readFileSync).toHaveBeenCalledWith(
+    expect(fs.promises.readFile).toHaveBeenCalledWith(
       '/tmp/experiments.json',
       'utf8',
     );
@@ -63,9 +68,9 @@ describe('experiments with GEMINI_EXP', () => {
 
   it('should fall back to server if reading file fails', async () => {
     process.env['GEMINI_EXP'] = '/tmp/missing.json';
-    vi.mocked(fs.readFileSync).mockImplementation(() => {
-      throw new Error('File not found');
-    });
+    vi.mocked(fs.promises.readFile).mockRejectedValue(
+      new Error('File not found'),
+    );
 
     // Mock server response
     const mockApiResponse = {
@@ -93,7 +98,7 @@ describe('experiments with GEMINI_EXP', () => {
       flags: [{ flagId: 333, boolValue: true }],
       experimentIds: [999],
     });
-    vi.mocked(fs.readFileSync).mockReturnValue(mockFileContent);
+    vi.mocked(fs.promises.readFile).mockResolvedValue(mockFileContent);
 
     const { getExperiments } = await import('./experiments.js');
     const experiments = await getExperiments(undefined);
@@ -109,5 +114,33 @@ describe('experiments with GEMINI_EXP', () => {
     const experiments = await getExperiments(undefined);
     expect(experiments.flags).toEqual({});
     expect(experiments.experimentIds).toEqual([]);
+  });
+
+  it('should fallback to server if file has invalid structure', async () => {
+    process.env['GEMINI_EXP'] = '/tmp/invalid.json';
+    const mockFileContent = JSON.stringify({
+      flags: 'invalid-flags-type', // Should be array
+      experimentIds: 123, // Should be array
+    });
+    vi.mocked(fs.promises.readFile).mockResolvedValue(mockFileContent);
+
+    // Mock server response
+    const mockApiResponse = {
+      flags: [{ flagId: 444, boolValue: true }],
+      experimentIds: [555],
+    };
+    vi.mocked(mockServer.listExperiments).mockResolvedValue(
+      mockApiResponse as ListExperimentsResponse,
+    );
+    const { getClientMetadata } = await import('./client_metadata.js');
+    vi.mocked(getClientMetadata).mockResolvedValue(
+      {} as unknown as ClientMetadata,
+    );
+
+    const { getExperiments } = await import('./experiments.js');
+    const experiments = await getExperiments(mockServer);
+
+    expect(experiments.flags[444]).toBeDefined();
+    expect(mockServer.listExperiments).toHaveBeenCalled();
   });
 });
