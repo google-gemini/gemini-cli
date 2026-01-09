@@ -71,7 +71,7 @@ describe('ValidationDialog', () => {
         expect.objectContaining({
           items: [
             {
-              label: 'Verify',
+              label: 'Verify your account',
               value: 'verify',
               key: 'verify',
             },
@@ -84,18 +84,6 @@ describe('ValidationDialog', () => {
         }),
         undefined,
       );
-      unmount();
-    });
-
-    it('should render validation description when provided', () => {
-      const { lastFrame, unmount } = render(
-        <ValidationDialog
-          validationDescription="Please verify your identity"
-          onChoice={mockOnChoice}
-        />,
-      );
-
-      expect(lastFrame()).toContain('Please verify your identity');
       unmount();
     });
 

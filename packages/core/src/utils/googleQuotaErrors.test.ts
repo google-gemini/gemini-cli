@@ -494,6 +494,48 @@ describe('classifyGoogleError', () => {
     expect((result as ValidationRequiredError).cause).toBe(apiError);
   });
 
+  it('should correctly parse Learn more URL when first link description contains "Learn more" text', () => {
+    // This tests the real API response format where the description of the first
+    // link contains "Learn more:" text, but we should use the second link's URL
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required to continue.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {},
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description:
+                'Further action is required to use this service. Navigate to the following URL to complete verification:\n\nhttps://accounts.sandbox.google.com/signin/continue?...\n\nLearn more:\n\nhttps://support.google.com/accounts?p=al_alert\n',
+              url: 'https://accounts.sandbox.google.com/signin/continue?sarp=1&scc=1&continue=...',
+            },
+            {
+              description: 'Learn more',
+              url: 'https://support.google.com/accounts?p=al_alert',
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    // Should get the validation link from the first link
+    expect((result as ValidationRequiredError).validationLink).toBe(
+      'https://accounts.sandbox.google.com/signin/continue?sarp=1&scc=1&continue=...',
+    );
+    // Should get the Learn more URL from the SECOND link, not the first
+    expect((result as ValidationRequiredError).learnMoreUrl).toBe(
+      'https://support.google.com/accounts?p=al_alert',
+    );
+  });
+
   it('should fallback to ErrorInfo metadata when Help detail is not present', () => {
     const apiError: GoogleApiError = {
       code: 403,

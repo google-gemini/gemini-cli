@@ -29,7 +29,6 @@ type DialogState = 'choosing' | 'waiting' | 'complete' | 'error';
 
 export function ValidationDialog({
   validationLink,
-  validationDescription,
   learnMoreUrl,
   onChoice,
 }: ValidationDialogProps): React.JSX.Element {
@@ -38,7 +37,7 @@ export function ValidationDialog({
 
   const items = [
     {
-      label: 'Verify',
+      label: 'Verify your account',
       value: 'verify' as const,
       key: 'verify',
     },
@@ -160,11 +159,6 @@ export function ValidationDialog({
       <Box marginBottom={1}>
         <Text>Further action is required to use this service.</Text>
       </Box>
-      {validationDescription && (
-        <Box marginBottom={1}>
-          <Text dimColor>{validationDescription}</Text>
-        </Box>
-      )}
       <Box marginTop={1} marginBottom={1}>
         <RadioButtonSelect
           items={items}
