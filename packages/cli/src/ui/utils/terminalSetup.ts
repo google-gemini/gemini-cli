@@ -401,7 +401,10 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
     });
 
     return !(hasOurShiftEnter && hasOurCtrlEnter);
-  } catch {
+  } catch (error) {
+    debugLogger.debug(
+      `Failed to read or parse keybindings, assuming prompt is needed: ${error}`,
+    );
     return true;
   }
 }
