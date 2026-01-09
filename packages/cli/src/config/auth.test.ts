@@ -85,8 +85,7 @@ describe('validateAuthMethod', () => {
     },
     {
       description: 'should return an error message for an invalid auth method',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      authType: 'invalid-method' as any,
+      authType: 'invalid-method' as unknown as AuthType,
       envs: {},
       expected: 'Invalid auth method selected.',
     },

@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
+import type { Settings } from '../settings.js';
 import { ExtensionStorage } from './storage.js';
 import {
   KeychainTokenStorage,
@@ -22,17 +23,20 @@ import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
 
 vi.mock('node:fs', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = await importOriginal<any>();
+  const actual = (await importOriginal<typeof import('node:fs')>()) as {
+    default?: typeof import('node:fs');
+  } & typeof import('node:fs');
   return {
     ...actual,
     default: {
       ...actual.default,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      existsSync: vi.fn((...args: any[]) => actual.existsSync(...args)),
+      existsSync: vi.fn((...args: unknown[]) =>
+        actual.existsSync(args[0] as fs.PathLike),
+      ),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    existsSync: vi.fn((...args: any[]) => actual.existsSync(...args)),
+    existsSync: vi.fn((...args: unknown[]) =>
+      actual.existsSync(args[0] as fs.PathLike),
+    ),
   };
 });
 
@@ -229,8 +233,7 @@ describe('extensionUpdates', () => {
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        settings: { telemetry: {} } as any,
+        settings: { telemetry: {} } as Settings,
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });
@@ -255,10 +258,12 @@ describe('extensionUpdates', () => {
         } as unknown as GeminiCLIExtension,
       ]);
       vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue(
-        {} as unknown as GeminiCLIExtension,
-      );
+      vi.spyOn(
+        manager as unknown as {
+          loadExtension: (path: string) => Promise<GeminiCLIExtension>;
+        },
+        'loadExtension',
+      ).mockResolvedValue({} as unknown as GeminiCLIExtension);
       vi.spyOn(manager, 'enableExtension').mockResolvedValue(undefined);
 
       // Mock fs.promises for the operations inside installOrUpdateExtension

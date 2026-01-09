@@ -12,6 +12,8 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   UserFeedbackPayload,
+  ResumedSessionData,
+  MessageRecord,
 } from '@google/gemini-cli-core';
 import {
   executeToolCall,
@@ -23,6 +25,7 @@ import {
   CoreEvent,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
+import type { ReadStream } from 'node:tty';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
   describe,
@@ -947,23 +950,24 @@ describe('runNonInteractive', () => {
   it('should handle cancellation (Ctrl+C)', async () => {
     // Mock isTTY and setRawMode safely
     const originalIsTTY = process.stdin.isTTY;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const originalSetRawMode = (process.stdin as any).setRawMode;
+    const originalSetRawMode = (process.stdin as unknown as ReadStream)
+      .setRawMode;
 
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true,
       configurable: true,
     });
     if (!originalSetRawMode) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (process.stdin as any).setRawMode = vi.fn();
+      (process.stdin as unknown as ReadStream).setRawMode = vi.fn();
     }
 
     const stdinOnSpy = vi
       .spyOn(process.stdin, 'on')
       .mockImplementation(() => process.stdin);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.spyOn(process.stdin as any, 'setRawMode').mockImplementation(() => true);
+    vi.spyOn(
+      process.stdin as unknown as ReadStream,
+      'setRawMode',
+    ).mockImplementation(() => process.stdin as unknown as ReadStream);
     vi.spyOn(process.stdin, 'resume').mockImplementation(() => process.stdin);
     vi.spyOn(process.stdin, 'pause').mockImplementation(() => process.stdin);
     vi.spyOn(process.stdin, 'removeAllListeners').mockImplementation(
@@ -1010,8 +1014,7 @@ describe('runNonInteractive', () => {
 
     // Find the keypress handler registered by runNonInteractive
     const keypressCall = stdinOnSpy.mock.calls.find(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (call) => (call[0] as any) === 'keypress',
+      (call) => (call[0] as unknown) === 'keypress',
     );
     expect(keypressCall).toBeDefined();
     const keypressHandler = keypressCall?.[1] as (
@@ -1053,11 +1056,9 @@ describe('runNonInteractive', () => {
       configurable: true,
     });
     if (originalSetRawMode) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (process.stdin as any).setRawMode = originalSetRawMode;
+      (process.stdin as unknown as ReadStream).setRawMode = originalSetRawMode;
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (process.stdin as any).setRawMode;
+      delete (process.stdin as unknown as Partial<ReadStream>).setRawMode;
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
@@ -1581,15 +1582,19 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
 
-    const resumedSessionData = {
+    const resumedSessionData: ResumedSessionData = {
       conversation: {
         sessionId: 'resumed-session-id',
         messages: [
-          { role: 'user', parts: [{ text: 'Previous message' }] },
-        ] as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+          {
+            id: 'msg-1',
+            timestamp: new Date().toISOString(),
+            type: 'user',
+            content: [{ text: 'Previous message' }],
+          },
+        ] as MessageRecord[],
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        firstUserMessage: 'Previous message',
         projectHash: 'test-hash',
       },
       filePath: '/path/to/session.json',

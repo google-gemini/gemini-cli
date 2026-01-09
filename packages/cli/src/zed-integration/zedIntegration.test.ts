@@ -25,6 +25,7 @@ import {
   type GeminiChat,
   type Config,
   type MessageBus,
+  type StreamEvent,
 } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -75,8 +76,9 @@ vi.mock(
 );
 
 // Helper to create mock streams
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function* createMockStream(items: any[]) {
+async function* createMockStream(
+  items: StreamEvent[],
+): AsyncGenerator<StreamEvent> {
   for (const item of items) {
     yield item;
   }
@@ -325,7 +327,7 @@ describe('Session', () => {
           candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     mockChat.sendMessageStream.mockResolvedValue(stream);
 
     const result = await session.prompt({
@@ -352,7 +354,7 @@ describe('Session', () => {
           functionCalls: [{ name: 'test_tool', args: { foo: 'bar' } }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     const stream2 = createMockStream([
       {
         type: StreamEventType.CHUNK,
@@ -360,7 +362,7 @@ describe('Session', () => {
           candidates: [{ content: { parts: [{ text: 'Result' }] } }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
 
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
@@ -418,13 +420,13 @@ describe('Session', () => {
           functionCalls: [{ name: 'test_tool', args: {} }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     const stream2 = createMockStream([
       {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
 
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
@@ -464,13 +466,13 @@ describe('Session', () => {
           functionCalls: [{ name: 'test_tool', args: {} }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     const stream2 = createMockStream([
       {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
 
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
@@ -511,7 +513,7 @@ describe('Session', () => {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     mockChat.sendMessageStream.mockResolvedValue(stream);
 
     await session.prompt({
@@ -630,13 +632,13 @@ describe('Session', () => {
           functionCalls: [{ name: 'test_tool', args: {} }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     const stream2 = createMockStream([
       {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
 
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
@@ -672,13 +674,13 @@ describe('Session', () => {
           functionCalls: [{ name: 'unknown_tool', args: {} }],
         },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     const stream2 = createMockStream([
       {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
 
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
@@ -715,7 +717,7 @@ describe('Session', () => {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     mockChat.sendMessageStream.mockResolvedValue(stream);
 
     await session.prompt({
@@ -748,7 +750,7 @@ describe('Session', () => {
         type: StreamEventType.CHUNK,
         value: { candidates: [] },
       },
-    ]);
+    ] as unknown as StreamEvent[]);
     mockChat.sendMessageStream.mockResolvedValue(stream);
 
     await session.prompt({
