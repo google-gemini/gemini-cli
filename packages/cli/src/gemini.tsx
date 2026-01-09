@@ -594,7 +594,7 @@ export async function main() {
     let input = config.getQuestion();
     const startupWarnings = [
       ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings()),
+      ...(await getUserStartupWarnings(settings.merged)),
     ];
 
     // Handle --resume flag
