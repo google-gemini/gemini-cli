@@ -12,9 +12,12 @@ import {
   GeminiChat,
   InvalidStreamError,
   StreamEventType,
-  SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
 } from './geminiChat.js';
+import {
+  ensureActiveLoopHasThoughtSignatures,
+  SYNTHETIC_THOUGHT_SIGNATURE,
+} from '../utils/generateContentResponseUtilities.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_THINKING_MODE } from '../config/models.js';
@@ -531,9 +534,9 @@ describe('GeminiChat', () => {
 
       // CRUCIAL ASSERTION:
       // The buggy code would fail here, resulting in parts.length being 0.
-      // The corrected code will pass, preserving the single visible text part.
-      expect(modelTurn?.parts?.length).toBe(1);
-      expect(modelTurn?.parts![0].text).toBe(
+      // The corrected code will pass, preserving the visible text part (along with the thought).
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn?.parts![1].text).toBe(
         'This is the visible text that should not be lost.',
       );
     });
@@ -1924,7 +1927,6 @@ describe('GeminiChat', () => {
 
   describe('ensureActiveLoopHasThoughtSignatures', () => {
     it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
-      const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'Old message' }] },
         {
@@ -1957,7 +1959,7 @@ describe('GeminiChat', () => {
         },
       ];
 
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+      const newContents = ensureActiveLoopHasThoughtSignatures(history);
 
       // Outside active loop - unchanged
       expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
@@ -1981,7 +1983,6 @@ describe('GeminiChat', () => {
     });
 
     it('should not modify contents if there is no user text message', () => {
-      const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         {
           role: 'user',
@@ -1992,22 +1993,20 @@ describe('GeminiChat', () => {
           parts: [{ functionCall: { name: 'tool2', args: {} } }],
         },
       ];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+      const newContents = ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);
       expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
     });
 
     it('should handle an empty history', () => {
-      const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+      const newContents = ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual([]);
     });
 
     it('should handle history with only a user message', () => {
-      const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+      const newContents = ensureActiveLoopHasThoughtSignatures(history);
       expect(newContents).toEqual(history);
     });
   });
