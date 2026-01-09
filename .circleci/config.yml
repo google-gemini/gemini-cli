@@ -1,0 +1,128 @@
+version: '2.1'
+
+orbs:
+  win: 'circleci/windows@5.0.0'
+
+executors:
+  linux_node:
+    docker:
+      - image: 'cimg/node:22.12'
+    working_directory: '~/project'
+  macos_node:
+    macos:
+      xcode: '15.4.0'
+    working_directory: '~/project'
+  windows_node:
+    machine:
+      image: 'windows-server-2022-gui:current'
+    resource_class: 'windows.medium'
+    working_directory: '~/project'
+
+commands:
+  install_deps:
+    description: 'Install and cache npm dependencies per OS'
+    steps:
+      - restore_cache:
+          keys:
+            - 'v1-deps-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package-lock.json" }}'
+      - run:
+          name: 'Install dependencies'
+          command: 'npm ci'
+      - save_cache:
+          key: 'v1-deps-{{ .Environment.CIRCLE_JOB }}-{{ checksum "package-lock.json" }}'
+          paths:
+            - 'node_modules'
+
+  setup_env_tools:
+    description: 'Install OS-specific system tools'
+    steps:
+      - run:
+          name: 'Install System Dependencies'
+          command: |
+            if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+              sudo apt-get update && sudo apt-get install -y python3-venv
+              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+              sudo apt-get update && sudo apt-get install -y google-cloud-cli
+            elif [[ "$OSTYPE" == "darwin"* ]]; then
+              brew install google-cloud-sdk
+            fi
+
+jobs:
+  test_platform:
+    parameters:
+      os_executor:
+        type: 'string'
+    executor: '<< parameters.os_executor >>'
+    steps:
+      - 'checkout'
+      - 'install_deps'
+      - 'setup_env_tools'
+      - run:
+          name: 'Build and Bundle'
+          command: |
+            npm run build
+            npm run bundle
+      - run:
+          name: 'Setup Config and Run E2E'
+          command: |
+            mkdir -p ~/.config/@google/gemini-cli
+            echo "{\"apiKey\": \"${GEMINI_API_KEY}\", \"autoApprove\": true}" > ~/.config/@google/gemini-cli/config.json
+
+            # Targeted E2E tests
+            npm run test:integration:sandbox:none -- \
+              --pool=forks \
+              --poolOptions.forks.singleFork \
+              clipboardUtils.e2e.test.ts \
+              ctrl-c-exit.test.ts \
+              flicker.test.ts
+          no_output_timeout: '10m'
+      - store_test_results:
+          path: 'test-results'
+      - store_artifacts:
+          path: 'test-results'
+          destination: 'raw-test-logs'
+
+  deploy:
+    executor: 'linux_node'
+    steps:
+      - 'checkout'
+      - 'install_deps'
+      - run:
+          name: 'Final Deployment'
+          command: |
+            echo "All platforms passed. Deploying..."
+
+workflows:
+  version: '2'
+  build_test_deploy:
+    jobs:
+      - test_platform:
+          name: 'test-linux'
+          os_executor: 'linux_node'
+          context: 'ci'
+          filters:
+            branches: &original_branches
+              only:
+                - 'main'
+                - '/^(feat|fix|chore|release|circleci)(/|-).*/'
+      - test_platform:
+          name: 'test-macos'
+          os_executor: 'macos_node'
+          context: 'ci'
+          filters:
+            branches: *original_branches
+      - test_platform:
+          name: 'test-windows'
+          os_executor: 'windows_node'
+          context: 'ci'
+          filters:
+            branches: *original_branches
+      - deploy:
+          requires:
+            - 'test-linux'
+            - 'test-macos'
+            - 'test-windows'
+          filters:
+            branches:
+              only: 'main'
