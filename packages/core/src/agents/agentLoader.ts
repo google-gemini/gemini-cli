@@ -89,7 +89,6 @@ const localAgentSchema = z
         }),
       )
       .optional(),
-    system_prompt: z.string().optional(),
     query: z.string().optional(),
     model: z
       .object({
@@ -246,7 +245,7 @@ export async function parseAgentMarkdown(
   const agentDef: FrontmatterLocalAgentDefinition = {
     ...frontmatter,
     kind: 'local',
-    system_prompt: frontmatter.system_prompt ?? body.trim(),
+    system_prompt: body.trim(),
     query: frontmatter.query,
   };
 

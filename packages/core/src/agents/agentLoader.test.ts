@@ -80,22 +80,6 @@ System prompt content.`);
       });
     });
 
-    it('should parse system_prompt from frontmatter', async () => {
-      const filePath = await writeAgentMarkdown(`---
-name: frontmatter-prompt
-description: Agent with prompt in frontmatter
-system_prompt: You are defined in frontmatter.
----
-Ignored body content.`);
-
-      const result = await parseAgentMarkdown(filePath);
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        name: 'frontmatter-prompt',
-        system_prompt: 'You are defined in frontmatter.',
-      });
-    });
-
     it('should parse query from frontmatter', async () => {
       const filePath = await writeAgentMarkdown(`---
 name: query-agent
