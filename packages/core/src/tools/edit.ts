@@ -831,6 +831,22 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+
+      if (
+        !editData.isNewFile &&
+        typeof displayResult !== 'string' &&
+        displayResult.fileDiff
+      ) {
+        const MAX_LLM_DIFF_CHARS = 2000;
+        let diffForLlm = displayResult.fileDiff;
+        if (diffForLlm.length > MAX_LLM_DIFF_CHARS) {
+          diffForLlm =
+            diffForLlm.substring(0, MAX_LLM_DIFF_CHARS) +
+            '\n... (diff truncated) ...';
+        }
+        llmSuccessMessageParts.push(`\n\`\`\`diff\n${diffForLlm}\n\`\`\``);
+      }
+
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,

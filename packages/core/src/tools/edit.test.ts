@@ -426,6 +426,9 @@ describe('EditTool', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.llmContent).toMatch(/```diff/);
+      expect(result.llmContent).toMatch(initialContent);
+      expect(result.llmContent).toMatch(newContent);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
       const display = result.returnDisplay as FileDiff;
       expect(display.fileDiff).toMatch(initialContent);
