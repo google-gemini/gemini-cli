@@ -165,7 +165,7 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
+    it('should NOT support modes property for Tier 2 and Tier 3 policies and report an error', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),
         `
@@ -186,8 +186,11 @@ modes = ["autoEdit"]
 
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('tier2-tool');
-      expect(result.rules[0].modes).toEqual(['autoEdit']);
-      expect(result.errors).toHaveLength(0);
+      expect(result.rules[0].modes).toBeUndefined();
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Restricted property "modes" cannot be used in user tier policies',
+      );
     });
 
     it('should handle TOML parse errors', async () => {
