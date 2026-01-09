@@ -60,9 +60,8 @@ name: complex-agent
 description: A complex markdown agent
 tools:
   - run_shell_command
-model:
-  model: gemini-pro
-  temperature: 0.7
+model: gemini-pro
+temperature: 0.7
 ---
 System prompt content.`);
 
@@ -72,28 +71,9 @@ System prompt content.`);
         name: 'complex-agent',
         description: 'A complex markdown agent',
         tools: ['run_shell_command'],
-        model: {
-          model: 'gemini-pro',
-          temperature: 0.7,
-        },
+        model: 'gemini-pro',
+        temperature: 0.7,
         system_prompt: 'System prompt content.',
-      });
-    });
-
-    it('should parse query from frontmatter', async () => {
-      const filePath = await writeAgentMarkdown(`---
-name: query-agent
-description: Agent with query
-query: What is the weather?
----
-System prompt.`);
-
-      const result = await parseAgentMarkdown(filePath);
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        name: 'query-agent',
-        system_prompt: 'System prompt.',
-        query: 'What is the weather?',
       });
     });
 
@@ -184,7 +164,8 @@ agent_card_url: https://example.com/inferred
 kind: remote
 name: no-body-remote
 agent_card_url: https://example.com/card
----`);
+---
+`);
       const result = await parseAgentMarkdown(filePath);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -202,7 +183,8 @@ agent_card_url: https://example.com/card
 - kind: remote
   name: remote-2
   agent_card_url: https://example.com/2
----`);
+---
+`);
       const result = await parseAgentMarkdown(filePath);
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
@@ -233,6 +215,7 @@ agent_card_url: https://example.com/card
         description: 'A test agent',
         promptConfig: {
           systemPrompt: 'You are a test agent.',
+          query: '${query}',
         },
         modelConfig: {
           model: 'inherit',
@@ -257,9 +240,7 @@ agent_card_url: https://example.com/card
         kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
-        model: {
-          model: GEMINI_MODEL_ALIAS_PRO,
-        },
+        model: GEMINI_MODEL_ALIAS_PRO,
         system_prompt: 'You are a test agent.',
       };
 
@@ -274,9 +255,7 @@ agent_card_url: https://example.com/card
         kind: 'local' as const,
         name: 'test-agent',
         description: 'A test agent',
-        model: {
-          model: 'auto',
-        },
+        model: 'auto',
         system_prompt: 'You are a test agent.',
       };
 

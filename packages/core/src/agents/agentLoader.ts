@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,6 +14,7 @@ import {
   isValidToolName,
   DELEGATE_TO_AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -29,15 +30,10 @@ interface FrontmatterLocalAgentDefinition
   description: string;
   tools?: string[];
   system_prompt: string;
-  query?: string;
-  model?: {
-    model?: string;
-    temperature?: number;
-  };
-  run?: {
-    max_turns?: number;
-    timeout_mins?: number;
-  };
+  model?: string;
+  temperature?: number;
+  max_turns?: number;
+  timeout_mins?: number;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -89,19 +85,10 @@ const localAgentSchema = z
         }),
       )
       .optional(),
-    query: z.string().optional(),
-    model: z
-      .object({
-        model: z.string().optional(),
-        temperature: z.number().optional(),
-      })
-      .optional(),
-    run: z
-      .object({
-        max_turns: z.number().int().positive().optional(),
-        timeout_mins: z.number().int().positive().optional(),
-      })
-      .optional(),
+    model: z.string().optional(),
+    temperature: z.number().optional(),
+    max_turns: z.number().int().positive().optional(),
+    timeout_mins: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -172,8 +159,7 @@ export async function parseAgentMarkdown(
   }
 
   // Split frontmatter and body
-  // Matches "---", newline, content, newline, "---", optional newline, optional rest
-  const match = content.match(/^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$/);
+  const match = content.match(FRONTMATTER_REGEX);
   if (!match) {
     throw new AgentLoadError(
       filePath,
@@ -246,7 +232,6 @@ export async function parseAgentMarkdown(
     ...frontmatter,
     kind: 'local',
     system_prompt: body.trim(),
-    query: frontmatter.query,
   };
 
   return [agentDef];
@@ -283,7 +268,7 @@ export function markdownToAgentDefinition(
   }
 
   // If a model is specified, use it. Otherwise, inherit
-  const modelName = markdown.model?.model || 'inherit';
+  const modelName = markdown.model || 'inherit';
 
   return {
     kind: 'local',
@@ -292,16 +277,16 @@ export function markdownToAgentDefinition(
     displayName: markdown.display_name,
     promptConfig: {
       systemPrompt: markdown.system_prompt,
-      query: markdown.query,
+      query: '${query}',
     },
     modelConfig: {
       model: modelName,
-      temp: markdown.model?.temperature ?? 1,
+      temp: markdown.temperature ?? 1,
       top_p: 0.95,
     },
     runConfig: {
-      max_turns: markdown.run?.max_turns,
-      max_time_minutes: markdown.run?.timeout_mins || 5,
+      max_turns: markdown.max_turns,
+      max_time_minutes: markdown.timeout_mins || 5,
     },
     toolConfig: markdown.tools
       ? {

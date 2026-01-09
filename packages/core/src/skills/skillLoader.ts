@@ -27,7 +27,7 @@ export interface SkillDefinition {
   disabled?: boolean;
 }
 
-const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;
+export const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;
 
 /**
  * Discovers and loads all skills in the provided directory.
