@@ -410,11 +410,7 @@ export class ChatRecordingService {
    */
   private writeConversation(
     conversation: ConversationRecord,
-<<<<<<< HEAD
     { allowEmpty = false }: { allowEmpty?: boolean } = {},
-=======
-    allowEmpty: boolean = false,
->>>>>>> b0447b052 (complete)
   ): void {
     try {
       if (!this.conversationFile) return;
