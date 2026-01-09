@@ -97,37 +97,27 @@ function verifyJetBrains(
     command: string;
   },
 ): IdeInfo {
-  if (ide.name !== IDE_DEFINITIONS.jetbrains.name || !ideProcessInfo?.command) {
+  if (ide.name !== IDE_DEFINITIONS.jetbrains.name || !ideProcessInfo.command) {
     return ide;
   }
 
   const command = ideProcessInfo.command.toLowerCase();
-  if (command.includes('idea')) {
-    return IDE_DEFINITIONS.intellijidea;
-  }
-  if (command.includes('webstorm')) {
-    return IDE_DEFINITIONS.webstorm;
-  }
-  if (command.includes('pycharm')) {
-    return IDE_DEFINITIONS.pycharm;
-  }
-  if (command.includes('goland')) {
-    return IDE_DEFINITIONS.goland;
-  }
-  if (command.includes('studio')) {
-    return IDE_DEFINITIONS.androidstudio;
-  }
-  if (command.includes('clion')) {
-    return IDE_DEFINITIONS.clion;
-  }
-  if (command.includes('rustrover')) {
-    return IDE_DEFINITIONS.rustrover;
-  }
-  if (command.includes('datagrip')) {
-    return IDE_DEFINITIONS.datagrip;
-  }
-  if (command.includes('phpstorm')) {
-    return IDE_DEFINITIONS.phpstorm;
+  const jetbrainsProducts: Array<[string, IdeInfo]> = [
+    ['idea', IDE_DEFINITIONS.intellijidea],
+    ['webstorm', IDE_DEFINITIONS.webstorm],
+    ['pycharm', IDE_DEFINITIONS.pycharm],
+    ['goland', IDE_DEFINITIONS.goland],
+    ['studio', IDE_DEFINITIONS.androidstudio],
+    ['clion', IDE_DEFINITIONS.clion],
+    ['rustrover', IDE_DEFINITIONS.rustrover],
+    ['datagrip', IDE_DEFINITIONS.datagrip],
+    ['phpstorm', IDE_DEFINITIONS.phpstorm],
+  ];
+
+  for (const [product, ideInfo] of jetbrainsProducts) {
+    if (command.includes(product)) {
+      return ideInfo;
+    }
   }
 
   return ide;
@@ -147,17 +137,18 @@ export function detectIde(
     };
   }
 
+  const isJetBrains = process.env['TERMINAL_EMULATOR']?.includes('JetBrains');
   // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
   if (
     process.env['TERM_PROGRAM'] !== 'vscode' &&
     process.env['TERM_PROGRAM'] !== 'sublime' &&
-    !process.env['TERMINAL_EMULATOR']?.includes('JetBrains')
+    !isJetBrains
   ) {
     return undefined;
   }
 
   const ide = detectIdeFromEnv();
-  return process.env['TERMINAL_EMULATOR']?.includes('JetBrains')
+  return isJetBrains
     ? verifyJetBrains(ide, ideProcessInfo)
     : verifyVSCode(ide, ideProcessInfo);
 }
