@@ -1951,10 +1951,13 @@ export function useTextBuffer({
 
   const addPastedContent = useCallback(
     (content: string, lineCount: number): string => {
+      // Normalize line endings: \r\n -> \n, \r -> \n
+      const normalizedContent = content.replace(/\r\n|\r/g, '\n');
+
       const base =
         lineCount > LARGE_PASTE_LINE_THRESHOLD
           ? `[Pasted Text: ${lineCount} lines]`
-          : `[Pasted Text: ${content.length} chars]`;
+          : `[Pasted Text: ${normalizedContent.length} chars]`;
 
       let id = base;
       let suffix = 2;
@@ -1963,7 +1966,10 @@ export function useTextBuffer({
         suffix++;
       }
 
-      dispatch({ type: 'add_pasted_content', payload: { id, text: content } });
+      dispatch({
+        type: 'add_pasted_content',
+        payload: { id, text: normalizedContent },
+      });
       return id;
     },
     [pastedContent],
@@ -1976,7 +1982,8 @@ export function useTextBuffer({
       }
 
       if (paste) {
-        const lineCount = ch.split('\n').length;
+        // Split on \n, \r\n, or \r to handle different line ending styles
+        const lineCount = ch.split(/\r?\n|\r/).length;
         if (
           lineCount > LARGE_PASTE_LINE_THRESHOLD ||
           ch.length > LARGE_PASTE_CHAR_THRESHOLD
