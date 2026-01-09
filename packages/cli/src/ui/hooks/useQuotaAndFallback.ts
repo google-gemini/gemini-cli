@@ -134,6 +134,8 @@ export function useQuotaAndFallback({
         // This ensures the Footer updates and future turns use this model.
         // The change is not persisted, so the original model is restored on restart.
         config.activateFallbackMode(proQuotaRequest.fallbackModel);
+        setModelSwitchedFromQuotaError(false);
+        config.setQuotaErrorOccurred(false);
         historyManager.addItem(
           {
             type: MessageType.INFO,
@@ -143,7 +145,7 @@ export function useQuotaAndFallback({
         );
       }
     },
-    [proQuotaRequest, historyManager, config],
+    [proQuotaRequest, historyManager, config, setModelSwitchedFromQuotaError],
   );
 
   return {

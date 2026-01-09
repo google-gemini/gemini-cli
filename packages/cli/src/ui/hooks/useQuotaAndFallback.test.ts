@@ -428,6 +428,10 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       // Verify setModel was called with isFallbackModel=true
       expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-flash', true);
 
+      // Verify quota error flags are reset
+      expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(false);
+      expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(false);
+
       // Check for the "Switched to fallback model" message
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
       const lastCall = (mockHistoryManager.addItem as Mock).mock.calls[0][0];
