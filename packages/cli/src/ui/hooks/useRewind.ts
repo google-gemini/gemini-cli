@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useMemo, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type {
   ConversationRecord,
   MessageRecord,
@@ -15,23 +15,12 @@ import {
   type FileChangeStats,
 } from '../utils/rewindFileOps.js';
 
-export function useRewindLogic(conversation: ConversationRecord) {
+export function useRewind(conversation: ConversationRecord) {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
     null,
   );
   const [confirmationStats, setConfirmationStats] =
     useState<FileChangeStats | null>(null);
-
-  const interactions = useMemo(() => {
-    const prompts: MessageRecord[] = [];
-
-    for (const msg of conversation.messages) {
-      if (msg.type === 'user') {
-        prompts.push(msg);
-      }
-    }
-    return prompts;
-  }, [conversation.messages]);
 
   const getStats = useCallback(
     (userMessage: MessageRecord) =>
@@ -41,13 +30,13 @@ export function useRewindLogic(conversation: ConversationRecord) {
 
   const selectMessage = useCallback(
     (messageId: string) => {
-      const msg = interactions.find((m) => m.id === messageId);
+      const msg = conversation.messages.find((m) => m.id === messageId);
       if (msg) {
         setSelectedMessageId(messageId);
         setConfirmationStats(calculateRewindImpact(conversation, msg));
       }
     },
-    [conversation, interactions],
+    [conversation],
   );
 
   const clearSelection = useCallback(() => {
@@ -56,7 +45,6 @@ export function useRewindLogic(conversation: ConversationRecord) {
   }, []);
 
   return {
-    interactions,
     selectedMessageId,
     getStats,
     confirmationStats,
