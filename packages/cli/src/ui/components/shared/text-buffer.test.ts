@@ -574,6 +574,43 @@ describe('useTextBuffer', () => {
       expect(state.text).toBe(largeText);
     });
 
+    it('insert: should clean up pastedContent when placeholder is deleted', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeText = '1\n2\n3\n4\n5\n6';
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      // Delete the placeholder using setText
+      act(() => result.current.setText(''));
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+    });
+
+    it('insert: should clean up pastedContent when placeholder is removed via backspace', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeText = '1\n2\n3\n4\n5\n6';
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      // Delete the placeholder character by character using backspace
+      const placeholderLength = '[Pasted Text: 6 lines]'.length;
+      act(() => {
+        for (let i = 0; i < placeholderLength; i++) {
+          result.current.backspace();
+        }
+      });
+
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+    });
+
     it('newline: should create a new line and move cursor', () => {
       const { result } = renderHook(() =>
         useTextBuffer({

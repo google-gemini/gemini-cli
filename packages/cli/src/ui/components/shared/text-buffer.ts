@@ -1788,7 +1788,21 @@ export function textBufferReducer(
   action: TextBufferAction,
   options: TextBufferOptions = {},
 ): TextBufferState {
-  const newState = textBufferReducerLogic(state, action, options);
+  let newState = textBufferReducerLogic(state, action, options);
+
+  // Clean up orphaned pastedContent entries when text changes
+  const pastedContentKeys = Object.keys(newState.pastedContent);
+  if (newState.lines !== state.lines && pastedContentKeys.length > 0) {
+    const newText = newState.lines.join('\n');
+    const cleaned = Object.fromEntries(
+      Object.entries(newState.pastedContent).filter(([id]) =>
+        newText.includes(id),
+      ),
+    );
+    if (Object.keys(cleaned).length !== pastedContentKeys.length) {
+      newState = { ...newState, pastedContent: cleaned };
+    }
+  }
 
   const newTransformedLines =
     newState.lines !== state.lines

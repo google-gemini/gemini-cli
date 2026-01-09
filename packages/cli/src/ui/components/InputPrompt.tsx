@@ -224,7 +224,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       let processedValue = submittedValue;
       if (buffer.pastedContent) {
         // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        PASTED_TEXT_PLACEHOLDER_REGEX.lastIndex = 0;
         processedValue = processedValue.replace(
           PASTED_TEXT_PLACEHOLDER_REGEX,
           (match) => buffer.pastedContent[match] || match,
