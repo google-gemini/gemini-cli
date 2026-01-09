@@ -27,6 +27,8 @@ import { debugLogger } from '../utils/debugLogger.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
+  // Track all configured servers (including disabled ones) for UI display
+  private allServerConfigs: Map<string, MCPServerConfig> = new Map();
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
@@ -91,14 +93,18 @@ export class McpClientManager {
     );
   }
 
-  private isAllowedMcpServer(name: string) {
+  /**
+   * Check if server is blocked by admin settings (allowlist/excludelist).
+   * Returns true if blocked, false if allowed.
+   */
+  private isBlockedBySettings(name: string): boolean {
     const allowedNames = this.cliConfig.getAllowedMcpServers();
     if (
       allowedNames &&
       allowedNames.length > 0 &&
       allowedNames.indexOf(name) === -1
     ) {
-      return false;
+      return true;
     }
     const blockedNames = this.cliConfig.getBlockedMcpServers();
     if (
@@ -106,23 +112,25 @@ export class McpClientManager {
       blockedNames.length > 0 &&
       blockedNames.indexOf(name) !== -1
     ) {
-      return false;
+      return true;
     }
+    return false;
+  }
 
-    // Check enablement callbacks for session/file-based enable/disable
+  /**
+   * Check if server is disabled by user (session or file-based).
+   */
+  private isDisabledByUser(name: string): boolean {
     const callbacks = this.cliConfig.getMcpEnablementCallbacks();
     if (callbacks) {
-      // Session disable takes precedence
       if (callbacks.isSessionDisabled(name)) {
-        return false;
+        return true;
       }
-      // Check file-based enablement
       if (!callbacks.isFileEnabled(name)) {
-        return false;
+        return true;
       }
     }
-
-    return true;
+    return false;
   }
 
   private async disconnectClient(name: string) {
@@ -151,13 +159,22 @@ export class McpClientManager {
     name: string,
     config: MCPServerConfig,
   ): Promise<void> | void {
-    if (!this.isAllowedMcpServer(name)) {
+    // Always track server config for UI display
+    this.allServerConfigs.set(name, config);
+
+    // Check if blocked by admin settings (allowlist/excludelist)
+    if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
         this.blockedMcpServers?.push({
           name,
           extensionName: config.extension?.name ?? '',
         });
       }
+      return;
+    }
+    // User-disabled servers: don't start, but don't add to blocked list either
+    // They'll show as "Disabled" in the UI via enablementState
+    if (this.isDisabledByUser(name)) {
       return;
     }
     if (!this.cliConfig.isTrustedFolder()) {
@@ -354,12 +371,12 @@ export class McpClientManager {
   }
 
   /**
-   * All of the MCP server configurations currently loaded.
+   * All of the MCP server configurations (including disabled ones).
    */
   getMcpServers(): Record<string, MCPServerConfig> {
     const mcpServers: Record<string, MCPServerConfig> = {};
-    for (const [name, client] of this.clients.entries()) {
-      mcpServers[name] = client.getServerConfig();
+    for (const [name, config] of this.allServerConfigs.entries()) {
+      mcpServers[name] = config;
     }
     return mcpServers;
   }
