@@ -583,6 +583,40 @@ describe('classifyGoogleError', () => {
     expect(result).not.toBeInstanceOf(ValidationRequiredError);
   });
 
+  it('should find learn more link by hostname when description is different', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {},
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description: 'Complete validation',
+              url: 'https://accounts.google.com/validate',
+            },
+            {
+              description: 'More information', // Not exactly "Learn more"
+              url: 'https://support.google.com/accounts?p=al_alert',
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    expect((result as ValidationRequiredError).learnMoreUrl).toBe(
+      'https://support.google.com/accounts?p=al_alert',
+    );
+  });
+
   it('should return original error for 403 from non-cloudcode domain', () => {
     const apiError: GoogleApiError = {
       code: 403,
