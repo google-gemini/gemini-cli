@@ -122,7 +122,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -132,7 +132,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     );
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
