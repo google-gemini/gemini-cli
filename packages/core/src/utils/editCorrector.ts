@@ -167,11 +167,11 @@ async function findLastEditTimestamp(
 export async function ensureCorrectEdit(
   filePath: string,
   currentContent: string,
-  originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
+  originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without 'corrected'
   geminiClient: GeminiClient,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
-  disableLLMCorrection: boolean = false,
+  disableLLMCorrection: boolean,
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
   const cachedResult = editCorrectionCache.get(cacheKey);
