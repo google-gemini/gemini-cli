@@ -24,7 +24,7 @@ import {
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
-vi.mock('child_process', () => ({
+vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
@@ -34,7 +34,7 @@ const originalPlatform = process.platform;
 
 describe('editor utils', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     vi.unstubAllEnvs();
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
@@ -75,8 +75,8 @@ describe('editor utils', () => {
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
     ];
@@ -180,8 +180,8 @@ describe('editor utils', () => {
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd'],
       },
     ];
 
@@ -311,171 +311,243 @@ describe('editor utils', () => {
       });
     }
 
-    it('should return the correct command for emacs', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'emacs');
+    it('should return the correct command for emacs with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacs',
+      );
       expect(command).toEqual({
         command: 'emacs',
-        args: ['--eval', '(ediff "old.txt" "new.txt")'],
+        args: [
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
       });
     });
 
     it('should return the correct command for helix', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'hx');
-      expect(command).toEqual({
+      const diffCommand = getDiffCommand('old.txt', 'new.txt', 'hx');
+      expect(diffCommand).toEqual({
         command: 'hx',
         args: ['--vsplit', '--', 'old.txt', 'new.txt'],
       });
     });
 
     it('should return null for an unsupported editor', () => {
-      // @ts-expect-error Testing unsupported editor
-      const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
-      expect(command).toBeNull();
+      // @ts-expect-error - testing invalid editor
+      const diffCommand = getDiffCommand('old.txt', 'new.txt', 'invalid');
+      expect(diffCommand).toBeNull();
     });
   });
 
   describe('openDiff', () => {
-    const guiEditors: EditorType[] = [
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'cursor',
-      'zed',
+    const guiEditors: Array<{
+      editor: EditorType;
+      command: string;
+      win32Command: string;
+    }> = [
+      { editor: 'vscode', command: 'code', win32Command: 'code.cmd' },
+      { editor: 'vscodium', command: 'codium', win32Command: 'codium.cmd' },
+      { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
+      { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
+      { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'antigravity', command: 'agy', win32Command: 'agy.cmd' },
     ];
 
-    for (const editor of guiEditors) {
-      it(`should call spawn for ${editor}`, async () => {
-        const mockSpawnOn = vi.fn((event, cb) => {
-          if (event === 'close') {
-            cb(0);
-          }
+    for (const { editor, command, win32Command } of guiEditors) {
+      describe(`${editor}`, () => {
+        it(`should call spawn for ${editor}`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'close') setTimeout(() => cb(0), 0);
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
+          await openDiff('old.txt', 'new.txt', editor);
+          const isWin32 = process.platform === 'win32';
+          expect(spawn).toHaveBeenCalledWith(
+            isWin32 ? win32Command : command,
+            ['--wait', '--diff', 'old.txt', 'new.txt'],
+            {
+              stdio: 'inherit',
+              shell: isWin32,
+            },
+          );
         });
-        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
 
-        await openDiff('old.txt', 'new.txt', editor);
-        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        expect(spawn).toHaveBeenCalledWith(
-          diffCommand.command,
-          diffCommand.args,
-          {
-            stdio: 'inherit',
-            shell: process.platform === 'win32',
-          },
-        );
-        expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
-        expect(mockSpawnOn).toHaveBeenCalledWith('error', expect.any(Function));
-      });
+        it(`should reject if spawn for ${editor} fails`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'error') cb(new Error('spawn failed'));
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
 
-      it(`should reject if spawn for ${editor} fails`, async () => {
-        const mockError = new Error('spawn error');
-        const mockSpawnOn = vi.fn((event, cb) => {
-          if (event === 'error') {
-            cb(mockError);
-          }
+          await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+            'spawn failed',
+          );
         });
-        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
 
-        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          'spawn error',
-        );
-      });
+        it(`should reject if ${editor} exits with non-zero code`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'close') cb(1);
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
 
-      it(`should reject if ${editor} exits with non-zero code`, async () => {
-        const mockSpawnOn = vi.fn((event, cb) => {
-          if (event === 'close') {
-            cb(1);
-          }
+          await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+            `${editor} exited with code 1`,
+          );
         });
-        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
-
-        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          `${editor} exited with code 1`,
-        );
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
+    it('should call spawnSync for vim', async () => {
+      await openDiff('old.txt', 'new.txt', 'vim');
+      expect(spawnSync).toHaveBeenCalledWith(
+        'vim',
+        [
+          '-d',
+          '-i',
+          'NONE',
+          '-c',
+          'wincmd h | set readonly | wincmd l',
+          '-c',
+          'highlight DiffAdd cterm=bold ctermbg=22 guibg=#005f00 | highlight DiffChange cterm=bold ctermbg=24 guibg=#005f87 | highlight DiffText ctermbg=21 guibg=#0000af | highlight DiffDelete ctermbg=52 guibg=#5f0000',
+          '-c',
+          'set showtabline=2 | set tabline=[Instructions]\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+          '-c',
+          'wincmd h | setlocal statusline=OLD\\ FILE',
+          '-c',
+          'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+          '-c',
+          'autocmd BufWritePost * wqa',
+          'old.txt',
+          'new.txt',
+        ],
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
 
-    for (const editor of terminalEditors) {
-      it(`should call spawnSync for ${editor}`, async () => {
-        await openDiff('old.txt', 'new.txt', editor);
-        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        expect(spawnSync).toHaveBeenCalledWith(
-          diffCommand.command,
-          diffCommand.args,
-          {
-            stdio: 'inherit',
-          },
-        );
-      });
-    }
+    it('should call spawnSync for neovim', async () => {
+      await openDiff('old.txt', 'new.txt', 'neovim');
+      expect(spawnSync).toHaveBeenCalledWith(
+        'nvim',
+        [
+          '-d',
+          '-i',
+          'NONE',
+          '-c',
+          'wincmd h | set readonly | wincmd l',
+          '-c',
+          'highlight DiffAdd cterm=bold ctermbg=22 guibg=#005f00 | highlight DiffChange cterm=bold ctermbg=24 guibg=#005f87 | highlight DiffText ctermbg=21 guibg=#0000af | highlight DiffDelete ctermbg=52 guibg=#5f0000',
+          '-c',
+          'set showtabline=2 | set tabline=[Instructions]\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+          '-c',
+          'wincmd h | setlocal statusline=OLD\\ FILE',
+          '-c',
+          'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
+          '-c',
+          'autocmd BufWritePost * wqa',
+          'old.txt',
+          'new.txt',
+        ],
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
+
+    it('should call spawnSync for emacs', async () => {
+      await openDiff('old.txt', 'new.txt', 'emacs');
+      expect(spawnSync).toHaveBeenCalledWith(
+        'emacs',
+        ['--eval', '(ediff "old.txt" "new.txt")'],
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
+
+    it('should call spawnSync for hx', async () => {
+      await openDiff('old.txt', 'new.txt', 'hx');
+      expect(spawnSync).toHaveBeenCalledWith(
+        'hx',
+        ['--vsplit', '--', 'old.txt', 'new.txt'],
+        {
+          stdio: 'inherit',
+        },
+      );
+    });
 
     it('should log an error if diff command is not available', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(debugLogger, 'error')
-        .mockImplementation(() => {});
-      // @ts-expect-error Testing unsupported editor
-      await openDiff('old.txt', 'new.txt', 'foobar');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      const loggerSpy = vi.spyOn(debugLogger, 'error');
+      // @ts-expect-error - testing invalid editor
+      await openDiff('old.txt', 'new.txt', 'invalid');
+      expect(loggerSpy).toHaveBeenCalledWith(
         'No diff tool available. Install a supported editor.',
       );
     });
   });
 
   describe('allowEditorTypeInSandbox', () => {
-    it('should allow vim in sandbox mode', () => {
-      vi.stubEnv('SANDBOX', 'sandbox');
-      expect(allowEditorTypeInSandbox('vim')).toBe(true);
-    });
-
-    it('should allow vim when not in sandbox mode', () => {
-      expect(allowEditorTypeInSandbox('vim')).toBe(true);
-    });
-
-    it('should allow emacs in sandbox mode', () => {
-      vi.stubEnv('SANDBOX', 'sandbox');
-      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
-    });
-
-    it('should allow emacs when not in sandbox mode', () => {
-      expect(allowEditorTypeInSandbox('emacs')).toBe(true);
-    });
-
-    it('should allow neovim in sandbox mode', () => {
-      vi.stubEnv('SANDBOX', 'sandbox');
-      expect(allowEditorTypeInSandbox('neovim')).toBe(true);
-    });
-
-    it('should allow neovim when not in sandbox mode', () => {
-      expect(allowEditorTypeInSandbox('neovim')).toBe(true);
-    });
-
-    it('should allow hx in sandbox mode', () => {
-      vi.stubEnv('SANDBOX', 'sandbox');
-      expect(allowEditorTypeInSandbox('hx')).toBe(true);
-    });
-
-    it('should allow hx when not in sandbox mode', () => {
-      expect(allowEditorTypeInSandbox('hx')).toBe(true);
-    });
-
     const guiEditors: EditorType[] = [
       'vscode',
       'vscodium',
       'windsurf',
       'cursor',
       'zed',
+      'antigravity',
     ];
-    for (const editor of guiEditors) {
-      it(`should not allow ${editor} in sandbox mode`, () => {
-        vi.stubEnv('SANDBOX', 'sandbox');
-        expect(allowEditorTypeInSandbox(editor)).toBe(false);
-      });
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
 
-      it(`should allow ${editor} when not in sandbox mode`, () => {
+    it.each(terminalEditors)(
+      'should allow terminal editor %s in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'true');
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
-      });
-    }
+      },
+    );
+
+    it.each(terminalEditors)(
+      'should allow terminal editor %s when not in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'false');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      },
+    );
+
+    it.each(guiEditors)(
+      'should not allow gui editor %s in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'true');
+        expect(allowEditorTypeInSandbox(editor)).toBe(false);
+      },
+    );
+
+    it.each(guiEditors)(
+      'should allow gui editor %s when not in sandbox mode',
+      (editor) => {
+        vi.stubEnv('GEMINI_SANDBOX', 'false');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      },
+    );
   });
 
   describe('isEditorAvailable', () => {
@@ -488,15 +560,17 @@ describe('editor utils', () => {
     });
 
     it('should return false for invalid editor type', () => {
-      expect(isEditorAvailable('invalid-editor')).toBe(false);
+      expect(isEditorAvailable('invalid')).toBe(false);
     });
 
     it('should return true for vscode when installed and not in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'false');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
       expect(isEditorAvailable('vscode')).toBe(true);
     });
 
     it('should return false for vscode when not installed and not in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'false');
       (execSync as Mock).mockImplementation(() => {
         throw new Error();
       });
@@ -504,32 +578,32 @@ describe('editor utils', () => {
     });
 
     it('should return false for vscode when installed and in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'true');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
-      vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('vscode')).toBe(false);
     });
 
     it('should return true for vim when installed and in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'true');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
-      vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('vim')).toBe(true);
     });
 
     it('should return true for emacs when installed and in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'true');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
-      vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('emacs')).toBe(true);
     });
 
     it('should return true for hx when installed and in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'true');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/hx'));
-      vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('hx')).toBe(true);
     });
 
     it('should return true for neovim when installed and in sandbox mode', () => {
+      vi.stubEnv('GEMINI_SANDBOX', 'true');
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
-      vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
     });
   });

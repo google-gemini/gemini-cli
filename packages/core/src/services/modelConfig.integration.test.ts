@@ -141,7 +141,7 @@ describe('ModelConfigService Integration', () => {
       // No agent specified, so it should match core agent-specific rules
     });
 
-    expect(resolved.model).toBe('gemini-1.5-flash-latest'); // from alias
+    expect(resolved.model).toBe('gemini-1.5-pro-latest'); // now overridden by 'base'
     expect(resolved.generateContentConfig).toEqual({
       topP: 0.95, // from base
       topK: 64, // from base
@@ -171,7 +171,7 @@ describe('ModelConfigService Integration', () => {
       overrideScope: 'core',
     });
 
-    expect(resolved.model).toBe('gemini-1.5-flash-latest');
+    expect(resolved.model).toBe('gemini-1.5-pro-latest'); // now overridden by 'base'
     expect(resolved.generateContentConfig).toEqual({
       // Inherited from 'base'
       topP: 0.95,
