@@ -46,8 +46,6 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    this.loadBuiltInAgents();
-
     coreEvents.on(CoreEvent.ModelChanged, () => {
       this.refreshAgents().catch((e) => {
         debugLogger.error(
@@ -56,6 +54,22 @@ export class AgentRegistry {
         );
       });
     });
+
+    await this.loadAgents();
+  }
+
+  /**
+   * Clears the current registry and re-scans for agents.
+   */
+  async reload(): Promise<void> {
+    A2AClientManager.getInstance().clearCache();
+    this.agents.clear();
+    await this.loadAgents();
+    coreEvents.emitAgentsRefreshed();
+  }
+
+  private async loadAgents(): Promise<void> {
+    this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -99,7 +113,7 @@ export class AgentRegistry {
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
-        `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
+        `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
       );
     }
   }

@@ -107,6 +107,7 @@ export enum CoreEvent {
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
+  AgentsRefreshed = 'agents-refreshed',
 }
 
 export interface CoreEvents {
@@ -119,6 +120,7 @@ export interface CoreEvents {
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.AgentsRefreshed]: never[];
 }
 
 type EventBacklogItem = {
@@ -218,6 +220,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitHookEnd(payload: HookEndPayload): void {
     this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
+   * Notifies subscribers that agents have been refreshed.
+   */
+  emitAgentsRefreshed(): void {
+    this.emit(CoreEvent.AgentsRefreshed);
   }
 
   /**
