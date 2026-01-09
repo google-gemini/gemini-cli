@@ -311,11 +311,18 @@ describe('editor utils', () => {
       });
     }
 
-    it('should return the correct command for emacs', () => {
-      const diffCommand = getDiffCommand('old.txt', 'new.txt', 'emacs');
-      expect(diffCommand).toEqual({
+    it('should return the correct command for emacs with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacs',
+      );
+      expect(command).toEqual({
         command: 'emacs',
-        args: ['--eval', '(ediff "old.txt" "new.txt")'],
+        args: [
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
       });
     });
 
@@ -335,260 +342,79 @@ describe('editor utils', () => {
   });
 
   describe('openDiff', () => {
-    it('should call spawn for vscode', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') setTimeout(() => cb(0), 0);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-      await openDiff('old.txt', 'new.txt', 'vscode');
-      const isWin32 = process.platform === 'win32';
-      expect(spawn).toHaveBeenCalledWith(
-        isWin32 ? 'code.cmd' : 'code',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        {
-          stdio: 'inherit',
-          shell: isWin32,
-        },
-      );
-    });
+    const guiEditors: Array<{
+      editor: EditorType;
+      command: string;
+      win32Command: string;
+    }> = [
+      { editor: 'vscode', command: 'code', win32Command: 'code.cmd' },
+      { editor: 'vscodium', command: 'codium', win32Command: 'codium.cmd' },
+      { editor: 'windsurf', command: 'windsurf', win32Command: 'windsurf' },
+      { editor: 'cursor', command: 'cursor', win32Command: 'cursor' },
+      { editor: 'zed', command: 'zed', win32Command: 'zed' },
+      { editor: 'antigravity', command: 'agy', win32Command: 'agy.cmd' },
+    ];
 
-    it('should reject if spawn for vscode fails', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') cb(new Error('spawn failed'));
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
+    for (const { editor, command, win32Command } of guiEditors) {
+      describe(`${editor}`, () => {
+        it(`should call spawn for ${editor}`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'close') setTimeout(() => cb(0), 0);
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
+          await openDiff('old.txt', 'new.txt', editor);
+          const isWin32 = process.platform === 'win32';
+          expect(spawn).toHaveBeenCalledWith(
+            isWin32 ? win32Command : command,
+            ['--wait', '--diff', 'old.txt', 'new.txt'],
+            {
+              stdio: 'inherit',
+              shell: isWin32,
+            },
+          );
+        });
 
-      await expect(openDiff('old.txt', 'new.txt', 'vscode')).rejects.toThrow(
-        'spawn failed',
-      );
-    });
+        it(`should reject if spawn for ${editor} fails`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'error') cb(new Error('spawn failed'));
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
 
-    it('should reject if vscode exits with non-zero code', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') cb(1);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
+          await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+            'spawn failed',
+          );
+        });
 
-      await expect(openDiff('old.txt', 'new.txt', 'vscode')).rejects.toThrow(
-        'vscode exited with code 1',
-      );
-    });
+        it(`should reject if ${editor} exits with non-zero code`, async () => {
+          (execSync as Mock).mockReturnValue(
+            Buffer.from(`/usr/bin/${command}`),
+          );
+          const mockChild = {
+            on: vi.fn((event, cb) => {
+              if (event === 'close') cb(1);
+            }),
+            unref: vi.fn(),
+          };
+          (spawn as Mock).mockReturnValue(mockChild);
 
-    it('should call spawn for vscodium', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/codium'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') setTimeout(() => cb(0), 0);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-      await openDiff('old.txt', 'new.txt', 'vscodium');
-      const isWin32 = process.platform === 'win32';
-      expect(spawn).toHaveBeenCalledWith(
-        isWin32 ? 'codium.cmd' : 'codium',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        {
-          stdio: 'inherit',
-          shell: isWin32,
-        },
-      );
-    });
-
-    it('should reject if spawn for vscodium fails', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/codium'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') cb(new Error('spawn failed'));
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'vscodium')).rejects.toThrow(
-        'spawn failed',
-      );
-    });
-
-    it('should reject if vscodium exits with non-zero code', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/codium'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') cb(1);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'vscodium')).rejects.toThrow(
-        'vscodium exited with code 1',
-      );
-    });
-
-    it('should call spawn for windsurf', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/windsurf'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') setTimeout(() => cb(0), 0);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-      await openDiff('old.txt', 'new.txt', 'windsurf');
-      const isWin32 = process.platform === 'win32';
-      expect(spawn).toHaveBeenCalledWith(
-        'windsurf',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        {
-          stdio: 'inherit',
-          shell: isWin32,
-        },
-      );
-    });
-
-    it('should reject if spawn for windsurf fails', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/windsurf'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') cb(new Error('spawn failed'));
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'windsurf')).rejects.toThrow(
-        'spawn failed',
-      );
-    });
-
-    it('should reject if windsurf exits with non-zero code', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/windsurf'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') cb(1);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'windsurf')).rejects.toThrow(
-        'windsurf exited with code 1',
-      );
-    });
-
-    it('should call spawn for cursor', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/cursor'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') setTimeout(() => cb(0), 0);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-      await openDiff('old.txt', 'new.txt', 'cursor');
-      const isWin32 = process.platform === 'win32';
-      expect(spawn).toHaveBeenCalledWith(
-        'cursor',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        {
-          stdio: 'inherit',
-          shell: isWin32,
-        },
-      );
-    });
-
-    it('should reject if spawn for cursor fails', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/cursor'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') cb(new Error('spawn failed'));
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'cursor')).rejects.toThrow(
-        'spawn failed',
-      );
-    });
-
-    it('should reject if cursor exits with non-zero code', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/cursor'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') cb(1);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'cursor')).rejects.toThrow(
-        'cursor exited with code 1',
-      );
-    });
-
-    it('should call spawn for zed', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/zed'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') setTimeout(() => cb(0), 0);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-      await openDiff('old.txt', 'new.txt', 'zed');
-      const isWin32 = process.platform === 'win32';
-      expect(spawn).toHaveBeenCalledWith(
-        'zed',
-        ['--wait', '--diff', 'old.txt', 'new.txt'],
-        {
-          stdio: 'inherit',
-          shell: isWin32,
-        },
-      );
-    });
-
-    it('should reject if spawn for zed fails', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/zed'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'error') cb(new Error('spawn failed'));
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'zed')).rejects.toThrow(
-        'spawn failed',
-      );
-    });
-
-    it('should reject if zed exits with non-zero code', async () => {
-      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/zed'));
-      const mockChild = {
-        on: vi.fn((event, cb) => {
-          if (event === 'close') cb(1);
-        }),
-        unref: vi.fn(),
-      };
-      (spawn as Mock).mockReturnValue(mockChild);
-
-      await expect(openDiff('old.txt', 'new.txt', 'zed')).rejects.toThrow(
-        'zed exited with code 1',
-      );
-    });
+          await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+            `${editor} exited with code 1`,
+          );
+        });
+      });
+    }
 
     it('should call spawnSync for vim', async () => {
       await openDiff('old.txt', 'new.txt', 'vim');

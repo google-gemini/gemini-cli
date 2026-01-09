@@ -162,6 +162,20 @@ describe('A2AClientManager', () => {
         "[A2AClientManager] Loaded agent 'TestAgent' from http://test.agent/card",
       );
     });
+
+    it('should clear the cache', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      expect(manager.getAgentCard('TestAgent')).toBeDefined();
+      expect(manager.getClient('TestAgent')).toBeDefined();
+
+      manager.clearCache();
+
+      expect(manager.getAgentCard('TestAgent')).toBeUndefined();
+      expect(manager.getClient('TestAgent')).toBeUndefined();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        '[A2AClientManager] Cache cleared.',
+      );
+    });
   });
 
   describe('sendMessage', () => {
@@ -339,6 +353,54 @@ describe('A2AClientManager', () => {
       const data = await response.json();
 
       expect(data.status.state).toBe('working');
+    });
+
+    it('bypasses adapter for JSON-RPC requests', async () => {
+      const baseFetch = vi.fn().mockResolvedValue(new Response('{}'));
+      const adapter = createAdapterFetch(baseFetch as typeof fetch);
+      const rpcBody = JSON.stringify({ jsonrpc: '2.0', method: 'foo' });
+
+      await adapter('http://example.com', {
+        method: 'POST',
+        body: rpcBody,
+      });
+
+      // Verify baseFetch was called with original body, not modified
+      expect(baseFetch).toHaveBeenCalledWith(
+        'http://example.com',
+        expect.objectContaining({ body: rpcBody }),
+      );
+    });
+
+    it('applies dialect translation for remote REST requests', async () => {
+      const baseFetch = vi.fn().mockResolvedValue(new Response('{}'));
+      const adapter = createAdapterFetch(baseFetch as typeof fetch);
+      const originalBody = JSON.stringify({
+        message: {
+          role: 'user',
+          parts: [{ kind: 'text', text: 'hi' }],
+        },
+      });
+
+      await adapter('https://remote-agent.com/v1/message:send', {
+        method: 'POST',
+        body: originalBody,
+      });
+
+      // Verify body WAS modified:
+      // 1. role: 'user' -> 'ROLE_USER'
+      // 2. parts mapped to content, kind stripped
+      const expectedBody = JSON.stringify({
+        message: {
+          role: 'ROLE_USER',
+          content: [{ text: 'hi' }],
+        },
+      });
+
+      expect(baseFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ body: expectedBody }),
+      );
     });
   });
 });
