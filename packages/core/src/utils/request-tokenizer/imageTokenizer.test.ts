@@ -9,6 +9,7 @@ import { ImageTokenizer } from './imageTokenizer.js';
 
 describe('ImageTokenizer', () => {
   const tokenizer = new ImageTokenizer();
+  const EXPECTED_TOKENS = 258; // Standard Gemini image token count
 
   describe('calculateTokens', () => {
     it('should calculate tokens for a standard image', () => {
@@ -21,14 +22,11 @@ describe('ImageTokenizer', () => {
 
       const tokens = tokenizer.calculateTokens(metadata);
 
-      // 1024*768 = 786,432 pixels
-      // Normalized: width=1008 (36*28), height=784 (28*28)
-      // Tokens: (1008*784)/784 + 2 = 1008 + 2 = 1010
-      expect(tokens).toBeGreaterThan(500);
-      expect(tokens).toBeLessThan(2000);
+      // Should be fixed 258
+      expect(tokens).toBe(EXPECTED_TOKENS);
     });
 
-    it('should cap tokens at MAX_TOKENS for very large images', () => {
+    it('should return standard tokens for very large images (no scaling)', () => {
       const metadata = {
         width: 10000,
         height: 10000,
@@ -38,11 +36,11 @@ describe('ImageTokenizer', () => {
 
       const tokens = tokenizer.calculateTokens(metadata);
 
-      // Should be capped at 16384 + 2 special tokens = 16386
-      expect(tokens).toBeLessThanOrEqual(16386);
+      // Should still be fixed 258
+      expect(tokens).toBe(EXPECTED_TOKENS);
     });
 
-    it('should enforce MIN_TOKENS for very small images', () => {
+    it('should return standard tokens for very small images', () => {
       const metadata = {
         width: 10,
         height: 10,
@@ -52,8 +50,8 @@ describe('ImageTokenizer', () => {
 
       const tokens = tokenizer.calculateTokens(metadata);
 
-      // Should be at least 4 + 2 special tokens = 6
-      expect(tokens).toBeGreaterThanOrEqual(6);
+      // Should be fixed 258
+      expect(tokens).toBe(EXPECTED_TOKENS);
     });
   });
 
@@ -87,11 +85,24 @@ describe('ImageTokenizer', () => {
         { data: 'data2', mimeType: 'image/jpeg' },
       ];
 
+      // Mock extractImageMetadata since we don't have real base64 data here
+      // and we want to test the batch logic, not extraction
+      const originalExtract = tokenizer.extractImageMetadata;
+      tokenizer.extractImageMetadata = async (data, mimeType) => ({
+        width: 100,
+        height: 100,
+        mimeType,
+        dataSize: 100,
+      });
+
       const tokens = await tokenizer.calculateTokensBatch(images);
 
+      // Restore original method
+      tokenizer.extractImageMetadata = originalExtract;
+
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toBeGreaterThan(0);
-      expect(tokens[1]).toBeGreaterThan(0);
+      expect(tokens[0]).toBe(EXPECTED_TOKENS);
+      expect(tokens[1]).toBe(EXPECTED_TOKENS);
     });
   });
 });

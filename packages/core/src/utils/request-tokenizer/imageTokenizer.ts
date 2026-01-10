@@ -8,27 +8,22 @@ import type { ImageMetadata } from './types.js';
 import { isSupportedImageMimeType } from './supportedImageFormats.js';
 
 /**
- * Image tokenizer for calculating image tokens based on dimensions
+ * Image tokenizer for calculating image tokens based on Gemini API specifications
  *
  * Key rules:
- * - 28x28 pixels = 1 token
- * - Minimum: 4 tokens per image
- * - Maximum: 16384 tokens per image
- * - Additional: 2 special tokens (vision_bos + vision_eos)
- * - Supports: PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC formats
+ * - Gemini 1.0/1.5: Fixed 258 tokens per image
+ * - Gemini 2.0: 258 tokens per 768x768 tile (images <= 384x384 are 258 tokens)
+ * - Source: https://ai.google.dev/gemini-api/docs/tokens
+ *
+ * Currently implements the standard 258 token count which is the baseline
+ * for both Gemini 1.5 and 2.0 (for standard/small images).
  */
 export class ImageTokenizer {
-  /** 28x28 pixels = 1 token */
-  private static readonly PIXELS_PER_TOKEN = 28 * 28;
-
-  /** Minimum tokens per image */
-  private static readonly MIN_TOKENS_PER_IMAGE = 4;
-
-  /** Maximum tokens per image */
-  private static readonly MAX_TOKENS_PER_IMAGE = 16384;
-
-  /** Special tokens for vision markers */
-  private static readonly VISION_SPECIAL_TOKENS = 2;
+  /**
+   * Fixed token count for images in Gemini models.
+   * Source: https://ai.google.dev/gemini-api/docs/tokens
+   */
+  private static readonly TOKENS_PER_IMAGE = 258;
 
   /**
    * Extract image metadata from base64 data
@@ -254,54 +249,11 @@ export class ImageTokenizer {
    * Calculate tokens for an image based on its metadata
    *
    * @param metadata Image metadata containing width, height, and format info
-   * @returns Total token count including base image tokens and special tokens
+   * @returns Total token count
    */
-  calculateTokens(metadata: ImageMetadata): number {
-    return this.calculateTokensWithScaling(metadata.width, metadata.height);
-  }
-
-  /**
-   * Calculate tokens with scaling logic
-   *
-   * Steps:
-   * 1. Normalize to 28-pixel multiples
-   * 2. Scale large images down, small images up
-   * 3. Calculate tokens: pixels / 784 + 2 special tokens
-   *
-   * @param width Original image width in pixels
-   * @param height Original image height in pixels
-   * @returns Total token count for the image
-   */
-  private calculateTokensWithScaling(width: number, height: number): number {
-    // Normalize to 28-pixel multiples
-    let hBar = Math.round(height / 28) * 28;
-    let wBar = Math.round(width / 28) * 28;
-
-    // Define pixel boundaries
-    const minPixels =
-      ImageTokenizer.MIN_TOKENS_PER_IMAGE * ImageTokenizer.PIXELS_PER_TOKEN;
-    const maxPixels =
-      ImageTokenizer.MAX_TOKENS_PER_IMAGE * ImageTokenizer.PIXELS_PER_TOKEN;
-
-    // Apply scaling
-    if (hBar * wBar > maxPixels) {
-      // Scale down large images
-      const beta = Math.sqrt((height * width) / maxPixels);
-      hBar = Math.floor(height / beta / 28) * 28;
-      wBar = Math.floor(width / beta / 28) * 28;
-    } else if (hBar * wBar < minPixels) {
-      // Scale up small images
-      const beta = Math.sqrt(minPixels / (height * width));
-      hBar = Math.ceil((height * beta) / 28) * 28;
-      wBar = Math.ceil((width * beta) / 28) * 28;
-    }
-
-    // Calculate tokens
-    const imageTokens = Math.floor(
-      (hBar * wBar) / ImageTokenizer.PIXELS_PER_TOKEN,
-    );
-
-    return imageTokens + ImageTokenizer.VISION_SPECIAL_TOKENS;
+  calculateTokens(_metadata: ImageMetadata): number {
+    // Return standard Gemini image token count
+    return ImageTokenizer.TOKENS_PER_IMAGE;
   }
 
   /**
@@ -321,11 +273,8 @@ export class ImageTokenizer {
         results.push(this.calculateTokens(metadata));
       } catch (error) {
         console.warn('Error calculating tokens for image:', error);
-        // Return minimum tokens as fallback
-        results.push(
-          ImageTokenizer.MIN_TOKENS_PER_IMAGE +
-            ImageTokenizer.VISION_SPECIAL_TOKENS,
-        );
+        // Return standard tokens as fallback
+        results.push(ImageTokenizer.TOKENS_PER_IMAGE);
       }
     }
 
