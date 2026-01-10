@@ -24,14 +24,14 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   };
 });
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { homedir as pathsHomedir } from '../utils/paths.js';
+import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+import { getIdeInstaller } from './ide-installer.js';
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
@@ -235,18 +235,21 @@ describe('AntigravityInstaller', () => {
     );
   });
 
-  it('returns a failure message if the alias is not set', async () => {
+  it('uses fallback commands if the alias is not set', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const { installer } = setup({});
     const result = await installer.install();
 
-    expect(result.success).toBe(false);
-    expect(result.message).toContain(
-      'ANTIGRAVITY_CLI_ALIAS environment variable not set',
+    // Should succeed using fallback 'agy' command
+    expect(result.success).toBe(true);
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'agy',
+      expect.any(Array),
+      expect.any(Object),
     );
   });
 
-  it('returns a failure message if the command is not found', async () => {
+  it('returns a failure message if all commands are not found', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'not-a-command');
     const { installer } = setup({
       execSync: () => {
@@ -256,6 +259,7 @@ describe('AntigravityInstaller', () => {
     const result = await installer.install();
 
     expect(result.success).toBe(false);
-    expect(result.message).toContain('not-a-command not found');
+    expect(result.message).toContain('Antigravity CLI not found');
+    expect(result.message).toContain('not-a-command');
   });
 });

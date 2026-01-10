@@ -4,37 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { ApprovalMode } from '../policy/types.js';
-import type { HookDefinition } from '../hooks/types.js';
-import { HookType, HookEventName } from '../hooks/types.js';
 import * as path from 'node:path';
-import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
-import {
-  DEFAULT_TELEMETRY_TARGET,
-  DEFAULT_OTLP_ENDPOINT,
-} from '../telemetry/index.js';
+import type { Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { GeminiClient } from '../core/client.js';
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
-import { GeminiClient } from '../core/client.js';
+import type { HookDefinition } from '../hooks/types.js';
+import { HookEventName, HookType } from '../hooks/types.js';
+import { ApprovalMode } from '../policy/types.js';
 import { GitService } from '../services/gitService.js';
-import { ShellTool } from '../tools/shell.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import type { SkillDefinition } from '../skills/skillLoader.js';
+import {
+  DEFAULT_OTLP_ENDPOINT,
+  DEFAULT_TELEMETRY_TARGET,
+} from '../telemetry/index.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
+import { GrepTool } from '../tools/grep.js';
+import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import { ShellTool } from '../tools/shell.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
-import type { SkillDefinition } from '../skills/skillLoader.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -181,13 +181,13 @@ vi.mock('../utils/fetch.js', () => ({
 
 vi.mock('../services/contextManager.js');
 
-import { BaseLlmClient } from '../core/baseLlmClient.js';
-import { tokenLimit } from '../core/tokenLimits.js';
-import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
+import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 import { ContextManager } from '../services/contextManager.js';
+import { uiTelemetryService } from '../telemetry/index.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -2023,10 +2023,10 @@ describe('Config JIT Initialization', () => {
 
       expect(mockOnReload).toHaveBeenCalled();
       expect(skillManager.setDisabledSkills).toHaveBeenCalledWith(['skill2']);
-      expect(toolRegistry.registerTool).toHaveBeenCalled();
-      expect(toolRegistry.unregisterTool).not.toHaveBeenCalledWith(
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
         ACTIVATE_SKILL_TOOL_NAME,
       );
+      expect(toolRegistry.registerTool).toHaveBeenCalled();
     });
 
     it('should unregister ActivateSkillTool when no skills exist after reload', async () => {
