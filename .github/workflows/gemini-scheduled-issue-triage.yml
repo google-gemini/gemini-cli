@@ -95,7 +95,7 @@ jobs:
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: "${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}"
+          ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
