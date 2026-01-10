@@ -27,6 +27,20 @@ import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
+/**
+ * Validates if a pattern is a valid regular expression.
+ * @param pattern The pattern to validate
+ * @returns true if the pattern is valid regex, false otherwise
+ */
+function isValidRegex(pattern: string): boolean {
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
@@ -213,32 +227,34 @@ class GrepToolInvocation extends BaseToolInvocation<
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      let allMatches = await this.performRipgrepSearch({
-        pattern: this.params.pattern,
-        path: searchDirAbs!,
-        include: this.params.include,
-        case_sensitive: this.params.case_sensitive,
-        fixed_strings: this.params.fixed_strings,
-        context: this.params.context,
-        after: this.params.after,
-        before: this.params.before,
-        no_ignore: this.params.no_ignore,
-        signal,
-      });
+      const { matches: allMatches, usedFallback } =
+        await this.performRipgrepSearch({
+          pattern: this.params.pattern,
+          path: searchDirAbs!,
+          include: this.params.include,
+          case_sensitive: this.params.case_sensitive,
+          fixed_strings: this.params.fixed_strings,
+          context: this.params.context,
+          after: this.params.after,
+          before: this.params.before,
+          no_ignore: this.params.no_ignore,
+          signal,
+        });
 
-      if (allMatches.length >= totalMaxMatches) {
-        allMatches = allMatches.slice(0, totalMaxMatches);
+      let resultMatches = allMatches;
+      if (resultMatches.length >= totalMaxMatches) {
+        resultMatches = resultMatches.slice(0, totalMaxMatches);
       }
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
-      if (allMatches.length === 0) {
+      if (resultMatches.length === 0) {
         const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
 
-      const wasTruncated = allMatches.length >= totalMaxMatches;
+      const wasTruncated = resultMatches.length >= totalMaxMatches;
 
-      const matchesByFile = allMatches.reduce(
+      const matchesByFile = resultMatches.reduce(
         (acc, match) => {
           const fileKey = match.filePath;
           if (!acc[fileKey]) {
@@ -251,13 +267,17 @@ class GrepToolInvocation extends BaseToolInvocation<
         {} as Record<string, GrepMatch[]>,
       );
 
-      const matchCount = allMatches.length;
+      const matchCount = resultMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
 
       if (wasTruncated) {
         llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+      }
+
+      if (usedFallback) {
+        llmContent += `\n\nNote: Pattern was treated as literal text (not regex) because it contains invalid regex syntax.`;
       }
 
       llmContent += `:\n---\n`;
@@ -326,6 +346,62 @@ class GrepToolInvocation extends BaseToolInvocation<
   }
 
   private async performRipgrepSearch(options: {
+    pattern: string;
+    path: string;
+    include?: string;
+    case_sensitive?: boolean;
+    fixed_strings?: boolean;
+    context?: number;
+    after?: number;
+    before?: number;
+    no_ignore?: boolean;
+    signal: AbortSignal;
+  }): Promise<{ matches: GrepMatch[]; usedFallback: boolean }> {
+    const { pattern, fixed_strings } = options;
+
+    // Validate regex pattern and auto-fallback to fixed_strings if invalid
+    let useFixedStrings = fixed_strings ?? false;
+    let usedFallback = false;
+
+    if (!useFixedStrings && !isValidRegex(pattern)) {
+      debugLogger.debug(
+        `GrepLogic: Pattern "${pattern}" is not a valid JavaScript regex, falling back to fixed-strings mode`,
+      );
+      useFixedStrings = true;
+      usedFallback = true;
+    }
+
+    try {
+      const matches = await this.executeRipgrepSearch({
+        ...options,
+        fixed_strings: useFixedStrings,
+      });
+      return { matches, usedFallback };
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+
+      // If ripgrep failed with regex parse error and we haven't tried fixed_strings yet, retry
+      if (
+        !useFixedStrings &&
+        !fixed_strings &&
+        errorMessage.includes('regex parse error')
+      ) {
+        debugLogger.debug(
+          `GrepLogic: Ripgrep regex parse error for pattern "${pattern}", retrying with fixed-strings mode`,
+        );
+        const matches = await this.executeRipgrepSearch({
+          ...options,
+          fixed_strings: true,
+        });
+        return { matches, usedFallback: true };
+      }
+
+      // Otherwise, re-throw the error
+      throw error;
+    }
+  }
+
+  private async executeRipgrepSearch(options: {
     pattern: string;
     path: string;
     include?: string;
@@ -441,6 +517,14 @@ class GrepToolInvocation extends BaseToolInvocation<
             resolve(stdoutData);
           } else if (code === 1) {
             resolve(''); // No matches found
+          } else if (code === 2) {
+            // Regex parse error or other ripgrep error
+            const errorMessage = stderrData.trim();
+            reject(
+              new Error(
+                `Invalid search pattern: ${errorMessage}\n\nTip: If you're searching for literal text (not a regex pattern), use the fixed_strings parameter.`,
+              ),
+            );
           } else {
             reject(
               new Error(`ripgrep exited with code ${code}: ${stderrData}`),

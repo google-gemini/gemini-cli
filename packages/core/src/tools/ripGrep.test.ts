@@ -559,10 +559,9 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = { pattern: '[[' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('ripgrep exited with code 2');
-      expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code 2',
-      );
+      expect(result.llmContent).toContain('Invalid search pattern');
+      expect(result.llmContent).toContain('fixed_strings parameter');
+      expect(result.returnDisplay).toContain('Error: Invalid search pattern');
     });
 
     it('should handle regex special characters correctly', async () => {
@@ -621,6 +620,94 @@ describe('RipGrepTool', () => {
       );
       expect(result.llmContent).toContain('File: fileB.js');
       expect(result.llmContent).toContain('L1: const foo = "bar";');
+    });
+
+    it('should auto-fallback to fixed_strings for patterns invalid in ripgrep but valid in JS (issue #16264)', async () => {
+      // First call: ripgrep fails with regex parse error (exit code 2)
+      // Second call: retry with fixed_strings succeeds
+      mockSpawn
+        .mockImplementationOnce(() => {
+          const mockProcess = {
+            stdout: { on: vi.fn(), removeListener: vi.fn() },
+            stderr: { on: vi.fn(), removeListener: vi.fn() },
+            on: vi.fn(),
+            removeListener: vi.fn(),
+            kill: vi.fn(),
+          };
+
+          setTimeout(() => {
+            const stderrHandler = mockProcess.stderr.on.mock.calls.find(
+              (call) => call[0] === 'data',
+            )?.[1];
+            const closeHandler = mockProcess.on.mock.calls.find(
+              (call) => call[0] === 'close',
+            )?.[1];
+
+            if (stderrHandler) {
+              stderrHandler(
+                Buffer.from(
+                  'regex parse error:\n    nightly={\n             ^\nerror: repetition quantifier expects a valid decimal',
+                ),
+              );
+            }
+            if (closeHandler) {
+              closeHandler(2); // Exit code 2 for regex error
+            }
+          }, 0);
+
+          return mockProcess as unknown as ChildProcess;
+        })
+        .mockImplementationOnce(() => {
+          const mockProcess = {
+            stdout: { on: vi.fn(), removeListener: vi.fn() },
+            stderr: { on: vi.fn(), removeListener: vi.fn() },
+            on: vi.fn(),
+            removeListener: vi.fn(),
+            kill: vi.fn(),
+          };
+
+          setTimeout(() => {
+            const stdoutHandler = mockProcess.stdout.on.mock.calls.find(
+              (call) => call[0] === 'data',
+            )?.[1];
+            const closeHandler = mockProcess.on.mock.calls.find(
+              (call) => call[0] === 'close',
+            )?.[1];
+
+            if (stdoutHandler) {
+              stdoutHandler(
+                Buffer.from(
+                  JSON.stringify({
+                    type: 'match',
+                    data: {
+                      path: { text: 'test.ts' },
+                      line_number: 10,
+                      lines: { text: 'const version = "nightly={value}";\n' },
+                    },
+                  }) + '\n',
+                ),
+              );
+            }
+            if (closeHandler) {
+              closeHandler(0); // Success with fixed_strings
+            }
+          }, 0);
+
+          return mockProcess as unknown as ChildProcess;
+        });
+
+      const params: RipGrepToolParams = { pattern: 'nightly={' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should succeed with fallback to fixed_strings
+      expect(result.llmContent).toContain('Found 1 match');
+      expect(result.llmContent).toContain('test.ts');
+      expect(result.llmContent).toContain('nightly={value}');
+      expect(result.llmContent).toContain(
+        'Note: Pattern was treated as literal text (not regex)',
+      );
+      expect(mockSpawn).toHaveBeenCalledTimes(2); // First call fails, second succeeds
     });
 
     it('should be case-insensitive by default (JS fallback)', async () => {
