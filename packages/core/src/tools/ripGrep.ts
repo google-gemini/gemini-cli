@@ -28,6 +28,18 @@ import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
 /**
+ * Ripgrep error patterns that indicate regex parse failure.
+ * Add new patterns here if ripgrep's error messages change.
+ */
+const RIPGREP_REGEX_ERROR_PATTERNS = ['regex parse error'] as const;
+
+function isRipgrepRegexError(errorMessage: string): boolean {
+  return RIPGREP_REGEX_ERROR_PATTERNS.some((pattern) =>
+    errorMessage.includes(pattern),
+  );
+}
+
+/**
  * Validates if a pattern is a valid regular expression.
  * @param pattern The pattern to validate
  * @returns true if the pattern is valid regex, false otherwise
@@ -380,11 +392,11 @@ class GrepToolInvocation extends BaseToolInvocation<
     } catch (error: unknown) {
       const errorMessage = getErrorMessage(error);
 
-      // If ripgrep failed with regex parse error and we haven't tried fixed_strings yet, retry
+      // If ripgrep failed due to invalid regex and we haven't tried fixed_strings yet, retry
       if (
         !useFixedStrings &&
         !fixed_strings &&
-        errorMessage.includes('regex parse error')
+        isRipgrepRegexError(errorMessage)
       ) {
         debugLogger.debug(
           `GrepLogic: Ripgrep regex parse error for pattern "${pattern}", retrying with fixed-strings mode`,
