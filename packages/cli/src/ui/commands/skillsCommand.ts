@@ -16,17 +16,25 @@ import {
   type HistoryItemInfo,
 } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
+import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
+import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 
 async function listAction(
   context: CommandContext,
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const subCommand = args.trim();
+  const subArgs = args.trim().split(/\s+/);
 
   // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
   let useShowDescriptions = true;
-  if (subCommand === 'nodesc') {
-    useShowDescriptions = false;
+  let showAll = false;
+
+  for (const arg of subArgs) {
+    if (arg === 'nodesc' || arg === '--nodesc') {
+      useShowDescriptions = false;
+    } else if (arg === 'all' || arg === '--all') {
+      showAll = true;
+    }
   }
 
   const skillManager = context.services.config?.getSkillManager();
@@ -41,7 +49,9 @@ async function listAction(
     return;
   }
 
-  const skills = skillManager.getAllSkills();
+  const skills = showAll
+    ? skillManager.getAllSkills()
+    : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
 
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
@@ -51,6 +61,7 @@ async function listAction(
       disabled: skill.disabled,
       location: skill.location,
       body: skill.body,
+      isBuiltin: skill.isBuiltin,
     })),
     showDescriptions: useShowDescriptions,
   };
@@ -86,29 +97,24 @@ async function disableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (currentDisabled.includes(skillName)) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is already disabled.`,
-      },
-      Date.now(),
-    );
-    return;
-  }
-
-  const newDisabled = [...currentDisabled, skillName];
   const scope = context.services.settings.workspace.path
     ? SettingScope.Workspace
     : SettingScope.User;
 
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
+  const result = disableSkill(context.services.settings, skillName, scope);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
+  }
+
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" disabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
+      text: feedback,
     },
     Date.now(),
   );
@@ -130,29 +136,20 @@ async function enableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (!currentDisabled.includes(skillName)) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is not disabled.`,
-      },
-      Date.now(),
-    );
-    return;
+  const result = enableSkill(context.services.settings, skillName);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
   }
 
-  const newDisabled = currentDisabled.filter((name) => name !== skillName);
-  const scope = context.services.settings.workspace.path
-    ? SettingScope.Workspace
-    : SettingScope.User;
-
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" enabled in ${scope} settings. Use "/skills reload" for it to take effect.`,
+      text: feedback,
     },
     Date.now(),
   );
@@ -290,7 +287,8 @@ export const skillsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'list',
-      description: 'List available agent skills. Usage: /skills list [nodesc]',
+      description:
+        'List available agent skills. Usage: /skills list [nodesc] [all]',
       kind: CommandKind.BUILT_IN,
       action: listAction,
     },
