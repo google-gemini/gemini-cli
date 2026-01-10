@@ -73,6 +73,7 @@ export interface CliArgs {
   resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
+  dumpQuota: boolean | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useWriteTodos: boolean | undefined;
@@ -211,6 +212,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description:
             'Delete a session by index number (use --list-sessions to see available sessions).',
+        })
+        .option('dump-quota', {
+          type: 'boolean',
+          description:
+            'Dump current quota information in JSON format and exit.',
         })
         .option('include-directories', {
           type: 'array',
@@ -701,6 +707,7 @@ export async function loadCliConfig(
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
+    dumpQuota: argv.dumpQuota || false,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,

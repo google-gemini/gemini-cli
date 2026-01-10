@@ -532,6 +532,30 @@ export async function main() {
       process.exit(ExitCodes.SUCCESS);
     }
 
+    // Handle --dump-quota flag
+    if (config.getDumpQuota()) {
+      // Attempt auth for quota retrieval
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          debugLogger.error('Auth failed for --dump-quota:', e);
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+        }
+      }
+
+      const quota = await config.refreshUserQuota();
+      if (quota) {
+        writeToStdout(JSON.stringify(quota, null, 2) + '\n');
+      } else {
+        writeToStderr('No quota information available\n');
+      }
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
     const wasRaw = process.stdin.isRaw;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
       // Set this as early as possible to avoid spurious characters from
