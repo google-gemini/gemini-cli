@@ -481,10 +481,19 @@ Would you like to attempt to install via "git clone" instead?`,
     if (!fs.existsSync(extensionsDir)) {
       return this.loadedExtensions;
     }
+
+    // Load extensions sequentially (refactored to prepare for parallelization)
     for (const subdir of fs.readdirSync(extensionsDir)) {
       const extensionDir = path.join(extensionsDir, subdir);
-      await this.loadExtension(extensionDir);
+      const extension = await this.loadExtension(extensionDir);
+
+      // Only add successfully loaded extensions to the array
+      if (extension !== null) {
+        this.loadedExtensions = [...this.loadedExtensions, extension];
+        await this.maybeStartExtension(extension);
+      }
     }
+
     return this.loadedExtensions;
   }
 
@@ -633,9 +642,12 @@ Would you like to attempt to install via "git clone" instead?`,
         resolvedSettings,
         skills,
       };
-      this.loadedExtensions = [...this.loadedExtensions, extension];
 
-      await this.maybeStartExtension(extension);
+      // NOTE: Caller (loadExtensions) is now responsible for:
+      // - Adding extension to this.loadedExtensions array
+      // - Calling this.maybeStartExtension(extension)
+      // This separation allows for parallel loading in the future.
+
       return extension;
     } catch (e) {
       debugLogger.error(
