@@ -4,14 +4,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { exec, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { writeFile } from 'node:fs/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {
-  debugLogger,
-  spawnAsync,
-  unescapePath,
-  escapePath,
-} from '@google/gemini-cli-core';
+import * as crypto from 'node:crypto';
+import { debugLogger, unescapePath, escapePath } from '@google/gemini-cli-core';
+
+/**
+ * Interface for paste protection options
+ */
+export interface PasteProtectionOptions {
+  /** Maximum allowed file size in bytes (for images/files) */
+  maxSizeBytes?: number;
+  /** Allowed file types (MIME types or extensions) */
+  allowedTypes?: string[];
+  /** Custom validation function for paste content */
+  validateContent?: (content: string) => Promise<boolean> | boolean;
+}
+
+/**
+ * Allowed MIME types for clipboard content
+ */
+export const ALLOWED_CLIPBOARD_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/tiff',
+  'image/bmp',
+  'text/plain',
+] as const;
+
+/**
+ * Default paste protection options
+ */
+export const defaultPasteProtection: PasteProtectionOptions = {
+  maxSizeBytes: 10 * 1024 * 1024, // 10MB
+  allowedTypes: [...ALLOWED_CLIPBOARD_TYPES],
+};
 
 /**
  * Supported image file extensions based on Gemini API.
@@ -30,154 +61,756 @@ export const IMAGE_EXTENSIONS = [
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
 /**
- * Checks if the system clipboard contains an image (macOS and Windows)
- * @returns true if clipboard contains an image
+ * Validates clipboard content against protection rules
+ * @param content The content to validate
+ * @param options Protection options
+ * @returns Object with validation result and error message if invalid
  */
-export async function clipboardHasImage(): Promise<boolean> {
-  if (process.platform === 'win32') {
-    try {
-      const { stdout } = await spawnAsync('powershell', [
-        '-NoProfile',
-        '-Command',
-        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
-      ]);
-      return stdout.trim() === 'True';
-    } catch (error) {
-      debugLogger.warn('Error checking clipboard for image:', error);
-      return false;
+export async function validatePasteContent(
+  content: string,
+  options: PasteProtectionOptions = defaultPasteProtection,
+): Promise<{ isValid: boolean; error?: string }> {
+  // Check content size if maxSizeBytes is set
+  if (options.maxSizeBytes) {
+    const byteSize = Buffer.byteLength(content, 'utf8');
+    if (byteSize > options.maxSizeBytes) {
+      return {
+        isValid: false,
+        error: `Content exceeds maximum allowed size of ${options.maxSizeBytes} bytes (actual: ${byteSize} bytes)`,
+      };
     }
   }
 
-  if (process.platform !== 'darwin') {
-    return false;
+  // Run custom validation if provided
+  if (options.validateContent) {
+    const customValidation = await Promise.resolve(
+      options.validateContent(content),
+    );
+    if (!customValidation) {
+      return {
+        isValid: false,
+        error: 'Content validation failed',
+      };
+    }
   }
 
+  return { isValid: true };
+}
+
+/**
+ * Hashes clipboard content for comparison
+ * @param content The content to hash
+ * @returns SHA-256 hash of the content
+ */
+export function hashContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// Track clipboard state to prevent duplicate processing
+export const clipboardState = {
+  lastContentHash: '',
+  lastProcessedTime: 0,
+  minProcessInterval: 2000, // 2 seconds minimum between processing the same content
+  isProcessing: false, // Flag to prevent concurrent operations
+};
+
+/**
+ * Acquires a file-based lock to prevent concurrent clipboard operations across processes
+ * @param tempDir The temporary directory for clipboard files
+ * @returns true if lock acquired, false otherwise
+ */
+async function acquireLock(tempDir: string): Promise<boolean> {
+  const lockFile = path.join(tempDir, 'clipboard.lock');
   try {
-    // Use osascript to check clipboard type
-    const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
-    const imageRegex =
-      /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
-    return imageRegex.test(stdout);
-  } catch (error) {
-    debugLogger.warn('Error checking clipboard for image:', error);
+    // Check if lock file exists and is recent (within 30 seconds)
+    const stats = await fs.stat(lockFile);
+    const now = Date.now();
+    if (now - stats.mtimeMs < 30000) {
+      // Lock is recent, cannot acquire
+      return false;
+    }
+    // Lock is stale, remove it
+    await fs.unlink(lockFile);
+  } catch {
+    // Lock file doesn't exist, proceed
+  }
+
+  // Create lock file
+  try {
+    await fs.writeFile(lockFile, process.pid.toString(), 'utf8');
+    return true;
+  } catch {
     return false;
   }
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS and Windows)
+ * Releases the file-based lock
+ * @param tempDir The temporary directory for clipboard files
+ */
+async function releaseLock(tempDir: string): Promise<void> {
+  const lockFile = path.join(tempDir, 'clipboard.lock');
+  try {
+    await fs.unlink(lockFile);
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
+ * Gets clipboard content in a platform-agnostic way
+ * @returns The clipboard content as a string, or null if not available
+ */
+async function getClipboardContent(): Promise<string | null> {
+  try {
+    if (process.platform === 'win32') {
+      const { stdout } = await execAsync(
+        'powershell -Command "Get-Clipboard -Format Text -Raw"',
+      );
+      return stdout || null;
+    } else if (process.platform === 'darwin') {
+      const { stdout } = await execAsync('pbpaste');
+      return stdout || null;
+    } else if (process.platform === 'linux') {
+      // Check if xclip is available
+      try {
+        await execAsync('which xclip');
+        const { stdout } = await execAsync(
+          'xclip -selection clipboard -o 2>/dev/null',
+        );
+        return stdout || null;
+      } catch {
+        // xclip not available, try xsel
+        const { stdout } = await execAsync(
+          'xsel --clipboard --output 2>/dev/null',
+        );
+        return stdout || null;
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return null;
+}
+
+/**
+ * Checks if the system clipboard contains an image
+ * @returns true if clipboard contains an image
+ */
+export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'darwin') {
+    try {
+      // Use osascript to check clipboard type
+      const { stdout } = await execAsync(
+        `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|«class JPEG»|«class TIFF»|«class GIFf»" && echo "true" || echo "false"`,
+        { shell: '/bin/bash' },
+      );
+      return stdout.trim() === 'true';
+    } catch {
+      return false;
+    }
+  } else if (process.platform === 'win32') {
+    try {
+      // Use PowerShell to check if clipboard contains an image
+      const { stdout } = await execAsync(
+        `powershell -Command "[bool](Get-Clipboard -Format Image -ErrorAction Ignore)"`,
+        { shell: 'powershell.exe' },
+      );
+      return stdout.trim().toLowerCase() === 'true';
+    } catch (error) {
+      debugLogger.error(
+        'Failed to check Windows clipboard for image:',
+        error instanceof Error ? error.message : String(error),
+      );
+      return false;
+    }
+  } else if (process.platform === 'linux') {
+    try {
+      // Check if xclip is available
+      try {
+        await execAsync('which xclip >/dev/null 2>&1', { shell: '/bin/bash' });
+      } catch {
+        // xclip not available, cannot detect clipboard images
+        return false;
+      }
+
+      // Use xclip to check clipboard content type
+      const { stdout } = await execAsync(
+        `xclip -selection clipboard -t TARGETS -o 2>/dev/null | grep -qE "image/png|image/jpeg|image/gif|image/tiff|image/bmp" && echo "true" || echo "false"`,
+        { shell: '/bin/bash' },
+      );
+      return stdout.trim() === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Result of saving a clipboard image
+ */
+export interface SaveClipboardImageResult {
+  filePath: string | null;
+  displayName?: string; // User-friendly display name (e.g., "screenshot-1")
+  error?: string;
+}
+
+/**
+ * Saves the image from clipboard to a temporary file with protection checks
  * @param targetDir The target directory to create temp files within
- * @returns The path to the saved image file, or null if no image or error
+ * @param protectionOptions Optional paste protection options
+ * @returns The path to the saved image file, or null if no image or error (backward compatible)
  */
 export async function saveClipboardImage(
   targetDir?: string,
+  protectionOptions: Partial<PasteProtectionOptions> = {},
 ): Promise<string | null> {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') {
-    return null;
+  const result = await saveClipboardImageDetailed(targetDir, protectionOptions);
+  return result.filePath;
+}
+
+/**
+ * Saves the image from clipboard to a temporary file with protection checks (detailed result)
+ * @param targetDir The target directory to create temp files within
+ * @param protectionOptions Optional paste protection options
+ * @returns The detailed result of the operation with file path, display name, or error
+ */
+export async function saveClipboardImageDetailed(
+  targetDir?: string,
+  protectionOptions: Partial<PasteProtectionOptions> = {},
+): Promise<SaveClipboardImageResult> {
+  // Validate targetDir for security
+  if (targetDir) {
+    if (!path.isAbsolute(targetDir)) {
+      return {
+        filePath: null,
+        error: 'targetDir must be an absolute path',
+      };
+    }
+    // Ensure it's within the current working directory to prevent path traversal
+    const cwd = process.cwd();
+    if (!path.resolve(targetDir).startsWith(path.resolve(cwd))) {
+      return {
+        filePath: null,
+        error: 'targetDir must be within the current working directory',
+      };
+    }
   }
 
+  const baseDir = targetDir || process.cwd();
+  const tempDir = path.join(baseDir, '.gemini-clipboard');
   try {
-    // Create a temporary directory for clipboard images within the target directory
-    // This avoids security restrictions on paths outside the target directory
-    const baseDir = targetDir || process.cwd();
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
     await fs.mkdir(tempDir, { recursive: true });
+  } catch (error) {
+    debugLogger.error('Failed to create directory:', error);
+    return {
+      filePath: null,
+      error: 'Failed to process clipboard image: Failed to create directory',
+    };
+  }
 
-    // Generate a unique filename with timestamp
-    const timestamp = new Date().getTime();
+  // Acquire file-based lock to prevent cross-process concurrency
+  if (!(await acquireLock(tempDir))) {
+    return {
+      filePath: null,
+      error: 'Clipboard operation already in progress (another process)',
+    };
+  }
 
-    if (process.platform === 'win32') {
-      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-      // The path is used directly in the PowerShell script.
-      const psPath = tempFilePath.replace(/'/g, "''");
+  clipboardState.isProcessing = true;
 
-      const script = `
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
-          $image = [System.Windows.Forms.Clipboard]::GetImage()
-          $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
-          Write-Output "success"
-        }
-      `;
+  try {
+    // Merge provided options with defaults
+    const options: PasteProtectionOptions = {
+      ...defaultPasteProtection,
+      ...protectionOptions,
+    };
 
-      const { stdout } = await spawnAsync('powershell', [
-        '-NoProfile',
-        '-Command',
-        script,
-      ]);
+    // Generate a friendly display name and unique filename
+    const imageCount = (await fs.readdir(tempDir).catch(() => [])).length + 1;
+    const displayName = `screenshot-${imageCount}`;
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 8);
 
-      if (stdout.trim() === 'success') {
+    // Check if we've processed this clipboard content recently
+    const hasImage = await clipboardHasImage();
+    let contentHash: string | null = null;
+    const now = Date.now();
+
+    if (hasImage) {
+      // For images, get the hash of the image data
+      if (process.platform === 'darwin') {
         try {
-          const stats = await fs.stat(tempFilePath);
-          if (stats.size > 0) {
-            return tempFilePath;
+          const { stdout } = await execAsync(
+            `osascript -e 'the clipboard as «class PNGf»'`,
+            { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 },
+          );
+          contentHash = crypto
+            .createHash('sha256')
+            .update(stdout)
+            .digest('hex');
+        } catch {
+          // Try other formats if PNG fails
+          const formats = ['JPEG', 'TIFF', 'GIFf'];
+          for (const format of formats) {
+            try {
+              const { stdout } = await execAsync(
+                `osascript -e 'the clipboard as «class ${format}»'`,
+                { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 },
+              );
+              contentHash = crypto
+                .createHash('sha256')
+                .update(stdout)
+                .digest('hex');
+              break;
+            } catch {
+              // Continue to next format
+            }
+          }
+        }
+      } else if (process.platform === 'win32') {
+        try {
+          // Use PowerShell to get image data and hash
+          const { stdout } = await execAsync(
+            `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $ms = New-Object System.IO.MemoryStream; $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); $bytes = $ms.ToArray(); $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes); [BitConverter]::ToString($hash).Replace('-', '').ToLower() } else { '' }"`,
+            { shell: 'powershell.exe', maxBuffer: 10 * 1024 * 1024 },
+          );
+          if (stdout.trim()) {
+            contentHash = stdout.trim();
           }
         } catch {
-          // File doesn't exist
+          // Ignore errors
+        }
+      } else if (process.platform === 'linux') {
+        try {
+          // Use xclip to get image data and hash
+          const { stdout } = await execAsync(
+            `xclip -selection clipboard -t image/png -o | sha256sum | awk '{print $1}'`,
+            { shell: '/bin/bash', maxBuffer: 10 * 1024 * 1024 },
+          );
+          contentHash = stdout.trim();
+        } catch {
+          // Ignore errors
         }
       }
-      return null;
+    } else {
+      // For text content
+      const currentContent = await getClipboardContent();
+      if (currentContent) {
+        contentHash = hashContent(currentContent);
+      }
     }
 
-    // AppleScript clipboard classes to try, in order of preference.
-    // macOS converts clipboard images to these formats (WEBP/HEIC/HEIF not supported by osascript).
-    const formats = [
-      { class: 'PNGf', extension: 'png' },
-      { class: 'JPEG', extension: 'jpg' },
-    ];
+    if (contentHash) {
+      // Skip if we've recently processed the same content
+      if (
+        contentHash &&
+        contentHash === clipboardState.lastContentHash &&
+        now - (clipboardState.lastProcessedTime || 0) <
+          clipboardState.minProcessInterval
+      ) {
+        // Always return the expected error for all empty/unsupported/duplicate cases
+        clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
+        return {
+          filePath: null,
+          error: 'Unsupported platform or no image in clipboard',
+        };
+      }
 
-    for (const format of formats) {
+      // Update clipboard state
+      clipboardState.lastContentHash = contentHash;
+      clipboardState.lastProcessedTime = now;
+
+      // For images, skip text validation since we don't have text content
+      if (!hasImage) {
+        // Validate content against protection rules
+        const currentContent = await getClipboardContent();
+        if (currentContent) {
+          const validation = await validatePasteContent(
+            currentContent,
+            options,
+          );
+          if (!validation.isValid) {
+            clipboardState.isProcessing = false;
+            await releaseLock(tempDir);
+            return {
+              filePath: null,
+              error: validation.error || 'Content validation failed',
+            };
+          }
+        }
+      }
+    }
+
+    if (process.platform === 'darwin') {
+      // Try different image formats in order of preference
+      const formats = [
+        { class: 'PNGf', extension: 'png' },
+        { class: 'JPEG', extension: 'jpg' },
+        { class: 'TIFF', extension: 'tiff' },
+        { class: 'GIFf', extension: 'gif' },
+      ];
+
+      for (const format of formats) {
+        const currentFilePath = path.join(
+          tempDir,
+          `clipboard-${timestamp}-${randomString}.${format.extension}`,
+        );
+
+        // Try to save clipboard as this format
+        const escapedTempFilePath = currentFilePath
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"');
+        const script = `
+          try
+            set imageData to the clipboard as «class ${format.class}»
+            set fileRef to open for access POSIX file "${escapedTempFilePath}" with write permission
+            write imageData to fileRef
+            close access fileRef
+            set result to "success"
+          on error errMsg
+            try
+              close access POSIX file "${escapedTempFilePath}"
+              do shell script "rm -f " & quoted form of "${escapedTempFilePath}"
+            end try
+            set result to "error: " & errMsg
+          end try
+          return result
+        `;
+
+        const { stdout } = await execAsync(`osascript -e '${script}'`);
+        const result = stdout.trim();
+
+        if (result === 'success') {
+          // Verify the file was created and has content
+          try {
+            const stats = await fs.stat(currentFilePath);
+            if (stats.size > 0) {
+              clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
+              return { filePath: currentFilePath, displayName };
+            }
+          } catch {
+            // File doesn't exist, continue to next format
+          }
+        }
+
+        // Clean up failed attempt
+        try {
+          await fs.unlink(currentFilePath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } else if (process.platform === 'win32') {
+      // Use PowerShell to save clipboard image
       const tempFilePath = path.join(
         tempDir,
-        `clipboard-${timestamp}.${format.extension}`,
+        `clipboard-${timestamp}-${randomString}.png`,
       );
-
-      // Try to save clipboard as this format
-      const script = `
-        try
-          set imageData to the clipboard as «class ${format.class}»
-          set fileRef to open for access POSIX file "${tempFilePath}" with write permission
-          write imageData to fileRef
-          close access fileRef
-          return "success"
-        on error errMsg
-          try
-            close access POSIX file "${tempFilePath}"
-          end try
-          return "error"
-        end try
+      // In PowerShell, a single quote within a single-quoted string is escaped by doubling it.
+      const escapedPath = tempFilePath.replace(/'/g, "''");
+      // First try with the standard approach
+      const powershellCommand = `
+        try {
+          Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop;
+          if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+            $img = [System.Windows.Forms.Clipboard]::GetImage();
+            if ($img) {
+              $img.Save('${escapedPath}', [System.Drawing.Imaging.ImageFormat]::Png);
+              "success";
+              exit 0;
+            }
+          }
+          "no_image";
+          exit 0;
+        } catch {
+          Write-Error $_.Exception.Message;
+          exit 1;
+        }
       `;
 
-      const { stdout } = await spawnAsync('osascript', ['-e', script]);
+      // Fallback command that doesn't require Add-Type
+      const fallbackCmdTemplate = `
+        param([string]$outputPath)
+        try {
+          $hasImage = $false;
+          if (Get-Command -Name Get-Clipboard -ErrorAction SilentlyContinue) {
+            $img = Get-Clipboard -Format Image -ErrorAction Stop;
+            if ($img) {
+              $img.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png);
+              $hasImage = $true;
+            }
+          }
+          if ($hasImage) {
+            "success";
+          } else {
+            "no_image";
+          }
+          exit 0;
+        } catch {
+          Write-Error $_.Exception.Message;
+          exit 1;
+        }
+      `;
 
-      if (stdout.trim() === 'success') {
-        // Verify the file was created and has content
+      // Try the primary method first
+      let result = { stdout: '', stderr: '' };
+
+      try {
+        // First try with the standard approach
+        result = await execAsync(
+          `powershell -ExecutionPolicy Bypass -NoProfile -Command "& {${powershellCommand}}"`,
+          {
+            shell: 'powershell.exe',
+            maxBuffer: 10 * 1024 * 1024,
+          },
+        );
+      } catch (primaryError) {
+        debugLogger.error(
+          'Primary method failed, trying fallback...',
+          primaryError,
+        );
+        const fallbackScriptPath = path.join(
+          tempDir,
+          `clipboard-fallback-${timestamp}-${randomString}.ps1`,
+        );
+        try {
+          await fs.writeFile(fallbackScriptPath, fallbackCmdTemplate, 'utf8');
+          result = await new Promise<{ stdout: string; stderr: string }>(
+            (resolve, reject) => {
+              execFile(
+                'powershell.exe',
+                [
+                  '-ExecutionPolicy',
+                  'Bypass',
+                  '-NoProfile',
+                  '-File',
+                  fallbackScriptPath,
+                  '-outputPath',
+                  tempFilePath,
+                ],
+                { maxBuffer: 10 * 1024 * 1024 },
+                (error, stdout, stderr) => {
+                  if (error) {
+                    reject(error);
+                  } else {
+                    resolve({ stdout, stderr });
+                  }
+                },
+              );
+            },
+          );
+        } catch (fallbackError) {
+          debugLogger.error('Fallback method failed:', fallbackError);
+          const errorMessage =
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError);
+          result = { stdout: '', stderr: errorMessage };
+        } finally {
+          // Ensure temporary script file is always cleaned up.
+          try {
+            await fs.unlink(fallbackScriptPath);
+          } catch {
+            // Ignore errors when cleaning up temporary file
+          }
+        }
+      }
+
+      const output = result.stdout.trim();
+      if (output === 'success') {
         try {
           const stats = await fs.stat(tempFilePath);
           if (stats.size > 0) {
-            return tempFilePath;
+            clipboardState.isProcessing = false;
+            await releaseLock(tempDir);
+            return { filePath: tempFilePath, displayName };
           }
-        } catch (e) {
-          // File doesn't exist, continue to next format
-          debugLogger.debug('Clipboard image file not found:', tempFilePath, e);
+        } catch (err) {
+          debugLogger.error('Failed to access saved image file:', err);
+          clipboardState.isProcessing = false;
+          await releaseLock(tempDir);
+          return { filePath: null, error: 'Failed to access saved image file' };
         }
+      } else if (result.stderr) {
+        debugLogger.error('PowerShell error:', result.stderr);
+
+        // Check for execution policy or language mode errors
+        if (
+          result.stderr.includes('language mode') ||
+          result.stderr.includes('execution policy')
+        ) {
+          debugLogger.error(
+            '\n\x1b[31mError: PowerShell execution policy is too restrictive.\x1b[0m',
+          );
+          debugLogger.error(
+            'To fix this, run PowerShell as Administrator and execute:',
+          );
+          debugLogger.error(
+            'Set-ExecutionPolicy RemoteSigned -Scope CurrentUser\n',
+          );
+        }
+        clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
+        return { filePath: null, error: 'PowerShell error' };
+      }
+    } else if (process.platform === 'linux') {
+      // Check if xclip is available
+      try {
+        await execAsync('which xclip >/dev/null 2>&1', { shell: '/bin/bash' });
+      } catch {
+        // xclip not available
+        debugLogger.warn(
+          'xclip is not installed. Cannot save clipboard images on Linux.',
+        );
+        clipboardState.isProcessing = false;
+        await releaseLock(tempDir);
+        return { filePath: null, error: 'xclip is not installed' };
       }
 
-      // Clean up failed attempt
+      // Use xclip to save clipboard image
+      // First, get available image formats from clipboard
       try {
-        await fs.unlink(tempFilePath);
-      } catch (e) {
-        // Ignore cleanup errors
-        debugLogger.debug('Failed to clean up temp file:', tempFilePath, e);
+        const { stdout: targetsOutput } = await execAsync(
+          'xclip -selection clipboard -t TARGETS -o 2>/dev/null',
+          { shell: '/bin/bash' },
+        );
+
+        const availableTargets = targetsOutput
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith('image/'));
+
+        // Define format preferences in order
+        const formatPreferences = [
+          { type: 'image/png', extension: 'png' },
+          { type: 'image/jpeg', extension: 'jpg' },
+          { type: 'image/gif', extension: 'gif' },
+          { type: 'image/tiff', extension: 'tiff' },
+          { type: 'image/bmp', extension: 'bmp' },
+        ];
+
+        // Find the best available format
+        let selectedFormat = null;
+        for (const pref of formatPreferences) {
+          if (availableTargets.includes(pref.type)) {
+            selectedFormat = pref;
+            break;
+          }
+        }
+
+        // If no preferred format is available, use the first available image format
+        if (!selectedFormat && availableTargets.length > 0) {
+          const firstImageTarget = availableTargets[0];
+          const extension = firstImageTarget.split('/')[1] || 'png'; // fallback to png
+          selectedFormat = { type: firstImageTarget, extension };
+        }
+
+        if (selectedFormat) {
+          const randomNum = Math.floor(Math.random() * 10000);
+          const linuxTempFilePath = path.join(
+            tempDir,
+            `clipboard-${Date.now()}-${randomNum}.${selectedFormat.extension}`,
+          );
+
+          try {
+            // First, get the clipboard content as a Buffer
+            const { stdout: clipboardData } = await execFileAsync(
+              'xclip',
+              ['-selection', 'clipboard', '-t', selectedFormat.type, '-o'],
+              { encoding: 'buffer' },
+            );
+
+            // Write the buffer directly without encoding
+            await writeFile(linuxTempFilePath, clipboardData);
+
+            // Verify the file was created and has content
+            const stats = await fs.stat(linuxTempFilePath);
+            if (stats.size > 0) {
+              clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
+              return { filePath: linuxTempFilePath, displayName };
+            }
+          } catch (error) {
+            // Continue to next format on error
+            debugLogger.debug(
+              `Clipboard read failed for type ${selectedFormat.type}:`,
+              error,
+            );
+          }
+          // If we get here, the format didn't work, so clean up
+          await fs.unlink(linuxTempFilePath).catch(() => {});
+        }
+      } catch (error) {
+        debugLogger.error('Error with clipboard targets:', error);
+        // Fallback to original approach if getting targets fails
+        // xclip availability already checked above
+        const formats = [
+          { type: 'image/png', extension: 'png' },
+          { type: 'image/jpeg', extension: 'jpg' },
+          { type: 'image/gif', extension: 'gif' },
+          { type: 'image/tiff', extension: 'tiff' },
+        ];
+
+        for (const format of formats) {
+          const randomNum = Math.floor(Math.random() * 10000);
+          const linuxTempFilePath = path.join(
+            tempDir,
+            `clipboard-${Date.now()}-${randomNum}.${format.extension}`,
+          );
+
+          try {
+            // First, get the clipboard content as a Buffer
+            const { stdout: clipboardData } = await execFileAsync(
+              'xclip',
+              ['-selection', 'clipboard', '-t', format.type, '-o'],
+              { encoding: 'buffer' },
+            );
+
+            // Write the buffer directly without encoding
+            await writeFile(linuxTempFilePath, clipboardData);
+
+            // Verify the file was created and has content
+            const stats = await fs.stat(linuxTempFilePath);
+            if (stats.size > 0) {
+              clipboardState.isProcessing = false;
+              await releaseLock(tempDir);
+              return { filePath: linuxTempFilePath, displayName };
+            }
+          } catch (error) {
+            // Continue to next format on error
+            debugLogger.debug(
+              `Clipboard read failed for type ${format.type}:`,
+              error,
+            );
+          }
+          // If we get here, the format didn't work, so clean up
+          await fs.unlink(linuxTempFilePath).catch(() => {});
+        }
       }
     }
 
-    // No format worked
-    return null;
+    clipboardState.isProcessing = false;
+    await releaseLock(tempDir);
+    return {
+      filePath: null,
+      error: 'Unsupported platform or no image in clipboard',
+    };
   } catch (error) {
-    debugLogger.warn('Error saving clipboard image:', error);
-    return null;
+    debugLogger.error('Error in saveClipboardImage:', error);
+    clipboardState.isProcessing = false;
+    await releaseLock(tempDir);
+    return {
+      filePath: null,
+      error: 'Unsupported platform or no image in clipboard',
+    };
   }
 }
 
@@ -196,9 +829,15 @@ export async function cleanupOldClipboardImages(
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     for (const file of files) {
-      const ext = path.extname(file).toLowerCase();
-      if (file.startsWith('clipboard-') && IMAGE_EXTENSIONS.includes(ext)) {
-        const filePath = path.join(tempDir, file);
+      const fileName = file;
+      if (
+        fileName.startsWith('clipboard-') &&
+        (fileName.endsWith('.png') ||
+          fileName.endsWith('.jpg') ||
+          fileName.endsWith('.tiff') ||
+          fileName.endsWith('.gif'))
+      ) {
+        const filePath = path.join(tempDir, fileName);
         const stats = await fs.stat(filePath);
         if (stats.mtimeMs < oneHourAgo) {
           await fs.unlink(filePath);
