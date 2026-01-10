@@ -26,13 +26,7 @@ vi.mock('node:os', async (importOriginal) => {
 describe('useTextBuffer - openInExternalEditor', () => {
   const mockSpawnSync = vi.mocked(spawnSync);
   const mockMkdtempSync = vi.mocked(fs.mkdtempSync);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const mockWriteFileSync = vi.mocked(fs.writeFileSync);
   const mockReadFileSync = vi.mocked(fs.readFileSync);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const mockUnlinkSync = vi.mocked(fs.unlinkSync);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const mockRmdirSync = vi.mocked(fs.rmdirSync);
 
   beforeEach(() => {
     vi.resetAllMocks();
