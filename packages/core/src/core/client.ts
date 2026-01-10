@@ -68,11 +68,11 @@ export const MAX_TURNS = 100;
 type BeforeAgentHookReturn =
   | {
       type: GeminiEventType.AgentExecutionStopped;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | {
       type: GeminiEventType.AgentExecutionBlocked;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -146,6 +146,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionStopped,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -155,6 +156,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionBlocked,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -846,6 +848,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
               reason: hookOutput.getEffectiveReason(),
+              systemMessage: hookOutput.systemMessage,
             },
           };
           return turn;
@@ -857,6 +860,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
+              systemMessage: hookOutput.systemMessage,
             },
           };
           const continueRequest = [{ text: continueReason }];
