@@ -185,9 +185,9 @@ const MCP_ENABLEMENT_FILENAME = 'mcp-server-enablement.json';
  * Supports both persistent (file) and session-only (in-memory) states.
  */
 export class McpServerEnablementManager {
-  private configFilePath: string;
-  private configDir: string;
-  private sessionDisabled: Set<string> = new Set();
+  private readonly configFilePath: string;
+  private readonly configDir: string;
+  private readonly sessionDisabled = new Set<string>();
 
   constructor() {
     this.configDir = Storage.getGlobalGeminiDir();
@@ -195,21 +195,12 @@ export class McpServerEnablementManager {
   }
 
   /**
-   * Normalize a server ID to canonical lowercase form.
-   */
-  private normalize(serverId: string): string {
-    return normalizeServerId(serverId);
-  }
-
-  /**
    * Check if server is enabled in FILE (persistent config only).
    * Does NOT include session state.
    */
   isFileEnabled(serverName: string): boolean {
-    const normalizedName = this.normalize(serverName);
     const config = this.readConfig();
-    const state = config[normalizedName];
-    // Default: enabled if not in file
+    const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
 
@@ -217,7 +208,7 @@ export class McpServerEnablementManager {
    * Check if server is session-disabled.
    */
   isSessionDisabled(serverName: string): boolean {
-    return this.sessionDisabled.has(this.normalize(serverName));
+    return this.sessionDisabled.has(normalizeServerId(serverName));
   }
 
   /**
@@ -225,11 +216,10 @@ export class McpServerEnablementManager {
    * Convenience method; canLoadServer() uses separate callbacks for granular blockType.
    */
   isEffectivelyEnabled(serverName: string): boolean {
-    const normalizedName = this.normalize(serverName);
-    if (this.sessionDisabled.has(normalizedName)) {
+    if (this.isSessionDisabled(serverName)) {
       return false;
     }
-    return this.isFileEnabled(normalizedName);
+    return this.isFileEnabled(serverName);
   }
 
   /**
@@ -237,11 +227,10 @@ export class McpServerEnablementManager {
    * Removes the server from config file (defaults to enabled).
    */
   enable(serverName: string): void {
-    const normalizedName = this.normalize(serverName);
+    const normalizedName = normalizeServerId(serverName);
     const config = this.readConfig();
 
-    // Remove from config (default is enabled)
-    if (config[normalizedName]) {
+    if (normalizedName in config) {
       delete config[normalizedName];
       this.writeConfig(config);
     }
@@ -252,35 +241,31 @@ export class McpServerEnablementManager {
    * Adds server to config file with enabled: false.
    */
   disable(serverName: string): void {
-    const normalizedName = this.normalize(serverName);
     const config = this.readConfig();
-    config[normalizedName] = { enabled: false };
+    config[normalizeServerId(serverName)] = { enabled: false };
     this.writeConfig(config);
   }
 
   /**
    * Disable a server for current session only (in-memory).
-   * Triggered by --session flag.
    */
   disableForSession(serverName: string): void {
-    this.sessionDisabled.add(this.normalize(serverName));
+    this.sessionDisabled.add(normalizeServerId(serverName));
   }
 
   /**
    * Clear session disable for a server.
-   * Falls back to file-based state.
    */
   clearSessionDisable(serverName: string): void {
-    this.sessionDisabled.delete(this.normalize(serverName));
+    this.sessionDisabled.delete(normalizeServerId(serverName));
   }
 
   /**
    * Get display state for a specific server (for UI).
    */
   getDisplayState(serverName: string): McpServerDisplayState {
-    const normalizedName = this.normalize(serverName);
-    const isSessionDisabled = this.sessionDisabled.has(normalizedName);
-    const isPersistentDisabled = !this.isFileEnabled(normalizedName);
+    const isSessionDisabled = this.isSessionDisabled(serverName);
+    const isPersistentDisabled = !this.isFileEnabled(serverName);
 
     return {
       enabled: !isSessionDisabled && !isPersistentDisabled,
@@ -291,14 +276,13 @@ export class McpServerEnablementManager {
 
   /**
    * Get all display states (for UI listing).
-   * Returns map of serverId -> McpServerDisplayState.
    */
   getAllDisplayStates(
     serverIds: string[],
   ): Record<string, McpServerDisplayState> {
     const result: Record<string, McpServerDisplayState> = {};
     for (const serverId of serverIds) {
-      result[this.normalize(serverId)] = this.getDisplayState(serverId);
+      result[normalizeServerId(serverId)] = this.getDisplayState(serverId);
     }
     return result;
   }
@@ -313,9 +297,6 @@ export class McpServerEnablementManager {
     };
   }
 
-  /**
-   * Read config from disk.
-   */
   private readConfig(): McpServerEnablementConfig {
     try {
       const content = fs.readFileSync(this.configFilePath, 'utf-8');
@@ -324,7 +305,7 @@ export class McpServerEnablementManager {
       if (
         error instanceof Error &&
         'code' in error &&
-        (error as NodeJS.ErrnoException).code === 'ENOENT'
+        error.code === 'ENOENT'
       ) {
         return {};
       }
@@ -337,9 +318,6 @@ export class McpServerEnablementManager {
     }
   }
 
-  /**
-   * Write config to disk.
-   */
   private writeConfig(config: McpServerEnablementConfig): void {
     fs.mkdirSync(this.configDir, { recursive: true });
     fs.writeFileSync(this.configFilePath, JSON.stringify(config, null, 2));

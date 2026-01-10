@@ -24,30 +24,43 @@ import {
   canLoadServer,
   normalizeServerId,
   isInSettingsList,
+  type EnablementCallbacks,
 } from './mcpServerEnablement.js';
 
-const inMemoryFs: { [key: string]: string } = {};
+let inMemoryFs: Record<string, string> = {};
+
+function createMockEnablement(
+  sessionDisabled: boolean,
+  fileEnabled: boolean,
+): EnablementCallbacks {
+  return {
+    isSessionDisabled: () => sessionDisabled,
+    isFileEnabled: () => fileEnabled,
+  };
+}
+
+function setupFsMocks(): void {
+  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+    const content = inMemoryFs[filePath.toString()];
+    if (content === undefined) {
+      const error = new Error(`ENOENT: ${filePath}`);
+      (error as NodeJS.ErrnoException).code = 'ENOENT';
+      throw error;
+    }
+    return content;
+  });
+  vi.spyOn(fs, 'writeFileSync').mockImplementation((filePath, data) => {
+    inMemoryFs[filePath.toString()] = data.toString();
+  });
+  vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+}
 
 describe('McpServerEnablementManager', () => {
   let manager: McpServerEnablementManager;
 
   beforeEach(() => {
-    for (const key in inMemoryFs) delete inMemoryFs[key];
-
-    vi.spyOn(fs, 'readFileSync').mockImplementation((path) => {
-      const content = inMemoryFs[path.toString()];
-      if (content === undefined) {
-        const error = new Error(`ENOENT: ${path}`);
-        (error as NodeJS.ErrnoException).code = 'ENOENT';
-        throw error;
-      }
-      return content;
-    });
-    vi.spyOn(fs, 'writeFileSync').mockImplementation((path, data) => {
-      inMemoryFs[path.toString()] = data.toString();
-    });
-    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
-
+    inMemoryFs = {};
+    setupFsMocks();
     manager = new McpServerEnablementManager();
   });
 
@@ -94,50 +107,55 @@ describe('McpServerEnablementManager', () => {
 });
 
 describe('canLoadServer', () => {
-  it('should check precedence: admin > allowlist > excludelist > session > file', () => {
-    expect(canLoadServer('s', { adminMcpEnabled: false }).blockType).toBe(
-      'admin',
-    );
-    expect(
-      canLoadServer('s', { adminMcpEnabled: true, allowedList: ['other'] })
-        .blockType,
-    ).toBe('allowlist');
-    expect(
-      canLoadServer('s', { adminMcpEnabled: true, excludedList: ['s'] })
-        .blockType,
-    ).toBe('excludelist');
-    expect(
-      canLoadServer('s', {
-        adminMcpEnabled: true,
-        enablement: {
-          isSessionDisabled: () => true,
-          isFileEnabled: () => true,
-        },
-      }).blockType,
-    ).toBe('session');
-    expect(
-      canLoadServer('s', {
-        adminMcpEnabled: true,
-        enablement: {
-          isSessionDisabled: () => false,
-          isFileEnabled: () => false,
-        },
-      }).blockType,
-    ).toBe('enablement');
+  it('blocks when admin has disabled MCP', () => {
+    const result = canLoadServer('s', { adminMcpEnabled: false });
+    expect(result.blockType).toBe('admin');
   });
 
-  it('should allow when all checks pass', () => {
-    expect(canLoadServer('s', { adminMcpEnabled: true }).allowed).toBe(true);
-    expect(
-      canLoadServer('s', {
-        adminMcpEnabled: true,
-        allowedList: ['s'],
-        enablement: {
-          isSessionDisabled: () => false,
-          isFileEnabled: () => true,
-        },
-      }).allowed,
-    ).toBe(true);
+  it('blocks when server is not in allowlist', () => {
+    const result = canLoadServer('s', {
+      adminMcpEnabled: true,
+      allowedList: ['other'],
+    });
+    expect(result.blockType).toBe('allowlist');
+  });
+
+  it('blocks when server is in excludelist', () => {
+    const result = canLoadServer('s', {
+      adminMcpEnabled: true,
+      excludedList: ['s'],
+    });
+    expect(result.blockType).toBe('excludelist');
+  });
+
+  it('blocks when server is session-disabled', () => {
+    const result = canLoadServer('s', {
+      adminMcpEnabled: true,
+      enablement: createMockEnablement(true, true),
+    });
+    expect(result.blockType).toBe('session');
+  });
+
+  it('blocks when server is file-disabled', () => {
+    const result = canLoadServer('s', {
+      adminMcpEnabled: true,
+      enablement: createMockEnablement(false, false),
+    });
+    expect(result.blockType).toBe('enablement');
+  });
+
+  it('allows when admin MCP is enabled and no restrictions', () => {
+    const result = canLoadServer('s', { adminMcpEnabled: true });
+    expect(result.allowed).toBe(true);
+  });
+
+  it('allows when server passes all checks', () => {
+    const result = canLoadServer('s', {
+      adminMcpEnabled: true,
+      allowedList: ['s'],
+      enablement: createMockEnablement(false, true),
+    });
+    expect(result.allowed).toBe(true);
   });
 });
 
