@@ -68,15 +68,16 @@ describe('ide-installer', () => {
     function setup({
       ide = IDE_DEFINITIONS.vscode,
       existsResult = false,
-      execSync = () => '',
+      spawnSync = () => ({ status: 0, stdout: Buffer.from('') }), // Mock default spawnSync behavior
       platform = 'linux' as NodeJS.Platform,
     }: {
       ide?: IdeInfo;
       existsResult?: boolean;
-      execSync?: () => string;
+      spawnSync?: () => { status: number; stdout: Buffer | string };
       platform?: NodeJS.Platform;
     } = {}) {
-      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      // @ts-expect-error - mockImplementation signature mismatch in vitest typings
+      vi.spyOn(child_process, 'spawnSync').mockImplementation(spawnSync);
       vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
       const installer = getIdeInstaller(ide, platform)!;
 
@@ -111,9 +112,9 @@ describe('ide-installer', () => {
         async ({ platform, expectedLookupPaths }) => {
           const { installer } = setup({
             platform,
-            execSync: () => {
-              throw new Error('Command not found'); // `code` is not in PATH
-            },
+            spawnSync: () => 
+               ({ status: 1, stdout: '' }) // Mock 'command not found' failure
+            ,
           });
           await installer.install();
           for (const [idx, path] of expectedLookupPaths.entries()) {
@@ -141,7 +142,10 @@ describe('ide-installer', () => {
       it('installs the extension using code cli on windows', async () => {
         const { installer } = setup({
           platform: 'win32',
-          execSync: () => 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+          spawnSync: () => ({
+            status: 0,
+            stdout: 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd\n',
+          }),
         });
         await installer.install();
         expect(child_process.spawnSync).toHaveBeenCalledWith(
@@ -190,9 +194,9 @@ describe('ide-installer', () => {
         async ({ ide, expectedErr }) => {
           const { installer } = setup({
             ide,
-            execSync: () => {
-              throw new Error('Command not found');
-            },
+            spawnSync: () => 
+               ({ status: 1, stdout: '' }) // Command not found
+            ,
             existsResult: false,
           });
           const result = await installer.install();
@@ -206,13 +210,14 @@ describe('ide-installer', () => {
 
 describe('AntigravityInstaller', () => {
   function setup({
-    execSync = () => '',
+    spawnSync = () => ({ status: 0, stdout: Buffer.from('') }),
     platform = 'linux' as NodeJS.Platform,
   }: {
-    execSync?: () => string;
+    spawnSync?: () => { status: number; stdout: Buffer | string };
     platform?: NodeJS.Platform;
   } = {}) {
-    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+    // @ts-expect-error - mockImplementation signature mismatch in vitest typings
+    vi.spyOn(child_process, 'spawnSync').mockImplementation(spawnSync);
     const installer = getIdeInstaller(IDE_DEFINITIONS.antigravity, platform)!;
 
     return { installer };
@@ -220,10 +225,14 @@ describe('AntigravityInstaller', () => {
 
   it('installs the extension using the alias', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
-    const { installer } = setup({});
+    const { installer } = setup({
+      spawnSync: () => ({ status: 0, stdout: Buffer.from('') }),
+    });
     const result = await installer.install();
 
     expect(result.success).toBe(true);
+    // Note: The second call to spawnSync is for the installation itself which we're not explicitly asserting on the mock's return value for here, but we are checking success.
+    // However, verify spawnSync was called correctly for the installation
     expect(child_process.spawnSync).toHaveBeenCalledWith(
       'agy',
       [
@@ -237,7 +246,9 @@ describe('AntigravityInstaller', () => {
 
   it('uses fallback commands if the alias is not set', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
-    const { installer } = setup({});
+    const { installer } = setup({
+      spawnSync: () => ({ status: 0, stdout: Buffer.from('') }),
+    });
     const result = await installer.install();
 
     // Should succeed using fallback 'agy' command
@@ -252,9 +263,9 @@ describe('AntigravityInstaller', () => {
   it('returns a failure message if all commands are not found', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'not-a-command');
     const { installer } = setup({
-      execSync: () => {
-        throw new Error('Command not found');
-      },
+      spawnSync: () => 
+         ({ status: 1, stdout: '' }) // Command not found
+      ,
     });
     const result = await installer.install();
 

@@ -28,20 +28,23 @@ async function findCommand(
   // 1. Check PATH first.
   try {
     if (platform === 'win32') {
-      const result = child_process
-        .execSync(`where.exe ${command}`)
-        .toString()
-        .trim();
-      // `where.exe` can return multiple paths. Return the first one.
-      const firstPath = result.split(/\r?\n/)[0];
-      if (firstPath) {
-        return firstPath;
+      const result = child_process.spawnSync('where.exe', [command], {
+        encoding: 'utf-8',
+      });
+      if (result.status === 0 && result.stdout) {
+        // `where.exe` can return multiple paths. Return the first one.
+        const firstPath = result.stdout.trim().split(/\r?\n/)[0];
+        if (firstPath) {
+          return firstPath;
+        }
       }
     } else {
-      child_process.execSync(`command -v ${command}`, {
+      const result = child_process.spawnSync('command', ['-v', command], {
         stdio: 'ignore',
       });
-      return command;
+      if (result.status === 0) {
+        return command;
+      }
     }
   } catch {
     // Not in PATH, continue to check common locations.
