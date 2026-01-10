@@ -818,7 +818,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        buffer.openInExternalEditor();
+        buffer.openInExternalEditor({
+          editor: settings.general?.preferredEditor,
+        });
         return;
       }
 
@@ -870,6 +872,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      settings.general?.preferredEditor,
     ],
   );
 

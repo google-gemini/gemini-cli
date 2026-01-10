@@ -5,6 +5,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { parse } from 'shell-quote';
 import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
@@ -2167,7 +2168,21 @@ export function useTextBuffer({
       const wasRaw = stdin?.isRaw ?? false;
       try {
         setRawMode?.(false);
-        const { status, error } = spawnSync(editor, [filePath], {
+
+        const parsed = parse(editor);
+        if (parsed.some((entry) => typeof entry !== 'string')) {
+          throw new Error(
+            'Shell operators are not supported in editor command. Please provide only the editor command and its arguments. Invalid command: ' +
+              editor,
+          );
+        }
+        const [cmd, ...args] = parsed as string[];
+
+        if (!cmd) {
+          throw new Error(`Invalid editor command: ${editor}`);
+        }
+
+        const { status, error } = spawnSync(cmd, [...args, filePath], {
           stdio: 'inherit',
         });
         if (error) throw error;
