@@ -400,6 +400,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false;
       }
 
+      // Let InputPrompt handle Ctrl+X for external editor
+      if (
+        normalizedKey.ctrl &&
+        (normalizedKey.name === 'x' || normalizedKey.sequence === '\x18')
+      ) {
+        return false;
+      }
+
       // Handle INSERT mode
       if (state.mode === 'INSERT') {
         return handleInsertModeInput(normalizedKey);
