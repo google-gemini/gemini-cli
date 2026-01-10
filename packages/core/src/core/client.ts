@@ -11,6 +11,7 @@ import type {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   getDirectoryContextString,
@@ -59,14 +60,19 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
 
 type BeforeAgentHookReturn =
   | {
-      type: GeminiEventType.Error;
-      value: { error: Error };
+      type: GeminiEventType.AgentExecutionStopped;
+      value: { reason: string; systemMessage?: string };
+    }
+  | {
+      type: GeminiEventType.AgentExecutionBlocked;
+      value: { reason: string; systemMessage?: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -135,13 +141,22 @@ export class GeminiClient {
     const hookOutput = await fireBeforeAgentHook(messageBus, request);
     hookState.hasFiredBeforeAgent = true;
 
-    if (hookOutput?.isBlockingDecision() || hookOutput?.shouldStopExecution()) {
+    if (hookOutput?.shouldStopExecution()) {
       return {
-        type: GeminiEventType.Error,
+        type: GeminiEventType.AgentExecutionStopped,
         value: {
-          error: new Error(
-            `BeforeAgent hook blocked processing: ${hookOutput.getEffectiveReason()}`,
-          ),
+          reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
+        },
+      };
+    }
+
+    if (hookOutput?.isBlockingDecision()) {
+      return {
+        type: GeminiEventType.AgentExecutionBlocked,
+        value: {
+          reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -496,7 +511,7 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
+    return resolveModel(this.config.getActiveModel());
   }
 
   private async *processTurn(
@@ -593,6 +608,7 @@ export class GeminiClient {
       history: this.getChat().getHistory(/*curated=*/ true),
       request,
       signal,
+      requestedModel: this.config.getModel(),
     };
 
     let modelToUse: string;
@@ -747,7 +763,18 @@ export class GeminiClient {
         prompt_id,
       );
       if (hookResult) {
-        if ('type' in hookResult && hookResult.type === GeminiEventType.Error) {
+        if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionStopped
+        ) {
+          // Add user message to history before returning so it's kept in the transcript
+          this.getChat().addHistory(createUserContent(request));
+          yield hookResult;
+          return new Turn(this.getChat(), prompt_id);
+        } else if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionBlocked
+        ) {
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
@@ -781,11 +808,26 @@ export class GeminiClient {
           turn,
         );
 
-        if (
-          hookOutput?.isBlockingDecision() ||
-          hookOutput?.shouldStopExecution()
-        ) {
+        if (hookOutput?.shouldStopExecution()) {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: {
+              reason: hookOutput.getEffectiveReason(),
+              systemMessage: hookOutput.systemMessage,
+            },
+          };
+          return turn;
+        }
+
+        if (hookOutput?.isBlockingDecision()) {
           const continueReason = hookOutput.getEffectiveReason();
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: {
+              reason: continueReason,
+              systemMessage: hookOutput.systemMessage,
+            },
+          };
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,
@@ -935,7 +977,19 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        this.chat = await this.startChat(newHistory);
+        // capture current session data before resetting
+        const currentRecordingService =
+          this.getChat().getChatRecordingService();
+        const conversation = currentRecordingService.getConversation();
+        const filePath = currentRecordingService.getConversationFilePath();
+
+        let resumedData: ResumedSessionData | undefined;
+
+        if (conversation && filePath) {
+          resumedData = { conversation, filePath };
+        }
+
+        this.chat = await this.startChat(newHistory, resumedData);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

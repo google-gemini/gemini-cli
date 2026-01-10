@@ -195,6 +195,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.config,
           serverDetails,
         );
+
         try {
           const response = await this.wrapped.generateContent(
             req,
@@ -213,7 +214,13 @@ export class LoggingContentGenerator implements ContentGenerator {
             response.responseId,
             response.candidates,
             response.usageMetadata,
-            JSON.stringify(response),
+            JSON.stringify({
+              candidates: response.candidates,
+              usageMetadata: response.usageMetadata,
+              responseId: response.responseId,
+              modelVersion: response.modelVersion,
+              promptFeedback: response.promptFeedback,
+            }),
             req.config,
             serverDetails,
           );
@@ -319,7 +326,15 @@ export class LoggingContentGenerator implements ContentGenerator {
         responses[0]?.responseId,
         responses.flatMap((response) => response.candidates || []),
         lastUsageMetadata,
-        JSON.stringify(responses),
+        JSON.stringify(
+          responses.map((r) => ({
+            candidates: r.candidates,
+            usageMetadata: r.usageMetadata,
+            responseId: r.responseId,
+            modelVersion: r.modelVersion,
+            promptFeedback: r.promptFeedback,
+          })),
+        ),
         req.config,
         serverDetails,
       );

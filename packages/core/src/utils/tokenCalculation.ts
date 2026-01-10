@@ -6,6 +6,7 @@
 
 import type { PartListUnion, Part } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
+import { debugLogger } from './debugLogger.js';
 
 // Token estimation constants
 // ASCII characters (0-127) are roughly 4 chars per token
@@ -13,6 +14,8 @@ const ASCII_TOKENS_PER_CHAR = 0.25;
 // Non-ASCII characters (including CJK) are often 1-2 tokens per char.
 // We use 1.3 as a conservative estimate to avoid underestimation.
 const NON_ASCII_TOKENS_PER_CHAR = 1.3;
+// Fixed token estimate for images
+const IMAGE_TOKEN_ESTIMATE = 3000;
 
 /**
  * Estimates token count for parts synchronously using a heuristic.
@@ -31,10 +34,21 @@ export function estimateTokenCountSync(parts: Part[]): number {
         }
       }
     } else {
-      // For non-text parts (functionCall, functionResponse, executableCode, etc.),
-      // we fallback to the JSON string length heuristic.
-      // Note: This is an approximation.
-      totalTokens += JSON.stringify(part).length / 4;
+      // For images, we use a fixed safe estimate (3,000 tokens) covering
+      // up to 4K resolution on Gemini 3.
+      // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
+      const inlineData = 'inlineData' in part ? part.inlineData : undefined;
+      const fileData = 'fileData' in part ? part.fileData : undefined;
+      const mimeType = inlineData?.mimeType || fileData?.mimeType;
+
+      if (mimeType?.startsWith('image/')) {
+        totalTokens += IMAGE_TOKEN_ESTIMATE;
+      } else {
+        // For other non-text parts (functionCall, functionResponse, etc.),
+        // we fallback to the JSON string length heuristic.
+        // Note: This is an approximation.
+        totalTokens += JSON.stringify(part).length / 4;
+      }
     }
   }
   return Math.floor(totalTokens);
@@ -69,8 +83,9 @@ export async function calculateRequestTokenCount(
         contents: [{ role: 'user', parts }],
       });
       return response.totalTokens ?? 0;
-    } catch {
+    } catch (error) {
       // Fallback to local estimation if the API call fails
+      debugLogger.debug('countTokens API failed:', error);
       return estimateTokenCountSync(parts);
     }
   }

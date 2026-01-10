@@ -1,0 +1,40 @@
+name: 'Label Child Issues for Project Rollup'
+
+on:
+  issues:
+    types: ['opened', 'edited', 'reopened']
+
+jobs:
+  labeler:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      issues: 'write'
+    steps:
+      - name: 'Check for Parent Workstream and Apply Label'
+        uses: 'actions/github-script@v7'
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labelToAdd = 'workstream-rollup';
+
+            // --- Define the FULL URLs of the allowed parent workstreams ---
+            const allowedParentUrls = [
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15374',
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15456',
+              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15324'
+            ];
+
+            // Check if the issue has a parent_issue_url and if it's in our allowed list.
+            if (issue && issue.parent_issue_url && allowedParentUrls.includes(issue.parent_issue_url)) {
+              console.log(`SUCCESS: Issue #${issue.number} is a child of a target workstream (${issue.parent_issue_url}). Adding label.`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: [labelToAdd]
+              });
+            } else if (issue && issue.parent_issue_url) {
+              console.log(`FAILURE: Issue #${issue.number} has a parent, but it's not a target workstream. Parent URL: ${issue.parent_issue_url}`);
+            } else {
+              console.log(`FAILURE: Issue #${issue.number} is not a child of any issue. No action taken.`);
+            }

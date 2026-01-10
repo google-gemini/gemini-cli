@@ -10,8 +10,9 @@ import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './toml-loader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
-import { IntrospectionAgent } from './introspection-agent.js';
+import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
+import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
@@ -19,8 +20,8 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   isPreviewModel,
+  isAutoModel,
 } from '../config/models.js';
-import type { ModelConfigAlias } from '../services/modelConfigService.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -45,8 +46,6 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    this.loadBuiltInAgents();
-
     coreEvents.on(CoreEvent.ModelChanged, () => {
       this.refreshAgents().catch((e) => {
         debugLogger.error(
@@ -55,6 +54,22 @@ export class AgentRegistry {
         );
       });
     });
+
+    await this.loadAgents();
+  }
+
+  /**
+   * Clears the current registry and re-scans for agents.
+   */
+  async reload(): Promise<void> {
+    A2AClientManager.getInstance().clearCache();
+    this.agents.clear();
+    await this.loadAgents();
+    coreEvents.emitAgentsRefreshed();
+  }
+
+  private async loadAgents(): Promise<void> {
+    this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
       return;
@@ -98,14 +113,14 @@ export class AgentRegistry {
 
     if (this.config.getDebugMode()) {
       debugLogger.log(
-        `[AgentRegistry] Initialized with ${this.agents.size} agents.`,
+        `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
       );
     }
   }
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
-    const introspectionSettings = this.config.getIntrospectionAgentSettings();
+    const cliHelpSettings = this.config.getCliHelpAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -144,9 +159,9 @@ export class AgentRegistry {
       this.registerLocalAgent(agentDef);
     }
 
-    // Register the introspection agent if it's explicitly enabled.
-    if (introspectionSettings.enabled) {
-      this.registerLocalAgent(IntrospectionAgent);
+    // Register the CLI help agent if it's explicitly enabled.
+    if (cliHelpSettings.enabled) {
+      this.registerLocalAgent(CliHelpAgent(this.config));
     }
   }
 
@@ -198,7 +213,10 @@ export class AgentRegistry {
 
     this.agents.set(definition.name, definition);
 
-    // Register model config.
+    // Register model config. We always create a runtime alias. However,
+    // if the user is using `auto` as a model string then we also create
+    // runtime overrides to ensure the subagent generation settings are
+    // respected regardless of the final model string from routing.
     // TODO(12916): Migrate sub-agents where possible to static configs.
     const modelConfig = definition.modelConfig;
     let model = modelConfig.model;
@@ -206,24 +224,35 @@ export class AgentRegistry {
       model = this.config.getModel();
     }
 
-    const runtimeAlias: ModelConfigAlias = {
-      modelConfig: {
-        model,
-        generateContentConfig: {
-          temperature: modelConfig.temp,
-          topP: modelConfig.top_p,
-          thinkingConfig: {
-            includeThoughts: true,
-            thinkingBudget: modelConfig.thinkingBudget ?? -1,
-          },
-        },
+    const generateContentConfig = {
+      temperature: modelConfig.temp,
+      topP: modelConfig.top_p,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: modelConfig.thinkingBudget ?? -1,
       },
     };
 
     this.config.modelConfigService.registerRuntimeModelConfig(
       getModelConfigAlias(definition),
-      runtimeAlias,
+      {
+        modelConfig: {
+          model,
+          generateContentConfig,
+        },
+      },
     );
+
+    if (isAutoModel(model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig,
+        },
+      });
+    }
   }
 
   /**
@@ -251,9 +280,12 @@ export class AgentRegistry {
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
+      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
+      const authHandler = new ADCHandler();
       const agentCard = await clientManager.loadAgent(
         definition.name,
         definition.agentCardUrl,
+        authHandler,
       );
       if (agentCard.skills && agentCard.skills.length > 0) {
         definition.description = agentCard.skills
