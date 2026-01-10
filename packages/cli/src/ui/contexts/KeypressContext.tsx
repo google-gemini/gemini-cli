@@ -251,18 +251,34 @@ function createDataListener(keypressHandler: KeypressHandler) {
   parser.next(); // prime the generator so it starts listening.
 
   let timeoutId: NodeJS.Timeout;
+  let inBracketedPaste = false;
+
   return (data: string) => {
     clearTimeout(timeoutId);
 
-    // Detect unbracketed pastes: multiple characters arriving at once
-    // that aren't escape sequences or already bracketed.
-    // This handles terminals (like VSCode on Windows) that paste without
-    // bracketed paste mode markers.
-    const hasPasteMarkers = data.includes('\x1B[200~');
-    const startsWithEsc = data.startsWith('\x1B');
-    const isLikelyPaste = !hasPasteMarkers && !startsWithEsc && data.length > 1;
+    // Track bracketed paste state across chunks
+    const hasPasteStart = data.includes('\x1B[200~');
+    const hasPasteEnd = data.includes('\x1B[201~');
 
-    if (isLikelyPaste) {
+    // Enter bracketed paste mode when we see paste-start
+    if (hasPasteStart) {
+      inBracketedPaste = true;
+    }
+
+    // Detect unbracketed paste ONLY if:
+    // 1. NOT currently in a bracketed paste session
+    // 2. Data contains NO escape sequences
+    // 3. Data has multiple characters (can't type 2+ chars in one stdin event)
+    const hasAnyEsc = data.includes('\x1B');
+    const isLikelyUnbracketedPaste =
+      !inBracketedPaste && !hasAnyEsc && data.length > 1;
+
+    // Exit bracketed paste mode when we see paste-end
+    if (hasPasteEnd) {
+      inBracketedPaste = false;
+    }
+
+    if (isLikelyUnbracketedPaste) {
       keypressHandler({
         name: '',
         ctrl: false,
