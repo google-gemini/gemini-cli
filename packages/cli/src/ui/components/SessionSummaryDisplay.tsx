@@ -17,7 +17,7 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 }) => (
   <Box flexDirection="column">
     <StatsDisplay title="Agent powering down. Goodbye!" duration={duration} />
-    <Box marginTop={1} marginLeft={1}>
+    <Box marginTop={1} paddingX={2}>
       <Text>
         Resume this session by running{' '}
         <Text color="magenta">`gemini --resume`</Text>
