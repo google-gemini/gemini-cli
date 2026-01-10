@@ -269,7 +269,7 @@ export interface McpEnablementCallbacks {
   /** Check if a server is disabled for the current session only */
   isSessionDisabled: (serverId: string) => boolean;
   /** Check if a server is enabled in the file-based configuration */
-  isFileEnabled: (serverId: string) => boolean;
+  isFileEnabled: (serverId: string) => Promise<boolean>;
 }
 
 export interface ConfigParameters {

@@ -24,13 +24,13 @@ interface Args {
   session?: boolean;
 }
 
-function handleEnable(args: Args): void {
+async function handleEnable(args: Args): Promise<void> {
   const manager = new McpServerEnablementManager();
   const name = normalizeServerId(args.name);
 
   // Check settings blocks
   const settings = loadSettings();
-  const result = canLoadServer(name, {
+  const result = await canLoadServer(name, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
     allowedList: settings.merged.mcp?.allowed,
     excludedList: settings.merged.mcp?.excluded,
@@ -48,7 +48,7 @@ function handleEnable(args: Args): void {
     manager.clearSessionDisable(name);
     debugLogger.log(`${GREEN}✓${RESET} Session disable cleared for '${name}'.`);
   } else {
-    manager.enable(name);
+    await manager.enable(name);
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' enabled.`);
   }
 
@@ -59,7 +59,7 @@ function handleEnable(args: Args): void {
   }
 }
 
-function handleDisable(args: Args): void {
+async function handleDisable(args: Args): Promise<void> {
   const manager = new McpServerEnablementManager();
   const name = normalizeServerId(args.name);
 
@@ -69,7 +69,7 @@ function handleDisable(args: Args): void {
       `${GREEN}✓${RESET} MCP server '${name}' disabled for this session.`,
     );
   } else {
-    manager.disable(name);
+    await manager.disable(name);
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' disabled.`);
   }
 }
@@ -90,7 +90,7 @@ export const enableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    handleEnable(argv as Args);
+    await handleEnable(argv as Args);
     await exitCli();
   },
 };
@@ -111,7 +111,7 @@ export const disableCommand: CommandModule<object, Args> = {
         default: false,
       }),
   handler: async (argv) => {
-    handleDisable(argv as Args);
+    await handleDisable(argv as Args);
     await exitCli();
   },
 };

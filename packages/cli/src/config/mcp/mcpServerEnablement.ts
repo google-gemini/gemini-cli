@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Storage, coreEvents } from '@google/gemini-cli-core';
 
@@ -39,7 +39,7 @@ export interface McpServerDisplayState {
  */
 export interface EnablementCallbacks {
   isSessionDisabled: (serverId: string) => boolean;
-  isFileEnabled: (serverId: string) => boolean;
+  isFileEnabled: (serverId: string) => Promise<boolean>;
 }
 
 /**
@@ -97,7 +97,7 @@ export function isInSettingsList(
  * Uses callbacks instead of direct enablementManager reference to keep
  * packages/core independent of packages/cli.
  */
-export function canLoadServer(
+export async function canLoadServer(
   serverId: string,
   config: {
     adminMcpEnabled: boolean;
@@ -105,7 +105,7 @@ export function canLoadServer(
     excludedList?: string[];
     enablement?: EnablementCallbacks;
   },
-): ServerLoadResult {
+): Promise<ServerLoadResult> {
   const normalizedId = normalizeServerId(serverId);
 
   // 1. Admin kill switch
@@ -164,7 +164,10 @@ export function canLoadServer(
   }
 
   // 5. File-based enablement check
-  if (config.enablement && !config.enablement.isFileEnabled(normalizedId)) {
+  if (
+    config.enablement &&
+    !(await config.enablement.isFileEnabled(normalizedId))
+  ) {
     return {
       allowed: false,
       reason: `Server '${serverId}' is disabled. Run 'gemini mcp enable ${serverId}' to enable.`,
@@ -198,8 +201,8 @@ export class McpServerEnablementManager {
    * Check if server is enabled in FILE (persistent config only).
    * Does NOT include session state.
    */
-  isFileEnabled(serverName: string): boolean {
-    const config = this.readConfig();
+  async isFileEnabled(serverName: string): Promise<boolean> {
+    const config = await this.readConfig();
     const state = config[normalizeServerId(serverName)];
     return state?.enabled ?? true;
   }
@@ -215,7 +218,7 @@ export class McpServerEnablementManager {
    * Check effective enabled state (combines file + session).
    * Convenience method; canLoadServer() uses separate callbacks for granular blockType.
    */
-  isEffectivelyEnabled(serverName: string): boolean {
+  async isEffectivelyEnabled(serverName: string): Promise<boolean> {
     if (this.isSessionDisabled(serverName)) {
       return false;
     }
@@ -226,13 +229,13 @@ export class McpServerEnablementManager {
    * Enable a server persistently.
    * Removes the server from config file (defaults to enabled).
    */
-  enable(serverName: string): void {
+  async enable(serverName: string): Promise<void> {
     const normalizedName = normalizeServerId(serverName);
-    const config = this.readConfig();
+    const config = await this.readConfig();
 
     if (normalizedName in config) {
       delete config[normalizedName];
-      this.writeConfig(config);
+      await this.writeConfig(config);
     }
   }
 
@@ -240,10 +243,10 @@ export class McpServerEnablementManager {
    * Disable a server persistently.
    * Adds server to config file with enabled: false.
    */
-  disable(serverName: string): void {
-    const config = this.readConfig();
+  async disable(serverName: string): Promise<void> {
+    const config = await this.readConfig();
     config[normalizeServerId(serverName)] = { enabled: false };
-    this.writeConfig(config);
+    await this.writeConfig(config);
   }
 
   /**
@@ -263,9 +266,9 @@ export class McpServerEnablementManager {
   /**
    * Get display state for a specific server (for UI).
    */
-  getDisplayState(serverName: string): McpServerDisplayState {
+  async getDisplayState(serverName: string): Promise<McpServerDisplayState> {
     const isSessionDisabled = this.isSessionDisabled(serverName);
-    const isPersistentDisabled = !this.isFileEnabled(serverName);
+    const isPersistentDisabled = !(await this.isFileEnabled(serverName));
 
     return {
       enabled: !isSessionDisabled && !isPersistentDisabled,
@@ -277,12 +280,13 @@ export class McpServerEnablementManager {
   /**
    * Get all display states (for UI listing).
    */
-  getAllDisplayStates(
+  async getAllDisplayStates(
     serverIds: string[],
-  ): Record<string, McpServerDisplayState> {
+  ): Promise<Record<string, McpServerDisplayState>> {
     const result: Record<string, McpServerDisplayState> = {};
     for (const serverId of serverIds) {
-      result[normalizeServerId(serverId)] = this.getDisplayState(serverId);
+      result[normalizeServerId(serverId)] =
+        await this.getDisplayState(serverId);
     }
     return result;
   }
@@ -297,9 +301,12 @@ export class McpServerEnablementManager {
     };
   }
 
-  private readConfig(): McpServerEnablementConfig {
+  /**
+   * Read config from file asynchronously.
+   */
+  private async readConfig(): Promise<McpServerEnablementConfig> {
     try {
-      const content = fs.readFileSync(this.configFilePath, 'utf-8');
+      const content = await fs.readFile(this.configFilePath, 'utf-8');
       return JSON.parse(content) as McpServerEnablementConfig;
     } catch (error) {
       if (
@@ -318,8 +325,11 @@ export class McpServerEnablementManager {
     }
   }
 
-  private writeConfig(config: McpServerEnablementConfig): void {
-    fs.mkdirSync(this.configDir, { recursive: true });
-    fs.writeFileSync(this.configFilePath, JSON.stringify(config, null, 2));
+  /**
+   * Write config to file asynchronously.
+   */
+  private async writeConfig(config: McpServerEnablementConfig): Promise<void> {
+    await fs.mkdir(this.configDir, { recursive: true });
+    await fs.writeFile(this.configFilePath, JSON.stringify(config, null, 2));
   }
 }

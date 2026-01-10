@@ -120,13 +120,13 @@ export class McpClientManager {
   /**
    * Check if server is disabled by user (session or file-based).
    */
-  private isDisabledByUser(name: string): boolean {
+  private async isDisabledByUser(name: string): Promise<boolean> {
     const callbacks = this.cliConfig.getMcpEnablementCallbacks();
     if (callbacks) {
       if (callbacks.isSessionDisabled(name)) {
         return true;
       }
-      if (!callbacks.isFileEnabled(name)) {
+      if (!(await callbacks.isFileEnabled(name))) {
         return true;
       }
     }
@@ -155,10 +155,10 @@ export class McpClientManager {
     }
   }
 
-  maybeDiscoverMcpServer(
+  async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
-  ): Promise<void> | void {
+  ): Promise<void> {
     // Always track server config for UI display
     this.allServerConfigs.set(name, config);
 
@@ -173,10 +173,10 @@ export class McpClientManager {
       return;
     }
     // User-disabled servers: disconnect if running, don't start
-    if (this.isDisabledByUser(name)) {
+    if (await this.isDisabledByUser(name)) {
       const existing = this.clients.get(name);
       if (existing) {
-        return this.disconnectClient(name);
+        await this.disconnectClient(name);
       }
       return;
     }

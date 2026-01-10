@@ -260,7 +260,8 @@ const listAction = async (
   const enablementManager = new McpServerEnablementManager();
   const enablementState: HistoryItemMcpStatus['enablementState'] = {};
   for (const serverName of serverNames) {
-    enablementState[serverName] = enablementManager.getDisplayState(serverName);
+    enablementState[serverName] =
+      await enablementManager.getDisplayState(serverName);
   }
 
   const mcpStatusItem: HistoryItemMcpStatus = {
@@ -387,8 +388,8 @@ async function handleEnableDisable(
   }
 
   const parts = args.trim().split(/\s+/);
-  const serverName = parts[0];
   const isSession = parts.includes('--session');
+  const serverName = parts.filter((p) => p !== '--session')[0];
   const action = enable ? 'enable' : 'disable';
 
   if (!serverName) {
@@ -404,7 +405,7 @@ async function handleEnableDisable(
 
   if (enable) {
     const settings = loadSettings();
-    const result = canLoadServer(name, {
+    const result = await canLoadServer(name, {
       adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
       allowedList: settings.merged.mcp?.allowed,
       excludedList: settings.merged.mcp?.excluded,
@@ -422,7 +423,7 @@ async function handleEnableDisable(
     if (isSession) {
       manager.clearSessionDisable(name);
     } else {
-      manager.enable(name);
+      await manager.enable(name);
     }
     if (result.blockType === 'admin') {
       context.ui.addItem(
@@ -437,7 +438,7 @@ async function handleEnableDisable(
     if (isSession) {
       manager.disableForSession(name);
     } else {
-      manager.disable(name);
+      await manager.disable(name);
     }
   }
 
@@ -458,20 +459,25 @@ async function handleEnableDisable(
   return { type: 'message', messageType: 'info', content: msg };
 }
 
-function getEnablementCompletion(
+async function getEnablementCompletion(
   context: CommandContext,
   partialArg: string,
   showEnabled: boolean,
-): string[] {
+): Promise<string[]> {
   const { config } = context.services;
   if (!config) return [];
   const servers = Object.keys(
     config.getMcpClientManager()?.getMcpServers() || {},
   );
   const manager = new McpServerEnablementManager();
-  return servers
-    .filter((n) => manager.getDisplayState(n).enabled === showEnabled)
-    .filter((n) => n.startsWith(partialArg));
+  const results: string[] = [];
+  for (const n of servers) {
+    const state = await manager.getDisplayState(n);
+    if (state.enabled === showEnabled && n.startsWith(partialArg)) {
+      results.push(n);
+    }
+  }
+  return results;
 }
 
 const enableCommand: SlashCommand = {
@@ -480,8 +486,7 @@ const enableCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (ctx, args) => handleEnableDisable(ctx, args, true),
-  completion: (ctx, arg) =>
-    Promise.resolve(getEnablementCompletion(ctx, arg, false)),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
 };
 
 const disableCommand: SlashCommand = {
@@ -490,8 +495,7 @@ const disableCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (ctx, args) => handleEnableDisable(ctx, args, false),
-  completion: (ctx, arg) =>
-    Promise.resolve(getEnablementCompletion(ctx, arg, true)),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 
 export const mcpCommand: SlashCommand = {

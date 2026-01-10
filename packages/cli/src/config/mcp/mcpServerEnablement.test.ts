@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -35,12 +35,12 @@ function createMockEnablement(
 ): EnablementCallbacks {
   return {
     isSessionDisabled: () => sessionDisabled,
-    isFileEnabled: () => fileEnabled,
+    isFileEnabled: () => Promise.resolve(fileEnabled),
   };
 }
 
 function setupFsMocks(): void {
-  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+  vi.spyOn(fs, 'readFile').mockImplementation(async (filePath) => {
     const content = inMemoryFs[filePath.toString()];
     if (content === undefined) {
       const error = new Error(`ENOENT: ${filePath}`);
@@ -49,10 +49,10 @@ function setupFsMocks(): void {
     }
     return content;
   });
-  vi.spyOn(fs, 'writeFileSync').mockImplementation((filePath, data) => {
+  vi.spyOn(fs, 'writeFile').mockImplementation(async (filePath, data) => {
     inMemoryFs[filePath.toString()] = data.toString();
   });
-  vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+  vi.spyOn(fs, 'mkdir').mockImplementation(async () => undefined);
 }
 
 describe('McpServerEnablementManager', () => {
@@ -66,91 +66,91 @@ describe('McpServerEnablementManager', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('should enable/disable servers with persistence', () => {
-    expect(manager.isFileEnabled('server')).toBe(true);
-    manager.disable('server');
-    expect(manager.isFileEnabled('server')).toBe(false);
-    manager.enable('server');
-    expect(manager.isFileEnabled('server')).toBe(true);
+  it('should enable/disable servers with persistence', async () => {
+    expect(await manager.isFileEnabled('server')).toBe(true);
+    await manager.disable('server');
+    expect(await manager.isFileEnabled('server')).toBe(false);
+    await manager.enable('server');
+    expect(await manager.isFileEnabled('server')).toBe(true);
   });
 
-  it('should handle session disable separately', () => {
+  it('should handle session disable separately', async () => {
     manager.disableForSession('server');
     expect(manager.isSessionDisabled('server')).toBe(true);
-    expect(manager.isFileEnabled('server')).toBe(true);
-    expect(manager.isEffectivelyEnabled('server')).toBe(false);
+    expect(await manager.isFileEnabled('server')).toBe(true);
+    expect(await manager.isEffectivelyEnabled('server')).toBe(false);
     manager.clearSessionDisable('server');
-    expect(manager.isEffectivelyEnabled('server')).toBe(true);
+    expect(await manager.isEffectivelyEnabled('server')).toBe(true);
   });
 
-  it('should be case-insensitive', () => {
-    manager.disable('PlayWright');
-    expect(manager.isFileEnabled('playwright')).toBe(false);
+  it('should be case-insensitive', async () => {
+    await manager.disable('PlayWright');
+    expect(await manager.isFileEnabled('playwright')).toBe(false);
   });
 
-  it('should return correct display state', () => {
-    manager.disable('file-disabled');
+  it('should return correct display state', async () => {
+    await manager.disable('file-disabled');
     manager.disableForSession('session-disabled');
 
-    expect(manager.getDisplayState('enabled')).toEqual({
+    expect(await manager.getDisplayState('enabled')).toEqual({
       enabled: true,
       isSessionDisabled: false,
       isPersistentDisabled: false,
     });
-    expect(manager.getDisplayState('file-disabled').isPersistentDisabled).toBe(
-      true,
-    );
-    expect(manager.getDisplayState('session-disabled').isSessionDisabled).toBe(
-      true,
-    );
+    expect(
+      (await manager.getDisplayState('file-disabled')).isPersistentDisabled,
+    ).toBe(true);
+    expect(
+      (await manager.getDisplayState('session-disabled')).isSessionDisabled,
+    ).toBe(true);
   });
 });
 
 describe('canLoadServer', () => {
-  it('blocks when admin has disabled MCP', () => {
-    const result = canLoadServer('s', { adminMcpEnabled: false });
+  it('blocks when admin has disabled MCP', async () => {
+    const result = await canLoadServer('s', { adminMcpEnabled: false });
     expect(result.blockType).toBe('admin');
   });
 
-  it('blocks when server is not in allowlist', () => {
-    const result = canLoadServer('s', {
+  it('blocks when server is not in allowlist', async () => {
+    const result = await canLoadServer('s', {
       adminMcpEnabled: true,
       allowedList: ['other'],
     });
     expect(result.blockType).toBe('allowlist');
   });
 
-  it('blocks when server is in excludelist', () => {
-    const result = canLoadServer('s', {
+  it('blocks when server is in excludelist', async () => {
+    const result = await canLoadServer('s', {
       adminMcpEnabled: true,
       excludedList: ['s'],
     });
     expect(result.blockType).toBe('excludelist');
   });
 
-  it('blocks when server is session-disabled', () => {
-    const result = canLoadServer('s', {
+  it('blocks when server is session-disabled', async () => {
+    const result = await canLoadServer('s', {
       adminMcpEnabled: true,
       enablement: createMockEnablement(true, true),
     });
     expect(result.blockType).toBe('session');
   });
 
-  it('blocks when server is file-disabled', () => {
-    const result = canLoadServer('s', {
+  it('blocks when server is file-disabled', async () => {
+    const result = await canLoadServer('s', {
       adminMcpEnabled: true,
       enablement: createMockEnablement(false, false),
     });
     expect(result.blockType).toBe('enablement');
   });
 
-  it('allows when admin MCP is enabled and no restrictions', () => {
-    const result = canLoadServer('s', { adminMcpEnabled: true });
+  it('allows when admin MCP is enabled and no restrictions', async () => {
+    const result = await canLoadServer('s', { adminMcpEnabled: true });
     expect(result.allowed).toBe(true);
   });
 
-  it('allows when server passes all checks', () => {
-    const result = canLoadServer('s', {
+  it('allows when server passes all checks', async () => {
+    const result = await canLoadServer('s', {
       adminMcpEnabled: true,
       allowedList: ['s'],
       enablement: createMockEnablement(false, true),
