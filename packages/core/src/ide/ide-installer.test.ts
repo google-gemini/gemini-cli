@@ -64,7 +64,7 @@ describe('ide-installer', () => {
     });
   });
 
-  describe('VsCodeFamilyInstaller for VS Code', () => {
+  describe('VsCodeInstaller', () => {
     function setup({
       ide = IDE_DEFINITIONS.vscode,
       existsResult = false,
@@ -260,7 +260,7 @@ describe('AntigravityInstaller', () => {
   });
 });
 
-describe('VsCodeFamilyInstaller for Positron', () => {
+describe('PositronInstaller', () => {
   function setup({
     execSync = () => '',
     platform = 'linux' as NodeJS.Platform,
