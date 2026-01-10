@@ -1,12 +1,16 @@
 name: '📋 Gemini Scheduled Issue Triage'
 
 on:
+  issues:
+    types:
+      - 'opened'
+      - 'reopened'
   schedule:
     - cron: '0 * * * *' # Runs every hour
   workflow_dispatch:
 
 concurrency:
-  group: '${{ github.workflow }}'
+  group: '${{ github.workflow }}-${{ github.event.number || github.run_id }}'
   cancel-in-progress: true
 
 defaults:
@@ -35,7 +39,17 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
 
+      - name: 'Get issue from event'
+        if: github.event_name == 'issues'
+        id: 'get_issue_from_event'
+        run: |
+          set -euo pipefail
+          ISSUE_JSON=$(jq -n --argjson issue "$${{ toJSON(github.event.issue) }}" '[{number: $issue.number, title: $issue.title, body: $issue.body}]')
+          echo "issues_to_triage=${ISSUE_JSON}" >> "${GITHUB_OUTPUT}"
+          echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
+
       - name: 'Find untriaged issues'
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         id: 'find_issues'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
@@ -76,13 +90,12 @@ jobs:
             return labelNames;
 
       - name: 'Run Gemini Issue Analysis'
-        if: |-
-          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+        if: steps.get_issue_from_event.outputs.issues_to_triage != '[]' || steps.find_issues.outputs.issues_to_triage != '[]'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
+          ISSUES_TO_TRIAGE: "${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}"
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
