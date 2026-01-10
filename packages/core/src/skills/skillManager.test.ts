@@ -163,4 +163,45 @@ description: desc1
     expect(service.getAllSkills()).toHaveLength(1);
     expect(service.getAllSkills()[0].disabled).toBe(true);
   });
+
+  it('should filter built-in skills in getDisplayableSkills', async () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.skills = [
+      {
+        name: 'regular-skill',
+        description: 'regular',
+        location: 'loc1',
+        body: 'body',
+        isBuiltin: false,
+      },
+      {
+        name: 'builtin-skill',
+        description: 'builtin',
+        location: 'loc2',
+        body: 'body',
+        isBuiltin: true,
+      },
+      {
+        name: 'disabled-builtin',
+        description: 'disabled builtin',
+        location: 'loc3',
+        body: 'body',
+        isBuiltin: true,
+        disabled: true,
+      },
+    ];
+
+    const displayable = service.getDisplayableSkills();
+    expect(displayable).toHaveLength(1);
+    expect(displayable[0].name).toBe('regular-skill');
+
+    const all = service.getAllSkills();
+    expect(all).toHaveLength(3);
+
+    const enabled = service.getSkills();
+    expect(enabled).toHaveLength(2);
+    expect(enabled.map((s) => s.name)).toContain('builtin-skill');
+  });
 });
