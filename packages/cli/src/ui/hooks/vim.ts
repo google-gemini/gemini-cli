@@ -9,6 +9,7 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -401,10 +402,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       }
 
       // Let InputPrompt handle Ctrl+X for external editor
-      if (
-        normalizedKey.ctrl &&
-        (normalizedKey.name === 'x' || normalizedKey.sequence === '\x18')
-      ) {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](normalizedKey)) {
         return false;
       }
 
