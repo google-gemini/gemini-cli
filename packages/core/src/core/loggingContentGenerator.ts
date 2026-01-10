@@ -33,6 +33,7 @@ import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
+import { resolveVertexServerDetails } from '../utils/baseUrlUtils.js';
 
 interface StructuredError {
   status: number;
@@ -94,6 +95,10 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     // Case 2: Using an API key for Vertex AI.
     if (genConfig?.vertexai) {
+      const vertexCustomServerDetails = resolveVertexServerDetails();
+      if (vertexCustomServerDetails) {
+        return vertexCustomServerDetails;
+      }
       const location = process.env['GOOGLE_CLOUD_LOCATION'];
       if (location) {
         return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
