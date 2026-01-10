@@ -60,6 +60,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
@@ -67,11 +68,11 @@ const MAX_TURNS = 100;
 type BeforeAgentHookReturn =
   | {
       type: GeminiEventType.AgentExecutionStopped;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | {
       type: GeminiEventType.AgentExecutionBlocked;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -145,6 +146,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionStopped,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -154,6 +156,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionBlocked,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -508,7 +511,7 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
+    return resolveModel(this.config.getActiveModel());
   }
 
   private async *processTurn(
@@ -605,6 +608,7 @@ export class GeminiClient {
       history: this.getChat().getHistory(/*curated=*/ true),
       request,
       signal,
+      requestedModel: this.config.getModel(),
     };
 
     let modelToUse: string;
@@ -809,6 +813,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
               reason: hookOutput.getEffectiveReason(),
+              systemMessage: hookOutput.systemMessage,
             },
           };
           return turn;
@@ -820,6 +825,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
+              systemMessage: hookOutput.systemMessage,
             },
           };
           const continueRequest = [{ text: continueReason }];
@@ -971,7 +977,19 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        this.chat = await this.startChat(newHistory);
+        // capture current session data before resetting
+        const currentRecordingService =
+          this.getChat().getChatRecordingService();
+        const conversation = currentRecordingService.getConversation();
+        const filePath = currentRecordingService.getConversationFilePath();
+
+        let resumedData: ResumedSessionData | undefined;
+
+        if (conversation && filePath) {
+          resumedData = { conversation, filePath };
+        }
+
+        this.chat = await this.startChat(newHistory, resumedData);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

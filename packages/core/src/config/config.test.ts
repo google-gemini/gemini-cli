@@ -226,6 +226,10 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
   });
 
   describe('initialize', () => {
@@ -941,6 +945,7 @@ describe('Server Config (config.ts)', () => {
       const params: ConfigParameters = {
         ...baseParams,
         codebaseInvestigatorSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       };
       const config = new Config(params);
 

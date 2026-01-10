@@ -323,7 +323,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: 'text',
-        description: 'The format of the CLI output.',
+        description: 'The format of the CLI output. Can be `text` or `json`.',
         showInDialog: true,
         options: [
           { value: 'text', label: 'Text' },
@@ -382,6 +382,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Show Gemini CLI status and thoughts in the terminal window title',
+        showInDialog: true,
+      },
+      showHomeDirectoryWarning: {
+        type: 'boolean',
+        label: 'Show Home Directory Warning',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
       hideTips: {
@@ -595,7 +605,7 @@ const SETTINGS_SCHEMA = {
         category: 'IDE',
         requiresRestart: true,
         default: false,
-        description: 'Enable IDE integration mode',
+        description: 'Enable IDE integration mode.',
         showInDialog: true,
       },
       hasSeenNudge: {
@@ -844,7 +854,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .gitignore files when searching',
+            description: 'Respect .gitignore files when searching.',
             showInDialog: true,
           },
           respectGeminiIgnore: {
@@ -853,7 +863,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .geminiignore files when searching',
+            description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
@@ -1087,12 +1097,12 @@ const SETTINGS_SCHEMA = {
       },
       enableHooks: {
         type: 'boolean',
-        label: 'Enable Hooks System',
+        label: 'Enable Hooks System (Experimental)',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
-          'Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.',
+          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
         showInDialog: false,
       },
     },
@@ -1393,7 +1403,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Agent Skills (experimental).',
-        showInDialog: false,
+        showInDialog: true,
       },
       codebaseInvestigatorSettings: {
         type: 'object',
@@ -1465,22 +1475,22 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
       },
-      introspectionAgentSettings: {
+      cliHelpAgentSettings: {
         type: 'object',
-        label: 'Introspection Agent Settings',
+        label: 'CLI Help Agent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
-        description: 'Configuration for Introspection Agent.',
+        description: 'Configuration for CLI Help Agent.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Introspection Agent',
+            label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
-            description: 'Enable the Introspection Agent.',
+            default: true,
+            description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
         },
@@ -1530,7 +1540,7 @@ const SETTINGS_SCHEMA = {
     requiresRestart: true,
     default: {},
     description: 'Settings for agent skills.',
-    showInDialog: true,
+    showInDialog: false,
     properties: {
       disabled: {
         type: 'array',
@@ -1556,6 +1566,16 @@ const SETTINGS_SCHEMA = {
       'Hook configurations for intercepting and customizing agent behavior.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
+        showInDialog: false,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Hooks',
@@ -1570,6 +1590,15 @@ const SETTINGS_SCHEMA = {
           description: 'Hook command name',
         },
         mergeStrategy: MergeStrategy.UNION,
+      },
+      notifications: {
+        type: 'boolean',
+        label: 'Hook Notifications',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: true,
+        description: 'Show visual indicators when hooks are executing.',
+        showInDialog: true,
       },
       BeforeTool: {
         type: 'array',
@@ -1709,6 +1738,74 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  admin: {
+    type: 'object',
+    label: 'Admin',
+    category: 'Admin',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings configured remotely by enterprise admins.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.REPLACE,
+    properties: {
+      secureModeEnabled: {
+        type: 'boolean',
+        label: 'Secure Mode Enabled',
+        category: 'Admin',
+        requiresRestart: false,
+        default: false,
+        description: 'If true, disallows yolo mode from being used.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+      },
+      extensions: {
+        type: 'object',
+        label: 'Extensions Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'Extensions-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Extensions Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description:
+              'If false, disallows extensions from being installed or used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
+      mcp: {
+        type: 'object',
+        label: 'MCP Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'MCP-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'MCP Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description: 'If false, disallows MCP servers from being used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
     },
   },
 } as const satisfies SettingsSchema;
@@ -2060,3 +2157,11 @@ type InferSettings<T extends SettingsSchema> = {
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
+
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
+export function getEnableHooks(settings: Settings): boolean {
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
+}
