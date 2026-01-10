@@ -419,7 +419,11 @@ async function handleEnableDisable(
         content: result.reason ?? 'Blocked by settings.',
       };
     }
-    isSession ? manager.clearSessionDisable(name) : manager.enable(name);
+    if (isSession) {
+      manager.clearSessionDisable(name);
+    } else {
+      manager.enable(name);
+    }
     if (result.blockType === 'admin') {
       context.ui.addItem(
         {
@@ -430,7 +434,11 @@ async function handleEnableDisable(
       );
     }
   } else {
-    isSession ? manager.disableForSession(name) : manager.disable(name);
+    if (isSession) {
+      manager.disableForSession(name);
+    } else {
+      manager.disable(name);
+    }
   }
 
   const msg = `MCP server '${name}' ${enable ? 'enabled' : 'disabled'}${isSession ? ' for this session' : ''}.`;

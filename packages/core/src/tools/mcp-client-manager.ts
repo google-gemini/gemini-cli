@@ -102,7 +102,7 @@ export class McpClientManager {
     if (
       allowedNames &&
       allowedNames.length > 0 &&
-      allowedNames.indexOf(name) === -1
+      !allowedNames.includes(name)
     ) {
       return true;
     }
@@ -110,7 +110,7 @@ export class McpClientManager {
     if (
       blockedNames &&
       blockedNames.length > 0 &&
-      blockedNames.indexOf(name) !== -1
+      blockedNames.includes(name)
     ) {
       return true;
     }
