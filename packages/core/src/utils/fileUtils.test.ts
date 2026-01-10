@@ -35,13 +35,18 @@ import {
   saveTruncatedContent,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { extractMediaText } from './mediaTextExtraction.js';
 
 vi.mock('mime/lite', () => ({
   default: { getType: vi.fn() },
   getType: vi.fn(),
 }));
+vi.mock('./mediaTextExtraction.js', () => ({
+  extractMediaText: vi.fn(),
+}));
 
 const mockMimeGetType = mime.getType as Mock;
+const mockExtractMediaText = extractMediaText as Mock;
 
 describe('fileUtils', () => {
   let tempRootDir: string;
@@ -774,6 +779,30 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakePdfData.toString('base64'));
       expect(result.returnDisplay).toContain('Read pdf file: document.pdf');
+    });
+
+    it('should extract text from a PDF when media text extraction is enabled', async () => {
+      const fakePdfData = Buffer.from('fake pdf data');
+      actualNodeFs.writeFileSync(testPdfFilePath, fakePdfData);
+      mockMimeGetType.mockReturnValue('application/pdf');
+      mockExtractMediaText.mockResolvedValueOnce({
+        text: 'Extracted content',
+        method: 'pdftotext',
+      });
+
+      const result = await processSingleFileContent(
+        testPdfFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        { enableMediaTextExtraction: true },
+      );
+
+      expect(result.llmContent).toBe('Extracted content');
+      expect(result.returnDisplay).toContain(
+        'Extracted text from pdf file: document.pdf (pdftotext)',
+      );
     });
 
     it('should process an audio file', async () => {

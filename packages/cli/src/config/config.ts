@@ -716,6 +716,7 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
+    enableMediaTextExtraction: settings.tools?.mediaTextExtraction ?? false,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:

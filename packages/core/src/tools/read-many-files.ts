@@ -283,6 +283,12 @@ ${finalExclusionPatternsForDescription
             filePath,
             this.config.getTargetDir(),
             this.config.getFileSystemService(),
+            undefined,
+            undefined,
+            {
+              enableMediaTextExtraction:
+                this.config.getEnableMediaTextExtraction(),
+            },
           );
 
           if (fileReadResult.error) {

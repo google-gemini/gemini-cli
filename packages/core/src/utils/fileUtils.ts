@@ -16,6 +16,7 @@ import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
 import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import { extractMediaText } from './mediaTextExtraction.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -343,6 +344,68 @@ export interface ProcessedFileReadResult {
   linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
 }
 
+export interface ProcessSingleFileOptions {
+  enableMediaTextExtraction?: boolean;
+}
+
+function formatTextContent(
+  content: string,
+  relativePathForDisplay: string,
+  offset?: number,
+  limit?: number,
+  sourceLabel?: string,
+): ProcessedFileReadResult {
+  const lines = content.split('\n');
+  const originalLineCount = lines.length;
+
+  const startLine = offset || 0;
+  const effectiveLimit =
+    limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
+  const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
+  const actualStartLine = Math.min(startLine, originalLineCount);
+  const selectedLines = lines.slice(actualStartLine, endLine);
+
+  let linesWereTruncatedInLength = false;
+  const formattedLines = selectedLines.map((line) => {
+    if (line.length > MAX_LINE_LENGTH_TEXT_FILE) {
+      linesWereTruncatedInLength = true;
+      return line.substring(0, MAX_LINE_LENGTH_TEXT_FILE) + '... [truncated]';
+    }
+    return line;
+  });
+
+  const contentRangeTruncated =
+    startLine > 0 || endLine < originalLineCount;
+  const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+  const llmContent = formattedLines.join('\n');
+
+  let returnDisplay = '';
+  if (contentRangeTruncated) {
+    returnDisplay = `Read lines ${actualStartLine + 1}-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+    if (linesWereTruncatedInLength) {
+      returnDisplay += ' (some lines were shortened)';
+    }
+  } else if (linesWereTruncatedInLength) {
+    returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
+  }
+
+  if (sourceLabel) {
+    if (returnDisplay) {
+      returnDisplay = `${sourceLabel}. ${returnDisplay}`;
+    } else {
+      returnDisplay = sourceLabel;
+    }
+  }
+
+  return {
+    llmContent,
+    returnDisplay,
+    isTruncated,
+    originalLineCount,
+    linesShown: [actualStartLine + 1, endLine],
+  };
+}
+
 /**
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
@@ -357,6 +420,7 @@ export async function processSingleFileContent(
   fileSystemService: FileSystemService,
   offset?: number,
   limit?: number,
+  options?: ProcessSingleFileOptions,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -419,66 +483,42 @@ export async function processSingleFileContent(
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
-        const lines = content.split('\n');
-        const originalLineCount = lines.length;
-
-        const startLine = offset || 0;
-        const effectiveLimit =
-          limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-        // Ensure endLine does not exceed originalLineCount
-        const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
-        // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
-        const actualStartLine = Math.min(startLine, originalLineCount);
-        const selectedLines = lines.slice(actualStartLine, endLine);
-
-        let linesWereTruncatedInLength = false;
-        const formattedLines = selectedLines.map((line) => {
-          if (line.length > MAX_LINE_LENGTH_TEXT_FILE) {
-            linesWereTruncatedInLength = true;
-            return (
-              line.substring(0, MAX_LINE_LENGTH_TEXT_FILE) + '... [truncated]'
-            );
-          }
-          return line;
-        });
-
-        const contentRangeTruncated =
-          startLine > 0 || endLine < originalLineCount;
-        const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
-        const llmContent = formattedLines.join('\n');
-
-        // By default, return nothing to streamline the common case of a successful read_file.
-        let returnDisplay = '';
-        if (contentRangeTruncated) {
-          returnDisplay = `Read lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
-          if (linesWereTruncatedInLength) {
-            returnDisplay += ' (some lines were shortened)';
-          }
-        } else if (linesWereTruncatedInLength) {
-          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
-        }
-
-        return {
-          llmContent,
-          returnDisplay,
-          isTruncated,
-          originalLineCount,
-          linesShown: [actualStartLine + 1, endLine],
-        };
+        return formatTextContent(
+          content,
+          relativePathForDisplay,
+          offset,
+          limit,
+        );
       }
       case 'image':
       case 'pdf':
       case 'audio':
       case 'video': {
+        const mimeType =
+          getSpecificMimeType(filePath) || 'application/octet-stream';
+        if (
+          options?.enableMediaTextExtraction &&
+          (fileType === 'image' || fileType === 'pdf')
+        ) {
+          const extracted = await extractMediaText(filePath, mimeType);
+          if (extracted?.text) {
+            const sourceLabel = `Extracted text from ${fileType} file: ${relativePathForDisplay} (${extracted.method})`;
+            return formatTextContent(
+              extracted.text,
+              relativePathForDisplay,
+              offset,
+              limit,
+              sourceLabel,
+            );
+          }
+        }
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,

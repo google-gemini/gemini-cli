@@ -1045,6 +1045,18 @@ const SETTINGS_SCHEMA = {
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
       },
+      mediaTextExtraction: {
+        type: 'boolean',
+        label: 'Enable Media Text Extraction',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description: oneLine`
+          Attempt local text extraction for PDFs and images using pdftotext or tesseract.
+          When extraction succeeds, read_file returns text instead of inlineData.
+        `,
+        showInDialog: false,
+      },
       enableToolOutputTruncation: {
         type: 'boolean',
         label: 'Enable Tool Output Truncation',

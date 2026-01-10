@@ -319,6 +319,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
+  enableMediaTextExtraction?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
@@ -446,6 +447,7 @@ export class Config {
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
+  private readonly enableMediaTextExtraction: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
@@ -589,6 +591,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
+    this.enableMediaTextExtraction = params.enableMediaTextExtraction ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -1579,6 +1582,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getEnableMediaTextExtraction(): boolean {
+    return this.enableMediaTextExtraction;
   }
 
   getEnableInteractiveShell(): boolean {
