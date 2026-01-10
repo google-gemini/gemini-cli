@@ -17,7 +17,7 @@ import type {
 } from '../config/settingsSchema.js';
 import { getSettingsSchema } from '../config/settingsSchema.js';
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger } from '@google/gemini-cli-core';
+// import { debugLogger } from '@google/gemini-cli-core';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -111,18 +111,18 @@ export async function getEffectiveDefaultValue(
 
   if (key === 'model.compressionThreshold' && config) {
     try {
-      const experimentValue = await config.getCompressionThreshold();
+      await config.ensureExperimentsLoaded();
+
+      const experimentValue =
+        config.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
+          ?.floatValue;
       if (experimentValue !== undefined) {
         return experimentValue;
       }
-    } catch (error) {
+    } catch (_error) {
       // If experiment check fails, fall back to schema default
       // This can happen if experiments aren't loaded yet or there's an error
-      debugLogger.log(
-        `[getEffectiveDefaultValue] Error getting experiment value for ${key}:`,
-        error instanceof Error ? error.message : String(error),
-        `- falling back to schema default ${schemaDefault}`,
-      );
+      return schemaDefault;
     }
   }
 

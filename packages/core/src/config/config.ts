@@ -814,26 +814,31 @@ export class Config {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer?.projectId) {
-      await this.refreshUserQuota();
-    }
+    if (codeAssistServer) {
+      if (codeAssistServer.projectId) {
+        await this.refreshUserQuota();
+      }
 
-    this.experimentsPromise = getExperiments(codeAssistServer)
-      .then((experiments) => {
-        this.setExperiments(experiments);
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
 
-        // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-        if (this.getPreviewFeatures() === undefined) {
-          const remotePreviewFeatures =
-            experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
-          if (remotePreviewFeatures === true) {
-            this.setPreviewFeatures(remotePreviewFeatures);
+          // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
+          if (this.getPreviewFeatures() === undefined) {
+            const remotePreviewFeatures =
+              experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
+            if (remotePreviewFeatures === true) {
+              this.setPreviewFeatures(remotePreviewFeatures);
+            }
           }
-        }
-      })
-      .catch((e) => {
-        debugLogger.error('Failed to fetch experiments', e);
-      });
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+        });
+    } else {
+      this.experiments = undefined;
+      this.experimentsPromise = undefined;
+    }
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -854,7 +859,10 @@ export class Config {
       return this.experiments;
     }
     const codeAssistServer = getCodeAssistServer(this);
-    return getExperiments(codeAssistServer);
+    if (codeAssistServer) {
+      return getExperiments(codeAssistServer);
+    }
+    return undefined;
   }
 
   getUserTier(): UserTierId | undefined {
@@ -1475,22 +1483,7 @@ export class Config {
   }
 
   async getCompressionThreshold(): Promise<number | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    const remoteThreshold =
-      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
-        ?.floatValue;
-
-    // If experiment has a valid (non-zero) value, use it
-    if (remoteThreshold !== undefined && remoteThreshold !== 0) {
-      return remoteThreshold;
-    }
-
-    // Fall back to local value (from settings) if no experiment value
-    if (this.compressionThreshold) {
-      return this.compressionThreshold;
-    }
-    return undefined;
+    return this.compressionThreshold;
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
@@ -1515,7 +1508,7 @@ export class Config {
     );
   }
 
-  private async ensureExperimentsLoaded(): Promise<void> {
+  async ensureExperimentsLoaded(): Promise<void> {
     if (!this.experimentsPromise) {
       return;
     }
