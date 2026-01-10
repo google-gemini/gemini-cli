@@ -116,6 +116,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   const totalIdealWidth = idealColumnWidths.reduce((sum, w) => sum + w, 0);
 
+  const isNarrowForMinLayout = terminalWidth < numColumns * 15 + borderOverhead;
+
+  const showRowSeparators =
+    numColumns === 1 ||
+    isNarrowForMinLayout ||
+    totalIdealWidth > availableContentWidth;
+
   let adjustedWidths: number[];
   if (totalIdealWidth <= availableContentWidth) {
     adjustedWidths = [...idealColumnWidths];
@@ -236,7 +243,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       {rows.map((row, index) => (
         <React.Fragment key={index}>
           {renderRow(row)}
-          {index < rows.length - 1 && renderRowSeparator()}
+          {showRowSeparators && index < rows.length - 1 && renderRowSeparator()}
         </React.Fragment>
       ))}
 
