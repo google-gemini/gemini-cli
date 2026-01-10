@@ -29,7 +29,6 @@ import {
 } from './types.js';
 import { MessageType, StreamingState } from './types.js';
 import {
-  type EditorType,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -392,8 +391,8 @@ export const AppContainer = (props: AppContainerProps) => {
   }, []);
 
   const getPreferredEditor = useCallback(
-    () => settings.merged.general.preferredEditor as EditorType,
-    [settings.merged.general.preferredEditor],
+    (): string | undefined => settings.merged.general?.preferredEditor,
+    [settings.merged.general?.preferredEditor],
   );
 
   const buffer = useTextBuffer({

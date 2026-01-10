@@ -1343,6 +1343,18 @@ describe('useVim hook', () => {
         expect.objectContaining(key),
       );
     });
+
+    it.each([
+      { mode: 'NORMAL' as VimMode, key: { name: 'x', ctrl: true } },
+      { mode: 'INSERT' as VimMode, key: { name: 'x', ctrl: true } },
+    ])('should pass through ctrl+x in $mode mode', ({ mode, key }) => {
+      mockVimContext.vimMode = mode;
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput(createKey(key));
+
+      expect(handled).toBe(false);
+    });
   });
 
   // Line operations (dd, cc) are tested in text-buffer.test.ts

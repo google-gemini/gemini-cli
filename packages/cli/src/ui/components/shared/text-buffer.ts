@@ -15,9 +15,9 @@ import {
   CoreEvent,
   debugLogger,
   unescapePath,
-  type EditorType,
   getEditorCommand,
   isGuiEditor,
+  isValidEditorType,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -569,7 +569,7 @@ interface UseTextBufferProps {
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
-  getPreferredEditor?: () => EditorType | undefined;
+  getPreferredEditor?: () => string | undefined;
 }
 
 interface UndoHistoryEntry {
@@ -2165,21 +2165,24 @@ export function useTextBuffer({
     let command: string | undefined = undefined;
     const args = [filePath];
 
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
+    const preferredEditor = getPreferredEditor?.();
+    if (preferredEditor) {
+      if (isValidEditorType(preferredEditor)) {
+        command = getEditorCommand(preferredEditor);
+        if (isGuiEditor(preferredEditor)) {
+          args.unshift('--wait');
+        }
+      } else {
+        command = preferredEditor;
       }
     }
 
     if (!command) {
-      command =
-        (process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        process.platform === 'win32')
-          ? 'notepad'
-          : 'vi';
+      command = process.env['VISUAL'] ?? process.env['EDITOR'];
+    }
+
+    if (!command) {
+      command = process.platform === 'win32' ? 'notepad' : 'vi';
     }
 
     dispatch({ type: 'create_undo_snapshot' });

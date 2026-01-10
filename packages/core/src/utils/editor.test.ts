@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import {
   checkHasEditorType,
+  getEditorCommand,
   getDiffCommand,
   openDiff,
   allowEditorTypeInSandbox,
@@ -147,7 +148,7 @@ describe('editor utils', () => {
           });
         }
 
-        it(`should return false if none of the commands exist on windows`, () => {
+        it('should return false if none of the commands exist on windows', () => {
           Object.defineProperty(process, 'platform', { value: 'win32' });
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
@@ -157,6 +158,11 @@ describe('editor utils', () => {
         });
       });
     }
+
+    it('getEditorCommand should return the editor string if it is an unknown editor type', () => {
+      // @ts-expect-error Testing unknown editor type
+      expect(getEditorCommand('unknown-editor')).toBe('unknown-editor');
+    });
   });
 
   describe('getDiffCommand', () => {
