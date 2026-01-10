@@ -25,6 +25,8 @@ export interface SkillDefinition {
   body: string;
   /** Whether the skill is currently disabled. */
   disabled?: boolean;
+  /** Whether the skill is a built-in skill. */
+  isBuiltin?: boolean;
 }
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;

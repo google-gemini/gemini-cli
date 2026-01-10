@@ -65,7 +65,7 @@ describe('skills list command', () => {
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
 
-      await handleList();
+      await handleList({});
 
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -96,7 +96,7 @@ describe('skills list command', () => {
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
 
-      await handleList();
+      await handleList({});
 
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -120,10 +120,63 @@ describe('skills list command', () => {
       );
     });
 
+    it('should filter built-in skills by default and show them with { all: true }', async () => {
+      const skills = [
+        {
+          name: 'regular',
+          description: 'desc1',
+          disabled: false,
+          location: '/loc1',
+        },
+        {
+          name: 'builtin',
+          description: 'desc2',
+          disabled: false,
+          location: '/loc2',
+          isBuiltin: true,
+        },
+      ];
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getSkillManager: vi.fn().mockReturnValue({
+          getAllSkills: vi.fn().mockReturnValue(skills),
+        }),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
+
+      // Default
+      await handleList({ all: false });
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining('regular'),
+      );
+      expect(emitConsoleLog).not.toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining('builtin'),
+      );
+
+      vi.clearAllMocks();
+
+      // With all: true
+      await handleList({ all: true });
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining('regular'),
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining('builtin'),
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining(chalk.gray(' [Built-in]')),
+      );
+    });
+
     it('should throw an error when listing fails', async () => {
       mockLoadCliConfig.mockRejectedValue(new Error('List failed'));
 
-      await expect(handleList()).rejects.toThrow('List failed');
+      await expect(handleList({})).rejects.toThrow('List failed');
     });
   });
 

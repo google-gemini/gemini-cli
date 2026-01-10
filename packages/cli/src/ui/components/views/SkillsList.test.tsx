@@ -105,4 +105,25 @@ describe('SkillsList Component', () => {
 
     unmount();
   });
+
+  it('should render [Built-in] tag for built-in skills', () => {
+    const builtinSkill: SkillDefinition = {
+      name: 'builtin-skill',
+      description: 'A built-in skill',
+      disabled: false,
+      location: 'loc',
+      body: 'body',
+      isBuiltin: true,
+    };
+
+    const { lastFrame, unmount } = render(
+      <SkillsList skills={[builtinSkill]} showDescriptions={true} />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('builtin-skill');
+    expect(output).toContain('Built-in');
+
+    unmount();
+  });
 });
