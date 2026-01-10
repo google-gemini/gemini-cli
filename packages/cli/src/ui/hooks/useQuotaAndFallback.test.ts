@@ -71,6 +71,7 @@ describe('useQuotaAndFallback', () => {
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
     vi.spyOn(mockConfig, 'setModel');
     vi.spyOn(mockConfig, 'setActiveModel');
+    vi.spyOn(mockConfig, 'activateFallbackMode');
   });
 
   afterEach(() => {
@@ -165,8 +166,10 @@ describe('useQuotaAndFallback', () => {
         const intent = await promise!;
         expect(intent).toBe('retry_always');
 
-        // Verify setActiveModel was called
-        expect(mockConfig.setActiveModel).toHaveBeenCalledWith('gemini-flash');
+        // Verify activateFallbackMode was called
+        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+          'gemini-flash',
+        );
 
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
@@ -279,8 +282,10 @@ describe('useQuotaAndFallback', () => {
           const intent = await promise!;
           expect(intent).toBe('retry_always');
 
-          // Verify setActiveModel was called
-          expect(mockConfig.setActiveModel).toHaveBeenCalledWith('model-B');
+          // Verify activateFallbackMode was called
+          expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+            'model-B',
+          );
 
           // The pending request should be cleared from the state
           expect(result.current.proQuotaRequest).toBeNull();
@@ -337,8 +342,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         const intent = await promise!;
         expect(intent).toBe('retry_always');
 
-        // Verify setActiveModel was called
-        expect(mockConfig.setActiveModel).toHaveBeenCalledWith(
+        // Verify activateFallbackMode was called
+        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
           'gemini-2.5-pro',
         );
 
@@ -425,8 +430,10 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
 
-      // Verify setActiveModel was called
-      expect(mockConfig.setActiveModel).toHaveBeenCalledWith('gemini-flash');
+      // Verify activateFallbackMode was called
+      expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+        'gemini-flash',
+      );
 
       // Verify quota error flags are reset
       expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(false);
