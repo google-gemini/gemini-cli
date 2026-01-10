@@ -40,10 +40,10 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Get issue from event'
-        if: github.event_name == 'issues'
+        if: "github.event_name == 'issues'"
         id: 'get_issue_from_event'
         env:
-          ISSUE_EVENT: ${{ toJSON(github.event.issue) }}
+          ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
         run: |
           set -euo pipefail
           ISSUE_JSON=$(echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]')
@@ -51,7 +51,7 @@ jobs:
           echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
 
       - name: 'Find untriaged issues'
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        if: "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
         id: 'find_issues'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
@@ -99,7 +99,7 @@ jobs:
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: "${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}"
+          ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
