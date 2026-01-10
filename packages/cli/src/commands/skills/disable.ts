@@ -23,13 +23,10 @@ export async function handleDisable(args: DisableArgs) {
   const settings = loadSettings(workspaceDir);
 
   const result = disableSkill(settings, name, scope);
-  let feedback = renderSkillActionFeedback(
+  const feedback = renderSkillActionFeedback(
     result,
     (label, path) => `${chalk.bold(label)} (${chalk.dim(path)})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Restart required to take effect.';
-  }
   debugLogger.log(feedback);
 }
 
