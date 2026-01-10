@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { debugLogger } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -26,11 +25,8 @@ export class ClipboardTestHelpers {
 
     try {
       if (platform === 'win32') {
-        // Windows - Use PowerShell to avoid command injection
-        const escapedText = text.replace(/'/g, "''");
-        await execAsync(
-          `powershell -Command "Set-Clipboard -Value '${escapedText}'"`,
-        );
+        // Windows
+        await execAsync(`echo ${JSON.stringify(text)} | clip`);
       } else if (platform === 'darwin') {
         // macOS
         const proc = exec('pbcopy');
@@ -61,7 +57,7 @@ export class ClipboardTestHelpers {
             setTimeout(() => reject(new Error('xclip timed out')), 5000);
           });
         } catch (error) {
-          debugLogger.error('xclip failed, trying xsel...', error);
+          console.error('xclip failed, trying xsel...', error);
           // Fallback to xsel if xclip is not available
           const proc = exec('xsel --clipboard --input');
           proc.stdin?.write(text);
@@ -78,7 +74,7 @@ export class ClipboardTestHelpers {
         }
       }
     } catch (error) {
-      debugLogger.error('Failed to copy text to clipboard:', error);
+      console.error('Failed to copy text to clipboard:', error);
       throw error;
     }
   }
@@ -122,7 +118,7 @@ export class ClipboardTestHelpers {
         ]);
       }
     } catch (error) {
-      debugLogger.error('Failed to copy image to clipboard:', error);
+      console.error('Failed to copy image to clipboard:', error);
       throw error;
     }
   }
@@ -146,7 +142,7 @@ export class ClipboardTestHelpers {
         }
       }
     } catch (error) {
-      debugLogger.error('Failed to clear clipboard:', error);
+      console.error('Failed to clear clipboard:', error);
       throw error;
     }
   }
@@ -178,7 +174,7 @@ export class ClipboardTestHelpers {
         try {
           await fs.unlink(path.join(tempDir, file));
         } catch (error) {
-          debugLogger.warn(`Failed to delete temp file ${file}:`, error);
+          console.warn(`Failed to delete temp file ${file}:`, error);
         }
       }
     }
@@ -228,7 +224,7 @@ export class ClipboardTestHelpers {
       }
       throw new Error(`Unsupported platform: ${platform}`);
     } catch (error) {
-      debugLogger.error('Failed to get text from clipboard:', error);
+      console.error('Failed to get text from clipboard:', error);
       throw error;
     }
   }
@@ -262,7 +258,7 @@ export class ClipboardTestHelpers {
   ): void {
     const currentPlatform = os.platform();
     if (!platforms.includes(currentPlatform)) {
-      debugLogger.warn(
+      console.warn(
         `Skipping test on ${currentPlatform} as it's not in the supported platforms: ${platforms.join(', ')}`,
       );
       return;

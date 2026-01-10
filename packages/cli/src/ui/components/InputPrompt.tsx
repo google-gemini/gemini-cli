@@ -5,9 +5,8 @@
  */
 
 import type React from 'react';
-import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, useStdout, type DOMElement } from 'ink';
+import { Box, Text } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -24,30 +23,25 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
-  parseSegmentsFromTokens,
+  buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { takeAndAddScreenshot } from '../utils/screenshotUtils.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import {
-  isAutoExecutableCommand,
-  isSlashCommand,
-} from '../utils/commandUtils.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
-import { useMouseClick } from '../hooks/useMouseClick.js';
-import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -79,14 +73,11 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
-  onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
-  popAllMessages?: () => string | undefined;
-  suggestionsPosition?: 'above' | 'below';
-  setBannerVisible: (visible: boolean) => void;
+  popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -121,20 +112,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   approvalMode,
   onEscapePromptChange,
-  onSuggestionsVisibilityChange,
   vimHandleInput,
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
   popAllMessages,
-  suggestionsPosition = 'below',
-  setBannerVisible,
 }) => {
-  const { stdout } = useStdout();
-  const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused } = useUIActions();
   const { mainAreaWidth } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -144,8 +129,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const innerBoxRef = useRef<DOMElement>(null);
 
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
   const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
@@ -154,11 +147,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
   const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
     useState<number>(-1);
+  const [isPasting, setIsPasting] = useState(false);
   const shellHistory = useShellHistory(config.getProjectRoot());
   const shellHistoryData = shellHistory.history;
 
   const completion = useCommandCompletion(
     buffer,
+    dirs,
     config.getTargetDir(),
     slashCommands,
     commandContext,
@@ -303,92 +298,119 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Returns true if we should continue with input history navigation
   const tryLoadQueuedMessages = useCallback(() => {
     if (buffer.text.trim() === '' && popAllMessages) {
-      const allMessages = popAllMessages();
-      if (allMessages) {
-        buffer.setText(allMessages);
-      } else {
-        // No queued messages, proceed with input history
-        inputHistory.navigateUp();
-      }
+      popAllMessages((allMessages) => {
+        if (allMessages) {
+          buffer.setText(allMessages);
+        } else {
+          // No queued messages, proceed with input history
+          inputHistory.navigateUp();
+        }
+      });
       return true; // We handled the up arrow key
     }
     return false;
   }, [buffer, popAllMessages, inputHistory]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardPaste = useCallback(async () => {
+  const handleClipboardImage = useCallback(async (): Promise<boolean> => {
     try {
-      if (await clipboardHasImage()) {
-        const imagePath = await saveClipboardImage(config.getTargetDir());
-        if (imagePath) {
-          // Clean up old images
-          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
-            // Ignore cleanup errors
-          });
-
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
-
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
-          const currentText = buffer.text;
-          const offset = buffer.getOffset();
-
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
-
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
-          return;
-        }
+      const hasImage = await clipboardHasImage();
+      if (!hasImage) {
+        console.log('No image found in clipboard');
+        return false;
       }
 
-      if (settings.experimental?.useOSC52Paste) {
-        stdout.write('\x1b]52;c;?\x07');
-      } else {
-        const textToInsert = await clipboardy.read();
-        const offset = buffer.getOffset();
-        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      const targetDir = config.getTargetDir();
+
+      try {
+        // Clean up old images first
+        await cleanupOldClipboardImages(targetDir).catch(() => {
+          // Ignore cleanup errors
+        });
+
+        const saveResult = await saveClipboardImage(targetDir);
+
+        if (!saveResult?.filePath) {
+          console.error('Failed to save image from clipboard');
+          return false;
+        }
+
+        // Insert the file path with friendly name in markdown format: [screenshot-1](@path/to/image.png)
+        const relativePath = path.relative(process.cwd(), saveResult.filePath);
+        const displayName = saveResult.displayName || 'screenshot';
+        const markdownLink = `[${displayName}](@${relativePath})`;
+
+        // Insert the markdown link at the current cursor position using replaceRangeByOffset
+        const cursorPos = buffer.cursor;
+        const lines = buffer.lines;
+
+        // Calculate the offset for the cursor position
+        let offset = 0;
+        for (let i = 0; i < cursorPos[0]; i++) {
+          offset += lines[i].length + 1; // +1 for newline
+        }
+        offset += cursorPos[1];
+
+        // Insert at cursor position
+        buffer.replaceRangeByOffset(offset, offset, markdownLink);
+
+        // Update cursor position
+        buffer.cursor = [cursorPos[0], cursorPos[1] + markdownLink.length];
+
+        console.log(`Added image: ${markdownLink}`);
+        return true;
+      } catch (error) {
+        console.error('Error processing clipboard image:', error);
+        return false;
       }
     } catch (error) {
-      debugLogger.error('Error handling paste:', error);
+      console.error('Error handling clipboard image:', error);
+      return false;
     }
-  }, [buffer, config, stdout, settings]);
+  }, [buffer, config]);
 
-  useMouseClick(
-    innerBoxRef,
-    (_event, relX, relY) => {
-      if (isEmbeddedShellFocused) {
-        setEmbeddedShellFocused(false);
-      }
-      const visualRow = buffer.visualScrollRow + relY;
-      buffer.moveToVisualPosition(visualRow, relX);
-    },
-    { isActive: focus },
-  );
+  // Handle taking a screenshot
+  const handleScreenshot = useCallback(async () => {
+    if (!config) return;
 
-  useMouse(
-    (event: MouseEvent) => {
-      if (event.name === 'right-release') {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        handleClipboardPaste();
+    try {
+      const targetDir = config.getTargetDir();
+      const screenshotsDir = path.join(targetDir, '.gemini-cli', 'screenshots');
+      await fs.mkdir(screenshotsDir, { recursive: true });
+      const screenshotMarkdown = await takeAndAddScreenshot(screenshotsDir);
+      if (screenshotMarkdown) {
+        // Insert the screenshot markdown at the current cursor position
+        const cursorPos = buffer.cursor;
+        let offset = 0;
+        for (let i = 0; i < cursorPos[0]; i++) {
+          offset += buffer.lines[i].length + 1; // +1 for newline
+        }
+        offset += cursorPos[1];
+
+        buffer.replaceRangeByOffset(offset, offset, screenshotMarkdown);
+
+        // Update cursor position
+        buffer.cursor = [
+          cursorPos[0],
+          cursorPos[1] + screenshotMarkdown.length,
+        ];
+
+        console.log(`Added screenshot: ${screenshotMarkdown}`);
+      } else {
+        console.error('Failed to take screenshot');
       }
-    },
-    { isActive: focus },
-  );
+    } catch (error) {
+      console.error('Error taking screenshot:', error);
+    }
+  }, [buffer, config]);
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Ignore input during paste operations to prevent race conditions, except for enter
+      if (isPasting && key.name !== 'return') {
+        return;
+      }
+
       // TODO(jacobr): this special case is likely not needed anymore.
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
@@ -399,7 +421,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
+        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
           setRecentUnsafePasteTime(Date.now());
 
           // Clear any existing paste timeout
@@ -421,8 +443,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+        // Clear the paste protection after a safe delay
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentUnsafePasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 40);
+
+        // Check for clipboard image and handle it
+        const handlePaste = async () => {
+          const imageHandled = await handleClipboardImage();
+          if (!imageHandled) {
+            // If no image was handled, process as regular paste
+            buffer.handleInput(key);
+          }
+        };
+        setIsPasting(true);
+        void handlePaste().finally(() => setIsPasting(false));
         return;
       }
 
@@ -522,7 +558,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
-        setBannerVisible(false);
         onClearScreen();
         return;
       }
@@ -596,12 +631,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      // We prioritize execution unless the user is explicitly selecting a different suggestion.
-      if (
-        completion.isPerfectMatch &&
-        keyMatchers[Command.RETURN](key) &&
-        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
-      ) {
+      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
         handleSubmit(buffer.text);
         return;
       }
@@ -626,52 +656,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               completion.activeSuggestionIndex === -1
                 ? 0 // Default to the first if none is active
                 : completion.activeSuggestionIndex;
-
             if (targetIndex < completion.suggestions.length) {
-              const suggestion = completion.suggestions[targetIndex];
-
-              const isEnterKey = key.name === 'return' && !key.ctrl;
-
-              if (isEnterKey && buffer.text.startsWith('/')) {
-                const { isArgumentCompletion, leafCommand } =
-                  completion.slashCompletionRange;
-
-                if (
-                  isArgumentCompletion &&
-                  isAutoExecutableCommand(leafCommand)
-                ) {
-                  // isArgumentCompletion guarantees leafCommand exists
-                  const completedText = completion.getCompletedText(suggestion);
-                  if (completedText) {
-                    setExpandedSuggestionIndex(-1);
-                    handleSubmit(completedText.trim());
-                    return;
-                  }
-                } else if (!isArgumentCompletion) {
-                  // Existing logic for command name completion
-                  const command =
-                    completion.getCommandFromSuggestion(suggestion);
-
-                  // Only auto-execute if the command has no completion function
-                  // (i.e., it doesn't require an argument to be selected)
-                  if (
-                    command &&
-                    isAutoExecutableCommand(command) &&
-                    !command.completion
-                  ) {
-                    const completedText =
-                      completion.getCompletedText(suggestion);
-
-                    if (completedText) {
-                      setExpandedSuggestionIndex(-1);
-                      handleSubmit(completedText.trim());
-                      return;
-                    }
-                  }
-                }
-              }
-
-              // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }
@@ -758,7 +743,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             // newline that was part of the paste.
             // This has the added benefit that in the worst case at least users
             // get some feedback that their keypress was handled rather than
-            // wondering why it was completely ignored.
+            // wondering why it was completey ignored.
             buffer.newline();
             return;
           }
@@ -817,15 +802,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         buffer.openInExternalEditor();
         return;
       }
 
-      // Ctrl+V for clipboard paste
-      if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        handleClipboardPaste();
+      // Ctrl+V for clipboard image paste
+      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
+        // Check for Shift key to determine if we should take a screenshot
+        if (key.shift) {
+          console.log('Taking screenshot...');
+          handleScreenshot();
+        } else {
+          console.log('Pasting image from clipboard...');
+          handleClipboardImage();
+        }
         return;
       }
 
@@ -856,7 +846,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       handleSubmit,
       shellHistory,
       reverseSearchCompletion,
-      handleClipboardPaste,
+      handleClipboardImage,
       resetCompletionState,
       showEscapePrompt,
       resetEscapeState,
@@ -867,9 +857,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
-      kittyProtocol.enabled,
+      kittyProtocol.supported,
       tryLoadQueuedMessages,
-      setBannerVisible,
+      handleScreenshot,
+      isPasting,
     ],
   );
 
@@ -1001,12 +992,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
-  useEffect(() => {
-    if (onSuggestionsVisibilityChange) {
-      onSuggestionsVisibilityChange(shouldShowSuggestions);
-    }
-  }, [shouldShowSuggestions, onSuggestionsVisibilityChange]);
-
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
@@ -1025,30 +1010,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
-  const suggestionsNode = shouldShowSuggestions ? (
-    <Box paddingRight={2}>
-      <SuggestionsDisplay
-        suggestions={activeCompletion.suggestions}
-        activeIndex={activeCompletion.activeSuggestionIndex}
-        isLoading={activeCompletion.isLoadingSuggestions}
-        width={suggestionsWidth}
-        scrollOffset={activeCompletion.visibleStartIndex}
-        userInput={buffer.text}
-        mode={
-          buffer.text.startsWith('/') &&
-          !reverseSearchActive &&
-          !commandSearchActive
-            ? 'slash'
-            : 'reverse'
-        }
-        expandedIndex={expandedSuggestionIndex}
-      />
-    </Box>
-  ) : null;
-
   return (
     <>
-      {suggestionsPosition === 'above' && suggestionsNode}
       <Box
         borderStyle="round"
         borderColor={
@@ -1085,7 +1048,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             '>'
           )}{' '}
         </Text>
-        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
+        <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
             showCursor ? (
               <Text>
@@ -1108,27 +1071,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 const renderedLine: React.ReactNode[] = [];
 
-                const [logicalLineIdx] = mapEntry;
+                const [logicalLineIdx, logicalStartCol] = mapEntry;
                 const logicalLine = buffer.lines[logicalLineIdx] || '';
-                const transformations =
-                  buffer.transformationsByLine[logicalLineIdx] ?? [];
                 const tokens = parseInputForHighlighting(
                   logicalLine,
                   logicalLineIdx,
-                  transformations,
-                  ...(focus && buffer.cursor[0] === logicalLineIdx
-                    ? [buffer.cursor[1]]
-                    : []),
                 );
-                const startColInTransformed =
-                  buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
-                const visualStartCol = startColInTransformed;
-                const visualEndCol = visualStartCol + cpLen(lineText);
-                const segments = parseSegmentsFromTokens(
+
+                const visualStart = logicalStartCol;
+                const visualEnd = logicalStartCol + cpLen(lineText);
+                const segments = buildSegmentsForVisualSlice(
                   tokens,
-                  visualStartCol,
-                  visualEndCol,
+                  visualStart,
+                  visualEnd,
                 );
+
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
@@ -1144,7 +1101,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                       relativeVisualColForHighlight < segEnd
                     ) {
                       const charToHighlight = cpSlice(
-                        display,
+                        seg.text,
                         relativeVisualColForHighlight - segStart,
                         relativeVisualColForHighlight - segStart + 1,
                       );
@@ -1153,20 +1110,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         : charToHighlight;
                       display =
                         cpSlice(
-                          display,
+                          seg.text,
                           0,
                           relativeVisualColForHighlight - segStart,
                         ) +
                         highlighted +
                         cpSlice(
-                          display,
+                          seg.text,
                           relativeVisualColForHighlight - segStart + 1,
                         );
                     }
                     charCount = segEnd;
-                  } else {
-                    // Advance the running counter even when not on cursor line
-                    charCount += segLen;
                   }
 
                   const color =
@@ -1236,7 +1190,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           )}
         </Box>
       </Box>
-      {suggestionsPosition === 'below' && suggestionsNode}
+      {shouldShowSuggestions && (
+        <Box paddingRight={2}>
+          <SuggestionsDisplay
+            suggestions={activeCompletion.suggestions}
+            activeIndex={activeCompletion.activeSuggestionIndex}
+            isLoading={activeCompletion.isLoadingSuggestions}
+            width={suggestionsWidth}
+            scrollOffset={activeCompletion.visibleStartIndex}
+            userInput={buffer.text}
+            mode={
+              buffer.text.startsWith('/') &&
+              !reverseSearchActive &&
+              !commandSearchActive
+                ? 'slash'
+                : 'reverse'
+            }
+            expandedIndex={expandedSuggestionIndex}
+          />
+        </Box>
+      )}
     </>
   );
 };
