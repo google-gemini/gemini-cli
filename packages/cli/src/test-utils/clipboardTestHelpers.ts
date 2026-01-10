@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -57,7 +58,7 @@ export class ClipboardTestHelpers {
             setTimeout(() => reject(new Error('xclip timed out')), 5000);
           });
         } catch (error) {
-          console.error('xclip failed, trying xsel...', error);
+          debugLogger.error('xclip failed, trying xsel...', error);
           // Fallback to xsel if xclip is not available
           const proc = exec('xsel --clipboard --input');
           proc.stdin?.write(text);
@@ -74,7 +75,7 @@ export class ClipboardTestHelpers {
         }
       }
     } catch (error) {
-      console.error('Failed to copy text to clipboard:', error);
+      debugLogger.error('Failed to copy text to clipboard:', error);
       throw error;
     }
   }
@@ -118,7 +119,7 @@ export class ClipboardTestHelpers {
         ]);
       }
     } catch (error) {
-      console.error('Failed to copy image to clipboard:', error);
+      debugLogger.error('Failed to copy image to clipboard:', error);
       throw error;
     }
   }
@@ -142,7 +143,7 @@ export class ClipboardTestHelpers {
         }
       }
     } catch (error) {
-      console.error('Failed to clear clipboard:', error);
+      debugLogger.error('Failed to clear clipboard:', error);
       throw error;
     }
   }
@@ -174,7 +175,7 @@ export class ClipboardTestHelpers {
         try {
           await fs.unlink(path.join(tempDir, file));
         } catch (error) {
-          console.warn(`Failed to delete temp file ${file}:`, error);
+          debugLogger.warn(`Failed to delete temp file ${file}:`, error);
         }
       }
     }
@@ -224,7 +225,7 @@ export class ClipboardTestHelpers {
       }
       throw new Error(`Unsupported platform: ${platform}`);
     } catch (error) {
-      console.error('Failed to get text from clipboard:', error);
+      debugLogger.error('Failed to get text from clipboard:', error);
       throw error;
     }
   }
@@ -258,7 +259,7 @@ export class ClipboardTestHelpers {
   ): void {
     const currentPlatform = os.platform();
     if (!platforms.includes(currentPlatform)) {
-      console.warn(
+      debugLogger.warn(
         `Skipping test on ${currentPlatform} as it's not in the supported platforms: ${platforms.join(', ')}`,
       );
       return;

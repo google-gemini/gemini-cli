@@ -8,6 +8,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { debugLogger } from '@google/gemini-cli-core';
 // No longer using uuid
 
 const execAsync = promisify(exec);
@@ -48,7 +49,7 @@ export async function takeScreenshot(
         await execAsync(`scrot -s "${filePath}"`);
       }
     } else {
-      console.error('Screenshot not supported on this platform');
+      debugLogger.error('Screenshot not supported on this platform');
       return null;
     }
 
@@ -62,10 +63,10 @@ export async function takeScreenshot(
       // File doesn't exist or is empty
     }
 
-    console.error('Failed to capture screenshot');
+    debugLogger.error('Failed to capture screenshot');
     return null;
   } catch (error) {
-    console.error('Error taking screenshot:', error);
+    debugLogger.error('Error taking screenshot:', error);
     return null;
   }
 }
@@ -98,10 +99,10 @@ export async function copyImageToClipboard(filePath: string): Promise<boolean> {
       );
       return true;
     }
-    console.warn('Clipboard copy not supported on this platform');
+    debugLogger.warn('Clipboard copy not supported on this platform');
     return false;
   } catch (error) {
-    console.error('Error copying image to clipboard:', error);
+    debugLogger.error('Error copying image to clipboard:', error);
     return false;
   }
 }
