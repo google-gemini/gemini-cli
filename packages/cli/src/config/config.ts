@@ -87,7 +87,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .locale('en')
     .scriptName('gemini')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
 
     .option('debug', {
@@ -100,7 +100,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       yargsInstance
         .positional('query', {
           description:
-            'Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive.',
+            'Initial prompt. Runs in interactive mode by default; use -p/--prompt for non-interactive.',
         })
         .option('model', {
           alias: 'm',
@@ -112,7 +112,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'p',
           type: 'string',
           nargs: 1,
-          description: 'Prompt. Appended to input on stdin (if any).',
+          description:
+            'Run in non-interactive (headless) mode with the given prompt. Appended to input on stdin (if any).',
         })
         .option('prompt-interactive', {
           alias: 'i',
@@ -329,11 +330,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     ? queryArg.join(' ')
     : queryArg;
 
-  // Route positional args: explicit -i flag -> interactive; else -> one-shot (even for @commands)
+  // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    const hasExplicitInteractive =
-      result['promptInteractive'] === '' || !!result['promptInteractive'];
-    if (hasExplicitInteractive) {
+    if (process.stdin.isTTY) {
       result['promptInteractive'] = q;
     } else {
       result['prompt'] = q;
@@ -549,12 +548,12 @@ export async function loadCliConfig(
     throw err;
   }
 
-  // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
-  const hasQuery = !!argv.query;
+  // -p/--prompt forces non-interactive (headless) mode
+  // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !hasQuery && !argv.prompt);
+    (process.stdin.isTTY && !argv.prompt);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);

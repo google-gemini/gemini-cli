@@ -1723,15 +1723,16 @@ describe('loadCliConfig interactive', () => {
     expect(config.isInteractive()).toBe(false);
   });
 
-  it('should not be interactive if positional prompt words are provided with other flags', async () => {
+  it('should be interactive if positional prompt words are provided with other flags', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro', 'Hello'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
+    expect(argv.promptInteractive).toBe('Hello');
   });
 
-  it('should not be interactive if positional prompt words are provided with multiple flags', async () => {
+  it('should be interactive if positional prompt words are provided with multiple flags', async () => {
     process.stdin.isTTY = true;
     process.argv = [
       'node',
@@ -1743,19 +1744,19 @@ describe('loadCliConfig interactive', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
-    // Verify the question is preserved for one-shot execution
-    expect(argv.prompt).toBe('Hello world');
-    expect(argv.promptInteractive).toBeUndefined();
+    expect(config.isInteractive()).toBe(true);
+    expect(argv.promptInteractive).toBe('Hello world');
+    expect(argv.prompt).toBeUndefined();
   });
 
-  it('should not be interactive if positional prompt words are provided with extensions flag', async () => {
+  it('should be interactive if positional prompt words are provided with extensions flag', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello');
+    expect(argv.promptInteractive).toBe('hello');
     expect(argv.extensions).toEqual(['none']);
   });
 
@@ -1764,9 +1765,9 @@ describe('loadCliConfig interactive', () => {
     process.argv = ['node', 'script.js', 'hello world how are you'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
-    expect(argv.prompt).toBe('hello world how are you');
+    expect(argv.promptInteractive).toBe('hello world how are you');
   });
 
   it('should handle multiple positional words with flags', async () => {
@@ -1785,8 +1786,9 @@ describe('loadCliConfig interactive', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('write a function to sort array');
+    expect(argv.promptInteractive).toBe('write a function to sort array');
     expect(argv.model).toBe('gemini-2.5-pro');
   });
 
@@ -1814,8 +1816,9 @@ describe('loadCliConfig interactive', () => {
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
+    expect(argv.promptInteractive).toBe('hello world how are you');
     expect(argv.extensions).toEqual(['none']);
   });
 
@@ -2338,9 +2341,9 @@ describe('PolicyEngine nonInteractive wiring', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set nonInteractive to true in one-shot mode', async () => {
+  it('should set nonInteractive to true when -p flag is used', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', 'echo hello']; // Positional query makes it one-shot
+    process.argv = ['node', 'script.js', '--prompt', 'echo hello']; // -p flag makes it non-interactive
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
