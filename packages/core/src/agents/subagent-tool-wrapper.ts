@@ -38,7 +38,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
   constructor(
     private readonly definition: AgentDefinition,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const parameterSchema = convertInputConfigToJsonSchema(
       definition.inputConfig,
@@ -50,9 +50,9 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       definition.description,
       Kind.Think,
       parameterSchema,
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
@@ -67,17 +67,30 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    */
   protected createInvocation(
     params: AgentInputs,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<AgentInputs, ToolResult> {
     const definition = this.definition;
+    const effectiveMessageBus = messageBus;
+
     if (definition.kind === 'remote') {
-      return new RemoteAgentInvocation(definition, params, this.messageBus);
+      return new RemoteAgentInvocation(
+        definition,
+        params,
+        effectiveMessageBus,
+        _toolName,
+        _toolDisplayName,
+      );
     }
 
     return new LocalSubagentInvocation(
       definition,
       this.config,
       params,
-      this.messageBus,
+      effectiveMessageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }

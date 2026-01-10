@@ -9,6 +9,8 @@ import {
   resolveModel,
   resolveClassifierModel,
   isGemini2Model,
+  isAutoModel,
+  getDisplayString,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -17,10 +19,48 @@ import {
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_FLASH_LITE,
+  GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from './models.js';
+
+describe('getDisplayString', () => {
+  it('should return Auto (Gemini 3) for preview auto model', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto (Gemini 3)');
+  });
+
+  it('should return Auto (Gemini 2.5) for default auto model', () => {
+    expect(getDisplayString(DEFAULT_GEMINI_MODEL_AUTO)).toBe(
+      'Auto (Gemini 2.5)',
+    );
+  });
+
+  it('should return concrete model name for pro alias', () => {
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO, false)).toBe(
+      DEFAULT_GEMINI_MODEL,
+    );
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO, true)).toBe(
+      PREVIEW_GEMINI_MODEL,
+    );
+  });
+
+  it('should return concrete model name for flash alias', () => {
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH, false)).toBe(
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH, true)).toBe(
+      PREVIEW_GEMINI_FLASH_MODEL,
+    );
+  });
+
+  it('should return the model name as is for other models', () => {
+    expect(getDisplayString('custom-model')).toBe('custom-model');
+    expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
+      DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    );
+  });
+});
 
 describe('supportsMultimodalFunctionResponse', () => {
   it('should return true for gemini-3 model', () => {
@@ -130,6 +170,26 @@ describe('isGemini2Model', () => {
 
   it('should return false for arbitrary strings', () => {
     expect(isGemini2Model('gpt-4')).toBe(false);
+  });
+});
+
+describe('isAutoModel', () => {
+  it('should return true for "auto"', () => {
+    expect(isAutoModel(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
+  });
+
+  it('should return true for "auto-gemini-3"', () => {
+    expect(isAutoModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+  });
+
+  it('should return true for "auto-gemini-2.5"', () => {
+    expect(isAutoModel(DEFAULT_GEMINI_MODEL_AUTO)).toBe(true);
+  });
+
+  it('should return false for concrete models', () => {
+    expect(isAutoModel(DEFAULT_GEMINI_MODEL)).toBe(false);
+    expect(isAutoModel(PREVIEW_GEMINI_MODEL)).toBe(false);
+    expect(isAutoModel('some-random-model')).toBe(false);
   });
 });
 

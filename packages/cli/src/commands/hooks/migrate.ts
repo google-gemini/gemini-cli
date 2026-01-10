@@ -243,7 +243,7 @@ export async function handleMigrateFromClaude() {
       '\nMigration complete! Please review the migrated hooks in .gemini/settings.json',
     );
     debugLogger.log(
-      'Note: Set tools.enableHooks to true in your settings to enable the hook system.',
+      'Note: Set hooks.enabled to true in your settings to enable the hook system.',
     );
   } catch (error) {
     debugLogger.error(`Error saving migrated hooks: ${getErrorMessage(error)}`);

@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
@@ -593,7 +596,7 @@ describe('InputPrompt', () => {
       });
       await waitFor(() => {
         expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-          'Error handling clipboard image:',
+          'Error handling paste:',
           expect.any(Error),
         );
       });
@@ -626,6 +629,31 @@ describe('InputPrompt', () => {
           'pasted text',
         );
       });
+      unmount();
+    });
+
+    it('should use OSC 52 when useOSC52Paste setting is enabled', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const settings = createMockSettings({
+        experimental: { useOSC52Paste: true },
+      });
+
+      const { stdout, stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { settings },
+      );
+
+      const writeSpy = vi.spyOn(stdout, 'write');
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(writeSpy).toHaveBeenCalledWith('\x1b]52;c;?\x07');
+      });
+      // Should NOT call clipboardy.read()
+      expect(clipboardy.read).not.toHaveBeenCalled();
       unmount();
     });
   });

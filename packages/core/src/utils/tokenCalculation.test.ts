@@ -123,8 +123,26 @@ describe('calculateRequestTokenCount', () => {
 
     // Should fallback to estimation:
     // 'Hello': 5 chars * 0.25 = 1.25
-    // inlineData: JSON.stringify length / 4
-    expect(count).toBeGreaterThan(0);
+    // inlineData: 3000
+    // Total: 3001.25 -> 3001
+    expect(count).toBe(3001);
     expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
+
+  it('should use fixed estimate for images in fallback', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+      new Error('API error'),
+    );
+    const request = [
+      { inlineData: { mimeType: 'image/png', data: 'large_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    expect(count).toBe(3000);
   });
 });
