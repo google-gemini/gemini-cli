@@ -31,13 +31,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
-    debugLogger: {
-      log: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-      info: vi.fn(),
-    },
   };
 });
 
@@ -49,6 +42,7 @@ describe('ExtensionManager skills validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emitFeedback');
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
     mockHomedir.mockReturnValue(tempDir);
@@ -108,19 +102,43 @@ describe('ExtensionManager skills validation', () => {
   });
 
   it('should emit a warning during load if skills directory is not empty but no skills are loaded', async () => {
-    // Manually create an installed extension
+    // 1. Create a source extension
+    const sourceDir = path.join(tempDir, 'source-ext-load');
     createExtension({
-      extensionsDir,
+      extensionsDir: sourceDir,
       name: 'skills-ext-load',
       version: '1.0.0',
     });
-    const extensionPath = path.join(extensionsDir, 'skills-ext-load');
+    const sourceExtPath = path.join(sourceDir, 'skills-ext-load');
 
-    const skillsDir = path.join(extensionPath, 'skills');
+    // Add invalid skills content
+    const skillsDir = path.join(sourceExtPath, 'skills');
     fs.mkdirSync(skillsDir);
     fs.writeFileSync(path.join(skillsDir, 'not-a-skill.txt'), 'hello');
 
+    // 2. Install it to ensure correct disk state
     await extensionManager.loadExtensions();
+    await extensionManager.installOrUpdateExtension({
+      type: 'local',
+      source: sourceExtPath,
+    });
+
+    // Clear the spy
+    vi.mocked(debugLogger.debug).mockClear();
+
+    // 3. Create a fresh ExtensionManager to force loading from disk
+    const newExtensionManager = new ExtensionManager({
+      settings: {
+        telemetry: { enabled: false },
+        trustedFolders: [tempDir],
+      } as unknown as Settings,
+      requestConsent: vi.fn().mockResolvedValue(true),
+      requestSetting: vi.fn(),
+      workspaceDir: tempDir,
+    });
+
+    // 4. Load extensions
+    await newExtensionManager.loadExtensions();
 
     expect(debugLogger.debug).toHaveBeenCalledWith(
       expect.stringContaining('Failed to load skills from'),
