@@ -30,7 +30,7 @@ async function listAction(
   let showAll = false;
 
   for (const arg of subArgs) {
-    if (arg === 'nodesc') {
+    if (arg === 'nodesc' || arg === '--nodesc') {
       useShowDescriptions = false;
     } else if (arg === 'all' || arg === '--all') {
       showAll = true;

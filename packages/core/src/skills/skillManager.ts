@@ -102,8 +102,11 @@ export class SkillManager {
    * Sets the list of disabled skill names.
    */
   setDisabledSkills(disabledNames: string[]): void {
+    const lowercaseDisabledNames = disabledNames.map((n) => n.toLowerCase());
     for (const skill of this.skills) {
-      skill.disabled = disabledNames.includes(skill.name);
+      skill.disabled = lowercaseDisabledNames.includes(
+        skill.name.toLowerCase(),
+      );
     }
   }
 
@@ -111,7 +114,10 @@ export class SkillManager {
    * Reads the full content (metadata + body) of a skill by name.
    */
   getSkill(name: string): SkillDefinition | null {
-    return this.skills.find((s) => s.name === name) ?? null;
+    const lowercaseName = name.toLowerCase();
+    return (
+      this.skills.find((s) => s.name.toLowerCase() === lowercaseName) ?? null
+    );
   }
 
   /**
