@@ -466,61 +466,75 @@ Would you like to attempt to install via "git clone" instead?`,
   /**
    * Loads all installed extensions, should only be called once.
    */
+  // Promise to track the loading state and prevent concurrent loading
+  private loadingPromise: Promise<GeminiCLIExtension[]> | null = null;
+
+  /**
+   * Loads all installed extensions, should only be called once.
+   */
   async loadExtensions(): Promise<GeminiCLIExtension[]> {
     if (this.loadedExtensions) {
-      throw new Error('Extensions already loaded, only load extensions once.');
-    }
-
-    if (this.settings.admin?.extensions?.enabled === false) {
-      this.loadedExtensions = [];
       return this.loadedExtensions;
     }
 
-    const extensionsDir = ExtensionStorage.getUserExtensionsDir();
-    this.loadedExtensions = [];
-
-    // Use async readdir instead of sync
-    let subdirs: string[];
-    try {
-      subdirs = await fs.promises.readdir(extensionsDir);
-    } catch {
-      // Directory doesn't exist or can't be read
-      return this.loadedExtensions;
+    if (this.loadingPromise) {
+      return this.loadingPromise;
     }
 
-    // Load all extensions in parallel
-    const loadPromises = subdirs.map((subdir) => {
-      const extensionDir = path.join(extensionsDir, subdir);
-      return this.loadExtension(extensionDir);
-    });
-
-    const results = await Promise.all(loadPromises);
-
-    // Validate and collect successfully loaded extensions
-    const names = new Set<string>();
-    const extensions: GeminiCLIExtension[] = [];
-
-    for (const ext of results) {
-      if (ext === null) continue;
-
-      // Detect duplicate extension names
-      if (names.has(ext.name)) {
-        debugLogger.error(`Duplicate extension name detected: ${ext.name}`);
-        continue;
+    this.loadingPromise = (async () => {
+      if (this.settings.admin?.extensions?.enabled === false) {
+        this.loadedExtensions = [];
+        return this.loadedExtensions;
       }
-      names.add(ext.name);
-      extensions.push(ext);
-    }
 
-    // Single atomic update to shared state
-    this.loadedExtensions = extensions;
+      const extensionsDir = ExtensionStorage.getUserExtensionsDir();
+      this.loadedExtensions = [];
 
-    // Start extensions sequentially to preserve ordering guarantees
-    for (const extension of this.loadedExtensions) {
-      await this.maybeStartExtension(extension);
-    }
+      // Use async readdir instead of sync
+      let subdirs: string[];
+      try {
+        subdirs = await fs.promises.readdir(extensionsDir);
+      } catch {
+        // Directory doesn't exist or can't be read
+        return this.loadedExtensions;
+      }
 
-    return this.loadedExtensions;
+      // Load all extensions in parallel
+      const loadPromises = subdirs.map((subdir) => {
+        const extensionDir = path.join(extensionsDir, subdir);
+        return this.loadExtension(extensionDir);
+      });
+
+      const results = await Promise.all(loadPromises);
+
+      // Validate and collect successfully loaded extensions
+      const names = new Set<string>();
+      const extensions: GeminiCLIExtension[] = [];
+
+      for (const ext of results) {
+        if (ext === null) continue;
+
+        // Detect duplicate extension names
+        if (names.has(ext.name)) {
+          debugLogger.error(`Duplicate extension name detected: ${ext.name}`);
+          continue;
+        }
+        names.add(ext.name);
+        extensions.push(ext);
+      }
+
+      // Single atomic update to shared state
+      this.loadedExtensions = extensions;
+
+      // Start extensions sequentially to preserve ordering guarantees
+      for (const extension of this.loadedExtensions) {
+        await this.maybeStartExtension(extension);
+      }
+
+      return this.loadedExtensions;
+    })();
+
+    return this.loadingPromise;
   }
 
   /**
@@ -529,8 +543,6 @@ Would you like to attempt to install via "git clone" instead?`,
   private async loadExtension(
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
-    this.loadedExtensions ??= [];
-
     // Use async stat instead of sync
     try {
       const stats = await fs.promises.stat(extensionDir);

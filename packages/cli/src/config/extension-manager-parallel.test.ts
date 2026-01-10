@@ -351,13 +351,9 @@ describe('ExtensionManager parallel loading', () => {
         version: '1.0.0',
       });
 
-      // First load should succeed
-      await extensionManager.loadExtensions();
-
-      // Second load should throw
-      await expect(extensionManager.loadExtensions()).rejects.toThrow(
-        'Extensions already loaded',
-      );
+      // Second load should return the same extensions without error
+      const secondLoad = await extensionManager.loadExtensions();
+      expect(secondLoad).toEqual(await extensionManager.loadExtensions());
     });
   });
 });
