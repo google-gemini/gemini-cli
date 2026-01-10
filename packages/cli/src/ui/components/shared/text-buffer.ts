@@ -1951,13 +1951,11 @@ export function useTextBuffer({
 
   const addPastedContent = useCallback(
     (content: string, lineCount: number): string => {
-      // Normalize line endings: \r\n -> \n, \r -> \n
-      const normalizedContent = content.replace(/\r\n|\r/g, '\n');
-
+      // content is already normalized by the caller
       const base =
         lineCount > LARGE_PASTE_LINE_THRESHOLD
           ? `[Pasted Text: ${lineCount} lines]`
-          : `[Pasted Text: ${normalizedContent.length} chars]`;
+          : `[Pasted Text: ${content.length} chars]`;
 
       let id = base;
       let suffix = 2;
@@ -1968,7 +1966,7 @@ export function useTextBuffer({
 
       dispatch({
         type: 'add_pasted_content',
-        payload: { id, text: normalizedContent },
+        payload: { id, text: content },
       });
       return id;
     },
@@ -1981,31 +1979,34 @@ export function useTextBuffer({
         return;
       }
 
+      // Normalize line endings once at the entry point for pastes
+      const text = paste ? ch.replace(/\r\n|\r/g, '\n') : ch;
+
       if (paste) {
-        // Split on \n, \r\n, or \r to handle different line ending styles
-        const lineCount = ch.split(/\r?\n|\r/).length;
+        const lineCount = text.split('\n').length;
         if (
           lineCount > LARGE_PASTE_LINE_THRESHOLD ||
-          ch.length > LARGE_PASTE_CHAR_THRESHOLD
+          text.length > LARGE_PASTE_CHAR_THRESHOLD
         ) {
-          const id = addPastedContent(ch, lineCount);
+          const id = addPastedContent(text, lineCount);
           dispatch({ type: 'insert', payload: id });
           return;
         }
       }
 
-      if (!singleLine && /[\n\r]/.test(ch)) {
-        dispatch({ type: 'insert', payload: ch });
+      if (!singleLine && /[\n\r]/.test(text)) {
+        dispatch({ type: 'insert', payload: text });
         return;
       }
 
+      let textToInsert = text;
       const minLengthToInferAsDragDrop = 3;
       if (
-        ch.length >= minLengthToInferAsDragDrop &&
+        text.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
         paste
       ) {
-        let potentialPath = ch.trim();
+        let potentialPath = text.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
         if (quoteMatch) {
           potentialPath = quoteMatch[1];
@@ -2015,12 +2016,12 @@ export function useTextBuffer({
 
         const processed = parsePastedPaths(potentialPath, isValidPath);
         if (processed) {
-          ch = processed;
+          textToInsert = processed;
         }
       }
 
       let currentText = '';
-      for (const char of toCodePoints(ch)) {
+      for (const char of toCodePoints(textToInsert)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
             dispatch({ type: 'insert', payload: currentText });

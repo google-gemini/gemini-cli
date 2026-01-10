@@ -589,7 +589,7 @@ describe('useTextBuffer', () => {
       expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
     });
 
-    it('insert: should clean up pastedContent when placeholder is removed via backspace', () => {
+    it('insert: should retain pastedContent when placeholder is removed via backspace', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
@@ -608,7 +608,9 @@ describe('useTextBuffer', () => {
       });
 
       expect(getBufferState(result).text).toBe('');
-      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+      // pastedContent intentionally retains the entry to avoid race conditions
+      // and complexity from cleanup logic on every text mutation
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(1);
     });
 
     it('newline: should create a new line and move cursor', () => {
