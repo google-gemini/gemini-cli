@@ -14,9 +14,15 @@ on:
         description: 'issue number to triage'
         required: true
         type: 'number'
+  workflow_call:
+    inputs:
+      issue_number:
+        description: 'issue number to triage'
+        required: false
+        type: 'string'
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number }}'
+  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || inputs.issue_number }}'
   cancel-in-progress: true
 
 defaults:
@@ -34,7 +40,7 @@ permissions:
 jobs:
   triage-issue:
     if: |-
-      github.repository == 'google-gemini/gemini-cli' &&
+      (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') &&
       (
         github.event_name == 'workflow_dispatch' ||
         (
@@ -58,10 +64,11 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
+            const issueNumber = ${{ github.event.inputs.issue_number || inputs.issue_number }};
             const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ github.event.inputs.issue_number }},
+              issue_number: issueNumber,
             });
             core.setOutput('title', issue.title);
             core.setOutput('body', issue.body);
@@ -72,7 +79,7 @@ jobs:
         if: |-
           github.event_name == 'workflow_dispatch'
         env:
-          ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number }}'
+          ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number || inputs.issue_number }}'
           LABELS: '${{ steps.get_issue_data.outputs.labels }}'
         run: |
           if ! echo "${LABELS}" | grep -q 'status/need-triage'; then
@@ -133,7 +140,7 @@ jobs:
           ISSUE_BODY: >-
             ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}
           ISSUE_NUMBER: >-
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.issue_number || github.event.issue.number }}
+            ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.issue_number || inputs.issue_number) || github.event.issue.number }}
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
