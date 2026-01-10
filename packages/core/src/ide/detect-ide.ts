@@ -16,6 +16,7 @@ export const IDE_DEFINITIONS = {
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
   positron: { name: 'positron', displayName: 'Positron' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
+  sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
 } as const;
 
 export interface IdeInfo {
@@ -54,6 +55,8 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['POSITRON'] === '1') {
     return IDE_DEFINITIONS.positron;
+  if (process.env['TERM_PROGRAM'] === 'sublime') {
+    return IDE_DEFINITIONS.sublimetext;
   }
   return IDE_DEFINITIONS.vscode;
 }
@@ -91,8 +94,11 @@ export function detectIde(
     };
   }
 
-  // Only VSCode-based integrations are currently supported.
-  if (process.env['TERM_PROGRAM'] !== 'vscode') {
+  // Only VS Code and Sublime Text integrations are currently supported.
+  if (
+    process.env['TERM_PROGRAM'] !== 'vscode' &&
+    process.env['TERM_PROGRAM'] !== 'sublime'
+  ) {
     return undefined;
   }
 
