@@ -478,20 +478,46 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
-    if (!fs.existsSync(extensionsDir)) {
+
+    // Use async readdir instead of sync
+    let subdirs: string[];
+    try {
+      subdirs = await fs.promises.readdir(extensionsDir);
+    } catch {
+      // Directory doesn't exist or can't be read
       return this.loadedExtensions;
     }
 
-    // Load extensions sequentially (refactored to prepare for parallelization)
-    for (const subdir of fs.readdirSync(extensionsDir)) {
+    // Load all extensions in parallel
+    const loadPromises = subdirs.map((subdir) => {
       const extensionDir = path.join(extensionsDir, subdir);
-      const extension = await this.loadExtension(extensionDir);
+      return this.loadExtension(extensionDir);
+    });
 
-      // Only add successfully loaded extensions to the array
-      if (extension !== null) {
-        this.loadedExtensions = [...this.loadedExtensions, extension];
-        await this.maybeStartExtension(extension);
+    const results = await Promise.all(loadPromises);
+
+    // Validate and collect successfully loaded extensions
+    const names = new Set<string>();
+    const extensions: GeminiCLIExtension[] = [];
+
+    for (const ext of results) {
+      if (ext === null) continue;
+
+      // Detect duplicate extension names
+      if (names.has(ext.name)) {
+        debugLogger.error(`Duplicate extension name detected: ${ext.name}`);
+        continue;
       }
+      names.add(ext.name);
+      extensions.push(ext);
+    }
+
+    // Single atomic update to shared state
+    this.loadedExtensions = extensions;
+
+    // Start extensions sequentially to preserve ordering guarantees
+    for (const extension of this.loadedExtensions) {
+      await this.maybeStartExtension(extension);
     }
 
     return this.loadedExtensions;
@@ -504,7 +530,15 @@ Would you like to attempt to install via "git clone" instead?`,
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
     this.loadedExtensions ??= [];
-    if (!fs.statSync(extensionDir).isDirectory()) {
+
+    // Use async stat instead of sync
+    try {
+      const stats = await fs.promises.stat(extensionDir);
+      if (!stats.isDirectory()) {
+        return null;
+      }
+    } catch {
+      // Path doesn't exist or can't be accessed
       return null;
     }
 
