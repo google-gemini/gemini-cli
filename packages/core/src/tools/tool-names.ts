@@ -23,6 +23,10 @@ export const MEMORY_TOOL_NAME = 'save_memory';
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
+
+/** Tools that automatically trigger AUTO_EDIT approval mode when "ProceedAlways" is selected. */
+export const AUTO_EDIT_TOOLS = [EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME] as const;
+
 export const DELEGATE_TO_AGENT_TOOL_NAME = 'delegate_to_agent';
 
 /** Prefix used for tools discovered via the toolDiscoveryCommand. */
