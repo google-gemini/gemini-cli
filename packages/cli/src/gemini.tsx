@@ -466,6 +466,13 @@ export async function main() {
     });
     loadConfigHandle?.end();
 
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
+
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);
