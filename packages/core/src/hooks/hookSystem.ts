@@ -18,8 +18,14 @@ import type {
   SessionStartSource,
   SessionEndReason,
   PreCompressTrigger,
+  McpToolContext,
+  NotificationType,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from '@google/genai';
 /**
  * Main hook system that coordinates all hook-related functionality
  */
@@ -116,5 +122,100 @@ export class HookSystem {
       return undefined;
     }
     return this.hookEventHandler.firePreCompressEvent(trigger);
+  }
+
+  async fireBeforeModelEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeModelEvent(llmRequest);
+  }
+
+  async fireAfterModelEvent(
+    llmRequest: GenerateContentParameters,
+    llmResponse: GenerateContentResponse,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireAfterModelEvent(llmRequest, llmResponse);
+  }
+
+  async fireBeforeToolSelectionEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeToolSelectionEvent(llmRequest);
+  }
+
+  async fireBeforeToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeToolEvent(
+      toolName,
+      toolInput,
+      mcpContext,
+    );
+  }
+
+  async fireAfterToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolOutput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireAfterToolEvent(
+      toolName,
+      toolInput,
+      toolOutput,
+      mcpContext,
+    );
+  }
+
+  async fireBeforeAgentEvent(
+    prompt: string,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeAgentEvent(prompt);
+  }
+
+  async fireAfterAgentEvent(
+    prompt: string,
+    response: string,
+    stopHookActive: boolean = false,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireAfterAgentEvent(
+      prompt,
+      response,
+      stopHookActive,
+    );
+  }
+
+  async fireNotificationEvent(
+    type: NotificationType,
+    message: string,
+    details: Record<string, unknown>,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireNotificationEvent(type, message, details);
   }
 }
