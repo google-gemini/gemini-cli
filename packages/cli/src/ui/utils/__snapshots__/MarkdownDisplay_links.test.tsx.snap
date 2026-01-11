@@ -1,7 +1,0 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
-
-exports[`<MarkdownDisplay /> (Repro) > renders URLs excluding trailing Chinese punctuation 1`] = `"Check https://google.com。"`;
-
-exports[`<MarkdownDisplay /> (Repro) > renders file paths specially 1`] = `"File at marketing/seo-strategy-qa.md。"`;
-
-exports[`<MarkdownDisplay /> (Repro) > renders file paths without punctuation 1`] = `"File marketing/seo-strategy-qa.md"`;
