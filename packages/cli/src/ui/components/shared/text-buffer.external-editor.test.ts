@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '../../../test-utils/render.js';
 import { useTextBuffer } from './text-buffer.js';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -28,11 +29,24 @@ describe('useTextBuffer - openInExternalEditor', () => {
   const mockMkdtempSync = vi.mocked(fs.mkdtempSync);
   const mockReadFileSync = vi.mocked(fs.readFileSync);
 
+  function renderTextBuffer() {
+    return renderHook(() =>
+      useTextBuffer({
+        initialText: 'initial',
+        viewport: { width: 80, height: 24 },
+        isValidPath: () => false,
+      }),
+    );
+  }
+
+  const expectedTmpDir = path.join(os.tmpdir(), 'gemini-edit-123');
+  const expectedFilePath = path.join(expectedTmpDir, 'buffer.txt');
+
   beforeEach(() => {
     vi.resetAllMocks();
 
     // Setup default mock behaviors
-    mockMkdtempSync.mockReturnValue('/tmp/gemini-edit-123');
+    mockMkdtempSync.mockReturnValue(expectedTmpDir);
     mockReadFileSync.mockReturnValue('edited content');
     mockSpawnSync.mockReturnValue({
       pid: 123,
@@ -48,101 +62,49 @@ describe('useTextBuffer - openInExternalEditor', () => {
     vi.clearAllMocks();
   });
 
-  it('should parse editor command with arguments correctly', async () => {
-    const { result } = renderHook(() =>
-      useTextBuffer({
-        initialText: 'initial',
-        viewport: { width: 80, height: 24 },
-        isValidPath: () => false,
-      }),
-    );
-
-    await result.current.openInExternalEditor({ editor: 'code -n --wait' });
-
-    const expectedFilePath = path.join('/tmp/gemini-edit-123', 'buffer.txt');
-
-    expect(mockSpawnSync).toHaveBeenCalledWith(
-      'code',
-      ['-n', '--wait', expectedFilePath],
-      expect.objectContaining({ stdio: 'inherit' }),
-    );
-  });
-
-  it('should handle editor command without arguments', async () => {
-    const { result } = renderHook(() =>
-      useTextBuffer({
-        initialText: 'initial',
-        viewport: { width: 80, height: 24 },
-        isValidPath: () => false,
-      }),
-    );
-
-    await result.current.openInExternalEditor({ editor: 'vim' });
-
-    const expectedFilePath = path.join('/tmp/gemini-edit-123', 'buffer.txt');
-
-    expect(mockSpawnSync).toHaveBeenCalledWith(
-      'vim',
-      [expectedFilePath],
-      expect.objectContaining({ stdio: 'inherit' }),
-    );
-  });
-
-  it('should handle quoted arguments in editor command', async () => {
-    const { result } = renderHook(() =>
-      useTextBuffer({
-        initialText: 'initial',
-        viewport: { width: 80, height: 24 },
-        isValidPath: () => false,
-      }),
-    );
-
-    await result.current.openInExternalEditor({
+  it.each([
+    {
+      name: 'command with arguments',
+      editor: 'code -n --wait',
+      expectedCmd: 'code',
+      expectedArgs: ['-n', '--wait', expectedFilePath],
+    },
+    {
+      name: 'command without arguments',
+      editor: 'vim',
+      expectedCmd: 'vim',
+      expectedArgs: [expectedFilePath],
+    },
+    {
+      name: 'quoted arguments',
       editor: '/path/to/editor --arg "quoted value"',
-    });
+      expectedCmd: '/path/to/editor',
+      expectedArgs: ['--arg', 'quoted value', expectedFilePath],
+    },
+  ])(
+    'should parse editor $name correctly',
+    async ({ editor, expectedCmd, expectedArgs }) => {
+      const { result } = renderTextBuffer();
 
-    const expectedFilePath = path.join('/tmp/gemini-edit-123', 'buffer.txt');
+      await result.current.openInExternalEditor({ editor });
 
-    expect(mockSpawnSync).toHaveBeenCalledWith(
-      '/path/to/editor',
-      ['--arg', 'quoted value', expectedFilePath],
-      expect.objectContaining({ stdio: 'inherit' }),
-    );
-  });
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        expectedCmd,
+        expectedArgs,
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    },
+  );
 
-  it('should reject editor command with shell operators', async () => {
-    const { result } = renderHook(() =>
-      useTextBuffer({
-        initialText: 'initial',
-        viewport: { width: 80, height: 24 },
-        isValidPath: () => false,
-      }),
-    );
+  it.each([
+    { name: 'shell operators (&&)', editor: 'code -n && touch /tmp/malicious' },
+    { name: 'pipe operators', editor: 'cat | vim -' },
+  ])('should reject editor command with $name', async ({ editor }) => {
+    const { result } = renderTextBuffer();
 
-    // Shell operators like && are not supported
-    await result.current.openInExternalEditor({
-      editor: 'code -n && touch /tmp/malicious',
-    });
+    await result.current.openInExternalEditor({ editor });
 
     // spawnSync should NOT be called because the command should be rejected
-    expect(mockSpawnSync).not.toHaveBeenCalled();
-  });
-
-  it('should reject editor command with pipe operators', async () => {
-    const { result } = renderHook(() =>
-      useTextBuffer({
-        initialText: 'initial',
-        viewport: { width: 80, height: 24 },
-        isValidPath: () => false,
-      }),
-    );
-
-    // Pipe operators are not supported
-    await result.current.openInExternalEditor({
-      editor: 'cat | vim -',
-    });
-
-    // spawnSync should NOT be called
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 });
