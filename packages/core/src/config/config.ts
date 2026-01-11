@@ -4,9 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { EventEmitter } from 'node:events';
 import * as path from 'node:path';
-import { inspect } from 'node:util';
 import process from 'node:process';
+import { inspect } from 'node:util';
+import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
+import { AgentRegistry } from '../agents/registry.js';
+import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
+import { getCodeAssistServer } from '../code_assist/codeAssist.js';
+import type { Experiments } from '../code_assist/experiments/experiments.js';
+import { getExperiments } from '../code_assist/experiments/experiments.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import type {
+  GeminiCodeAssistSetting,
+  RetrieveUserQuotaResponse,
+  UserTierId,
+} from '../code_assist/types.js';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { GeminiClient } from '../core/client.js';
 import type {
   ContentGenerator,
   ContentGeneratorConfig,
@@ -16,35 +32,63 @@ import {
   createContentGenerator,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { tokenLimit } from '../core/tokenLimits.js';
+import type { FallbackModelHandler } from '../fallback/types.js';
+import { HookSystem } from '../hooks/index.js';
+import type { HookDefinition, HookEventName } from '../hooks/types.js';
+import { ideContextStore } from '../ide/ideContext.js';
+import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import { OutputFormat } from '../output/types.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
-import { GlobTool } from '../tools/glob.js';
-import { ActivateSkillTool } from '../tools/activate-skill.js';
-import { EditTool } from '../tools/edit.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
-import { WebSearchTool } from '../tools/web-search.js';
-import { GeminiClient } from '../core/client.js';
-import { BaseLlmClient } from '../core/baseLlmClient.js';
-import type { HookDefinition, HookEventName } from '../hooks/types.js';
+import { ModelRouterService } from '../routing/modelRouterService.js';
+import { ContextManager } from '../services/contextManager.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { GitService } from '../services/gitService.js';
+import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
+import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
 import {
-  initializeTelemetry,
-  DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
+  DEFAULT_TELEMETRY_TARGET,
+  initializeTelemetry,
   uiTelemetryService,
 } from '../telemetry/index.js';
+import { logFlashFallback, logRipgrepFallback } from '../telemetry/loggers.js';
+import { startupProfiler } from '../telemetry/startupProfiler.js';
+import {
+  FlashFallbackEvent,
+  RipgrepFallbackEvent,
+} from '../telemetry/types.js';
+import { ActivateSkillTool } from '../tools/activate-skill.js';
+import { EditTool } from '../tools/edit.js';
+import { GlobTool } from '../tools/glob.js';
+import { GrepTool } from '../tools/grep.js';
+import { LSTool } from '../tools/ls.js';
+import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
+import { ShellTool } from '../tools/shell.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
+import type { AnyToolInvocation } from '../tools/tools.js';
+import { WebFetchTool } from '../tools/web-fetch.js';
+import { WebSearchTool } from '../tools/web-search.js';
+import { WriteFileTool } from '../tools/write-file.js';
+import { WriteTodosTool } from '../tools/write-todos.js';
+import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { tokenLimit } from '../core/tokenLimits.js';
+import { setGlobalProxy } from '../utils/fetch.js';
+import { FileExclusions } from '../utils/ignorePatterns.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -54,52 +98,10 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
-import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
-import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { ideContextStore } from '../ide/ideContext.js';
-import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
-import {
-  RipgrepFallbackEvent,
-  FlashFallbackEvent,
-} from '../telemetry/types.js';
-import type { FallbackModelHandler } from '../fallback/types.js';
-import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import { ModelRouterService } from '../routing/modelRouterService.js';
-import { OutputFormat } from '../output/types.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
-import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { ContextManager } from '../services/contextManager.js';
+import { Storage } from './storage.js';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig, AnyToolInvocation };
-import type { AnyToolInvocation } from '../tools/tools.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { Storage } from './storage.js';
-import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
-import { FileExclusions } from '../utils/ignorePatterns.js';
-import type { EventEmitter } from 'node:events';
-import { MessageBus } from '../confirmation-bus/message-bus.js';
-import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
-import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
-import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
-import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
-import { AgentRegistry } from '../agents/registry.js';
-import { setGlobalProxy } from '../utils/fetch.js';
-import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
-import { startupProfiler } from '../telemetry/startupProfiler.js';
+export type { AnyToolInvocation, MCPOAuthConfig };
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -194,18 +196,18 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
 
-import {
-  type ExtensionLoader,
-  SimpleExtensionLoader,
-} from '../utils/extensionLoader.js';
-import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
+import {
+  SimpleExtensionLoader,
+  type ExtensionLoader,
+} from '../utils/extensionLoader.js';
 
-export type { FileFilteringOptions };
 export {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
+export type { FileFilteringOptions };
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
@@ -757,6 +759,7 @@ export class Config {
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
       if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
@@ -1557,6 +1560,7 @@ export class Config {
 
     // Re-register ActivateSkillTool to update its schema with the newly discovered skills
     if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
       this.getToolRegistry().registerTool(
         new ActivateSkillTool(this, this.messageBus),
       );

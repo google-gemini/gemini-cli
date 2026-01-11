@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type DOMElement, measureElement } from 'ink';
-import { useEffect } from 'react';
-import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@google/gemini-cli-core';
-import { appEvents, AppEvent } from '../../utils/events.js';
+import { type DOMElement, measureElement } from 'ink';
+import { useEffect, useRef } from 'react';
+import { AppEvent, appEvents } from '../../utils/events.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+
+// Number of render frames to skip before detecting flickers
+// This allows initial layout to settle during startup, authentication, and IDE connection
+const STARTUP_GRACE_FRAMES = 50;
 
 /**
  * A hook that detects when the UI flickers (renders taller than the terminal).
@@ -24,8 +28,15 @@ export function useFlickerDetector(
 ) {
   const config = useConfig();
   const { constrainHeight } = useUIState();
+  const frameCountRef = useRef<number>(0);
 
   useEffect(() => {
+    // Skip flicker detection during startup grace period to allow layout to settle
+    frameCountRef.current++;
+    if (frameCountRef.current <= STARTUP_GRACE_FRAMES) {
+      return;
+    }
+
     if (rootUiRef.current) {
       const measurement = measureElement(rootUiRef.current);
       if (measurement.height > terminalHeight) {

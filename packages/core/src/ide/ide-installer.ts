@@ -5,12 +5,12 @@
  */
 
 import * as child_process from 'node:child_process';
-import * as process from 'node:process';
-import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
-import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
+import * as path from 'node:path';
+import * as process from 'node:process';
 import { homedir } from '../utils/paths.js';
+import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
+import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -28,20 +28,23 @@ async function findCommand(
   // 1. Check PATH first.
   try {
     if (platform === 'win32') {
-      const result = child_process
-        .execSync(`where.exe ${command}`)
-        .toString()
-        .trim();
-      // `where.exe` can return multiple paths. Return the first one.
-      const firstPath = result.split(/\r?\n/)[0];
-      if (firstPath) {
-        return firstPath;
+      const result = child_process.spawnSync('where.exe', [command], {
+        encoding: 'utf-8',
+      });
+      if (result.status === 0 && result.stdout) {
+        // `where.exe` can return multiple paths. Return the first one.
+        const firstPath = result.stdout.trim().split(/\r?\n/)[0];
+        if (firstPath) {
+          return firstPath;
+        }
       }
     } else {
-      child_process.execSync(`command -v ${command}`, {
+      const result = child_process.spawnSync('command', ['-v', command], {
         stdio: 'ignore',
       });
-      return command;
+      if (result.status === 0) {
+        return command;
+      }
     }
   } catch {
     // Not in PATH, continue to check common locations.
@@ -147,25 +150,51 @@ class VsCodeInstaller implements IdeInstaller {
 }
 
 class AntigravityInstaller implements IdeInstaller {
+  // Fallback commands to try if the primary command is not found
+  private static readonly FALLBACK_COMMANDS = ['agy', 'antigravity'];
+
   constructor(
     readonly ideInfo: IdeInfo,
     readonly platform = process.platform,
   ) {}
 
   async install(): Promise<InstallResult> {
-    const command = process.env['ANTIGRAVITY_CLI_ALIAS'];
-    if (!command) {
-      return {
-        success: false,
-        message: 'ANTIGRAVITY_CLI_ALIAS environment variable not set.',
-      };
+    const primaryCommand = process.env['ANTIGRAVITY_CLI_ALIAS'];
+
+    // Build list of commands to try: primary command first, then fallbacks
+    const commandsToTry: string[] = [];
+    if (primaryCommand) {
+      commandsToTry.push(primaryCommand);
+    }
+    // Add fallbacks that aren't already in the list
+    for (const fallback of AntigravityInstaller.FALLBACK_COMMANDS) {
+      if (!commandsToTry.includes(fallback)) {
+        commandsToTry.push(fallback);
+      }
+    }
+    // On Windows, also try .cmd variants
+    if (this.platform === 'win32') {
+      const cmdVariants = commandsToTry
+        .filter((cmd) => !cmd.endsWith('.cmd'))
+        .map((cmd) => `${cmd}.cmd`);
+      commandsToTry.push(...cmdVariants);
     }
 
-    const commandPath = await findCommand(command, this.platform);
+    // Try each command until one is found
+    let commandPath: string | null = null;
+    const triedCommands: string[] = [];
+    for (const command of commandsToTry) {
+      triedCommands.push(command);
+      commandPath = await findCommand(command, this.platform);
+      if (commandPath) {
+        break;
+      }
+    }
+
     if (!commandPath) {
       return {
         success: false,
-        message: `${command} not found. Please ensure it is in your system's PATH.`,
+        message: `Antigravity CLI not found. Tried: ${triedCommands.join(', ')}. Please ensure one of these commands is in your system's PATH.`,
       };
     }
 
