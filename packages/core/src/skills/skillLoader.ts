@@ -33,6 +33,80 @@ export const FRONTMATTER_REGEX =
   /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?/;
 
 /**
+ * Parses frontmatter content using YAML with a fallback to simple key-value parsing.
+ * This handles cases where description contains colons that would break YAML parsing.
+ */
+function parseFrontmatter(
+  content: string,
+): { name: string; description: string } | null {
+  // Try YAML parsing first
+  try {
+    const parsed = yaml.load(content);
+    if (parsed && typeof parsed === 'object') {
+      const { name, description } = parsed as Record<string, unknown>;
+      if (typeof name === 'string' && typeof description === 'string') {
+        return { name, description };
+      }
+    }
+  } catch {
+    // YAML parsing failed, try simple key-value parsing
+  }
+
+  // Fallback: simple key-value parsing for name and description
+  // This handles cases like "description: text with colons: like this"
+  return parseSimpleFrontmatter(content);
+}
+
+/**
+ * Simple frontmatter parser that extracts name and description fields.
+ * Handles cases where values contain colons that would break YAML parsing.
+ */
+function parseSimpleFrontmatter(
+  content: string,
+): { name: string; description: string } | null {
+  const lines = content.split(/\r?\n/);
+  let name: string | undefined;
+  let description: string | undefined;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Match "name:" at the start of the line
+    if (line.startsWith('name:')) {
+      name = line.substring(5).trim();
+      continue;
+    }
+
+    // Match "description:" at the start of the line
+    if (line.startsWith('description:')) {
+      // The description value is everything after "description:"
+      // It may continue on subsequent indented lines (YAML multi-line format)
+      let descValue = line.substring(12).trim();
+
+      // Check for multi-line description (indented continuation lines)
+      while (i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        // If next line is indented, it's a continuation of the description
+        if (nextLine.match(/^[ \t]+\S/)) {
+          descValue += ' ' + nextLine.trim();
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      description = descValue;
+      continue;
+    }
+  }
+
+  if (name && description) {
+    return { name, description };
+  }
+  return null;
+}
+
+/**
  * Discovers and loads all skills in the provided directory.
  */
 export async function loadSkillsFromDir(
@@ -92,19 +166,14 @@ export async function loadSkillFromFile(
       return null;
     }
 
-    const frontmatter = yaml.load(match[1]);
-    if (!frontmatter || typeof frontmatter !== 'object') {
-      return null;
-    }
-
-    const { name, description } = frontmatter as Record<string, unknown>;
-    if (typeof name !== 'string' || typeof description !== 'string') {
+    const frontmatter = parseFrontmatter(match[1]);
+    if (!frontmatter) {
       return null;
     }
 
     return {
-      name,
-      description,
+      name: frontmatter.name,
+      description: frontmatter.description,
       location: filePath,
       body: match[2].trim(),
     };
