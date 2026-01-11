@@ -218,6 +218,54 @@ describe('LoggingContentGenerator', () => {
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
     });
+
+    it('should set latest API request in config for main agent requests', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      // Main agent prompt IDs end with exactly 8 hashes and a turn counter
+      const mainAgentPromptId = 'session-uuid########1';
+      config.setLatestApiRequest = vi.fn();
+
+      async function* createAsyncGenerator() {
+        yield { candidates: [] } as unknown as GenerateContentResponse;
+      }
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+
+      await loggingContentGenerator.generateContentStream(
+        req,
+        mainAgentPromptId,
+      );
+
+      expect(config.setLatestApiRequest).toHaveBeenCalledWith(req);
+    });
+
+    it('should NOT set latest API request in config for sub-agent requests', async () => {
+      const req = {
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        model: 'gemini-pro',
+      };
+      // Sub-agent prompt IDs contain fewer hashes, typically separating the agent name and ID
+      const subAgentPromptId = 'codebase_investigator#12345';
+      config.setLatestApiRequest = vi.fn();
+
+      async function* createAsyncGenerator() {
+        yield { candidates: [] } as unknown as GenerateContentResponse;
+      }
+      vi.mocked(wrapped.generateContentStream).mockResolvedValue(
+        createAsyncGenerator(),
+      );
+
+      await loggingContentGenerator.generateContentStream(
+        req,
+        subAgentPromptId,
+      );
+
+      expect(config.setLatestApiRequest).not.toHaveBeenCalled();
+    });
   });
 
   describe('getWrapped', () => {

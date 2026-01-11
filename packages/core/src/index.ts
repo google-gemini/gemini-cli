@@ -89,6 +89,8 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
+export * from './utils/apiConversionUtils.js';
+export * from './utils/channel.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
