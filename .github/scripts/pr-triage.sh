@@ -128,13 +128,12 @@ if [[ -z "${GITHUB_OUTPUT:-}" ]]; then
     exit 1
 fi
 
-JQ_EXTRACT_FIELDS=
-{
+JQ_EXTRACT_FIELDS='{
     number: .number,
     isDraft: .isDraft,
     issue: (.closingIssuesReferences[0].number // (.body // "" | capture("(^|[^a-zA-Z0-9])#(?<num>[0-9]+)([^a-zA-Z0-9]|$)")? | .num) // ""),
     labels: [.labels[].name] | join(",")
-}
+}'
 
 JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // "") | tostring)\t\(.labels)"'
 
