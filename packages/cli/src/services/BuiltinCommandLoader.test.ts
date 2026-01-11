@@ -53,16 +53,29 @@ vi.mock('../ui/commands/permissionsCommand.js', async () => {
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
 import type { Config } from '@google/gemini-cli-core';
+import { isNightly } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    isNightly: vi.fn().mockResolvedValue(false),
+  };
+});
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
 vi.mock('../ui/commands/agentsCommand.js', () => ({
   agentsCommand: { name: 'agents' },
 }));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
-vi.mock('../ui/commands/chatCommand.js', () => ({ chatCommand: {} }));
+vi.mock('../ui/commands/chatCommand.js', () => ({
+  chatCommand: { name: 'chat', subCommands: [] },
+  debugCommand: { name: 'debug' },
+}));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
 vi.mock('../ui/commands/compressCommand.js', () => ({ compressCommand: {} }));
 vi.mock('../ui/commands/corgiCommand.js', () => ({ corgiCommand: {} }));
@@ -208,6 +221,30 @@ describe('BuiltinCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
     const agentsCmd = commands.find((c) => c.name === 'agents');
     expect(agentsCmd).toBeUndefined();
+  });
+
+  describe('chat debug command', () => {
+    it('should NOT add debug subcommand to chatCommand if not a nightly build', async () => {
+      vi.mocked(isNightly).mockResolvedValue(false);
+      const loader = new BuiltinCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      const chatCmd = commands.find((c) => c.name === 'chat');
+      expect(chatCmd?.subCommands).toBeDefined();
+      const hasDebug = chatCmd!.subCommands!.some((c) => c.name === 'debug');
+      expect(hasDebug).toBe(false);
+    });
+
+    it('should add debug subcommand to chatCommand if it is a nightly build', async () => {
+      vi.mocked(isNightly).mockResolvedValue(true);
+      const loader = new BuiltinCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(new AbortController().signal);
+
+      const chatCmd = commands.find((c) => c.name === 'chat');
+      expect(chatCmd?.subCommands).toBeDefined();
+      const hasDebug = chatCmd!.subCommands!.some((c) => c.name === 'debug');
+      expect(hasDebug).toBe(true);
+    });
   });
 });
 
