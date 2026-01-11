@@ -56,6 +56,9 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  handleAskUserQuestionSubmit: (answers: {
+    [questionIndex: string]: string;
+  }) => Promise<void>;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

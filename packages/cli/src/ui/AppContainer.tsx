@@ -126,6 +126,7 @@ import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
+import { useAskUserQuestion } from './hooks/useAskUserQuestion.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -212,6 +213,11 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const { bannerText } = useBanner(bannerData, config);
+
+  const {
+    request: askUserQuestionRequest,
+    handleSubmit: handleAskUserQuestionSubmit,
+  } = useAskUserQuestion(config);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -1384,6 +1390,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    !!askUserQuestionRequest ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
@@ -1550,6 +1557,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      askUserQuestionRequest,
     }),
     [
       isThemeDialogOpen,
@@ -1644,6 +1652,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      askUserQuestionRequest,
     ],
   );
 
@@ -1687,6 +1696,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      handleAskUserQuestionSubmit,
     }),
     [
       handleThemeSelect,
@@ -1722,6 +1732,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      handleAskUserQuestionSubmit,
     ],
   );
 
