@@ -195,6 +195,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.config,
           serverDetails,
         );
+
         try {
           const response = await this.wrapped.generateContent(
             req,
