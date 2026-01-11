@@ -1,0 +1,32 @@
+{
+  "name": "gemini-cli-devtools",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "bin": {
+    "gemini-cli-devtools": "dist/src/bin.js"
+  },
+  "scripts": {
+    "build": "npm run build:client && tsc --outDir dist/src --module ESNext --target ESNext --moduleResolution bundler src/index.ts src/bin.ts",
+    "build:client": "vite build"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0",
+    "@types/node": "^20.11.24"
+  }
+}
