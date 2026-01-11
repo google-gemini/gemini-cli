@@ -36,6 +36,7 @@ export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './scheduler/types.js';
+export * from './scheduler/tool-executor.js';
 export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
@@ -49,6 +50,7 @@ export * from './code_assist/telemetry.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
@@ -63,9 +65,11 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export * from './utils/shell-permissions.js';
+export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -117,13 +121,16 @@ export * from './resources/resource-registry.js';
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
 
+// Export agent definitions
+export * from './agents/types.js';
+
 // Export specific tool logic
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
 export * from './tools/grep.js';
 export * from './tools/ripGrep.js';
 export * from './tools/glob.js';
-export * from './tools/smart-edit.js';
+export * from './tools/edit.js';
 export * from './tools/write-file.js';
 export * from './tools/web-fetch.js';
 export * from './tools/memoryTool.js';
@@ -159,6 +166,9 @@ export * from './hooks/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export agent types
+export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

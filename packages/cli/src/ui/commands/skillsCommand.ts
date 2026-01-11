@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,19 +10,31 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
-import { MessageType, type HistoryItemSkillsList } from '../types.js';
+import {
+  MessageType,
+  type HistoryItemSkillsList,
+  type HistoryItemInfo,
+} from '../types.js';
 import { SettingScope } from '../../config/settings.js';
+import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
+import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 
 async function listAction(
   context: CommandContext,
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const subCommand = args.trim();
+  const subArgs = args.trim().split(/\s+/);
 
   // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
   let useShowDescriptions = true;
-  if (subCommand === 'nodesc') {
-    useShowDescriptions = false;
+  let showAll = false;
+
+  for (const arg of subArgs) {
+    if (arg === 'nodesc' || arg === '--nodesc') {
+      useShowDescriptions = false;
+    } else if (arg === 'all' || arg === '--all') {
+      showAll = true;
+    }
   }
 
   const skillManager = context.services.config?.getSkillManager();
@@ -37,7 +49,9 @@ async function listAction(
     return;
   }
 
-  const skills = skillManager.getAllSkills();
+  const skills = showAll
+    ? skillManager.getAllSkills()
+    : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
 
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
@@ -47,6 +61,7 @@ async function listAction(
       disabled: skill.disabled,
       location: skill.location,
       body: skill.body,
+      isBuiltin: skill.isBuiltin,
     })),
     showDescriptions: useShowDescriptions,
   };
@@ -82,29 +97,24 @@ async function disableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (currentDisabled.includes(skillName)) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is already disabled.`,
-      },
-      Date.now(),
-    );
-    return;
-  }
-
-  const newDisabled = [...currentDisabled, skillName];
   const scope = context.services.settings.workspace.path
     ? SettingScope.Workspace
     : SettingScope.User;
 
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
+  const result = disableSkill(context.services.settings, skillName, scope);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
+  }
+
   context.ui.addItem(
     {
       type: MessageType.INFO,
-      text: `Skill "${skillName}" disabled in ${scope} settings. Restart required to take effect.`,
+      text: feedback,
     },
     Date.now(),
   );
@@ -126,32 +136,118 @@ async function enableAction(
     return;
   }
 
-  const currentDisabled =
-    context.services.settings.merged.skills?.disabled ?? [];
-  if (!currentDisabled.includes(skillName)) {
+  const result = enableSkill(context.services.settings, skillName);
+
+  let feedback = renderSkillActionFeedback(
+    result,
+    (label, path) => `${label} (${path})`,
+  );
+  if (result.status === 'success') {
+    feedback += ' Use "/skills reload" for it to take effect.';
+  }
+
+  context.ui.addItem(
+    {
+      type: MessageType.INFO,
+      text: feedback,
+    },
+    Date.now(),
+  );
+}
+
+async function reloadAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  const config = context.services.config;
+  if (!config) {
     context.ui.addItem(
       {
-        type: MessageType.INFO,
-        text: `Skill "${skillName}" is not disabled.`,
+        type: MessageType.ERROR,
+        text: 'Could not retrieve configuration.',
       },
       Date.now(),
     );
     return;
   }
 
-  const newDisabled = currentDisabled.filter((name) => name !== skillName);
-  const scope = context.services.settings.workspace.path
-    ? SettingScope.Workspace
-    : SettingScope.User;
+  const skillManager = config.getSkillManager();
+  const beforeNames = new Set(skillManager.getSkills().map((s) => s.name));
 
-  context.services.settings.setValue(scope, 'skills.disabled', newDisabled);
-  context.ui.addItem(
-    {
+  const startTime = Date.now();
+  let pendingItemSet = false;
+  const pendingTimeout = setTimeout(() => {
+    context.ui.setPendingItem({
       type: MessageType.INFO,
-      text: `Skill "${skillName}" enabled in ${scope} settings. Restart required to take effect.`,
-    },
-    Date.now(),
-  );
+      text: 'Reloading agent skills...',
+    });
+    pendingItemSet = true;
+  }, 100);
+
+  try {
+    await config.reloadSkills();
+
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      // If we showed the pending item, make sure it stays for at least 500ms
+      // total to avoid a "flicker" where it appears and immediately disappears.
+      const elapsed = Date.now() - startTime;
+      const minVisibleDuration = 500;
+      if (elapsed < minVisibleDuration) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minVisibleDuration - elapsed),
+        );
+      }
+      context.ui.setPendingItem(null);
+    }
+
+    const afterSkills = skillManager.getSkills();
+    const afterNames = new Set(afterSkills.map((s) => s.name));
+
+    const added = afterSkills.filter((s) => !beforeNames.has(s.name));
+    const removedCount = [...beforeNames].filter(
+      (name) => !afterNames.has(name),
+    ).length;
+
+    let successText = 'Agent skills reloaded successfully.';
+    const details: string[] = [];
+
+    if (added.length > 0) {
+      details.push(
+        `${added.length} newly available skill${added.length > 1 ? 's' : ''}`,
+      );
+    }
+    if (removedCount > 0) {
+      details.push(
+        `${removedCount} skill${removedCount > 1 ? 's' : ''} no longer available`,
+      );
+    }
+
+    if (details.length > 0) {
+      successText += ` ${details.join(' and ')}.`;
+    }
+
+    context.ui.addItem(
+      {
+        type: 'info',
+        text: successText,
+        icon: '✓ ',
+        color: 'green',
+      } as HistoryItemInfo,
+      Date.now(),
+    );
+  } catch (error) {
+    clearTimeout(pendingTimeout);
+    if (pendingItemSet) {
+      context.ui.setPendingItem(null);
+    }
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+      },
+      Date.now(),
+    );
+  }
 }
 
 function disableCompletion(
@@ -185,13 +281,14 @@ function enableCompletion(
 export const skillsCommand: SlashCommand = {
   name: 'skills',
   description:
-    'List, enable, or disable Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name>]',
+    'List, enable, disable, or reload Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name> | reload]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
     {
       name: 'list',
-      description: 'List available agent skills. Usage: /skills list [nodesc]',
+      description:
+        'List available agent skills. Usage: /skills list [nodesc] [all]',
       kind: CommandKind.BUILT_IN,
       action: listAction,
     },
@@ -209,6 +306,13 @@ export const skillsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       action: enableAction,
       completion: enableCompletion,
+    },
+    {
+      name: 'reload',
+      description:
+        'Reload the list of discovered skills. Usage: /skills reload',
+      kind: CommandKind.BUILT_IN,
+      action: reloadAction,
     },
   ],
   action: listAction,

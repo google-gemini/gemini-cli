@@ -99,7 +99,7 @@ describe('AgentRegistry', () => {
 
       const agentCount = debugRegistry.getAllDefinitions().length;
       expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Initialized with ${agentCount} agents.`,
+        `[AgentRegistry] Loaded with ${agentCount} agents.`,
       );
     });
 
@@ -209,6 +209,7 @@ describe('AgentRegistry', () => {
       const disabledConfig = makeFakeConfig({
         enableAgents: false,
         codebaseInvestigatorSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
 
@@ -220,30 +221,73 @@ describe('AgentRegistry', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should register introspection agent if enabled', async () => {
-      const config = makeFakeConfig({
-        introspectionAgentSettings: { enabled: true },
-      });
+    it('should register CLI help agent by default', async () => {
+      const config = makeFakeConfig();
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
-      expect(registry.getDefinition('introspection_agent')).toBeDefined();
+      expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
-    it('should NOT register introspection agent if disabled', async () => {
+    it('should NOT register CLI help agent if disabled', async () => {
       const config = makeFakeConfig({
-        introspectionAgentSettings: { enabled: false },
+        cliHelpAgentSettings: { enabled: false },
       });
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
-      expect(registry.getDefinition('introspection_agent')).toBeUndefined();
+      expect(registry.getDefinition('cli_help')).toBeUndefined();
     });
   });
 
   describe('registration logic', () => {
+    it('should register runtime overrides when the model is "auto"', async () => {
+      const autoAgent: LocalAgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'AutoAgent',
+        modelConfig: { ...MOCK_AGENT_V1.modelConfig, model: 'auto' },
+      };
+
+      const registerOverrideSpy = vi.spyOn(
+        mockConfig.modelConfigService,
+        'registerRuntimeModelOverride',
+      );
+
+      await registry.testRegisterAgent(autoAgent);
+
+      // Should register one alias for the custom model config.
+      expect(
+        mockConfig.modelConfigService.getResolvedConfig({
+          model: getModelConfigAlias(autoAgent),
+        }),
+      ).toStrictEqual({
+        model: 'auto',
+        generateContentConfig: {
+          temperature: autoAgent.modelConfig.temp,
+          topP: autoAgent.modelConfig.top_p,
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingBudget: -1,
+          },
+        },
+      });
+
+      // Should register one override for the agent name (scope)
+      expect(registerOverrideSpy).toHaveBeenCalledTimes(1);
+
+      // Check scope override
+      expect(registerOverrideSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          match: { overrideScope: autoAgent.name },
+          modelConfig: expect.objectContaining({
+            generateContentConfig: expect.any(Object),
+          }),
+        }),
+      );
+    });
+
     it('should register a valid agent definition', async () => {
       await registry.testRegisterAgent(MOCK_AGENT_V1);
       expect(registry.getDefinition('MockAgent')).toEqual(MOCK_AGENT_V1);
@@ -397,6 +441,37 @@ describe('AgentRegistry', () => {
 
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
+    });
+  });
+
+  describe('reload', () => {
+    it('should clear existing agents and reload from directories', async () => {
+      const config = makeFakeConfig({ enableAgents: true });
+      const registry = new TestableAgentRegistry(config);
+
+      const initialAgent = { ...MOCK_AGENT_V1, name: 'InitialAgent' };
+      await registry.testRegisterAgent(initialAgent);
+      expect(registry.getDefinition('InitialAgent')).toBeDefined();
+
+      const newAgent = { ...MOCK_AGENT_V1, name: 'NewAgent' };
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [newAgent],
+        errors: [],
+      });
+
+      const clearCacheSpy = vi.fn();
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        clearCache: clearCacheSpy,
+      } as unknown as A2AClientManager);
+
+      const emitSpy = vi.spyOn(coreEvents, 'emitAgentsRefreshed');
+
+      await registry.reload();
+
+      expect(clearCacheSpy).toHaveBeenCalled();
+      expect(registry.getDefinition('InitialAgent')).toBeUndefined();
+      expect(registry.getDefinition('NewAgent')).toBeDefined();
+      expect(emitSpy).toHaveBeenCalled();
     });
   });
 
