@@ -55,13 +55,13 @@ process_pr_optimized() {
     if [[ -z "${ISSUE_NUMBER}" || "${ISSUE_NUMBER}" == "null" || "${ISSUE_NUMBER}" == "" ]]; then
         if [[ "${IS_DRAFT}" == "true" ]]; then
             echo "   📝 PR #${PR_NUMBER} is a draft and has no linked issue"
-            if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
+            if [[ ",${CURRENT_LABELS}," == ",status/need-issue,"* ]]; then
                 echo "      ➖ Removing status/need-issue label"
                 LABELS_TO_REMOVE="status/need-issue"
             fi
         else
             echo "   ⚠️  No linked issue found for PR #${PR_NUMBER}"
-            if [[ ",${CURRENT_LABELS}," != *",status/need-issue,"* ]]; then
+            if [[ ",${CURRENT_LABELS}," != ",status/need-issue,"* ]]; then
                 echo "      ➕ Adding status/need-issue label"
                 LABELS_TO_ADD="status/need-issue"
             fi
@@ -75,7 +75,7 @@ process_pr_optimized() {
     else
         echo "   🔗 Found linked issue #${ISSUE_NUMBER}"
 
-        if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
+        if [[ ",${CURRENT_LABELS}," == ",status/need-issue,"* ]]; then
             echo "      ➖ Removing status/need-issue label"
             LABELS_TO_REMOVE="status/need-issue"
         fi
@@ -131,11 +131,11 @@ fi
 JQ_EXTRACT_FIELDS='{
     number: .number,
     isDraft: .isDraft,
-    issue: (.closingIssuesReferences[0].number // (.body // "" | capture("(^|[^a-zA-Z0-9])#(?<num>[0-9]+)([^a-zA-Z0-9]|$)")? | .num) // ""),
+    issue: (.closingIssuesReferences[0].number // (.body // "" | capture("(^|[^a-zA-Z0-9])#(?<num>[0-9]+)([^a-zA-Z0-9]|$)")? | .num) // "null"),
     labels: [.labels[].name] | join(",")
 }'
 
-JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // "") | tostring)\t\(.labels)"'
+JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // "null") | tostring)\t\(.labels)"'
 
 if [[ -n "${PR_NUMBER:-}" ]]; then
     echo "🔄 Processing single PR #${PR_NUMBER}"
