@@ -66,23 +66,19 @@ export class BuiltinCommandLoader implements ICommandLoader {
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
     const handle = startupProfiler.start('load_builtin_commands');
 
-    // Dynamically add the debug command to the chat subcommands if in nightly
-    // build
-    if (await isNightly(process.cwd())) {
-      if (
-        chatCommand.subCommands &&
-        !chatCommand.subCommands.some((c) => c.name === 'debug')
-      ) {
-        chatCommand.subCommands.push(debugCommand);
-      }
-    }
+    const isNightlyBuild = await isNightly(process.cwd());
 
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
       bugCommand,
-      chatCommand,
+      {
+        ...chatCommand,
+        subCommands: isNightlyBuild
+          ? [...(chatCommand.subCommands || []), debugCommand]
+          : chatCommand.subCommands,
+      },
       clearCommand,
       compressCommand,
       copyCommand,
