@@ -36,7 +36,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S*[^.,?!:;。，？！、：；\s]|\b[\w-]+\/[\w./-]+\.\w+\b)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -140,6 +140,12 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
       } else if (fullMatch.match(/^https?:\/\//)) {
         renderedNode = (
           <Text key={key} color={theme.text.link}>
+            {fullMatch}
+          </Text>
+        );
+      } else if (fullMatch.match(/^[\w-]+\/[\w./-]+\.\w+$/)) {
+        renderedNode = (
+          <Text key={key} color={theme.text.accent}>
             {fullMatch}
           </Text>
         );
