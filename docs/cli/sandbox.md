@@ -87,6 +87,16 @@ Built-in profiles (set via `SEATBELT_PROFILE` env var):
 - `restrictive-open`: Strict restrictions, network allowed
 - `restrictive-closed`: Maximum restrictions
 
+### Custom macOS Seatbelt profiles
+
+You can create custom profiles by adding a `.sb` file to your project's
+`.gemini` directory or your home directory's `.gemini` folder (`~/.gemini/`).
+The file should be named `sandbox-macos-<profile>.sb`.
+
+For example, to create a profile named `custom`, create a file at
+`.gemini/sandbox-macos-custom.sb` or `~/.gemini/sandbox-macos-custom.sb` and set
+`SEATBELT_PROFILE=custom`.
+
 ### Custom sandbox flags
 
 For container-based sandboxing, you can inject custom flags into the `docker` or
