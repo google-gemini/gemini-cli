@@ -1345,24 +1345,16 @@ describe('useVim hook', () => {
       );
     });
 
-    it('should pass through ctrl+x in NORMAL mode', () => {
-      mockVimContext.vimMode = 'NORMAL';
+    it.each([
+      { mode: 'NORMAL' as VimMode, key: { name: 'x', ctrl: true } },
+      { mode: 'INSERT' as VimMode, key: { name: 'x', ctrl: true } },
+      { mode: 'NORMAL' as VimMode, key: { sequence: '\x18', ctrl: true } },
+      { mode: 'INSERT' as VimMode, key: { sequence: '\x18', ctrl: true } },
+    ])('should pass through ctrl+x in $mode mode', ({ mode, key }) => {
+      mockVimContext.vimMode = mode;
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(
-        createKey({ name: 'x', ctrl: true }),
-      );
-
-      expect(handled).toBe(false);
-    });
-
-    it('should pass through ctrl+x in INSERT mode', () => {
-      mockVimContext.vimMode = 'INSERT';
-      const { result } = renderVimHook();
-
-      const handled = result.current.handleInput(
-        createKey({ name: 'x', ctrl: true }),
-      );
+      const handled = result.current.handleInput(createKey(key));
 
       expect(handled).toBe(false);
     });
