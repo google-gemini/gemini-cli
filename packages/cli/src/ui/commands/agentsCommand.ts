@@ -131,14 +131,6 @@ function completeAgentsToDisable(context: CommandContext, partialArg: string) {
   return allAgents.filter((name) => name.startsWith(partialArg));
 }
 
-const listCommand: SlashCommand = {
-  name: 'list',
-  description: 'List available local and remote agents',
-  kind: CommandKind.BUILT_IN,
-  autoExecute: true,
-  action: listAction,
-};
-
 const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a disabled agent',
@@ -157,11 +149,50 @@ const disableCommand: SlashCommand = {
   completion: completeAgentsToDisable,
 };
 
-export const agentsCommand: SlashCommand = {
-  name: 'agents',
+const agentsListCommand: SlashCommand = {
+  name: 'list',
   description: 'List available local and remote agents',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  subCommands: [listCommand, enableCommand, disableCommand],
   action: listAction,
+};
+
+const agentsRefreshCommand: SlashCommand = {
+  name: 'refresh',
+  description: 'Reload the agent registry',
+  kind: CommandKind.BUILT_IN,
+  action: async (context: CommandContext) => {
+    const { config } = context.services;
+    const agentRegistry = config?.getAgentRegistry();
+    if (!agentRegistry) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Agent registry not found.',
+      };
+    }
+
+    await agentRegistry.reload();
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'Agents refreshed successfully.',
+    };
+  },
+};
+
+export const agentsCommand: SlashCommand = {
+  name: 'agents',
+  description: 'Manage agents',
+  kind: CommandKind.BUILT_IN,
+  subCommands: [
+    agentsListCommand,
+    agentsRefreshCommand,
+    enableCommand,
+    disableCommand,
+  ],
+  action: async (context: CommandContext, args) =>
+    // Default to list if no subcommand is provided
+    agentsListCommand.action!(context, args),
 };

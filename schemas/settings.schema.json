@@ -194,6 +194,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showHomeDirectoryWarning": {
+          "title": "Show Home Directory Warning",
+          "description": "Show a warning when running Gemini CLI in the home directory.",
+          "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",

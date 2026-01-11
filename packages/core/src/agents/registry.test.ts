@@ -99,7 +99,7 @@ describe('AgentRegistry', () => {
 
       const agentCount = debugRegistry.getAllDefinitions().length;
       expect(debugLogSpy).toHaveBeenCalledWith(
-        `[AgentRegistry] Initialized with ${agentCount} agents.`,
+        `[AgentRegistry] Loaded with ${agentCount} agents.`,
       );
     });
 
@@ -441,6 +441,37 @@ describe('AgentRegistry', () => {
 
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
+    });
+  });
+
+  describe('reload', () => {
+    it('should clear existing agents and reload from directories', async () => {
+      const config = makeFakeConfig({ enableAgents: true });
+      const registry = new TestableAgentRegistry(config);
+
+      const initialAgent = { ...MOCK_AGENT_V1, name: 'InitialAgent' };
+      await registry.testRegisterAgent(initialAgent);
+      expect(registry.getDefinition('InitialAgent')).toBeDefined();
+
+      const newAgent = { ...MOCK_AGENT_V1, name: 'NewAgent' };
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [newAgent],
+        errors: [],
+      });
+
+      const clearCacheSpy = vi.fn();
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        clearCache: clearCacheSpy,
+      } as unknown as A2AClientManager);
+
+      const emitSpy = vi.spyOn(coreEvents, 'emitAgentsRefreshed');
+
+      await registry.reload();
+
+      expect(clearCacheSpy).toHaveBeenCalled();
+      expect(registry.getDefinition('InitialAgent')).toBeUndefined();
+      expect(registry.getDefinition('NewAgent')).toBeDefined();
+      expect(emitSpy).toHaveBeenCalled();
     });
   });
 
