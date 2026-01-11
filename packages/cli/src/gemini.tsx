@@ -390,6 +390,20 @@ export async function main() {
       }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);
+      // Ensure the error message is flushed before exiting.
+      // debugLogger typically writes to stderr asynchronously.
+      // We force a direct write to stderr to ensure visibility.
+      const errorMessage =
+        err instanceof Error ? (err.stack ?? err.message) : String(err);
+      const flush = writeToStderr(
+        `Fatal error: Authentication failed.\n${errorMessage}\n`,
+      );
+      if (!flush) {
+        await new Promise<void>((resolve) =>
+          process.stderr.once('drain', resolve),
+        );
+      }
+
       await runExitCleanup();
       process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     }

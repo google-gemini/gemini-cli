@@ -161,6 +161,80 @@ describe('sandbox', () => {
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
 
+    it('should find profile in home directory if missing in project', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      process.env['SEATBELT_PROFILE'] = 'custom_user';
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        if (
+          typeof p === 'string' &&
+          p.includes('/home/user/.gemini/sandbox-macos-custom_user.sb')
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = {
+        command: 'sandbox-exec',
+        image: 'some-image',
+      };
+
+      interface MockProcess extends EventEmitter {
+        stdout: EventEmitter;
+        stderr: EventEmitter;
+      }
+      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      mockSpawnProcess.stdout = new EventEmitter();
+      mockSpawnProcess.stderr = new EventEmitter();
+      vi.mocked(spawn).mockReturnValue(
+        mockSpawnProcess as unknown as ReturnType<typeof spawn>,
+      );
+
+      const promise = start_sandbox(config, [], undefined, []);
+      setTimeout(() => {
+        mockSpawnProcess.emit('close', 0);
+      }, 10);
+
+      await expect(promise).resolves.toBe(0);
+      expect(spawn).toHaveBeenCalledWith(
+        'sandbox-exec',
+        expect.arrayContaining([
+          '-f',
+          expect.stringContaining(
+            '/home/user/.gemini/sandbox-macos-custom_user.sb',
+          ),
+        ]),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
+    it('should throw FatalSandboxError if multiple ambiguous profiles exist', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      process.env['SEATBELT_PROFILE'] = 'duplicate';
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        // Simulate kebab-case existing in both project and home dir
+        if (
+          typeof p === 'string' &&
+          p.includes('.gemini/sandbox-macos-duplicate.sb')
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      const config: SandboxConfig = {
+        command: 'sandbox-exec',
+        image: 'some-image',
+      };
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+      await expect(start_sandbox(config)).rejects.toThrow(
+        /Ambiguous macos seatbelt profile/,
+      );
+    });
+
     it('should handle Docker execution', async () => {
       const config: SandboxConfig = {
         command: 'docker',

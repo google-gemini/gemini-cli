@@ -20,10 +20,14 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       process.stdin.resume();
       const errorMessage =
         error instanceof Error ? (error.stack ?? error.message) : String(error);
-      writeToStderr(
+      const flushed = writeToStderr(
         `Fatal error: Failed to relaunch the CLI process.\n${errorMessage}\n`,
       );
-      process.exit(1);
+      if (!flushed) {
+        process.stderr.once('drain', () => process.exit(1));
+      } else {
+        process.exit(1);
+      }
     }
   }
 }
