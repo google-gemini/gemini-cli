@@ -19,7 +19,6 @@ import type {
   SessionEndReason,
   PreCompressTrigger,
   McpToolContext,
-  NotificationType,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
@@ -206,16 +205,5 @@ export class HookSystem {
       response,
       stopHookActive,
     );
-  }
-
-  async fireNotificationEvent(
-    type: NotificationType,
-    message: string,
-    details: Record<string, unknown>,
-  ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
-    return this.hookEventHandler.fireNotificationEvent(type, message, details);
   }
 }
