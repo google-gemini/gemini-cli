@@ -124,8 +124,8 @@ available combinations.
 
 ## Additional context-specific shortcuts
 
-- `Option+M` (macOS): Entering `µ` with Option+M also toggles Markdown
-  rendering, matching `Cmd+M`.
+- `Option+B/F/M` (macOS only): Are interpreted as `Cmd+B/F/M` even if your
+  terminal isn't configured to send Meta with Option.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
