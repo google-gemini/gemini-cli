@@ -80,6 +80,16 @@ describe('keyMatchers', () => {
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
     },
+    {
+      command: Command.UNDO,
+      positive: [createKey('z', { ctrl: true, shift: false })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: true })],
+    },
+    {
+      command: Command.REDO,
+      positive: [createKey('z', { ctrl: true, shift: true })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: false })],
+    },
 
     // Screen control
     {

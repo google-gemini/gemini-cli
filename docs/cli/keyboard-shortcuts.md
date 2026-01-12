@@ -28,6 +28,8 @@ available combinations.
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                |
 | Clear all text in the input field.               | `Ctrl + C`                                |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace` |
+| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                     |
+| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                        |
 
 #### Screen Control
 
@@ -133,7 +135,6 @@ available combinations.
   right.
 - `Ctrl+W`: Delete the word to the left of the cursor (in addition to
   `Ctrl+Backspace` / `Cmd+Backspace`).
-- `Ctrl+Z` / `Ctrl+Shift+Z`: Undo or redo the most recent text edit.
 - `Meta+Enter`: Open the current input in an external editor (alias for
   `Ctrl+X`).
 - `Esc` pressed twice quickly: Clear the current input buffer.
