@@ -35,6 +35,7 @@ export default tseslint.config(
       'package/bundle/**',
       '.integration-tests/**',
       'dist/**',
+      'packages/core/src/skills/builtin/skill-creator/scripts/*.cjs',
     ],
   },
   eslint.configs.recommended,
