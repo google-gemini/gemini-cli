@@ -195,6 +195,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           req.config,
           serverDetails,
         );
+
         try {
           const response = await this.wrapped.generateContent(
             req,
@@ -257,6 +258,13 @@ export class LoggingContentGenerator implements ContentGenerator {
           req,
           'generateContentStream',
         );
+
+        // For debugging: Capture the latest main agent request payload.
+        // Main agent prompt IDs end with exactly 8 hashes and a turn counter (e.g. "...########1")
+        if (/########\d+$/.test(userPromptId)) {
+          this.config.setLatestApiRequest(req);
+        }
+
         this.logApiRequest(
           toContents(req.contents),
           req.model,
