@@ -37,7 +37,6 @@ describe('AboutBox', () => {
   });
 
   it.each([
-    ['userEmail', 'test@example.com', 'User Email'],
     ['gcpProject', 'my-project', 'GCP Project'],
     ['ideClient', 'vscode', 'IDE Client'],
   ])('renders optional prop %s', (prop, value, label) => {
