@@ -64,6 +64,7 @@
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
+    "systeminformation": "^5.25.11",
     "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
     "uuid": "^13.0.0",
