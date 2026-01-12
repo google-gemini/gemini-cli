@@ -456,6 +456,7 @@ export class Session {
             title: invocation.getDescription(),
             content,
             locations: invocation.toolLocations(),
+            rawInput: invocation.params,
             kind: tool.kind,
           },
         };
@@ -495,6 +496,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
+          rawInput: invocation.params,
           kind: tool.kind,
         });
       }
@@ -506,6 +508,7 @@ export class Session {
         sessionUpdate: 'tool_call_update',
         toolCallId: callId,
         status: 'completed',
+        rawOutput: toolResult.llmContent,
         content: content ? [content] : [],
       });
 
@@ -792,6 +795,7 @@ export class Session {
           content: [],
           locations: invocation.toolLocations(),
           kind: readManyFilesTool.kind,
+          rawInput: invocation.params,
         });
 
         const result = await invocation.execute(abortSignal);
@@ -807,6 +811,7 @@ export class Session {
           toolCallId: callId,
           status: 'completed',
           content: content ? [content] : [],
+          rawOutput: result.llmContent,
         });
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
