@@ -4,6 +4,19 @@ Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
 
+> **Note: Hooks are currently an experimental feature.**
+>
+> To use hooks, you must explicitly enable them in your `settings.json`:
+>
+> ```json
+> {
+>   "tools": { "enableHooks": true },
+>   "hooks": { "enabled": true }
+> }
+> ```
+>
+> Both of these are needed in this experimental phase.
+
 See [writing hooks guide](writing-hooks.md) for a tutorial on creating your
 first hook and a comprehensive example.
 
@@ -29,10 +42,10 @@ Gemini CLI waits for all matching hooks to complete before continuing.
 
 ## Security and Risks
 
-> [!WARNING] **Hooks execute arbitrary code with your user privileges.**
-
-By configuring hooks, you are explicitly allowing Gemini CLI to run shell
-commands on your machine. Malicious or poorly configured hooks can:
+> **Warning: Hooks execute arbitrary code with your user privileges.**
+>
+> By configuring hooks, you are explicitly allowing Gemini CLI to run shell
+> commands on your machine. Malicious or poorly configured hooks can:
 
 - **Exfiltrate data**: Read sensitive files (`.env`, ssh keys) and send them to
   remote servers.
@@ -46,7 +59,7 @@ project hook (identified by its name and command), but it is **your
 responsibility** to review these hooks (and any installed extensions) before
 trusting them.
 
-> [!NOTE] Extension hooks are subject to a mandatory security warning and
+> **Note:** Extension hooks are subject to a mandatory security warning and
 > consent flow during extension installation or update if hooks are detected.
 > You must explicitly approve the installation or update of any extension that
 > contains hooks.
