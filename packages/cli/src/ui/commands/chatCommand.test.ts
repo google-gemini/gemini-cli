@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
@@ -13,7 +12,11 @@ import type { Content } from '@google/genai';
 import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
-import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
+import { chatCommand, debugCommand } from './chatCommand.js';
+import {
+  serializeHistoryToMarkdown,
+  exportHistoryToFile,
+} from '../utils/historyExportUtils.js';
 import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
@@ -24,8 +27,18 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
+vi.mock('../utils/historyExportUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/historyExportUtils.js')>();
+  return {
+    ...actual,
+    exportHistoryToFile: vi.fn(),
+  };
+});
+
 describe('chatCommand', () => {
-  const mockFs = fsPromises as Mocked<typeof fsPromises>;
+  const mockFs = vi.mocked(fsPromises);
+  const mockExport = vi.mocked(exportHistoryToFile);
 
   let mockContext: CommandContext;
   let mockGetChat: ReturnType<typeof vi.fn>;
@@ -448,9 +461,10 @@ describe('chatCommand', () => {
         process.cwd(),
         'gemini-conversation-1234567890.json',
       );
-      const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
-      expect(actualPath).toEqual(expectedPath);
-      expect(actualContent).toEqual(JSON.stringify(mockHistory, null, 2));
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -462,9 +476,10 @@ describe('chatCommand', () => {
       const filePath = 'my-chat.json';
       const result = await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
-      const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
-      expect(actualPath).toEqual(expectedPath);
-      expect(actualContent).toEqual(JSON.stringify(mockHistory, null, 2));
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -476,30 +491,10 @@ describe('chatCommand', () => {
       const filePath = 'my-chat.md';
       const result = await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
-      const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
-      expect(actualPath).toEqual(expectedPath);
-      const expectedContent = `## USER 🧑‍💻
-
-context
-
----
-
-## MODEL ✨
-
-context response
-
----
-
-## USER 🧑‍💻
-
-Hello
-
----
-
-## MODEL ✨
-
-Hi there!`;
-      expect(actualContent).toEqual(expectedContent);
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
+      });
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -510,7 +505,7 @@ Hi there!`;
     it('should return an error for unsupported file extensions', async () => {
       const filePath = 'my-chat.txt';
       const result = await shareCommand?.action?.(mockContext, filePath);
-      expect(mockFs.writeFile).not.toHaveBeenCalled();
+      expect(mockExport).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
@@ -523,7 +518,7 @@ Hi there!`;
         { role: 'user', parts: [{ text: 'context' }] },
       ]);
       const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
-      expect(mockFs.writeFile).not.toHaveBeenCalled();
+      expect(mockExport).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -533,7 +528,7 @@ Hi there!`;
 
     it('should handle errors during file writing', async () => {
       const error = new Error('Permission denied');
-      mockFs.writeFile.mockRejectedValue(error);
+      mockExport.mockRejectedValue(error);
       const result = await shareCommand?.action?.(mockContext, 'my-chat.json');
       expect(result).toEqual({
         type: 'message',
@@ -546,14 +541,9 @@ Hi there!`;
       const filePath = 'my-chat.json';
       await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
-      const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
-      expect(actualPath).toEqual(expectedPath);
-      const parsedContent = JSON.parse(actualContent as string);
-      expect(Array.isArray(parsedContent)).toBe(true);
-      parsedContent.forEach((item: Content) => {
-        expect(item).toHaveProperty('role');
-        expect(item).toHaveProperty('parts');
-        expect(Array.isArray(item.parts)).toBe(true);
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
       });
     });
 
@@ -561,15 +551,9 @@ Hi there!`;
       const filePath = 'my-chat.md';
       await shareCommand?.action?.(mockContext, filePath);
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
-      const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
-      expect(actualPath).toEqual(expectedPath);
-      const entries = (actualContent as string).split('\n\n---\n\n');
-      expect(entries.length).toBe(mockHistory.length);
-      entries.forEach((entry: string, index: number) => {
-        const { role, parts } = mockHistory[index];
-        const text = parts.map((p) => p.text).join('');
-        const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
-        expect(entry).toBe(`## ${role.toUpperCase()} ${roleIcon}\n\n${text}`);
+      expect(mockExport).toHaveBeenCalledWith({
+        history: mockHistory,
+        filePath: expectedPath,
       });
     });
   });
@@ -708,6 +692,67 @@ Hi there!`;
 
       const result = serializeHistoryToMarkdown(history as Content[]);
       expect(result).toBe(expectedMarkdown);
+    });
+    describe('debug subcommand', () => {
+      let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        mockGetLatestApiRequest = vi.fn();
+        mockContext.services.config!.getLatestApiRequest =
+          mockGetLatestApiRequest;
+        vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
+        vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+        mockFs.writeFile.mockClear();
+      });
+
+      it('should return an error if no API request is found', async () => {
+        mockGetLatestApiRequest.mockReturnValue(undefined);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'No recent API request found to export.',
+        });
+        expect(mockFs.writeFile).not.toHaveBeenCalled();
+      });
+
+      it('should convert and write the API request to a json file', async () => {
+        const mockRequest = {
+          contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+        };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        const expectedFilename = 'gcli-request-1234567890.json';
+        const expectedPath = path.join('/project/root', expectedFilename);
+
+        expect(mockFs.writeFile).toHaveBeenCalledWith(
+          expectedPath,
+          expect.stringContaining('"role": "user"'),
+        );
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'info',
+          content: `Debug API request saved to ${expectedFilename}`,
+        });
+      });
+
+      it('should handle errors during file write', async () => {
+        const mockRequest = { contents: [] };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+        mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'Error saving debug request: Write failed',
+        });
+      });
     });
   });
 });

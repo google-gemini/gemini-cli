@@ -60,6 +60,14 @@ function isValidEditorType(editor: string): editor is EditorType {
   return EDITORS_SET.has(editor);
 }
 
+/**
+ * Escapes a string for use in an Emacs Lisp string literal.
+ * Wraps in double quotes and escapes backslashes and double quotes.
+ */
+function escapeELispString(str: string): string {
+  return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
 interface DiffCommand {
   command: string;
   args: string[];
@@ -182,7 +190,10 @@ export function getDiffCommand(
     case 'emacs':
       return {
         command: 'emacs',
-        args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
+        args: [
+          '--eval',
+          `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
+        ],
       };
     case 'hx':
       return {

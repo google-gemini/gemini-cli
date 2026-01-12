@@ -154,6 +154,7 @@ const createMockConfig = (overrides = {}) => ({
   }),
   getSkillManager: () => ({
     getSkills: () => [],
+    getDisplayableSkills: () => [],
   }),
   getMcpClientManager: () => ({
     getMcpServers: () => ({}),

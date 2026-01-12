@@ -32,6 +32,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 export interface BeforeModelHookResult {
   /** Whether the model call was blocked */
   blocked: boolean;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
   /** Reason for blocking (if blocked) */
   reason?: string;
   /** Synthetic response to return instead of calling the model (if blocked) */
@@ -59,14 +61,16 @@ export interface BeforeToolSelectionHookResult {
 export interface AfterModelHookResult {
   /** The response to yield (either modified or original) */
   response: GenerateContentResponse;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
+  /** Whether the model call was blocked */
+  blocked?: boolean;
+  /** Reason for blocking or stopping */
+  reason?: string;
 }
 
 /**
  * Fires the BeforeModel hook and returns the result.
- *
- * @param messageBus The message bus to use for hook communication
- * @param llmRequest The LLM request parameters
- * @returns The hook result with blocking info or modifications
  */
 export async function fireBeforeModelHook(
   messageBus: MessageBus,
@@ -94,9 +98,18 @@ export async function fireBeforeModelHook(
 
     const hookOutput = beforeResultFinalOutput;
 
-    // Check if hook blocked the model call or requested to stop execution
+    // Check if hook requested to stop execution
+    if (hookOutput?.shouldStopExecution()) {
+      return {
+        blocked: true,
+        stopped: true,
+        reason: hookOutput.getEffectiveReason(),
+      };
+    }
+
+    // Check if hook blocked the model call
     const blockingError = hookOutput?.getBlockingError();
-    if (blockingError?.blocked || hookOutput?.shouldStopExecution()) {
+    if (blockingError?.blocked) {
       const beforeModelOutput = hookOutput as BeforeModelHookOutput;
       const syntheticResponse = beforeModelOutput.getSyntheticResponse();
       const reason =
@@ -217,9 +230,30 @@ export async function fireAfterModelHook(
       ? createHookOutput('AfterModel', response.output)
       : undefined;
 
-    // Apply modifications from hook (handles both normal modifications and stop execution)
-    if (afterResultFinalOutput) {
-      const afterModelOutput = afterResultFinalOutput as AfterModelHookOutput;
+    const hookOutput = afterResultFinalOutput;
+
+    // Check if hook requested to stop execution
+    if (hookOutput?.shouldStopExecution()) {
+      return {
+        response: chunk,
+        stopped: true,
+        reason: hookOutput.getEffectiveReason(),
+      };
+    }
+
+    // Check if hook blocked the model call
+    const blockingError = hookOutput?.getBlockingError();
+    if (blockingError?.blocked) {
+      return {
+        response: chunk,
+        blocked: true,
+        reason: hookOutput?.getEffectiveReason(),
+      };
+    }
+
+    // Apply modifications from hook
+    if (hookOutput) {
+      const afterModelOutput = hookOutput as AfterModelHookOutput;
       const modifiedResponse = afterModelOutput.getModifiedResponse();
       if (modifiedResponse) {
         return { response: modifiedResponse };
