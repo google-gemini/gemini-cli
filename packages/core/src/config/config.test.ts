@@ -2029,7 +2029,7 @@ describe('Config JIT Initialization', () => {
       expect(mockOnReload).toHaveBeenCalled();
       expect(skillManager.setDisabledSkills).toHaveBeenCalledWith(['skill2']);
       expect(toolRegistry.registerTool).toHaveBeenCalled();
-      expect(toolRegistry.unregisterTool).not.toHaveBeenCalledWith(
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
         ACTIVATE_SKILL_TOOL_NAME,
       );
     });
