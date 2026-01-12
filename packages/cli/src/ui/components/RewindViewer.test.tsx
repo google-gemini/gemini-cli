@@ -99,7 +99,7 @@ describe('RewindViewer', () => {
     });
   });
 
-  it('updates selection and expansion on navigation', () => {
+  it('updates selection and expansion on navigation', async () => {
     const longText1 = 'Line A\nLine B\nLine C\nLine D\nLine E\nLine F\nLine G';
     const longText2 = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7';
     const conversation = createConversation([
@@ -122,16 +122,20 @@ describe('RewindViewer', () => {
     expect(lastFrame()).toMatchSnapshot('initial-state');
 
     // Move down to select Item 1 (older message)
-    stdin.write('\x1b[B');
+    act(() => {
+      stdin.write('\x1b[B');
+    });
 
-    expect(lastFrame()).toMatchSnapshot('after-down');
+    await waitFor(() => {
+      expect(lastFrame()).toMatchSnapshot('after-down');
+    });
   });
 
   describe('Navigation', () => {
     it.each([
       { name: 'down', sequence: '\x1b[B', expectedSnapshot: 'after-down' },
       { name: 'up', sequence: '\x1b[A', expectedSnapshot: 'after-up' },
-    ])('handles $name navigation', ({ sequence, expectedSnapshot }) => {
+    ])('handles $name navigation', async ({ sequence, expectedSnapshot }) => {
       const conversation = createConversation([
         { type: 'user', content: 'Q1', id: '1', timestamp: '1' },
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
@@ -145,11 +149,15 @@ describe('RewindViewer', () => {
         />,
       );
 
-      stdin.write(sequence);
-      expect(lastFrame()).toMatchSnapshot(expectedSnapshot);
+      act(() => {
+        stdin.write(sequence);
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot(expectedSnapshot);
+      });
     });
 
-    it('handles cyclic navigation', () => {
+    it('handles cyclic navigation', async () => {
       const conversation = createConversation([
         { type: 'user', content: 'Q1', id: '1', timestamp: '1' },
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
@@ -164,12 +172,20 @@ describe('RewindViewer', () => {
       );
 
       // Up from first -> Last
-      stdin.write('\x1b[A');
-      expect(lastFrame()).toMatchSnapshot('cyclic-up');
+      act(() => {
+        stdin.write('\x1b[A');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot('cyclic-up');
+      });
 
       // Down from last -> First
-      stdin.write('\x1b[B');
-      expect(lastFrame()).toMatchSnapshot('cyclic-down');
+      act(() => {
+        stdin.write('\x1b[B');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot('cyclic-down');
+      });
     });
   });
 
