@@ -70,18 +70,28 @@ export const formatTimeAgo = (date: string | number | Date): string => {
 
   const now = new Date();
   const diffMs = now.getTime() - past.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffSeconds < 60) {
+  if (diffMs < 60000) {
     return 'just now';
   }
-  if (diffMinutes < 60) {
-    return `${diffMinutes}m ago`;
-  }
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-  return `${diffDays}d ago`;
+  return `${formatDuration(diffMs)} ago`;
 };
+
+const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
+const REFERENCE_CONTENT_END = '--- End of content ---';
+
+export function stripReferenceContent(text: string): string {
+  const startIndex = text.indexOf(REFERENCE_CONTENT_START);
+  if (startIndex === -1) return text;
+
+  const endIndex = text.lastIndexOf(REFERENCE_CONTENT_END);
+  if (endIndex === -1 || endIndex < startIndex) return text;
+
+  let removeStart = startIndex;
+  if (removeStart > 0 && text[removeStart - 1] === '\n') {
+    removeStart--;
+  }
+
+  const removeEnd = endIndex + REFERENCE_CONTENT_END.length;
+
+  return (text.slice(0, removeStart) + text.slice(removeEnd)).trim();
+}

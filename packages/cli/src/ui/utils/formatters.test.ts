@@ -9,6 +9,7 @@ import {
   formatDuration,
   formatMemoryUsage,
   formatTimeAgo,
+  stripReferenceContent,
 } from './formatters.js';
 
 describe('formatters', () => {
@@ -103,7 +104,7 @@ describe('formatters', () => {
 
     it('should return days ago', () => {
       const past = new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000);
-      expect(formatTimeAgo(past)).toBe('2d ago');
+      expect(formatTimeAgo(past)).toBe('48h ago');
     });
 
     it('should handle string dates', () => {
@@ -118,6 +119,42 @@ describe('formatters', () => {
     it('should handle invalid timestamps', () => {
       const past = 'hello';
       expect(formatTimeAgo(past)).toBe('invalid date');
+    });
+  });
+
+  describe('stripReferenceContent', () => {
+    it('should return the original text if no markers are present', () => {
+      const text = 'Hello world';
+      expect(stripReferenceContent(text)).toBe(text);
+    });
+
+    it('should strip content between markers', () => {
+      const text =
+        'Prompt @file.txt\n--- Content from referenced files ---\nFile content here\n--- End of content ---';
+      expect(stripReferenceContent(text)).toBe('Prompt @file.txt');
+    });
+
+    it('should strip content and keep text after the markers', () => {
+      const text =
+        'Before\n--- Content from referenced files ---\nMiddle\n--- End of content ---\nAfter';
+      expect(stripReferenceContent(text)).toBe('Before\nAfter');
+    });
+
+    it('should handle missing end marker gracefully', () => {
+      const text = 'Before\n--- Content from referenced files ---\nMiddle';
+      expect(stripReferenceContent(text)).toBe(text);
+    });
+
+    it('should handle end marker before start marker gracefully', () => {
+      const text =
+        '--- End of content ---\n--- Content from referenced files ---';
+      expect(stripReferenceContent(text)).toBe(text);
+    });
+
+    it('should strip even if markers are on the same line (though unlikely)', () => {
+      const text =
+        'A--- Content from referenced files ---B--- End of content ---C';
+      expect(stripReferenceContent(text)).toBe('AC');
     });
   });
 });

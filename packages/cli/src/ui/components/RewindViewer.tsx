@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import {
   type ConversationRecord,
   type MessageRecord,
@@ -17,6 +17,7 @@ import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
+import { stripReferenceContent } from '../utils/formatters.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -30,32 +31,12 @@ interface RewindViewerProps {
 
 const MAX_LINES_PER_BOX = 2;
 
-const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
-const REFERENCE_CONTENT_END = '--- End of content ---';
-
-function stripReferenceContent(text: string): string {
-  const startIndex = text.indexOf(REFERENCE_CONTENT_START);
-  if (startIndex === -1) return text;
-
-  const endIndex = text.lastIndexOf(REFERENCE_CONTENT_END);
-  if (endIndex === -1 || endIndex < startIndex) return text;
-
-  let removeStart = startIndex;
-  if (removeStart > 0 && text[removeStart - 1] === '\n') {
-    removeStart--;
-  }
-
-  const removeEnd = endIndex + REFERENCE_CONTENT_END.length;
-
-  return (text.slice(0, removeStart) + text.slice(removeEnd)).trim();
-}
-
 export const RewindViewer: React.FC<RewindViewerProps> = ({
   conversation,
   onExit,
   onRewind,
 }) => {
-  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
+  const { terminalWidth, terminalHeight } = useUIState();
   const {
     selectedMessageId,
     getStats,

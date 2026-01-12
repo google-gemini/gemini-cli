@@ -4,43 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '../../test-utils/render.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
-import { act } from 'react';
-import type { Key } from '../hooks/useKeypress.js';
-
-// Mock useKeypress
-const keypressHandlers: Array<(key: unknown) => void> = [];
-vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: (
-    handler: (key: unknown) => void,
-    options: { isActive: boolean },
-  ) => {
-    if (options?.isActive) {
-      keypressHandlers.push(handler);
-    }
-  },
-}));
-
-const triggerKey = (partialKey: Partial<Key>) => {
-  const key = {
-    name: '',
-    ctrl: false,
-    meta: false,
-    shift: false,
-    sequence: '',
-    ...partialKey,
-  };
-  act(() => {
-    keypressHandlers.forEach((handler) => handler(key));
-  });
-};
 
 describe('RewindConfirmation', () => {
-  beforeEach(() => {
-    keypressHandlers.length = 0;
-    vi.clearAllMocks();
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders correctly with stats', () => {
@@ -51,66 +21,62 @@ describe('RewindConfirmation', () => {
       details: [{ fileName: 'test.ts', diff: '' }],
     };
     const onConfirm = vi.fn();
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RewindConfirmation
         stats={stats}
         onConfirm={onConfirm}
         terminalWidth={80}
       />,
+      { width: 80 },
     );
 
-    expect(lastFrame()).toContain('Confirm Rewind');
-    expect(lastFrame()).toContain('File: test.ts');
-    expect(lastFrame()).toContain('Lines added: 10');
-    expect(lastFrame()).toContain('Lines removed: 5');
-    expect(lastFrame()).toContain(
-      'Rewind conversation and revert code changes',
-    );
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly without stats', () => {
     const onConfirm = vi.fn();
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
         terminalWidth={80}
       />,
+      { width: 80 },
     );
 
-    expect(lastFrame()).toContain('Confirm Rewind');
-    expect(lastFrame()).toContain('No code changes to revert');
-    expect(lastFrame()).toContain(
-      'Rewind conversation and revert code changes',
-    );
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('calls onConfirm with Cancel on Escape', () => {
+  it('calls onConfirm with Cancel on Escape', async () => {
     const onConfirm = vi.fn();
-    render(
+    vi.useFakeTimers();
+    const { stdin } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
         terminalWidth={80}
       />,
+      { width: 80 },
     );
 
-    triggerKey({ name: 'escape' });
+    stdin.write('\x1b');
+    await vi.advanceTimersByTimeAsync(100);
     expect(onConfirm).toHaveBeenCalledWith(RewindOutcome.Cancel);
   });
 
   it('renders timestamp when provided', () => {
     const onConfirm = vi.fn();
     const timestamp = new Date().toISOString();
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
         terminalWidth={80}
         timestamp={timestamp}
       />,
+      { width: 80 },
     );
 
-    expect(lastFrame()).toContain('just now');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });
