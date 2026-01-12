@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
@@ -23,7 +23,7 @@ export class Storage {
   }
 
   static getGlobalGeminiDir(): string {
-    const homeDir = os.homedir();
+    const homeDir = homedir();
     if (!homeDir) {
       return path.join(os.tmpdir(), GEMINI_DIR);
     }
@@ -50,12 +50,20 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'commands');
   }
 
+  static getUserSkillsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'skills');
+  }
+
   static getGlobalMemoryFilePath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'memory.md');
   }
 
   static getUserPoliciesDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
+  }
+
+  static getUserAgentsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
 
   static getSystemSettingsPath(): string {
@@ -123,8 +131,20 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'commands');
   }
 
+  getProjectSkillsDir(): string {
+    return path.join(this.getGeminiDir(), 'skills');
+  }
+
+  getProjectAgentsDir(): string {
+    return path.join(this.getGeminiDir(), 'agents');
+  }
+
   getProjectTempCheckpointsDir(): string {
     return path.join(this.getProjectTempDir(), 'checkpoints');
+  }
+
+  getProjectTempLogsDir(): string {
+    return path.join(this.getProjectTempDir(), 'logs');
   }
 
   getExtensionsDir(): string {

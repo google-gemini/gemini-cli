@@ -44,6 +44,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -148,7 +149,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -222,7 +223,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       newContent: correctedContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // No need to publish a policy update as the default policy for
+          // AUTO_EDIT already reflects always approving write-file.
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        } else {
+          await this.publishPolicyUpdate(outcome);
         }
 
         if (ideConfirmation) {
@@ -341,9 +346,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const displayResult: FileDiff = {
         fileDiff,
         fileName,
+        filePath: this.resolvedPath,
         originalContent: correctedContentResult.originalContent,
         newContent: correctedContentResult.correctedContent,
         diffStat,
+        isNewFile,
       };
 
       return {
@@ -373,7 +380,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
         // Include stack trace in debug mode for better troubleshooting
         if (this.config.getDebugMode() && error.stack) {
-          console.error('Write file error stack:', error.stack);
+          debugLogger.error('Write file error stack:', error.stack);
         }
       } else if (error instanceof Error) {
         errorMsg = `Error writing to file: ${error.message}`;
@@ -404,7 +411,7 @@ export class WriteFileTool
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       WriteFileTool.Name,
@@ -427,9 +434,9 @@ export class WriteFileTool
         required: ['file_path', 'content'],
         type: 'object',
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
@@ -470,11 +477,12 @@ export class WriteFileTool
 
   protected createInvocation(
     params: WriteFileToolParams,
+    messageBus: MessageBus,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
     return new WriteFileToolInvocation(
       this.config,
       params,
-      this.messageBus,
+      messageBus ?? this.messageBus,
       this.name,
       this.displayName,
     );

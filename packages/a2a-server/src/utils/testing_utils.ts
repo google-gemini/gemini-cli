@@ -11,10 +11,12 @@ import type {
 } from '@a2a-js/sdk';
 import {
   ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   GeminiClient,
   HookSystem,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import type { Config, Storage } from '@google/gemini-cli-core';
@@ -32,6 +34,7 @@ export function createMockConfig(
     }),
     getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     getIdeMode: vi.fn().mockReturnValue(false),
+    isInteractive: () => true,
     getAllowedTools: vi.fn().mockReturnValue([]),
     getWorkspaceContext: vi.fn().mockReturnValue({
       isPathWithinWorkspace: () => true,
@@ -45,6 +48,7 @@ export function createMockConfig(
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+    getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
     getDebugMode: vi.fn().mockReturnValue(false),
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
     getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -56,7 +60,6 @@ export function createMockConfig(
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),
     getUserTier: vi.fn(),
-    getEnableMessageBusIntegration: vi.fn().mockReturnValue(false),
     getMessageBus: vi.fn(),
     getPolicyEngine: vi.fn(),
     getEnableExtensionReloading: vi.fn().mockReturnValue(false),
@@ -75,6 +78,17 @@ export function createMockConfig(
   mockConfig.getGeminiClient = vi
     .fn()
     .mockReturnValue(new GeminiClient(mockConfig));
+
+  mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+    check: async () => {
+      const mode = mockConfig.getApprovalMode();
+      if (mode === ApprovalMode.YOLO) {
+        return { decision: PolicyDecision.ALLOW };
+      }
+      return { decision: PolicyDecision.ASK_USER };
+    },
+  });
+
   return mockConfig;
 }
 

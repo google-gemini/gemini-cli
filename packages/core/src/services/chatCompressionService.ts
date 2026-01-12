@@ -20,8 +20,8 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
-import { firePreCompressHook } from '../core/sessionHookTriggers.js';
 import { PreCompressTrigger } from '../hooks/types.js';
 
 /**
@@ -88,6 +88,8 @@ export function modelStringToModelConfigAlias(model: string): string {
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
       return 'chat-compression-3-pro';
+    case PREVIEW_GEMINI_FLASH_MODEL:
+      return 'chat-compression-3-flash';
     case DEFAULT_GEMINI_MODEL:
       return 'chat-compression-2.5-pro';
     case DEFAULT_GEMINI_FLASH_MODEL:
@@ -125,16 +127,10 @@ export class ChatCompressionService {
       };
     }
 
-    // Fire PreCompress hook before compression (only if hooks are enabled)
+    // Fire PreCompress hook before compression
     // This fires for both manual and auto compression attempts
-    const hooksEnabled = config.getEnableHooks();
-    const messageBus = config.getMessageBus();
-    if (hooksEnabled && messageBus) {
-      const trigger = force
-        ? PreCompressTrigger.Manual
-        : PreCompressTrigger.Auto;
-      await firePreCompressHook(messageBus, trigger);
-    }
+    const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
+    await config.getHookSystem()?.firePreCompressEvent(trigger);
 
     const originalTokenCount = chat.getLastPromptTokenCount();
 

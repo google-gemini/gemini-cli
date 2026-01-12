@@ -43,9 +43,15 @@ topics on:
   - **Cause:** You may be on a corporate network with a firewall that intercepts
     and inspects SSL/TLS traffic. This often requires a custom root CA
     certificate to be trusted by Node.js.
-  - **Solution:** Set the `NODE_EXTRA_CA_CERTS` environment variable to the
-    absolute path of your corporate root CA certificate file.
-    - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
+  - **Solution:** First try setting `NODE_USE_SYSTEM_CA`; if that does not
+    resolve the issue, set `NODE_EXTRA_CA_CERTS`.
+    - Set the `NODE_USE_SYSTEM_CA=1` environment variable to tell Node.js to use
+      the operating system's native certificate store (where corporate
+      certificates are typically already installed).
+      - Example: `export NODE_USE_SYSTEM_CA=1`
+    - Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of
+      your corporate root CA certificate file.
+      - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
 
 ## Common error messages and solutions
 
@@ -153,3 +159,6 @@ guide_, consider searching the Gemini CLI
 [Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues).
 If you can't find an issue similar to yours, consider creating a new GitHub
 Issue with a detailed description. Pull requests are also welcome!
+
+> **Note:** Issues tagged as "🔒Maintainers only" are reserved for project
+> maintainers. We will not accept pull requests related to these issues.

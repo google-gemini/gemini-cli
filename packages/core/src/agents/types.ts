@@ -39,6 +39,11 @@ export interface OutputObject {
 export type AgentInputs = Record<string, unknown>;
 
 /**
+ * Simplified input structure for Remote Agents, which consumes a single string query.
+ */
+export type RemoteAgentInputs = { query: string };
+
+/**
  * Structured events emitted during subagent execution for user observability.
  */
 export interface SubagentActivityEvent {
@@ -49,20 +54,33 @@ export interface SubagentActivityEvent {
 }
 
 /**
- * The definition for an agent.
+ * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
  */
-export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
+export interface BaseAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> {
   /** Unique identifier for the agent. */
   name: string;
   displayName?: string;
   description: string;
+  inputConfig: InputConfig;
+  outputConfig?: OutputConfig<TOutput>;
+}
+
+export interface LocalAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseAgentDefinition<TOutput> {
+  kind: 'local';
+
+  // Local agent required configs
   promptConfig: PromptConfig;
   modelConfig: ModelConfig;
   runConfig: RunConfig;
+
+  // Optional configs
   toolConfig?: ToolConfig;
-  outputConfig?: OutputConfig<TOutput>;
-  inputConfig: InputConfig;
+
   /**
    * An optional function to process the raw output from the agent's final tool
    * call into a string format.
@@ -72,6 +90,17 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
    */
   processOutput?: (output: z.infer<TOutput>) => string;
 }
+
+export interface RemoteAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseAgentDefinition<TOutput> {
+  kind: 'remote';
+  agentCardUrl: string;
+}
+
+export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
+  | LocalAgentDefinition<TOutput>
+  | RemoteAgentDefinition<TOutput>;
 
 /**
  * Configures the initial prompt for the agent.

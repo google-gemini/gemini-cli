@@ -397,6 +397,48 @@ describe('extensionSettings', () => {
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toBe('VAR1="a value with spaces"\n');
     });
+
+    it('should not attempt to clear secrets if keychain is unavailable', async () => {
+      // Arrange
+      const mockIsAvailable = vi.fn().mockResolvedValue(false);
+      const mockListSecrets = vi.fn();
+
+      vi.mocked(KeychainTokenStorage).mockImplementation(
+        () =>
+          ({
+            isAvailable: mockIsAvailable,
+            listSecrets: mockListSecrets,
+            deleteSecret: vi.fn(),
+            getSecret: vi.fn(),
+            setSecret: vi.fn(),
+          }) as unknown as KeychainTokenStorage,
+      );
+
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [], // Empty settings triggers clearSettings
+      };
+
+      const previousConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+      };
+
+      // Act
+      await maybePromptForSettings(
+        config,
+        '12345',
+        mockRequestSetting,
+        previousConfig,
+        undefined,
+      );
+
+      // Assert
+      expect(mockIsAvailable).toHaveBeenCalled();
+      expect(mockListSecrets).not.toHaveBeenCalled();
+    });
   });
 
   describe('promptForSetting', () => {
@@ -487,6 +529,7 @@ describe('extensionSettings', () => {
         config,
         extensionId,
         ExtensionSettingScope.USER,
+        tempWorkspaceDir,
       );
 
       expect(contents).toEqual({
@@ -510,6 +553,7 @@ describe('extensionSettings', () => {
         config,
         extensionId,
         ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
       );
 
       expect(contents).toEqual({
@@ -554,7 +598,11 @@ describe('extensionSettings', () => {
       );
       await workspaceKeychain.setSecret('VAR2', 'workspace-secret2');
 
-      const contents = await getEnvContents(config, extensionId);
+      const contents = await getEnvContents(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
 
       expect(contents).toEqual({
         VAR1: 'workspace-value1',
@@ -594,6 +642,7 @@ describe('extensionSettings', () => {
         'VAR1',
         mockRequestSetting,
         ExtensionSettingScope.USER,
+        tempWorkspaceDir,
       );
 
       const expectedEnvPath = path.join(extensionDir, '.env');
@@ -610,6 +659,7 @@ describe('extensionSettings', () => {
         'VAR1',
         mockRequestSetting,
         ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
       );
 
       const expectedEnvPath = path.join(tempWorkspaceDir, '.env');
@@ -626,6 +676,7 @@ describe('extensionSettings', () => {
         'VAR2',
         mockRequestSetting,
         ExtensionSettingScope.USER,
+        tempWorkspaceDir,
       );
 
       const userKeychain = new KeychainTokenStorage(
@@ -643,6 +694,7 @@ describe('extensionSettings', () => {
         'VAR2',
         mockRequestSetting,
         ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
       );
 
       const workspaceKeychain = new KeychainTokenStorage(
@@ -668,6 +720,7 @@ describe('extensionSettings', () => {
         'VAR1',
         mockRequestSetting,
         ExtensionSettingScope.WORKSPACE,
+        tempWorkspaceDir,
       );
 
       // Read the .env file after update

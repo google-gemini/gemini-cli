@@ -104,7 +104,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -303,6 +303,23 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Setting Descriptions', () => {
+    it('should render descriptions for settings that have them', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = renderDialog(settings, onSelect);
+
+      const output = lastFrame();
+      // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
+      expect(output).toContain('Vim Mode');
+      expect(output).toContain('Enable Vim keybindings');
+      // 'general.disableAutoUpdate' has description 'Disable automatic updates'
+      expect(output).toContain('Disable Auto Update');
+      expect(output).toContain('Disable automatic updates');
+    });
+  });
+
   describe('Settings Navigation', () => {
     it.each([
       {
@@ -326,7 +343,7 @@ describe('SettingsDialog', () => {
 
       // Navigate down
       act(() => {
-        stdin.write(down as string);
+        stdin.write(down);
       });
 
       await waitFor(() => {
@@ -335,7 +352,7 @@ describe('SettingsDialog', () => {
 
       // Navigate up
       act(() => {
-        stdin.write(up as string);
+        stdin.write(up);
       });
 
       await waitFor(() => {

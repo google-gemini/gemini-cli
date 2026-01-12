@@ -91,6 +91,7 @@ const mockConfig = {
   isTrustedFolder: () => true,
   getIdeMode: () => false,
   getEnableInteractiveShell: () => true,
+  getPreviewFeatures: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {
@@ -108,7 +109,7 @@ export const mockSettings = new LoadedSettings(
   { path: '', settings: {}, originalSettings: {} },
   { path: '', settings: {}, originalSettings: {} },
   true,
-  new Set(),
+  [],
 );
 
 export const createMockSettings = (
@@ -121,7 +122,7 @@ export const createMockSettings = (
     { path: '', settings, originalSettings: settings },
     { path: '', settings: {}, originalSettings: {} },
     true,
-    new Set(),
+    [],
   );
 };
 
@@ -133,6 +134,7 @@ const baseMockUiState = {
   mainAreaWidth: 100,
   terminalWidth: 120,
   currentModel: 'gemini-pro',
+  terminalBackgroundColor: undefined,
 };
 
 const mockUIActions: UIActions = {

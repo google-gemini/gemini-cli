@@ -17,7 +17,7 @@ vi.mock('./HistoryItemDisplay.js', async () => {
   const { Text } = await vi.importActual('ink');
   return {
     HistoryItemDisplay: ({ item }: { item: { content: string } }) =>
-      React.createElement(Text as unknown as React.FC, null, item.content),
+      React.createElement(Text as React.FC, null, item.content),
   };
 });
 
