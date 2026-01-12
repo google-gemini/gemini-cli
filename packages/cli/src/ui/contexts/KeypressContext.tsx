@@ -24,6 +24,7 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
+export const UNBRACKETED_PASTE_MIN_LENGTH = 10;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -268,10 +269,13 @@ function createDataListener(keypressHandler: KeypressHandler) {
     // Detect unbracketed paste ONLY if:
     // 1. NOT currently in a bracketed paste session
     // 2. Data contains NO escape sequences
-    // 3. Data has multiple characters (can't type 2+ chars in one stdin event)
+    // 3. Data meets minimum length threshold (avoids false positives from
+    //    key repeat, SSH latency batching, or IME composition)
     const hasAnyEsc = data.includes('\x1B');
     const isLikelyUnbracketedPaste =
-      !inBracketedPaste && !hasAnyEsc && data.length > 1;
+      !inBracketedPaste &&
+      !hasAnyEsc &&
+      data.length >= UNBRACKETED_PASTE_MIN_LENGTH;
 
     // Exit bracketed paste mode when we see paste-end
     if (hasPasteEnd) {
