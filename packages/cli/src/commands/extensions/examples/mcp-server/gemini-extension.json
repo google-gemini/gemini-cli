@@ -4,7 +4,7 @@
   "mcpServers": {
     "nodeServer": {
       "command": "node",
-      "args": ["${extensionPath}${/}example.js"],
+      "args": ["${extensionPath}${/}dist${/}example.js"],
       "cwd": "${extensionPath}"
     }
   }

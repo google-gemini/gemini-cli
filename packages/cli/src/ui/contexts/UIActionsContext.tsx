@@ -59,6 +59,7 @@ export interface UIActions {
   dismissBackgroundShell: (pid: number) => void;
   setActiveBackgroundShellPid: (pid: number) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;
+  setAuthContext: (context: { requiresRestart?: boolean }) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);
