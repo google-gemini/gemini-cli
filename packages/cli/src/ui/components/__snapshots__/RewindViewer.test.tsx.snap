@@ -22,6 +22,9 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 │ ● read @server3:mcp://demo-resource hello                                                                            │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
+│ ● Original Prompt                                                                                                    │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
 │                                                                                                                      │
 │ (Use Enter to select a message, Esc to close)                                                                        │
 │                                                                                                                      │
