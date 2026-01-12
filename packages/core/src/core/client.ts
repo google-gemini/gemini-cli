@@ -12,7 +12,6 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import { createUserContent } from '@google/genai';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
@@ -40,10 +39,6 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
-import {
-  fireBeforeAgentHook,
-  fireAfterAgentHook,
-} from './clientHookTriggers.js';
 import type { DefaultHookOutput } from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
@@ -62,6 +57,7 @@ import {
 } from '../availability/policyHelpers.js';
 import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { partToString } from '../utils/partUtils.js';
 
 const MAX_TURNS = 100;
 
@@ -113,7 +109,6 @@ export class GeminiClient {
   >();
 
   private async fireBeforeAgentHookSafe(
-    messageBus: MessageBus,
     request: PartListUnion,
     prompt_id: string,
   ): Promise<BeforeAgentHookReturn> {
@@ -138,7 +133,10 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookOutput = await fireBeforeAgentHook(messageBus, request);
+    const hookResult = await this.config
+      .getHookSystem()
+      ?.fireBeforeAgentEvent(partToString(request));
+    const hookOutput = hookResult?.finalOutput;
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -169,7 +167,6 @@ export class GeminiClient {
   }
 
   private async fireAfterAgentHookSafe(
-    messageBus: MessageBus,
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
@@ -190,11 +187,11 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookOutput = await fireAfterAgentHook(
-      messageBus,
-      finalRequest,
-      finalResponseText,
-    );
+    const hookResult = await this.config
+      .getHookSystem()
+      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+    const hookOutput = hookResult?.finalOutput;
+
     return hookOutput;
   }
 
@@ -757,11 +754,7 @@ export class GeminiClient {
     }
 
     if (hooksEnabled && messageBus) {
-      const hookResult = await this.fireBeforeAgentHookSafe(
-        messageBus,
-        request,
-        prompt_id,
-      );
+      const hookResult = await this.fireBeforeAgentHookSafe(request, prompt_id);
       if (hookResult) {
         if (
           'type' in hookResult &&
@@ -802,7 +795,6 @@ export class GeminiClient {
       // Fire AfterAgent hook if we have a turn and no pending tools
       if (hooksEnabled && messageBus) {
         const hookOutput = await this.fireAfterAgentHookSafe(
-          messageBus,
           request,
           prompt_id,
           turn,
