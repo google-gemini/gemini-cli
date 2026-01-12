@@ -14,7 +14,6 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
-import type { GenerateContentConfig } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -245,6 +244,9 @@ export class AgentRegistry {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
+    // TODO(16443): Refactor definition merging logic into a helper.
+    // To do this, we need to align the definition of the internal `Definition`
+    // type with the one exported in settings.json.
     const mergedDefinition = {
       ...definition,
       runConfig: {
@@ -272,7 +274,7 @@ export class AgentRegistry {
 
     let agentModelConfig: ModelConfig = {
       model,
-      generateContentConfig: GenerateContentConfig: {
+      generateContentConfig: {
         temperature: modelConfig.temp,
         topP: modelConfig.top_p,
         thinkingConfig: {

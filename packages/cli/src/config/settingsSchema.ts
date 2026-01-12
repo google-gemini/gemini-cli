@@ -800,7 +800,8 @@ const SETTINGS_SCHEMA = {
         category: 'Advanced',
         requiresRestart: true,
         default: {},
-        description: 'Override settings for specific agents.',
+        description:
+          'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
         showInDialog: false,
         additionalProperties: {
           type: 'object',

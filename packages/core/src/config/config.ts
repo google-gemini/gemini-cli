@@ -515,9 +515,9 @@ export class Config {
     | undefined;
 
   private readonly enableAgents: boolean;
+  private readonly agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
-  private readonly agents: AgentSettings;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;

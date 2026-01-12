@@ -935,8 +935,8 @@
       "properties": {
         "overrides": {
           "title": "Agent Overrides",
-          "description": "Override settings for specific agents.",
-          "markdownDescription": "Override settings for specific agents.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+          "description": "Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.",
+          "markdownDescription": "Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "additionalProperties": {
