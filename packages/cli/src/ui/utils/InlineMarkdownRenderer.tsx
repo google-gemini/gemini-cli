@@ -140,8 +140,9 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
       } else if (fullMatch.match(/^https?:\/\//)) {
         // Strip trailing punctuation that shouldn't be part of URLs
         // Includes ASCII punctuation and CJK punctuation (Chinese, Japanese, etc.)
-        const trailingPunctuationRegex =
-          /[.,;:!?\)\]\}>"'。，；：！？）】》'"、）〉》〕〗〙〛]+$/;
+        // Note: Excludes brackets/parens as they can be valid URL characters
+        // (e.g., https://en.wikipedia.org/wiki/Link_(The_Legend_of_Zelda))
+        const trailingPunctuationRegex = /[.,;:!?"'。，；：！？》'"、]+$/;
         const trailingMatch = fullMatch.match(trailingPunctuationRegex);
         const cleanUrl = trailingMatch
           ? fullMatch.slice(0, -trailingMatch[0].length)
