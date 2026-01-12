@@ -8,7 +8,7 @@ import { Storage } from '../config/storage.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
-import { loadAgentsFromDirectory } from './toml-loader.js';
+import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
@@ -46,17 +46,19 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.refreshAgents().catch((e) => {
-        debugLogger.error(
-          '[AgentRegistry] Failed to refresh agents on model change:',
-          e,
-        );
-      });
-    });
+    coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
   }
+
+  private onModelChanged = () => {
+    this.refreshAgents().catch((e) => {
+      debugLogger.error(
+        '[AgentRegistry] Failed to refresh agents on model change:',
+        e,
+      );
+    });
+  };
 
   /**
    * Clears the current registry and re-scans for agents.
@@ -66,6 +68,13 @@ export class AgentRegistry {
     this.agents.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
+  }
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  dispose(): void {
+    coreEvents.off(CoreEvent.ModelChanged, this.onModelChanged);
   }
 
   private async loadAgents(): Promise<void> {
