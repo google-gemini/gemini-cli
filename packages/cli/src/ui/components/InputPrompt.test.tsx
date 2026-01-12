@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
+import {
+  calculateTransformationsForLine,
+  calculateTransformedLine,
+} from './shared/text-buffer.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
@@ -31,6 +38,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { StreamingState } from '../types.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -117,6 +125,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isKittyProtocolEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
@@ -158,6 +170,8 @@ describe('InputPrompt', () => {
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
       visualToLogicalMap: [[0, 0]],
+      visualToTransformedMap: [0],
+      transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
     } as unknown as TextBuffer;
 
@@ -571,8 +585,8 @@ describe('InputPrompt', () => {
     });
 
     it('should handle errors during clipboard operations', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+      const debugLoggerErrorSpy = vi
+        .spyOn(debugLogger, 'error')
         .mockImplementation(() => {});
       vi.mocked(clipboardUtils.clipboardHasImage).mockRejectedValue(
         new Error('Clipboard error'),
@@ -586,14 +600,14 @@ describe('InputPrompt', () => {
         stdin.write('\x16'); // Ctrl+V
       });
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error handling clipboard image:',
+        expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
+          'Error handling paste:',
           expect.any(Error),
         );
       });
       expect(mockBuffer.setText).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      debugLoggerErrorSpy.mockRestore();
       unmount();
     });
   });
@@ -620,6 +634,31 @@ describe('InputPrompt', () => {
           'pasted text',
         );
       });
+      unmount();
+    });
+
+    it('should use OSC 52 when useOSC52Paste setting is enabled', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const settings = createMockSettings({
+        experimental: { useOSC52Paste: true },
+      });
+
+      const { stdout, stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { settings },
+      );
+
+      const writeSpy = vi.spyOn(stdout, 'write');
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(writeSpy).toHaveBeenCalledWith('\x1b]52;c;?\x07');
+      });
+      // Should NOT call clipboardy.read()
+      expect(clipboardy.read).not.toHaveBeenCalled();
       unmount();
     });
   });
@@ -2379,6 +2418,84 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('Tab focus toggle', () => {
+    it.each([
+      {
+        name: 'should toggle focus in on Tab when no suggestions or ghost text',
+        showSuggestions: false,
+        ghostText: '',
+        suggestions: [],
+        expectedFocusToggle: true,
+      },
+      {
+        name: 'should accept ghost text and NOT toggle focus on Tab',
+        showSuggestions: false,
+        ghostText: 'ghost text',
+        suggestions: [],
+        expectedFocusToggle: false,
+        expectedAcceptCall: true,
+      },
+      {
+        name: 'should NOT toggle focus on Tab when suggestions are present',
+        showSuggestions: true,
+        ghostText: '',
+        suggestions: [{ label: 'test', value: 'test' }],
+        expectedFocusToggle: false,
+      },
+    ])(
+      '$name',
+      async ({
+        showSuggestions,
+        ghostText,
+        suggestions,
+        expectedFocusToggle,
+        expectedAcceptCall,
+      }) => {
+        const mockAccept = vi.fn();
+        mockedUseCommandCompletion.mockReturnValue({
+          ...mockCommandCompletion,
+          showSuggestions,
+          suggestions,
+          promptCompletion: {
+            text: ghostText,
+            accept: mockAccept,
+            clear: vi.fn(),
+            isLoading: false,
+            isActive: ghostText !== '',
+            markSelected: vi.fn(),
+          },
+        });
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiActions,
+            uiState: { activePtyId: 1 },
+          },
+        );
+
+        await act(async () => {
+          stdin.write('\t');
+        });
+
+        await waitFor(() => {
+          if (expectedFocusToggle) {
+            expect(uiActions.setEmbeddedShellFocused).toHaveBeenCalledWith(
+              true,
+            );
+          } else {
+            expect(uiActions.setEmbeddedShellFocused).not.toHaveBeenCalled();
+          }
+
+          if (expectedAcceptCall) {
+            expect(mockAccept).toHaveBeenCalled();
+          }
+        });
+        unmount();
+      },
+    );
+  });
+
   describe('mouse interaction', () => {
     it.each([
       {
@@ -2739,6 +2856,59 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+  });
+
+  describe('image path transformation snapshots', () => {
+    const logicalLine = '@/path/to/screenshots/screenshot2x.png';
+    const transformations = calculateTransformationsForLine(logicalLine);
+
+    const applyVisualState = (visualLine: string, cursorCol: number): void => {
+      mockBuffer.text = logicalLine;
+      mockBuffer.lines = [logicalLine];
+      mockBuffer.viewportVisualLines = [visualLine];
+      mockBuffer.allVisualLines = [visualLine];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualToTransformedMap = [0];
+      mockBuffer.transformationsByLine = [transformations];
+      mockBuffer.cursor = [0, cursorCol];
+      mockBuffer.visualCursor = [0, 0];
+    };
+
+    it('should snapshot collapsed image path', async () => {
+      const { transformedLine } = calculateTransformedLine(
+        logicalLine,
+        0,
+        [0, transformations[0].logEnd + 5],
+        transformations,
+      );
+      applyVisualState(transformedLine, transformations[0].logEnd + 5);
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
+      unmount();
+    });
+
+    it('should snapshot expanded image path when cursor is on it', async () => {
+      const { transformedLine } = calculateTransformedLine(
+        logicalLine,
+        0,
+        [0, transformations[0].logStart + 1],
+        transformations,
+      );
+      applyVisualState(transformedLine, transformations[0].logStart + 1);
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
+      unmount();
+    });
   });
 });
 

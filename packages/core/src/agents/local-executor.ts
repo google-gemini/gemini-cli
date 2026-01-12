@@ -17,7 +17,8 @@ import type {
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/turn.js';
+import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -39,6 +40,8 @@ import type {
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
+import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -98,7 +101,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
-    const agentToolRegistry = new ToolRegistry(runtimeContext);
+    const agentToolRegistry = new ToolRegistry(
+      runtimeContext,
+      runtimeContext.getMessageBus(),
+    );
     const parentToolRegistry = runtimeContext.getToolRegistry();
 
     if (definition.toolConfig) {
@@ -585,9 +591,44 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const modelConfigAlias = getModelConfigAlias(this.definition);
+
+    // Resolve the model config early to get the concrete model string (which may be `auto`).
+    const resolvedConfig =
+      this.runtimeContext.modelConfigService.getResolvedConfig({
+        model: modelConfigAlias,
+        overrideScope: this.definition.name,
+      });
+    const requestedModel = resolvedConfig.model;
+
+    let modelToUse: string;
+    if (isAutoModel(requestedModel)) {
+      // TODO(joshualitt): This try / catch is inconsistent with the routing
+      // behavior for the main agent. Ideally, we would have a universal
+      // policy for routing failure. Given routing failure does not necessarily
+      // mean generation will fail, we may want to share this logic with
+      // other places we use model routing.
+      try {
+        const routingContext: RoutingContext = {
+          history: chat.getHistory(/*curated=*/ true),
+          request: message.parts || [],
+          signal,
+          requestedModel,
+        };
+        const router = this.runtimeContext.getModelRouterService();
+        const decision = await router.route(routingContext);
+        modelToUse = decision.model;
+      } catch (error) {
+        debugLogger.warn(`Error during model routing: ${error}`);
+        modelToUse = DEFAULT_GEMINI_MODEL;
+      }
+    } else {
+      modelToUse = requestedModel;
+    }
+
     const responseStream = await chat.sendMessageStream(
       {
-        model: getModelConfigAlias(this.definition),
+        model: modelToUse,
         overrideScope: this.definition.name,
       },
       message.parts || [],

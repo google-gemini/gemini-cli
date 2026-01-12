@@ -159,7 +159,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `output`
 
 - **`output.format`** (enum):
-  - **Description:** The format of the CLI output.
+  - **Description:** The format of the CLI output. Can be `text` or `json`.
   - **Default:** `"text"`
   - **Values:** `"text"`, `"json"`
 
@@ -183,6 +183,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show Gemini CLI status and thoughts in the terminal window
     title
   - **Default:** `false`
+
+- **`ui.showHomeDirectoryWarning`** (boolean):
+  - **Description:** Show a warning when running Gemini CLI in the home
+    directory.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
@@ -269,7 +275,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `ide`
 
 - **`ide.enabled`** (boolean):
-  - **Description:** Enable IDE integration mode
+  - **Description:** Enable IDE integration mode.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -573,12 +579,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
-  - **Description:** Respect .gitignore files when searching
+  - **Description:** Respect .gitignore files when searching.
   - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`context.fileFiltering.respectGeminiIgnore`** (boolean):
-  - **Description:** Respect .geminiignore files when searching
+  - **Description:** Respect .geminiignore files when searching.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -620,6 +626,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The maximum time in seconds allowed without output from the
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
+
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
 
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
@@ -679,20 +690,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `1000`
   - **Requires restart:** Yes
 
-- **`tools.enableMessageBusIntegration`** (boolean):
-  - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools automatically respect policy engine
-    decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
-    implementations.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.enableHooks`** (boolean):
-  - **Description:** Enable the hooks system for intercepting and customizing
-    Gemini CLI behavior. When enabled, hooks configured in settings will execute
-    at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.).
-    Requires MessageBus integration.
-  - **Default:** `false`
+  - **Description:** Enables the hooks system experiment. When disabled, the
+    hooks system is completely deactivated regardless of other settings.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `mcp`
@@ -711,12 +712,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** A list of MCP servers to exclude.
   - **Default:** `undefined`
   - **Requires restart:** Yes
-
-#### `useSmartEdit`
-
-- **`useSmartEdit`** (boolean):
-  - **Description:** Enable the smart-edit tool instead of the replace tool.
-  - **Default:** `true`
 
 #### `useWriteTodos`
 
@@ -825,6 +820,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
   - **Description:** Enable the Codebase Investigator agent.
   - **Default:** `true`
@@ -852,17 +852,38 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
-- **`experimental.introspectionAgentSettings.enabled`** (boolean):
-  - **Description:** Enable the Introspection Agent.
+- **`experimental.useOSC52Paste`** (boolean):
+  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
+    (useful for remote sessions).
   - **Default:** `false`
+
+- **`experimental.cliHelpAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the CLI Help Agent.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+#### `skills`
+
+- **`skills.disabled`** (array):
+  - **Description:** List of disabled skills.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 #### `hooks`
+
+- **`hooks.enabled`** (boolean):
+  - **Description:** Canonical toggle for the hooks system. When disabled, no
+    hooks will be executed.
+  - **Default:** `false`
 
 - **`hooks.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
     Hooks in this list will not execute even if configured.
   - **Default:** `[]`
+
+- **`hooks.notifications`** (boolean):
+  - **Description:** Show visual indicators when hooks are executing.
+  - **Default:** `true`
 
 - **`hooks.BeforeTool`** (array):
   - **Description:** Hooks that execute before tool execution. Can intercept,
@@ -918,6 +939,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `admin`
+
+- **`admin.secureModeEnabled`** (boolean):
+  - **Description:** If true, disallows yolo mode from being used.
+  - **Default:** `false`
+
+- **`admin.extensions.enabled`** (boolean):
+  - **Description:** If false, disallows extensions from being installed or
+    used.
+  - **Default:** `true`
+
+- **`admin.mcp.enabled`** (boolean):
+  - **Description:** If false, disallows MCP servers from being used.
+  - **Default:** `true`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

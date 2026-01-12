@@ -91,15 +91,18 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys       |
-| ----------------------------------------------------------------- | ---------- |
-| Toggle detailed error information.                                | `F12`      |
-| Toggle the full TODO list.                                        | `Ctrl + T` |
-| Toggle IDE context details.                                       | `Ctrl + G` |
-| Toggle Markdown rendering.                                        | `Cmd + M`  |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S` |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S` |
-| Toggle focus between the shell and Gemini input.                  | `Ctrl + F` |
+| Action                                                            | Keys                                |
+| ----------------------------------------------------------------- | ----------------------------------- |
+| Toggle detailed error information.                                | `F12`                               |
+| Toggle the full TODO list.                                        | `Ctrl + T`                          |
+| Toggle IDE context details.                                       | `Ctrl + G`                          |
+| Toggle Markdown rendering.                                        | `Cmd + M`                           |
+| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`                          |
+| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`                          |
+| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`                       |
+| Expand a height-constrained response to show additional lines.    | `Ctrl + S`                          |
+| Toggle focus between the shell and Gemini input.                  | `Tab (no Shift)`                    |
+| Toggle focus out of the interactive shell and into Gemini input.  | `Tab (no Shift)`<br />`Shift + Tab` |
 
 #### Session Control
 
@@ -112,8 +115,6 @@ available combinations.
 
 ## Additional context-specific shortcuts
 
-- `Ctrl+Y`: Toggle YOLO (auto-approval) mode for tool calls.
-- `Shift+Tab`: Toggle Auto Edit (auto-accept edits) mode.
 - `Option+M` (macOS): Entering `µ` with Option+M also toggles Markdown
   rendering, matching `Cmd+M`.
 - `!` on an empty prompt: Enter or exit shell mode.
@@ -122,8 +123,7 @@ available combinations.
 - `Ctrl+Delete` / `Meta+Delete`: Delete the word to the right of the cursor.
 - `Ctrl+B` or `Left Arrow`: Move the cursor one character to the left while
   editing text.
-- `Ctrl+F` or `Right Arrow`: Move the cursor one character to the right; with an
-  embedded shell attached, `Ctrl+F` still toggles focus.
+- `Ctrl+F` or `Right Arrow`: Move the cursor one character to the right.
 - `Ctrl+D` or `Delete`: Remove the character immediately to the right of the
   cursor.
 - `Ctrl+H` or `Backspace`: Remove the character immediately to the left of the

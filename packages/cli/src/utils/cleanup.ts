@@ -25,6 +25,16 @@ export function registerSyncCleanup(fn: () => void) {
   syncCleanupFunctions.push(fn);
 }
 
+/**
+ * Resets the internal cleanup state for testing purposes.
+ * This allows tests to run in isolation without vi.resetModules().
+ */
+export function resetCleanupForTesting() {
+  cleanupFunctions.length = 0;
+  syncCleanupFunctions.length = 0;
+  configForTelemetry = null;
+}
+
 export function runSyncCleanup() {
   for (const fn of syncCleanupFunctions) {
     try {
@@ -54,6 +64,14 @@ export async function runExitCleanup() {
     }
   }
   cleanupFunctions.length = 0; // Clear the array
+
+  if (configForTelemetry) {
+    try {
+      await configForTelemetry.dispose();
+    } catch (_) {
+      // Ignore errors during disposal
+    }
+  }
 
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed

@@ -224,7 +224,7 @@ export class GeminiAgent {
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
+    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
     await config.initialize();
     startupProfiler.flush(config);
@@ -615,7 +615,10 @@ export class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = new ReadManyFilesTool(this.config);
+    const readManyFilesTool = new ReadManyFilesTool(
+      this.config,
+      this.config.getMessageBus(),
+    );
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
