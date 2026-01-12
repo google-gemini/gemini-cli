@@ -43,7 +43,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -735,6 +735,8 @@ export class Config {
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
+    coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
@@ -759,6 +761,7 @@ export class Config {
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
       if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
@@ -949,8 +952,7 @@ export class Config {
   }
 
   activateFallbackMode(model: string): void {
-    this.setActiveModel(model);
-    coreEvents.emitModelChanged(model);
+    this.setModel(model, true);
     const authType = this.getContentGeneratorConfig()?.authType;
     if (authType) {
       logFlashFallback(this, new FlashFallbackEvent(authType));
@@ -1567,6 +1569,7 @@ export class Config {
 
     // Re-register ActivateSkillTool to update its schema with the newly discovered skills
     if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
       this.getToolRegistry().registerTool(
         new ActivateSkillTool(this, this.messageBus),
       );
@@ -1764,6 +1767,17 @@ export class Config {
 
     // Register Subagents as Tools
     // Register DelegateToAgentTool if agents are enabled
+    this.registerDelegateToAgentTool(registry);
+
+    await registry.discoverAllTools();
+    registry.sortTools();
+    return registry;
+  }
+
+  /**
+   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   */
+  private registerDelegateToAgentTool(registry: ToolRegistry): void {
     if (
       this.isAgentsEnabled() ||
       this.getCodebaseInvestigatorSettings().enabled ||
@@ -1783,10 +1797,6 @@ export class Config {
         registry.registerTool(delegateTool);
       }
     }
-
-    await registry.discoverAllTools();
-    registry.sortTools();
-    return registry;
   }
 
   /**
@@ -1869,6 +1879,35 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  private onAgentsRefreshed = async () => {
+    if (this.toolRegistry) {
+      this.registerDelegateToAgentTool(this.toolRegistry);
+    }
+    // Propagate updates to the active chat session
+    const client = this.getGeminiClient();
+    if (client?.isInitialized()) {
+      await client.setTools();
+      await client.updateSystemInstruction();
+    } else {
+      debugLogger.debug(
+        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
+      );
+    }
+  };
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  async dispose(): Promise<void> {
+    coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    if (this.agentRegistry) {
+      this.agentRegistry.dispose();
+    }
+    if (this.mcpClientManager) {
+      await this.mcpClientManager.stop();
+    }
   }
 }
 // Export model constants for use in CLI
