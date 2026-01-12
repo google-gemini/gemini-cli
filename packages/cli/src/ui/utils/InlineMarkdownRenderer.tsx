@@ -138,10 +138,23 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        // Strip trailing punctuation that shouldn't be part of URLs
+        // Includes ASCII punctuation and CJK punctuation (Chinese, Japanese, etc.)
+        const trailingPunctuationRegex =
+          /[.,;:!?\)\]\}>"'。，；：！？）】》'"、）〉》〕〗〙〛]+$/;
+        const trailingMatch = fullMatch.match(trailingPunctuationRegex);
+        const cleanUrl = trailingMatch
+          ? fullMatch.slice(0, -trailingMatch[0].length)
+          : fullMatch;
+        const trailingPunctuation = trailingMatch ? trailingMatch[0] : '';
+
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
-          </Text>
+          <React.Fragment key={key}>
+            <Text color={theme.text.link}>{cleanUrl}</Text>
+            {trailingPunctuation && (
+              <Text color={baseColor}>{trailingPunctuation}</Text>
+            )}
+          </React.Fragment>
         );
       }
     } catch (e) {
