@@ -69,7 +69,10 @@ import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type {
+  ModelConfig,
+  ModelConfigServiceConfig,
+} from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
@@ -157,6 +160,21 @@ export interface ResolvedExtensionSetting {
 
 export interface CliHelpAgentSettings {
   enabled?: boolean;
+}
+
+export interface AgentRunConfig {
+  maxTimeMinutes?: number;
+  maxTurns?: number;
+}
+
+export interface AgentOverride {
+  modelConfig?: ModelConfig;
+  runConfig?: AgentRunConfig;
+  disabled?: boolean;
+}
+
+export interface AgentSettings {
+  overrides?: Record<string, AgentOverride>;
 }
 
 /**
@@ -364,6 +382,7 @@ export interface ConfigParameters {
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
+  agents?: AgentSettings;
   onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
@@ -498,6 +517,7 @@ export class Config {
   private readonly enableAgents: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
+  private readonly agents: AgentSettings;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -570,6 +590,7 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -1441,6 +1462,10 @@ export class Config {
 
   getNoBrowser(): boolean {
     return this.noBrowser;
+  }
+
+  getAgentsSettings(): AgentSettings {
+    return this.agents;
   }
 
   isBrowserLaunchSuppressed(): boolean {

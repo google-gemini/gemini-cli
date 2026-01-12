@@ -557,6 +557,13 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+#### `agents`
+
+- **`agents.overrides`** (object):
+  - **Description:** Override settings for specific agents.
+  - **Default:** `{}`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
