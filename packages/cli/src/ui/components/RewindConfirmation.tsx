@@ -20,6 +20,29 @@ export enum RewindOutcome {
   Cancel = 'cancel',
 }
 
+const REWIND_OPTIONS: Array<RadioSelectItem<RewindOutcome>> = [
+  {
+    label: 'Rewind conversation and revert code changes',
+    value: RewindOutcome.RewindAndRevert,
+    key: 'Rewind conversation and revert code changes',
+  },
+  {
+    label: 'Rewind conversation',
+    value: RewindOutcome.RewindOnly,
+    key: 'Rewind conversation',
+  },
+  {
+    label: 'Revert code changes',
+    value: RewindOutcome.RevertOnly,
+    key: 'Revert code changes',
+  },
+  {
+    label: 'Do nothing (esc)',
+    value: RewindOutcome.Cancel,
+    key: 'Do nothing (esc)',
+  },
+];
+
 interface RewindConfirmationProps {
   stats: FileChangeStats | null;
   onConfirm: (outcome: RewindOutcome) => void;
@@ -41,29 +64,6 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
     },
     { isActive: true },
   );
-
-  const options: Array<RadioSelectItem<RewindOutcome>> = [
-    {
-      label: 'Rewind conversation and revert code changes',
-      value: RewindOutcome.RewindAndRevert,
-      key: 'Rewind conversation and revert code changes',
-    },
-    {
-      label: 'Rewind conversation',
-      value: RewindOutcome.RewindOnly,
-      key: 'Rewind conversation',
-    },
-    {
-      label: 'Revert code changes',
-      value: RewindOutcome.RevertOnly,
-      key: 'Revert code changes',
-    },
-    {
-      label: 'Do nothing (esc)',
-      value: RewindOutcome.Cancel,
-      key: 'Do nothing (esc)',
-    },
-  ];
 
   const handleSelect = (outcome: RewindOutcome) => {
     onConfirm(outcome);
@@ -134,7 +134,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
       </Box>
 
       <RadioButtonSelect
-        items={options}
+        items={REWIND_OPTIONS}
         onSelect={handleSelect}
         isFocused={true}
       />

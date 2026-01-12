@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
@@ -18,6 +19,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -45,29 +47,22 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     clearSelection,
   } = useRewind(conversation);
 
-  const truncate = (text: string, isSelected: boolean) => {
-    if (isSelected) return text;
-    const lines = text.split('\n');
-    if (lines.length > MAX_LINES_PER_BOX) {
-      return (
-        lines.slice(0, MAX_LINES_PER_BOX).join('\n') +
-        `\n... (${lines.length - MAX_LINES_PER_BOX} more lines)`
-      );
-    }
-    return text;
-  };
-
-  const interactions = conversation.messages.filter(
-    (msg) => msg.type === 'user',
+  const interactions = useMemo(
+    () => conversation.messages.filter((msg) => msg.type === 'user'),
+    [conversation.messages],
   );
 
-  const items = interactions
-    .map((msg, idx) => ({
-      key: `${msg.id || 'msg'}-${idx}`,
-      value: msg,
-      index: idx,
-    }))
-    .reverse();
+  const items = useMemo(
+    () =>
+      interactions
+        .map((msg, idx) => ({
+          key: `${msg.id || 'msg'}-${idx}`,
+          value: msg,
+          index: idx,
+        }))
+        .reverse(),
+    [interactions],
+  );
 
   useKeypress(
     (key) => {
@@ -158,13 +153,25 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             return (
               <Box flexDirection="column" marginBottom={1}>
                 <Box>
-                  <Text
-                    color={
-                      isSelected ? theme.status.success : theme.text.primary
-                    }
+                  <MaxSizedBox
+                    maxWidth={terminalWidth - 4}
+                    maxHeight={isSelected ? undefined : MAX_LINES_PER_BOX + 1}
+                    overflowDirection="bottom"
                   >
-                    {truncate(cleanedText, isSelected)}
-                  </Text>
+                    {cleanedText.split('\n').map((line, i) => (
+                      <Box key={i}>
+                        <Text
+                          color={
+                            isSelected
+                              ? theme.status.success
+                              : theme.text.primary
+                          }
+                        >
+                          {line}
+                        </Text>
+                      </Box>
+                    ))}
+                  </MaxSizedBox>
                 </Box>
                 {stats ? (
                   <Box flexDirection="row">

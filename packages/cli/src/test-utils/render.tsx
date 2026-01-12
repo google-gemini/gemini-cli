@@ -133,6 +133,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
 };

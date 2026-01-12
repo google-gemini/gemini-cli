@@ -9,16 +9,11 @@ import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { RewindViewer } from './RewindViewer.js';
 import { RewindOutcome } from './RewindConfirmation.js';
+import { waitFor } from '../../test-utils/async.js';
 import type {
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
-
-vi.mock('../contexts/SessionContext.js', () => ({
-  useSessionStats: () => ({
-    getPromptCount: () => 1,
-  }),
-}));
 
 vi.mock('../utils/formatters.js', async (importOriginal) => {
   const original =
@@ -182,9 +177,15 @@ describe('RewindViewer', () => {
     it.each([
       {
         name: 'confirms on Enter',
-        actionStep: async (stdin: { write: (data: string) => void }) => {
-          await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 100));
+        actionStep: async (
+          stdin: { write: (data: string) => void },
+          lastFrame: () => string | undefined,
+        ) => {
+          // Wait for confirmation dialog to be rendered and interactive
+          await waitFor(() => {
+            expect(lastFrame()).toContain('Confirm Rewind');
+          });
+          act(() => {
             stdin.write('\r');
           });
         },
@@ -192,11 +193,20 @@ describe('RewindViewer', () => {
       },
       {
         name: 'cancels on Escape',
-        actionStep: async (stdin: { write: (data: string) => void }) => {
-          await act(async () => {
-            await new Promise((resolve) => setTimeout(resolve, 100));
+        actionStep: async (
+          stdin: { write: (data: string) => void },
+          lastFrame: () => string | undefined,
+        ) => {
+          // Wait for confirmation dialog
+          await waitFor(() => {
+            expect(lastFrame()).toContain('Confirm Rewind');
+          });
+          act(() => {
             stdin.write('\x1b');
-            await new Promise((resolve) => setTimeout(resolve, 100));
+          });
+          // Wait for return to main view
+          await waitFor(() => {
+            expect(lastFrame()).toContain('> Rewind');
           });
         },
         expectRewind: false,
@@ -215,13 +225,13 @@ describe('RewindViewer', () => {
       );
 
       // Select
-      await act(async () => {
+      act(() => {
         stdin.write('\r');
       });
       expect(lastFrame()).toMatchSnapshot('confirmation-dialog');
 
       // Act
-      await actionStep(stdin);
+      await actionStep(stdin, lastFrame);
 
       if (expectRewind) {
         expect(onRewind).toHaveBeenCalledWith(
@@ -269,13 +279,18 @@ describe('RewindViewer', () => {
 
       expect(lastFrame()).toMatchSnapshot();
 
-      // Select and confirm
-      await act(async () => {
+      // Select
+      act(() => {
         stdin.write('\r'); // Select
       });
 
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for confirmation dialog
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Confirm Rewind');
+      });
+
+      // Confirm
+      act(() => {
         stdin.write('\r'); // Confirm
       });
 
