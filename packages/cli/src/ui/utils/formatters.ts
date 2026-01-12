@@ -76,10 +76,14 @@ export const formatTimeAgo = (date: string | number | Date): string => {
   return `${formatDuration(diffMs)} ago`;
 };
 
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
 const REFERENCE_CONTENT_END = '--- End of content ---';
 const REFERENCE_PATTERN = new RegExp(
-  `\\n?${REFERENCE_CONTENT_START}[\\s\\S]*?${REFERENCE_CONTENT_END}`,
+  `\\n?${escapeRegExp(REFERENCE_CONTENT_START)}[\\s\\S]*?${escapeRegExp(REFERENCE_CONTENT_END)}`,
   'g',
 );
 
