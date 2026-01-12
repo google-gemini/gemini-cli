@@ -1979,8 +1979,10 @@ describe('GeminiChat', () => {
       expect(newContents[3]?.parts?.[0]?.thoughtSignature).toBe(
         SYNTHETIC_THOUGHT_SIGNATURE,
       );
-      // Second function call does NOT
-      expect(newContents[3]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
+      // Second function call also gets a signature
+      expect(newContents[3]?.parts?.[1]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
 
       // User functionResponse part - unchanged (this is not a model turn)
       expect(newContents[4]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
@@ -1988,8 +1990,10 @@ describe('GeminiChat', () => {
       // Inside active loop, second model turn
       // First function call already has a signature, so nothing changes
       expect(newContents[5]?.parts?.[0]?.thoughtSignature).toBe('existing-sig');
-      // Second function call does NOT get a signature
-      expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
+      // Second function call now gets a signature
+      expect(newContents[5]?.parts?.[1]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
     });
 
     it('should not modify contents if there is no user text message', () => {

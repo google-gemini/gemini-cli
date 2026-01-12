@@ -703,30 +703,36 @@ export class GeminiChat {
       return requestContents;
     }
 
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
+    // Iterate through every message in the active loop, ensuring that all
+    // function calls in each message's list of parts have a valid
     // thoughtSignature property. If it does not we replace the function call
     // with a copy that uses the synthetic thought signature.
     const newContents = requestContents.slice(); // Shallow copy the array
     for (let i = activeLoopStartIndex; i < newContents.length; i++) {
       const content = newContents[i];
       if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
+        let partChanged = false;
+        let newParts: Part[] | undefined;
+        for (let j = 0; j < content.parts.length; j++) {
+          const part = content.parts[j];
           if (part.functionCall) {
             if (!part.thoughtSignature) {
+              if (!newParts) {
+                newParts = content.parts.slice();
+              }
               newParts[j] = {
                 ...part,
                 thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
               };
-              newContents[i] = {
-                ...content,
-                parts: newParts,
-              };
+              partChanged = true;
             }
-            break; // Only consider the first function call
           }
+        }
+        if (partChanged) {
+          newContents[i] = {
+            ...content,
+            parts: newParts,
+          };
         }
       }
     }
