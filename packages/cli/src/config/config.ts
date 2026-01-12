@@ -704,6 +704,7 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    dynamicExtensionLoading: settings.experimental?.dynamicExtensionLoading,
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,

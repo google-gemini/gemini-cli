@@ -30,6 +30,16 @@ export abstract class ExtensionLoader {
   abstract getExtensions(): GeminiCLIExtension[];
 
   /**
+   * Enables the extension with the given name for the specified scope.
+   */
+  abstract enableExtension(name: string, scope: ExtensionScope): Promise<void>;
+
+  /**
+   * Disables the extension with the given name for the specified scope.
+   */
+  abstract disableExtension(name: string, scope: ExtensionScope): Promise<void>;
+
+  /**
    * Fully initializes all active extensions.
    *
    * Called within `Config.initialize`, which must already have an
@@ -221,6 +231,18 @@ export interface ExtensionsStoppingEvent {
   completed: number;
 }
 
+/**
+ * Represents the scope of an extension enablement/disablement.
+ * The string values must match `SettingScope` in the CLI package.
+ */
+export enum ExtensionScope {
+  User = 'User',
+  Workspace = 'Workspace',
+  System = 'System',
+  SystemDefaults = 'SystemDefaults',
+  Session = 'Session',
+}
+
 export class SimpleExtensionLoader extends ExtensionLoader {
   constructor(
     protected readonly extensions: GeminiCLIExtension[],
@@ -231,6 +253,24 @@ export class SimpleExtensionLoader extends ExtensionLoader {
 
   getExtensions(): GeminiCLIExtension[] {
     return this.extensions;
+  }
+
+  async enableExtension(_name: string, _scope: ExtensionScope): Promise<void> {
+    const extension = this.extensions.find((e) => e.name === _name);
+    if (!extension) {
+      throw new Error(`Extension with name ${_name} does not exist.`);
+    }
+    extension.isActive = true;
+    await this.maybeStartExtension(extension);
+  }
+
+  async disableExtension(_name: string, _scope: ExtensionScope): Promise<void> {
+    const extension = this.extensions.find((e) => e.name === _name);
+    if (!extension) {
+      throw new Error(`Extension with name ${_name} does not exist.`);
+    }
+    extension.isActive = false;
+    await this.maybeStopExtension(extension);
   }
 
   /// Adds `extension` to the list of extensions and calls

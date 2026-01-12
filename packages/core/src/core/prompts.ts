@@ -17,6 +17,7 @@ import {
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  ACTIVATE_EXTENSION_TOOL_NAME,
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -154,6 +155,30 @@ ${skillsXml}
 `;
   }
 
+  const extensionLoader = config.getExtensionLoader();
+  const extensions = extensionLoader.getExtensions().filter((e) => !e.isActive);
+  let extensionsPrompt = '';
+  if (config.getDynamicExtensionLoading() && extensions.length > 0) {
+    const extensionsXml = extensions
+      .map(
+        (ext) => `  <extension>
+    <name>${ext.name}</name>
+    <description>${ext.description || 'No description provided.'}</description>
+  </extension>`,
+      )
+      .join('\n');
+
+    extensionsPrompt = `
+# Available Extensions
+
+You have access to the following extensions which are currently disabled. specific tools or capabilities they provide are not currently available. To activate an extension and gain access to its tools, you can call the \`${ACTIVATE_EXTENSION_TOOL_NAME}\` tool with the extension's name.
+
+<available_extensions>
+${extensionsXml}
+</available_extensions>
+`;
+  }
+
   let basePrompt: string;
   if (systemMdEnabled) {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
@@ -183,7 +208,7 @@ ${skillsXml}
           : ''
       }
 
-${config.getAgentRegistry().getDirectoryContext()}${skillsPrompt}`,
+${config.getAgentRegistry().getDirectoryContext()}${skillsPrompt}${extensionsPrompt}`,
       primaryWorkflows_prefix: `
 # Primary Workflows
 
