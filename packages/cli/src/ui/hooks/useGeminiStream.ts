@@ -46,6 +46,7 @@ import type {
   HistoryItem,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemThinking,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
@@ -120,6 +121,7 @@ export const useGeminiStream = (
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
@@ -544,6 +546,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
+        // Flush any pending item (including thinking items) before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -585,6 +588,40 @@ export const useGeminiStream = (
       return newGeminiMessageBuffer;
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  const handleThoughtEvent = useCallback(
+    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+      setThought(eventValue);
+
+      // Only accumulate thoughts in history if inline thinking is enabled
+      if (!settings.merged.ui?.showInlineThinking) {
+        return;
+      }
+
+      if (pendingHistoryItemRef.current?.type === 'thinking') {
+        // Accumulate thoughts in the existing thinking item
+        setPendingHistoryItem((prev) => ({
+          type: 'thinking',
+          thoughts: [...(prev as HistoryItemThinking).thoughts, eventValue],
+        }));
+      } else {
+        // Flush any existing pending item and start a new thinking item
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        }
+        setPendingHistoryItem({
+          type: 'thinking',
+          thoughts: [eventValue],
+        } as HistoryItemThinking);
+      }
+    },
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      settings.merged.ui?.showInlineThinking,
+    ],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -839,7 +876,7 @@ export const useGeminiStream = (
       for await (const event of stream) {
         switch (event.type) {
           case ServerGeminiEventType.Thought:
-            setThought(event.value);
+            handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             geminiMessageBuffer = handleContentEvent(
@@ -919,6 +956,7 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
+      handleThoughtEvent,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
@@ -994,6 +1032,10 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
+              // Clear any pending thinking item from previous prompt
+              if (pendingHistoryItemRef.current?.type === 'thinking') {
+                setPendingHistoryItem(null);
+              }
             }
 
             setIsResponding(true);

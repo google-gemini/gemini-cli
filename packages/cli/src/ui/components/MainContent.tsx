@@ -10,6 +10,7 @@ import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { AppHeader } from './AppHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { SCROLL_TO_ITEM_END } from './shared/VirtualizedList.js';
@@ -27,6 +28,7 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
 
   const {
@@ -35,6 +37,8 @@ export const MainContent = () => {
     staticAreaMaxItemHeight,
     availableTerminalHeight,
   } = uiState;
+
+  const inlineEnabled = settings.merged.ui?.showInlineThinking;
 
   const historyItems = uiState.history.map((h) => (
     <HistoryItemDisplay
@@ -45,6 +49,7 @@ export const MainContent = () => {
       item={h}
       isPending={false}
       commands={uiState.slashCommands}
+      inlineEnabled={inlineEnabled}
     />
   ));
 

@@ -179,6 +179,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.showInlineThinking`** (boolean):
+  - **Description:** Show model thinking summaries inline in the conversation.
+  - **Default:** `false`
+
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI status and thoughts in the terminal window
     title

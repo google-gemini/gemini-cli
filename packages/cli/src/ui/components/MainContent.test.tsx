@@ -11,6 +11,16 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 
 // Mock dependencies
+vi.mock('../contexts/SettingsContext.js', () => ({
+  useSettings: () => ({
+    merged: {
+      ui: {
+        showInlineThinking: false,
+      },
+    },
+  }),
+}));
+
 vi.mock('../contexts/AppContext.js', () => ({
   useAppContext: () => ({
     version: '1.0.0',
