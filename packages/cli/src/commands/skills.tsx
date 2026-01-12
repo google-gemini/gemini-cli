@@ -8,6 +8,8 @@ import type { CommandModule } from 'yargs';
 import { listCommand } from './skills/list.js';
 import { enableCommand } from './skills/enable.js';
 import { disableCommand } from './skills/disable.js';
+import { installCommand } from './skills/install.js';
+import { uninstallCommand } from './skills/uninstall.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const skillsCommand: CommandModule = {
@@ -20,6 +22,8 @@ export const skillsCommand: CommandModule = {
       .command(listCommand)
       .command(enableCommand)
       .command(disableCommand)
+      .command(installCommand)
+      .command(uninstallCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
