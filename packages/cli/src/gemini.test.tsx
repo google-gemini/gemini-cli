@@ -142,6 +142,9 @@ vi.mock('./config/config.js', () => ({
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
     setTerminalBackground: vi.fn(),
+    storage: {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+    },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
@@ -436,6 +439,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
@@ -793,6 +799,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {
@@ -875,6 +884,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // The mock is already set up at the top of the test
@@ -1115,6 +1127,9 @@ describe('gemini.tsx main function exit codes', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       merged: { security: { auth: {} }, ui: {} },
@@ -1180,6 +1195,9 @@ describe('gemini.tsx main function exit codes', () => {
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
       getRemoteAdminSettings: () => undefined,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
