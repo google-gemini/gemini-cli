@@ -51,16 +51,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       )
     : undefined;
 
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight && !isAlternateBuffer) {
-    renderOutputAsMarkdown = false;
-  }
-
-  const combinedPaddingAndBorderWidth = 4;
-  const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
-
   const truncatedResultDisplay = React.useMemo(() => {
     if (typeof resultDisplay === 'string') {
       if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
@@ -69,6 +59,23 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     }
     return resultDisplay;
   }, [resultDisplay]);
+
+  const combinedPaddingAndBorderWidth = 4;
+  const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
+
+  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
+  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
+  // to render as plain text, which is contained within the terminal using MaxSizedBox
+  if (availableHeight && !isAlternateBuffer && renderOutputAsMarkdown) {
+    if (typeof truncatedResultDisplay === 'string') {
+      const lineCount = truncatedResultDisplay.split('\n').length;
+      if (lineCount > availableHeight) {
+        renderOutputAsMarkdown = false;
+      }
+    } else {
+      renderOutputAsMarkdown = false;
+    }
+  }
 
   if (!truncatedResultDisplay) return null;
 

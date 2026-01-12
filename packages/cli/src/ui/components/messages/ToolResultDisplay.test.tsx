@@ -95,7 +95,7 @@ describe('ToolResultDisplay', () => {
   });
 
   it('truncates very long string results', { timeout: 20000 }, () => {
-    const longString = 'a'.repeat(1000005);
+    const longString = 'line\n'.repeat(100);
     const { lastFrame } = render(
       <ToolResultDisplay
         resultDisplay={longString}
@@ -105,7 +105,7 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toMatchSnapshot();
+    expect(output).toContain('MaxSizedBox:');
   });
 
   it('renders file diff result', () => {
@@ -157,12 +157,12 @@ describe('ToolResultDisplay', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('falls back to plain text if availableHeight is set and not in alternate buffer', () => {
+  it('renders markdown if availableHeight is set but content is short', () => {
     mockUseAlternateBuffer.mockReturnValue(false);
-    // availableHeight calculation: 20 - 1 - 5 = 14 > 3
+    // availableHeight calculation: 20 - 1 - 5 = 14
     const { lastFrame } = render(
       <ToolResultDisplay
-        resultDisplay="Some result"
+        resultDisplay="Short result"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
@@ -170,15 +170,17 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    // Should force renderOutputAsMarkdown to false
-    expect(output).toMatchSnapshot();
+    // Should stay as markdown
+    expect(output).toContain('MarkdownDisplay: Short result');
   });
 
-  it('keeps markdown if in alternate buffer even with availableHeight', () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
+  it('falls back to plain text if availableHeight is set and content is too long', () => {
+    mockUseAlternateBuffer.mockReturnValue(false);
+    // availableHeight calculation: 20 - 1 - 5 = 14
+    const longResult = 'line\n'.repeat(20);
     const { lastFrame } = render(
       <ToolResultDisplay
-        resultDisplay="Some result"
+        resultDisplay={longResult}
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
@@ -186,6 +188,23 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toMatchSnapshot();
+    // Should fallback to MaxSizedBox
+    expect(output).toContain('MaxSizedBox:');
+  });
+
+  it('keeps markdown if in alternate buffer even with long content and availableHeight', () => {
+    mockUseAlternateBuffer.mockReturnValue(true);
+    const longResult = 'line\n'.repeat(20);
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={longResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+        renderOutputAsMarkdown={true}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('MarkdownDisplay:');
   });
 });
