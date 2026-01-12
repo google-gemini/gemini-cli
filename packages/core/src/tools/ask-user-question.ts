@@ -54,6 +54,7 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
                 },
                 header: {
                   type: 'string',
+                  maxLength: 12,
                   description:
                     'Very short label displayed as a chip/tag (max 12 chars). Examples: "Auth method", "Library", "Approach".',
                 },
