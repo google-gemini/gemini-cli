@@ -114,10 +114,14 @@ expect.extend({
   },
 });
 
-vi.mock('node:os', () => ({
-  cpus: vi.fn(() => [{ model: 'Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz' }]),
-  totalmem: vi.fn(() => 32 * 1024 * 1024 * 1024),
-}));
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    cpus: vi.fn(() => [{ model: 'Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz' }]),
+    totalmem: vi.fn(() => 32 * 1024 * 1024 * 1024),
+  };
+});
 
 vi.mock('../../utils/userAccountManager.js');
 vi.mock('../../utils/installationManager.js');
