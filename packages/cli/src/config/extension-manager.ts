@@ -470,12 +470,8 @@ Would you like to attempt to install via "git clone" instead?`,
   private loadingPromise: Promise<GeminiCLIExtension[]> | null = null;
 
   async loadExtensions(): Promise<GeminiCLIExtension[]> {
-    if (this.loadedExtensions) {
-      return this.loadedExtensions;
-    }
-
     if (this.loadingPromise) {
-      return this.loadingPromise;
+      throw new Error('Extensions already loaded, only load extensions once.');
     }
 
     this.loadingPromise = (async () => {

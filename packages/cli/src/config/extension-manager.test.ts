@@ -40,7 +40,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-describe('ExtensionManager parallel loading', () => {
+describe('ExtensionManager', () => {
   let extensionManager: ExtensionManager;
   let tempDir: string;
   let extensionsDir: string;
@@ -351,9 +351,13 @@ describe('ExtensionManager parallel loading', () => {
         version: '1.0.0',
       });
 
-      // Second load should return the same extensions without error
-      const secondLoad = await extensionManager.loadExtensions();
-      expect(secondLoad).toEqual(await extensionManager.loadExtensions());
+      // First load works
+      await extensionManager.loadExtensions();
+
+      // Second load should fail
+      await expect(extensionManager.loadExtensions()).rejects.toThrow(
+        'Extensions already loaded, only load extensions once.',
+      );
     });
   });
 });
