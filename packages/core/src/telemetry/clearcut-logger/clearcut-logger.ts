@@ -346,10 +346,10 @@ export class ClearcutLogger {
     }
   }
 
-  async createBasicLogEvent(
+  createBasicLogEvent(
     eventName: EventNames,
     data: EventValue[] = [],
-  ): Promise<LogEvent> {
+  ): LogEvent {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
@@ -404,10 +404,7 @@ export class ClearcutLogger {
     return logEvent;
   }
 
-  async createLogEvent(
-    eventName: EventNames,
-    data: EventValue[] = [],
-  ): Promise<LogEvent> {
+  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
     if (eventName !== EventNames.START_SESSION) {
       data.push(...this.sessionData);
     }
@@ -626,7 +623,7 @@ export class ClearcutLogger {
     // Flush after experiments finish loading from CCPA server
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
-      await this.createLogEvent(EventNames.START_SESSION, data),
+      this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
       this.flushToClearcut().catch((error) => {
         debugLogger.debug('Error flushing to Clearcut:', error);
@@ -634,7 +631,7 @@ export class ClearcutLogger {
     });
   }
 
-  async logNewPromptEvent(event: UserPromptEvent): Promise<void> {
+  logNewPromptEvent(event: UserPromptEvent): void {
     this.promptId = event.prompt_id;
     const data: EventValue[] = [
       {
@@ -643,13 +640,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.NEW_PROMPT, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.NEW_PROMPT, data));
     this.flushIfNeeded();
   }
 
-  async logToolCallEvent(event: ToolCallEvent): Promise<void> {
+  logToolCallEvent(event: ToolCallEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
@@ -713,12 +708,12 @@ export class ClearcutLogger {
       });
     }
 
-    const logEvent = await this.createLogEvent(EventNames.TOOL_CALL, data);
+    const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
   }
 
-  async logFileOperationEvent(event: FileOperationEvent): Promise<void> {
+  logFileOperationEvent(event: FileOperationEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
@@ -749,12 +744,12 @@ export class ClearcutLogger {
       });
     }
 
-    const logEvent = await this.createLogEvent(EventNames.FILE_OPERATION, data);
+    const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
   }
 
-  async logApiRequestEvent(event: ApiRequestEvent): Promise<void> {
+  logApiRequestEvent(event: ApiRequestEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
@@ -762,13 +757,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.API_REQUEST, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_REQUEST, data));
     this.flushIfNeeded();
   }
 
-  async logApiResponseEvent(event: ApiResponseEvent): Promise<void> {
+  logApiResponseEvent(event: ApiResponseEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
@@ -809,13 +802,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.API_RESPONSE, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_RESPONSE, data));
     this.flushIfNeeded();
   }
 
-  async logApiErrorEvent(event: ApiErrorEvent): Promise<void> {
+  logApiErrorEvent(event: ApiErrorEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
@@ -835,11 +826,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(await this.createLogEvent(EventNames.API_ERROR, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_ERROR, data));
     this.flushIfNeeded();
   }
 
-  async logChatCompressionEvent(event: ChatCompressionEvent): Promise<void> {
+  logChatCompressionEvent(event: ChatCompressionEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_BEFORE,
@@ -852,29 +843,25 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.CHAT_COMPRESSION, data),
+      this.createLogEvent(EventNames.CHAT_COMPRESSION, data),
     );
   }
 
-  async logFlashFallbackEvent(): Promise<void> {
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.FLASH_FALLBACK, []),
-    );
+  logFlashFallbackEvent(): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  async logRipgrepFallbackEvent(): Promise<void> {
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.RIPGREP_FALLBACK, []),
-    );
+  logRipgrepFallbackEvent(): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RIPGREP_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  async logLoopDetectedEvent(event: LoopDetectedEvent): Promise<void> {
+  logLoopDetectedEvent(event: LoopDetectedEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
@@ -890,22 +877,20 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.LOOP_DETECTED, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
   }
 
-  async logLoopDetectionDisabledEvent(): Promise<void> {
+  logLoopDetectionDisabledEvent(): void {
     const data: EventValue[] = [];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.LOOP_DETECTION_DISABLED, data),
+      this.createLogEvent(EventNames.LOOP_DETECTION_DISABLED, data),
     );
     this.flushIfNeeded();
   }
 
-  async logNextSpeakerCheck(event: NextSpeakerCheckEvent): Promise<void> {
+  logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESPONSE_FINISH_REASON,
@@ -918,12 +903,12 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.NEXT_SPEAKER_CHECK, data),
+      this.createLogEvent(EventNames.NEXT_SPEAKER_CHECK, data),
     );
     this.flushIfNeeded();
   }
 
-  async logSlashCommandEvent(event: SlashCommandEvent): Promise<void> {
+  logSlashCommandEvent(event: SlashCommandEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
@@ -952,15 +937,11 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.SLASH_COMMAND, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.SLASH_COMMAND, data));
     this.flushIfNeeded();
   }
 
-  async logMalformedJsonResponseEvent(
-    event: MalformedJsonResponseEvent,
-  ): Promise<void> {
+  logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key:
@@ -970,12 +951,12 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.MALFORMED_JSON_RESPONSE, data),
+      this.createLogEvent(EventNames.MALFORMED_JSON_RESPONSE, data),
     );
     this.flushIfNeeded();
   }
 
-  async logIdeConnectionEvent(event: IdeConnectionEvent): Promise<void> {
+  logIdeConnectionEvent(event: IdeConnectionEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_IDE_CONNECTION_TYPE,
@@ -986,7 +967,7 @@ export class ClearcutLogger {
     // Flush after experiments finish loading from CCPA server
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
-      await this.createLogEvent(EventNames.START_SESSION, data),
+      this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
       this.flushToClearcut().catch((error) => {
         debugLogger.debug('Error flushing to Clearcut:', error);
@@ -994,9 +975,7 @@ export class ClearcutLogger {
     });
   }
 
-  async logConversationFinishedEvent(
-    event: ConversationFinishedEvent,
-  ): Promise<void> {
+  logConversationFinishedEvent(event: ConversationFinishedEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
@@ -1013,20 +992,20 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
+      this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
     );
     this.flushIfNeeded();
   }
 
-  async logEndSessionEvent(): Promise<void> {
+  logEndSessionEvent(): void {
     // Flush immediately on session end.
-    this.enqueueLogEvent(await this.createLogEvent(EventNames.END_SESSION, []));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
     this.flushToClearcut().catch((error) => {
       debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
-  async logInvalidChunkEvent(event: InvalidChunkEvent): Promise<void> {
+  logInvalidChunkEvent(event: InvalidChunkEvent): void {
     const data: EventValue[] = [];
 
     if (event.error_message) {
@@ -1036,13 +1015,11 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.INVALID_CHUNK, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.INVALID_CHUNK, data));
     this.flushIfNeeded();
   }
 
-  async logContentRetryEvent(event: ContentRetryEvent): Promise<void> {
+  logContentRetryEvent(event: ContentRetryEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key:
@@ -1063,15 +1040,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.CONTENT_RETRY, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.CONTENT_RETRY, data));
     this.flushIfNeeded();
   }
 
-  async logContentRetryFailureEvent(
-    event: ContentRetryFailureEvent,
-  ): Promise<void> {
+  logContentRetryFailureEvent(event: ContentRetryFailureEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key:
@@ -1098,7 +1071,7 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.CONTENT_RETRY_FAILURE, data),
+      this.createLogEvent(EventNames.CONTENT_RETRY_FAILURE, data),
     );
     this.flushIfNeeded();
   }
@@ -1128,9 +1101,11 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
-    this.flushIfNeeded();
+    await this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   async logExtensionUninstallEvent(
@@ -1152,9 +1127,11 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
-    this.flushIfNeeded();
+    await this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   async logExtensionUpdateEvent(event: ExtensionUpdateEvent): Promise<void> {
@@ -1186,14 +1163,14 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
-    this.flushIfNeeded();
+    await this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
-  async logToolOutputTruncatedEvent(
-    event: ToolOutputTruncatedEvent,
-  ): Promise<void> {
+  logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
@@ -1221,12 +1198,12 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
     );
     this.flushIfNeeded();
   }
 
-  async logModelRoutingEvent(event: ModelRoutingEvent): Promise<void> {
+  logModelRoutingEvent(event: ModelRoutingEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
@@ -1253,9 +1230,7 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.MODEL_ROUTING, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
     this.flushIfNeeded();
   }
 
@@ -1277,14 +1252,14 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
-    this.flushIfNeeded();
+    await this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
-  async logModelSlashCommandEvent(
-    event: ModelSlashCommandEvent,
-  ): Promise<void> {
+  logModelSlashCommandEvent(event: ModelSlashCommandEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_MODEL_SLASH_COMMAND,
@@ -1293,7 +1268,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.MODEL_SLASH_COMMAND, data),
+      this.createLogEvent(EventNames.MODEL_SLASH_COMMAND, data),
     );
     this.flushIfNeeded();
   }
@@ -1316,12 +1291,14 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+      this.createBasicLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
-    this.flushIfNeeded();
+    await this.flushToClearcut().catch((error) => {
+      debugLogger.debug('Error flushing to Clearcut:', error);
+    });
   }
 
-  async logEditStrategyEvent(event: EditStrategyEvent): Promise<void> {
+  logEditStrategyEvent(event: EditStrategyEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_STRATEGY,
@@ -1329,13 +1306,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EDIT_STRATEGY, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_STRATEGY, data));
     this.flushIfNeeded();
   }
 
-  async logEditCorrectionEvent(event: EditCorrectionEvent): Promise<void> {
+  logEditCorrectionEvent(event: EditCorrectionEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_CORRECTION,
@@ -1343,13 +1318,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EDIT_CORRECTION, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_CORRECTION, data));
     this.flushIfNeeded();
   }
 
-  async logAgentStartEvent(event: AgentStartEvent): Promise<void> {
+  logAgentStartEvent(event: AgentStartEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
@@ -1361,13 +1334,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.AGENT_START, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_START, data));
     this.flushIfNeeded();
   }
 
-  async logAgentFinishEvent(event: AgentFinishEvent): Promise<void> {
+  logAgentFinishEvent(event: AgentFinishEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
@@ -1391,13 +1362,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.AGENT_FINISH, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
     this.flushIfNeeded();
   }
 
-  async logRecoveryAttemptEvent(event: RecoveryAttemptEvent): Promise<void> {
+  logRecoveryAttemptEvent(event: RecoveryAttemptEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
@@ -1426,14 +1395,12 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.RECOVERY_ATTEMPT, data),
+      this.createLogEvent(EventNames.RECOVERY_ATTEMPT, data),
     );
     this.flushIfNeeded();
   }
 
-  async logWebFetchFallbackAttemptEvent(
-    event: WebFetchFallbackAttemptEvent,
-  ): Promise<void> {
+  logWebFetchFallbackAttemptEvent(event: WebFetchFallbackAttemptEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
@@ -1442,12 +1409,12 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
+      this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
     );
     this.flushIfNeeded();
   }
 
-  async logLlmLoopCheckEvent(event: LlmLoopCheckEvent): Promise<void> {
+  logLlmLoopCheckEvent(event: LlmLoopCheckEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
@@ -1469,13 +1436,11 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.LLM_LOOP_CHECK, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
     this.flushIfNeeded();
   }
 
-  async logHookCallEvent(event: HookCallEvent): Promise<void> {
+  logHookCallEvent(event: HookCallEvent): void {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_EVENT_NAME,
@@ -1498,7 +1463,7 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(await this.createLogEvent(EventNames.HOOK_CALL, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.HOOK_CALL, data));
     this.flushIfNeeded();
   }
 
@@ -1564,8 +1529,8 @@ export class ClearcutLogger {
     return safeJsonStringifyBooleanValuesOnly(this.config);
   }
 
-  shutdown(): Promise<void> {
-    return this.logEndSessionEvent();
+  shutdown() {
+    this.logEndSessionEvent();
   }
 
   private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {

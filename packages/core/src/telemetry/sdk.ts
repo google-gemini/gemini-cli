@@ -354,7 +354,7 @@ export async function shutdownTelemetry(
     return;
   }
   try {
-    await ClearcutLogger.getInstance()?.shutdown();
+    ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
     if (config.getDebugMode() && fromProcessExit) {
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
