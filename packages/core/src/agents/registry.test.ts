@@ -19,9 +19,9 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
-import * as tomlLoader from './toml-loader.js';
+import * as tomlLoader from './agentLoader.js';
 
-vi.mock('./toml-loader.js', () => ({
+vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
     .fn()
     .mockResolvedValue({ agents: [], errors: [] }),
