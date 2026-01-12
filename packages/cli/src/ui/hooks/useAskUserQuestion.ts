@@ -58,8 +58,13 @@ export function useAskUserQuestion(config: Config) {
     [config, request],
   );
 
+  const clearRequest = useCallback(() => {
+    setRequest(null);
+  }, []);
+
   return {
     request,
     handleSubmit,
+    clearRequest,
   };
 }

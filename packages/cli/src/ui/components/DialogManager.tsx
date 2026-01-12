@@ -56,6 +56,7 @@ export const DialogManager = ({
       <AskUserQuestionDialog
         questions={uiState.askUserQuestionRequest.questions}
         onSubmit={uiActions.handleAskUserQuestionSubmit}
+        onCancel={uiActions.clearAskUserQuestionRequest}
       />
     );
   }

@@ -136,9 +136,21 @@ export class AskUserQuestionInvocation extends BaseToolInvocation<
       const responseHandler = (response: AskUserQuestionResponse): void => {
         if (response.correlationId === correlationId) {
           cleanup();
+
+          // Build formatted key-value display
+          const formattedAnswers = Object.entries(response.answers)
+            .map(([index, answer]) => {
+              const question = this.params.questions[parseInt(index, 10)];
+              const category = question?.header ?? `Q${index}`;
+              return `  ${category} → ${answer}`;
+            })
+            .join('\n');
+
+          const returnDisplay = `User answered:\n${formattedAnswers}`;
+
           resolve({
             llmContent: JSON.stringify({ answers: response.answers }),
-            returnDisplay: `User answered: ${JSON.stringify(response.answers)}`,
+            returnDisplay,
           });
         }
       };

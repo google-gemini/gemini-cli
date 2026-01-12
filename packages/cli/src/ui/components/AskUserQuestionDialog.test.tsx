@@ -37,7 +37,11 @@ describe('AskUserQuestionDialog', () => {
 
   it('renders question and options', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={questions} onSubmit={vi.fn()} />,
+      <AskUserQuestionDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
 
     const output = lastFrame();
@@ -51,7 +55,11 @@ describe('AskUserQuestionDialog', () => {
   it('calls onSubmit with answers when an option is selected', async () => {
     const onSubmit = vi.fn();
     const { stdin } = renderWithProviders(
-      <AskUserQuestionDialog questions={questions} onSubmit={onSubmit} />,
+      <AskUserQuestionDialog
+        questions={questions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
     );
 
     // Press enter to select the first option
@@ -74,23 +82,27 @@ describe('AskUserQuestionDialog', () => {
     ];
     const onSubmit = vi.fn();
     const { stdin } = renderWithProviders(
-      <AskUserQuestionDialog questions={multiQuestions} onSubmit={onSubmit} />,
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
     );
 
     // Toggle Feature1 (Enter)
     await writeKey(stdin, '\r');
 
-    // Move down to Feature2 (j)
-    await writeKey(stdin, 'j');
+    // Move down to Feature2 (down arrow)
+    await writeKey(stdin, '\x1b[B');
 
     // Toggle Feature2 (Enter)
     await writeKey(stdin, '\r');
 
-    // Move down to Other (j)
-    await writeKey(stdin, 'j');
+    // Move down to Other (down arrow)
+    await writeKey(stdin, '\x1b[B');
 
-    // Move down to Done (j)
-    await writeKey(stdin, 'j');
+    // Move down to Done
+    await writeKey(stdin, '\x1b[B');
 
     // Press Enter on Done
     await writeKey(stdin, '\r', 100);
@@ -98,25 +110,32 @@ describe('AskUserQuestionDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ '0': 'Feature1, Feature2' });
   });
 
-  it('handles Other option in single select', async () => {
+  it('handles Other option in single select with inline typing', async () => {
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={questions} onSubmit={onSubmit} />,
+      <AskUserQuestionDialog
+        questions={questions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
     );
 
-    // Move down to Other (j) - Opt1, Opt2, Other
-    await writeKey(stdin, 'j');
-    await writeKey(stdin, 'j');
+    // Move down to Other
+    await writeKey(stdin, '\x1b[B');
+    await writeKey(stdin, '\x1b[B');
 
-    // Press Enter on Other
-    await writeKey(stdin, '\r');
+    // Should show placeholder when Other is focused
+    expect(lastFrame()).toContain('Enter a custom value');
 
-    expect(lastFrame()).toContain("Enter 'Other' value");
-
-    // Type 'Custom Value' and Enter
+    // Type directly (inline) - no need to press Enter first
     for (const char of 'Custom Value') {
       await writeKey(stdin, char, 10);
     }
+
+    // Should show the typed text
+    expect(lastFrame()).toContain('Custom Value');
+
+    // Press Enter to submit the custom value
     await writeKey(stdin, '\r', 100);
 
     expect(onSubmit).toHaveBeenCalledWith({ '0': 'Custom Value' });
@@ -145,7 +164,11 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={multiQuestions} onSubmit={vi.fn()} />,
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
 
     const output = lastFrame();
@@ -159,7 +182,11 @@ describe('AskUserQuestionDialog', () => {
 
   it('hides progress header for single question', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={questions} onSubmit={vi.fn()} />,
+      <AskUserQuestionDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
 
     const output = lastFrame();
@@ -170,7 +197,11 @@ describe('AskUserQuestionDialog', () => {
 
   it('shows keyboard hints', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={questions} onSubmit={vi.fn()} />,
+      <AskUserQuestionDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
 
     const output = lastFrame();
@@ -195,7 +226,11 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={multiQuestions} onSubmit={vi.fn()} />,
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
 
     // Initially on Q1
@@ -230,7 +265,11 @@ describe('AskUserQuestionDialog', () => {
 
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog questions={multiQuestions} onSubmit={onSubmit} />,
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
     );
 
     // Answer first question (should auto-advance to second)

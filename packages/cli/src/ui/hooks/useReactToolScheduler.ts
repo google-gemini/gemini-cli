@@ -274,6 +274,7 @@ export function mapToDisplay(
       > = {
         callId: trackedCall.request.callId,
         name: displayName,
+        toolName: trackedCall.request.name,
         description,
         renderOutputAsMarkdown,
       };
@@ -329,6 +330,7 @@ export function mapToDisplay(
           return {
             callId: (exhaustiveCheck as TrackedToolCall).request.callId,
             name: 'Unknown Tool',
+            toolName: 'Unknown internal tool name',
             description: 'Encountered an unknown tool call state.',
             status: ToolCallStatus.Error,
             resultDisplay: 'Unknown tool call state',

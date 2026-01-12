@@ -172,6 +172,7 @@ const mockUIActions: UIActions = {
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   handleAskUserQuestionSubmit: vi.fn(),
+  clearAskUserQuestionRequest: vi.fn(),
 };
 
 export const renderWithProviders = (

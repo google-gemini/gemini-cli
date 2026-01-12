@@ -88,7 +88,10 @@ describe('AskUserQuestionTool', () => {
     });
 
     const result = await executePromise;
-    expect(result.returnDisplay).toContain('User answered');
+    expect(result.returnDisplay).toContain('User answered:');
+    expect(result.returnDisplay).toContain(
+      '  Approach → Quick fix (Recommended)',
+    );
     expect(JSON.parse(result.llmContent as string)).toEqual({ answers });
   });
 

@@ -5,11 +5,9 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { Box, Text, useStdin } from 'ink';
+import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
-import { useTextBuffer } from './shared/text-buffer.js';
-import { TextInput } from './shared/TextInput.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
@@ -17,6 +15,7 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 interface AskUserQuestionDialogProps {
   questions: Question[];
   onSubmit: (answers: { [questionIndex: string]: string }) => void;
+  onCancel: () => void;
 }
 
 interface QuestionViewProps {
@@ -52,7 +51,7 @@ const QuestionProgressHeader: React.FC<QuestionProgressHeaderProps> = ({
           </Text>
           <Text
             color={
-              i === currentIndex ? theme.text.primary : theme.text.secondary
+              i === currentIndex ? theme.text.accent : theme.text.secondary
             }
             bold={i === currentIndex}
           >
@@ -129,29 +128,43 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   const [isOtherSelected, setIsOtherSelected] = useState(
     initialState.isOtherSelected,
   );
-  const [editingOther, setEditingOther] = useState(false);
+  const [isOtherFocused, setIsOtherFocused] = useState(false);
 
-  const { setRawMode, stdin } = useStdin();
+  // Handle inline typing when "Other" is focused
+  const handleOtherTyping = useCallback(
+    (key: Key) => {
+      if (!isOtherFocused) return;
 
-  // Notify parent when editing "Other" changes
-  const handleSetEditingOther = useCallback(
-    (editing: boolean) => {
-      setEditingOther(editing);
-      onEditingOther?.(editing);
-    },
-    [onEditingOther],
-  );
+      // Handle backspace
+      if (key.name === 'backspace' || key.name === 'delete') {
+        setOtherText((prev) => prev.slice(0, -1));
+        if (otherText.length <= 1) {
+          setIsOtherSelected(false);
+        }
+        return;
+      }
 
-  const handleOtherSubmit = useCallback(
-    (value: string) => {
-      setOtherText(value);
-      handleSetEditingOther(false);
-      if (!question.multiSelect) {
-        onAnswer(value);
+      // Handle printable characters (ignore control keys)
+      if (
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.ctrl &&
+        !key.meta &&
+        key.sequence.charCodeAt(0) >= 32
+      ) {
+        setOtherText((prev) => prev + key.sequence);
+        // Only mark as selected in multi-select mode (for single-select, green/checkmark
+        // should only appear for previously submitted answers from initialAnswer)
+        if (question.multiSelect) {
+          setIsOtherSelected(true);
+        }
+        onEditingOther?.(true);
       }
     },
-    [question, onAnswer, handleSetEditingOther],
+    [isOtherFocused, otherText.length, onEditingOther, question.multiSelect],
   );
+
+  useKeypress(handleOtherTyping, { isActive: isOtherFocused });
 
   const options = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = question.options.map(
@@ -169,10 +182,8 @@ const QuestionView: React.FC<QuestionViewProps> = ({
 
     const otherItem: OptionItem = {
       key: 'other',
-      label: isOtherSelected && otherText ? `Other: ${otherText}` : 'Other',
-      description: isOtherSelected
-        ? 'Custom value selected'
-        : 'Enter a custom value',
+      label: otherText || '',
+      description: '',
       type: 'other',
       index: list.length,
     };
@@ -186,11 +197,23 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         type: 'done',
         index: list.length,
       };
-      list.push({ key: doneItem.key, value: doneItem });
+      list.push({ key: doneItem.key, value: doneItem, hideNumber: true });
     }
 
     return list;
-  }, [question, isOtherSelected, otherText]);
+  }, [question, otherText]);
+
+  const handleHighlight = useCallback(
+    (itemValue: OptionItem) => {
+      const nowFocusingOther = itemValue.type === 'other';
+      setIsOtherFocused(nowFocusingOther);
+      // Notify parent when we stop focusing Other (so navigation can resume)
+      if (!nowFocusingOther) {
+        onEditingOther?.(false);
+      }
+    },
+    [onEditingOther],
+  );
 
   const handleSelect = useCallback(
     (itemValue: OptionItem) => {
@@ -206,8 +229,10 @@ const QuestionView: React.FC<QuestionViewProps> = ({
             return next;
           });
         } else if (itemValue.type === 'other') {
-          handleSetEditingOther(true);
-          setIsOtherSelected(true);
+          // Toggle other selection
+          if (otherText.trim()) {
+            setIsOtherSelected((prev) => !prev);
+          }
         } else if (itemValue.type === 'done') {
           const answers: string[] = [];
           question.options.forEach((opt, i) => {
@@ -224,58 +249,15 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         if (itemValue.type === 'option') {
           onAnswer(itemValue.label);
         } else if (itemValue.type === 'other') {
-          handleSetEditingOther(true);
-          setIsOtherSelected(true);
+          // Submit the other text if it has content
+          if (otherText.trim()) {
+            onAnswer(otherText.trim());
+          }
         }
       }
     },
-    [
-      question,
-      selectedIndices,
-      isOtherSelected,
-      otherText,
-      onAnswer,
-      handleSetEditingOther,
-    ],
+    [question, selectedIndices, isOtherSelected, otherText, onAnswer],
   );
-
-  const buffer = useTextBuffer({
-    initialText: otherText,
-    setRawMode,
-    stdin,
-    viewport: { height: 1, width: 80 },
-    isValidPath: () => false,
-    onChange: (t) => setOtherText(t),
-  });
-
-  if (editingOther) {
-    return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        paddingX={1}
-        borderColor={theme.border.default}
-      >
-        {progressHeader}
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
-        <Box marginTop={1}>
-          <Text color={theme.text.secondary}>
-            {"Enter 'Other' value (Enter to confirm):"}
-          </Text>
-        </Box>
-        <Box marginTop={1}>
-          <TextInput
-            buffer={buffer}
-            onSubmit={() => handleOtherSubmit(buffer.text)}
-            onCancel={() => handleSetEditingOther(false)}
-          />
-        </Box>
-        {keyboardHints}
-      </Box>
-    );
-  }
 
   return (
     <Box
@@ -300,7 +282,9 @@ const QuestionView: React.FC<QuestionViewProps> = ({
       <BaseSelectionList<OptionItem>
         items={options}
         onSelect={handleSelect}
-        renderItem={(item) => {
+        onHighlight={handleHighlight}
+        selectedColor={theme.text.accent}
+        renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
             selectedIndices.has(optionItem.index) ||
@@ -309,19 +293,79 @@ const QuestionView: React.FC<QuestionViewProps> = ({
             question.multiSelect &&
             (optionItem.type === 'option' || optionItem.type === 'other');
 
+          // Render inline text input for "Other" option
+          if (optionItem.type === 'other') {
+            const displayText = otherText || '';
+            const placeholder = 'Enter a custom value';
+            const showPlaceholder = !displayText && context.isSelected;
+            const showCursor = context.isSelected;
+            return (
+              <Box flexDirection="column">
+                <Box flexDirection="row">
+                  {showCheck && (
+                    <Text
+                      color={
+                        isChecked ? theme.text.accent : theme.text.secondary
+                      }
+                    >
+                      [{isChecked ? 'x' : ' '}]
+                    </Text>
+                  )}
+                  <Text color={theme.text.primary}> </Text>
+                  {showPlaceholder ? (
+                    <Text color={theme.text.secondary} italic>
+                      <Text color={theme.text.accent}>
+                        {showCursor ? '▌' : ''}
+                      </Text>
+                      {placeholder}
+                    </Text>
+                  ) : (
+                    <Text
+                      color={
+                        isChecked && !question.multiSelect
+                          ? theme.status.success
+                          : displayText
+                            ? theme.text.primary
+                            : theme.text.secondary
+                      }
+                    >
+                      {displayText || (context.isSelected ? '' : placeholder)}
+                      {showCursor && <Text color={theme.text.accent}>▌</Text>}
+                    </Text>
+                  )}
+                  {isChecked && !question.multiSelect && (
+                    <Text color={theme.status.success}> ✓</Text>
+                  )}
+                </Box>
+              </Box>
+            );
+          }
+
+          // Determine label color: checked (previously answered) uses success, selected uses accent, else primary
+          const labelColor =
+            isChecked && !question.multiSelect
+              ? theme.status.success
+              : context.isSelected
+                ? context.titleColor
+                : theme.text.primary;
+
           return (
             <Box flexDirection="column">
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={
-                      isChecked ? theme.status.success : theme.text.secondary
-                    }
+                    color={isChecked ? theme.text.accent : theme.text.secondary}
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
                 )}
-                <Text color={theme.text.primary}> {optionItem.label}</Text>
+                <Text color={labelColor} bold={optionItem.type === 'done'}>
+                  {' '}
+                  {optionItem.label}
+                </Text>
+                {isChecked && !question.multiSelect && (
+                  <Text color={theme.status.success}> ✓</Text>
+                )}
               </Box>
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
@@ -341,6 +385,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
 export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
   questions,
   onSubmit,
+  onCancel,
 }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
@@ -348,6 +393,21 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
   const [submitted, setSubmitted] = useState(false);
   // Use ref for synchronous check to prevent race conditions during unmount
   const submittedRef = useRef(false);
+
+  // Handle Escape or Ctrl+C to cancel
+  const handleCancel = useCallback(
+    (key: Key) => {
+      if (submittedRef.current) return;
+      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        onCancel();
+      }
+    },
+    [onCancel],
+  );
+
+  useKeypress(handleCancel, {
+    isActive: !submitted,
+  });
 
   // Bidirectional navigation between questions using custom useKeypress for consistency
   const handleNavigation = useCallback(
