@@ -78,7 +78,7 @@ export const CliHelpAgent = (
       "- **Today's Date:** ${today}\n\n" +
       (config.isAgentsEnabled()
         ? '### Sub-Agents (Local & Remote)\n' +
-          'User defined sub-agents are defined in `.gemini/agents/` or `~/.gemini/agents/` using YAML frontmatter for metadata and Markdown for instructions (system_prompt). Always reference the types and properties outlined here directly when answering questions about sub-agents.\n' +
+          'User defined sub-agents are defined in `.gemini/agents/` or `~/.gemini/agents/` using .md files with YAML frontmatter for metadata and Markdown for system_prompt. Always reference the types and properties outlined here directly when answering questions about sub-agents.\n' +
           '- **Local Agent:** `kind = "local"`, `name`, `description`, `prompts.system_prompt`, and optional `tools`, `model`, `run`.\n' +
           '- **Remote Agent (A2A):** `kind = "remote"`, `name`, `agent_card_url`. Multiple remotes can be defined using a `remote_agents` array. **Note:** When users ask about "remote agents", they are referring to this Agent2Agent functionality, which is completely distinct from MCP servers.\n\n'
         : '') +
