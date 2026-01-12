@@ -365,6 +365,15 @@ export const ToolConfirmationMessage: React.FC<
 
   return (
     <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
+      {/* System message from hook */}
+      {confirmationDetails.systemMessage && (
+        <Box marginBottom={1}>
+          <Text color={theme.status.warning}>
+            {confirmationDetails.systemMessage}
+          </Text>
+        </Box>
+      )}
+
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>

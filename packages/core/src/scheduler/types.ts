@@ -23,6 +23,7 @@ export interface ToolCallRequestInfo {
   prompt_id: string;
   checkpoint?: string;
   traceId?: string;
+  inputModifiedByHook?: boolean;
 }
 
 export interface ToolCallResponseInfo {

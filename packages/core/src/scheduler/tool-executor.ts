@@ -243,6 +243,28 @@ export class ToolExecutor {
       this.config.getActiveModel(),
     );
 
+    // Append notification if parameters were modified by hook
+    if (call.request.inputModifiedByHook) {
+      const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
+      const lastPart = response[response.length - 1];
+      if (lastPart?.functionResponse) {
+        const toolResponse = lastPart.functionResponse.response as Record<
+          string,
+          unknown
+        >;
+        if (typeof toolResponse === 'object' && toolResponse !== null) {
+          if (typeof toolResponse['content'] === 'string') {
+            toolResponse['content'] += modificationMsg;
+          } else {
+            // If it doesn't have a content field, we might need a different approach
+            // but for most tools, content is the field.
+            // Actually, we can just add a new part to the response.
+            response.push({ text: modificationMsg });
+          }
+        }
+      }
+    }
+
     const successResponse: ToolCallResponseInfo = {
       callId,
       responseParts: response,

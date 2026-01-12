@@ -14,8 +14,8 @@ import {
   createHookOutput,
   NotificationType,
   type DefaultHookOutput,
+  type BeforeToolHookOutput,
   type McpToolContext,
-  BeforeToolHookOutput,
 } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 import type {
@@ -164,7 +164,7 @@ export async function fireToolNotificationHook(
  * @param config Config to look up server details
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
-function extractMcpContext(
+export function extractMcpContext(
   invocation: ShellToolInvocation | AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
@@ -208,7 +208,7 @@ export async function fireBeforeToolHook(
   toolName: string,
   toolInput: Record<string, unknown>,
   mcpContext?: McpToolContext,
-): Promise<DefaultHookOutput | undefined> {
+): Promise<BeforeToolHookOutput | undefined> {
   try {
     const response = await messageBus.request<
       HookExecutionRequest,
@@ -227,7 +227,10 @@ export async function fireBeforeToolHook(
     );
 
     return response.output
-      ? createHookOutput('BeforeTool', response.output)
+      ? (createHookOutput(
+          'BeforeTool',
+          response.output,
+        ) as BeforeToolHookOutput)
       : undefined;
   } catch (error) {
     debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
@@ -309,15 +312,15 @@ export async function executeToolWithHooks(
   setPidCallback?: (pid: number) => void,
   config?: Config,
 ): Promise<ToolResult> {
-  const toolInput = (invocation.params || {}) as Record<string, unknown>;
-  let inputWasModified = false;
-  let modifiedKeys: string[] = [];
-
-  // Extract MCP context if this is an MCP tool (only if config is provided)
-  const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
+  let toolInput = (invocation.params || {}) as Record<string, unknown>;
+  let currentInvocation = invocation;
+  let modificationMessage: string | undefined;
 
   // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
+    const mcpContext = config
+      ? extractMcpContext(currentInvocation, config)
+      : undefined;
     const beforeOutput = await fireBeforeToolHook(
       messageBus,
       toolName,
@@ -325,102 +328,97 @@ export async function executeToolWithHooks(
       mcpContext,
     );
 
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.STOP_EXECUTION,
-          message: reason,
-        },
-      };
-    }
+    if (beforeOutput) {
+      // Check if hook requested to stop entire agent execution
+      if (beforeOutput.shouldStopExecution()) {
+        const reason = beforeOutput.getEffectiveReason();
+        return {
+          llmContent: `Agent execution stopped by hook: ${reason}`,
+          returnDisplay: `Agent execution stopped by hook: ${reason}`,
+          error: {
+            type: ToolErrorType.STOP_EXECUTION,
+            message: reason,
+          },
+        };
+      }
 
-    // Check if hook blocked the tool execution
-    const blockingError = beforeOutput?.getBlockingError();
-    if (blockingError?.blocked) {
-      return {
-        llmContent: `Tool execution blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: blockingError.reason,
-        },
-      };
-    }
+      // Check if hook blocked tool execution
+      const blockingError = beforeOutput.getBlockingError();
+      if (blockingError.blocked) {
+        return {
+          llmContent: `Tool execution blocked: ${blockingError.reason}`,
+          returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
+          error: {
+            type: ToolErrorType.EXECUTION_FAILED,
+            message: blockingError.reason,
+          },
+        };
+      }
 
-    // Check if hook requested to update tool input
-    if (beforeOutput instanceof BeforeToolHookOutput) {
+      // Check for modified tool input
       const modifiedInput = beforeOutput.getModifiedToolInput();
       if (modifiedInput) {
-        // We modify the toolInput object in-place, which should be the same reference as invocation.params
-        // We use Object.assign to update properties
-        Object.assign(invocation.params, modifiedInput);
-        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
-        inputWasModified = true;
-        modifiedKeys = Object.keys(modifiedInput);
+        // Update toolInput with modified values
+        toolInput = { ...toolInput, ...modifiedInput };
 
-        // Recreate the invocation with the new parameters
-        // to ensure any derived state (like resolvedPath in ReadFileTool) is updated.
+        // Attempt to update original invocation params in-place if possible
+        // to satisfy tests that check the original invocation object
         try {
-          // We use the tool's build method to validate and create the invocation
-          // This ensures consistent behavior with the initial creation
-          invocation = tool.build(invocation.params);
-        } catch (error) {
-          return {
-            llmContent: `Tool parameter modification by hook failed validation: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            returnDisplay: `Tool parameter modification by hook failed validation.`,
-            error: {
-              type: ToolErrorType.INVALID_TOOL_PARAMS,
-              message: String(error),
-            },
-          };
+          Object.assign(invocation.params, modifiedInput);
+        } catch (e) {
+          // If params is readonly or not extensible, we just continue with the new toolInput
+          debugLogger.debug('Could not modify invocation.params in-place:', e);
         }
+
+        // Re-build invocation with modified input
+        currentInvocation = tool.build(toolInput) as typeof currentInvocation;
+
+        // Track that modification occurred to inform the model later
+        const modifiedKeys = Object.keys(modifiedInput).join(', ');
+        modificationMessage = `[System] Tool input parameters (${modifiedKeys}) were modified by a hook before execution.`;
       }
     }
   }
 
   // Execute the actual tool
   let toolResult: ToolResult;
-  if (setPidCallback && invocation instanceof ShellToolInvocation) {
-    toolResult = await invocation.execute(
+  if (setPidCallback && currentInvocation instanceof ShellToolInvocation) {
+    toolResult = await currentInvocation.execute(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
       setPidCallback,
     );
   } else {
-    toolResult = await invocation.execute(
+    toolResult = await currentInvocation.execute(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
     );
   }
 
-  // Append notification if parameters were modified
-  if (inputWasModified) {
-    const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
-      ', ',
-    )}) were modified by a hook before execution.`;
+  // Add modification message if input was changed
+  if (modificationMessage) {
     if (typeof toolResult.llmContent === 'string') {
-      toolResult.llmContent += modificationMsg;
+      toolResult.llmContent += '\n\n' + modificationMessage;
     } else if (Array.isArray(toolResult.llmContent)) {
-      toolResult.llmContent.push({ text: modificationMsg });
+      toolResult.llmContent.push({ text: '\n\n' + modificationMessage });
     } else if (toolResult.llmContent) {
       // Handle single Part case by converting to an array
       toolResult.llmContent = [
         toolResult.llmContent,
-        { text: modificationMsg },
+        { text: '\n\n' + modificationMessage },
       ];
+    } else {
+      toolResult.llmContent = modificationMessage;
     }
   }
 
   // Fire AfterTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
+    const mcpContext = config
+      ? extractMcpContext(currentInvocation, config)
+      : undefined;
     const afterOutput = await fireAfterToolHook(
       messageBus,
       toolName,
@@ -433,47 +431,49 @@ export async function executeToolWithHooks(
       mcpContext,
     );
 
-    // Check if hook requested to stop entire agent execution
-    if (afterOutput?.shouldStopExecution()) {
-      const reason = afterOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.STOP_EXECUTION,
-          message: reason,
-        },
-      };
-    }
+    if (afterOutput) {
+      // Check if hook requested to stop entire agent execution
+      if (afterOutput.shouldStopExecution()) {
+        const reason = afterOutput.getEffectiveReason();
+        return {
+          llmContent: `Agent execution stopped by hook: ${reason}`,
+          returnDisplay: `Agent execution stopped by hook: ${reason}`,
+          error: {
+            type: ToolErrorType.STOP_EXECUTION,
+            message: reason,
+          },
+        };
+      }
 
-    // Check if hook blocked the tool result
-    const blockingError = afterOutput?.getBlockingError();
-    if (blockingError?.blocked) {
-      return {
-        llmContent: `Tool result blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool result blocked: ${blockingError.reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: blockingError.reason,
-        },
-      };
-    }
+      // Check if hook blocked the tool result
+      const blockingError = afterOutput.getBlockingError();
+      if (blockingError.blocked) {
+        return {
+          llmContent: `Tool result blocked: ${blockingError.reason}`,
+          returnDisplay: `Tool result blocked: ${blockingError.reason}`,
+          error: {
+            type: ToolErrorType.EXECUTION_FAILED,
+            message: blockingError.reason,
+          },
+        };
+      }
 
-    // Add additional context from hooks to the tool result
-    const additionalContext = afterOutput?.getAdditionalContext();
-    if (additionalContext) {
-      if (typeof toolResult.llmContent === 'string') {
-        toolResult.llmContent += '\n\n' + additionalContext;
-      } else if (Array.isArray(toolResult.llmContent)) {
-        toolResult.llmContent.push({ text: '\n\n' + additionalContext });
-      } else if (toolResult.llmContent) {
-        // Handle single Part case by converting to an array
-        toolResult.llmContent = [
-          toolResult.llmContent,
-          { text: '\n\n' + additionalContext },
-        ];
-      } else {
-        toolResult.llmContent = additionalContext;
+      // Add additional context from hooks to the tool result
+      const additionalContext = afterOutput.getAdditionalContext();
+      if (additionalContext) {
+        if (typeof toolResult.llmContent === 'string') {
+          toolResult.llmContent += '\n\n' + additionalContext;
+        } else if (Array.isArray(toolResult.llmContent)) {
+          toolResult.llmContent.push({ text: '\n\n' + additionalContext });
+        } else if (toolResult.llmContent) {
+          // Handle single Part case by converting to an array
+          toolResult.llmContent = [
+            toolResult.llmContent,
+            { text: '\n\n' + additionalContext },
+          ];
+        } else {
+          toolResult.llmContent = additionalContext;
+        }
       }
     }
   }

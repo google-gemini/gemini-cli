@@ -125,6 +125,7 @@ export class HookAggregator {
     const additionalContexts: string[] = [];
 
     let hasBlockDecision = false;
+    let hasAskDecision = false;
     let hasContinueFalse = false;
 
     for (const output of outputs) {
@@ -142,6 +143,12 @@ export class HookAggregator {
       if (tempOutput.isBlockingDecision()) {
         hasBlockDecision = true;
         merged.decision = output.decision;
+      } else if (tempOutput.isAskDecision()) {
+        hasAskDecision = true;
+        // Ask decision is only set if no blocking decision was found so far
+        if (!hasBlockDecision) {
+          merged.decision = output.decision;
+        }
       }
 
       // Collect messages
@@ -170,8 +177,8 @@ export class HookAggregator {
       this.extractAdditionalContext(output, additionalContexts);
     }
 
-    // Set final decision if no blocking decision was found
-    if (!hasBlockDecision && !hasContinueFalse) {
+    // Set final decision if no blocking or ask decision was found
+    if (!hasBlockDecision && !hasAskDecision && !hasContinueFalse) {
       merged.decision = 'allow';
     }
 
