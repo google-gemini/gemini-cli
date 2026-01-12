@@ -1128,7 +1128,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+      await this.createBasicLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
     this.flushIfNeeded();
   }
@@ -1152,7 +1152,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+      await this.createBasicLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     this.flushIfNeeded();
   }
@@ -1186,7 +1186,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      await this.createLogEvent(EventNames.EXTENSION_UPDATE, data),
+      await this.createBasicLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
     this.flushIfNeeded();
   }
