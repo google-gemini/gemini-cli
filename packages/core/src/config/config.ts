@@ -74,6 +74,7 @@ import type { ModelConfigServiceConfig } from '../services/modelConfigService.js
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -500,6 +501,7 @@ export class Config {
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
+  private latestApiRequest: GenerateContentParameters | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -896,6 +898,14 @@ export class Config {
 
   getTerminalBackground(): string | undefined {
     return this.terminalBackground;
+  }
+
+  getLatestApiRequest(): GenerateContentParameters | undefined {
+    return this.latestApiRequest;
+  }
+
+  setLatestApiRequest(req: GenerateContentParameters): void {
+    this.latestApiRequest = req;
   }
 
   getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
