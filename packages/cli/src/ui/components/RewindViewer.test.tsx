@@ -250,13 +250,11 @@ describe('RewindViewer', () => {
       await actionStep(stdin, lastFrame);
 
       if (expectRewind) {
-        await waitFor(() => {
-          expect(onRewind).toHaveBeenCalledWith(
-            '1',
-            'Original Prompt',
-            RewindOutcome.RewindAndRevert,
-          );
-        });
+        expect(onRewind).toHaveBeenCalledWith(
+          '1',
+          'Original Prompt',
+          RewindOutcome.RewindAndRevert,
+        );
       } else {
         expect(lastFrame()).toMatchSnapshot('after-cancel');
         expect(onRewind).not.toHaveBeenCalled();
@@ -312,13 +310,11 @@ describe('RewindViewer', () => {
         stdin.write('\r'); // Confirm
       });
 
-      await waitFor(() => {
-        expect(onRewind).toHaveBeenCalledWith(
-          '1',
-          expectedPrompt,
-          RewindOutcome.RewindAndRevert,
-        );
-      });
+      expect(onRewind).toHaveBeenCalledWith(
+        '1',
+        expectedPrompt,
+        RewindOutcome.RewindAndRevert,
+      );
     });
   });
 
