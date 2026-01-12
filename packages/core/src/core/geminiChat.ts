@@ -15,6 +15,8 @@ import type {
   PartListUnion,
   GenerateContentConfig,
   GenerateContentParameters,
+  ToolConfig,
+  ToolListUnion,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent, FinishReason } from '@google/genai';
@@ -52,8 +54,8 @@ import {
 import {
   fireAfterModelHook,
   fireBeforeModelHook,
-  fireBeforeToolSelectionHook,
 } from './geminiChatHookTriggers.js';
+import type { BeforeToolSelectionHookOutput } from '../hooks/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -553,14 +555,32 @@ export class GeminiChat {
         }
 
         // Fire BeforeToolSelection hook
-        const toolSelectionResult = await fireBeforeToolSelectionHook(
-          messageBus,
-          {
-            model: modelToUse,
-            config,
-            contents: contentsToUse,
-          },
-        );
+        const llmRequest = {
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        };
+        const toolHookResult = await this.config
+          .getHookSystem()
+          ?.fireBeforeToolSelectionEvent(llmRequest);
+
+        // Extract tool config modifications from AggregatedHookResult
+        let toolSelectionResult: {
+          toolConfig?: ToolConfig;
+          tools?: ToolListUnion;
+        } = {};
+        if (toolHookResult?.finalOutput) {
+          const hookOutput =
+            toolHookResult.finalOutput as BeforeToolSelectionHookOutput;
+          const modifiedConfig = hookOutput.applyToolConfigModifications({
+            toolConfig: config.toolConfig,
+            tools: config.tools,
+          });
+          toolSelectionResult = {
+            toolConfig: modifiedConfig.toolConfig,
+            tools: modifiedConfig.tools,
+          };
+        }
 
         // Apply tool configuration modifications
         if (toolSelectionResult.toolConfig) {
