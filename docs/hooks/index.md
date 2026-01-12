@@ -533,14 +533,29 @@ Use the `/hooks panel` command to view all registered hooks:
 
 This command displays:
 
-- All active hooks organized by event
+- All configured hooks organized by event
 - Hook source (user, project, system)
 - Hook type (command or plugin)
-- Execution status and recent output
+- Individual hook status (enabled/disabled)
 
-### Enable and disable hooks
+### Enable and disable all hooks at once
 
-You can temporarily enable or disable individual hooks using commands:
+You can enable or disable all hooks at once using commands:
+
+```bash
+/hooks enable-all
+/hooks disable-all
+```
+
+These commands provide a shortcut to enable or disable all configured hooks
+without managing them individually. The `enable-all` command removes all hooks
+from the `hooks.disabled` array, while `disable-all` adds all configured hooks
+to the disabled list. Changes take effect immediately without requiring a
+restart.
+
+### Enable and disable individual hooks
+
+You can enable or disable individual hooks using commands:
 
 ```bash
 /hooks enable hook-name
@@ -549,7 +564,8 @@ You can temporarily enable or disable individual hooks using commands:
 
 These commands allow you to control hook execution without editing configuration
 files. The hook name should match the `name` field in your hook configuration.
-Changes made via these commands are persisted to your global User settings
+Changes made via these commands are persisted to your settings. The settings are
+saved to workspace scope if available, otherwise to your global user settings
 (`~/.gemini/settings.json`).
 
 ### Disabled hooks configuration
