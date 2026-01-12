@@ -78,4 +78,10 @@ describe('events', () => {
     expect(firstCall).toBe(secondCall); // Should be the exact same promise object
     expect(mockServer.receiveEvents).toHaveBeenCalledTimes(1);
   });
+
+  it('should return undefined if server is undefined', async () => {
+    const { getEvents } = await import('./events.js');
+    const events = await getEvents(undefined);
+    expect(events).toBeUndefined();
+  });
 });

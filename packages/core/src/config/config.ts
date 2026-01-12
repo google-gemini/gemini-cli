@@ -835,18 +835,19 @@ export class Config {
           if (remotePreviewFeatures === true) {
             this.setPreviewFeatures(remotePreviewFeatures);
           }
-        })
-        .catch((e) => {
-          debugLogger.error('Failed to fetch experiments', e);
-        });
+        }
+      })
+      .catch((e) => {
+        debugLogger.error('Failed to fetch experiments', e);
+      });
 
-      this.eventsPromise = getEvents(codeAssistServer)
-        .then((event) => {
-          this.setEvent(event);
-        })
-        .catch((e) => {
-          debugLogger.error('Failed fetch events', e);
-        });
+    this.eventsPromise = getEvents(codeAssistServer)
+      .then((event) => {
+        this.setEvent(event);
+      })
+      .catch((e) => {
+        debugLogger.error('Failed fetch events', e);
+      });
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1891,7 +1892,7 @@ export class Config {
   /**
    * Set event
    */
-  setEvent(events: Event): void {
+  setEvent(events: Event | undefined): void {
     this.event = events;
   }
 }
