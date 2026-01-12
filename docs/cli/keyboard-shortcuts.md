@@ -103,10 +103,11 @@ available combinations.
 
 #### Session Control
 
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Cancel the current request or quit the CLI.  | `Ctrl + C` |
-| Exit the CLI when the input buffer is empty. | `Ctrl + D` |
+| Action                                         | Keys       |
+| ---------------------------------------------- | ---------- |
+| Cancel the current request or quit the CLI.    | `Ctrl + C` |
+| Exit the CLI when the input buffer is empty.   | `Ctrl + D` |
+| Suspend the CLI and move it to the background. | `Ctrl + Z` |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
