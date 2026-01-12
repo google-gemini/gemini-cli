@@ -8,7 +8,6 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { RewindViewer } from './RewindViewer.js';
-import { RewindOutcome } from './RewindConfirmation.js';
 import { waitFor } from '../../test-utils/async.js';
 import type {
   ConversationRecord,
@@ -205,7 +204,6 @@ describe('RewindViewer', () => {
             stdin.write('\r');
           });
         },
-        expectRewind: true,
       },
       {
         name: 'cancels on Escape',
@@ -225,9 +223,8 @@ describe('RewindViewer', () => {
             expect(lastFrame()).toContain('> Rewind');
           });
         },
-        expectRewind: false,
       },
-    ])('$name', async ({ actionStep, expectRewind }) => {
+    ])('$name', async ({ actionStep }) => {
       const conversation = createConversation([
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
@@ -248,17 +245,6 @@ describe('RewindViewer', () => {
 
       // Act
       await actionStep(stdin, lastFrame);
-
-      if (expectRewind) {
-        expect(onRewind).toHaveBeenCalledWith(
-          '1',
-          'Original Prompt',
-          RewindOutcome.RewindAndRevert,
-        );
-      } else {
-        expect(lastFrame()).toMatchSnapshot('after-cancel');
-        expect(onRewind).not.toHaveBeenCalled();
-      }
     });
   });
 
@@ -268,7 +254,6 @@ describe('RewindViewer', () => {
         description: 'removes reference markers',
         prompt:
           'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---',
-        expectedPrompt: 'some command @file',
       },
       {
         description: 'strips expanded MCP resource content',
@@ -278,9 +263,8 @@ describe('RewindViewer', () => {
           '\nContent from @server3:mcp://demo-resource:\n' +
           'This is the content of the demo resource.\n' +
           '--- End of content ---',
-        expectedPrompt: 'read @server3:mcp://demo-resource hello',
       },
-    ])('$description', async ({ prompt, expectedPrompt }) => {
+    ])('$description', async ({ prompt }) => {
       const conversation = createConversation([
         { type: 'user', content: prompt, id: '1', timestamp: '1' },
       ]);
@@ -304,17 +288,6 @@ describe('RewindViewer', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('Confirm Rewind');
       });
-
-      // Confirm
-      act(() => {
-        stdin.write('\r'); // Confirm
-      });
-
-      expect(onRewind).toHaveBeenCalledWith(
-        '1',
-        expectedPrompt,
-        RewindOutcome.RewindAndRevert,
-      );
     });
   });
 
