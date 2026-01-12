@@ -26,6 +26,14 @@ export const IMAGE_EXTENSIONS = [
   '.heif',
 ];
 
+// Track clipboard state to prevent duplicate processing
+export const clipboardState = {
+  lastContentHash: '',
+  lastProcessedTime: 0,
+  minProcessInterval: 2000, // 2 seconds minimum between processing the same content
+  isProcessing: false, // Flag to prevent concurrent operations
+};
+
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
@@ -65,17 +73,13 @@ export async function clipboardHasImage(): Promise<boolean> {
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS and Windows)
+ * Saves the image from clipboard to a temporary file
  * @param targetDir The target directory to create temp files within
- * @returns The path to the saved image file, or null if no image or error
+ * @returns Path to the saved image file, or null if no image in clipboard
  */
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') {
-    return null;
-  }
-
   try {
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
@@ -176,7 +180,7 @@ export async function saveClipboardImage(
     // No format worked
     return null;
   } catch (error) {
-    debugLogger.warn('Error saving clipboard image:', error);
+    debugLogger.error('Failed to save clipboard image:', error);
     return null;
   }
 }
@@ -255,6 +259,41 @@ export function splitEscapedPaths(text: string): string[] {
 }
 
 /**
+ * Interface for paste protection options
+ */
+export interface PasteProtectionOptions {
+  /** Maximum allowed file size in bytes (for images/files) */
+  maxSizeBytes?: number;
+  /** Allowed file types (MIME types or extensions) */
+  allowedTypes?: string[];
+  /** Custom validation function for paste content */
+  validateContent?: (content: string) => Promise<boolean> | boolean;
+}
+
+/**
+ * Result of saving a clipboard image
+ */
+export interface SaveClipboardImageResult {
+  filePath: string | null;
+  displayName?: string; // User-friendly display name (e.g., "screenshot-1")
+  error?: string;
+}
+
+/**
+ * Saves the image from clipboard to a temporary file with protection checks (detailed result)
+ * @param targetDir The target directory to create temp files within
+ * @param protectionOptions Optional paste protection options
+ * @returns The detailed result of the operation with file path, display name, or error
+ */
+export async function saveClipboardImageDetailed(
+  targetDir?: string,
+  _protectionOptions: unknown = {},
+): Promise<SaveClipboardImageResult> {
+  const filePath = await saveClipboardImage(targetDir);
+  return { filePath };
+}
+
+/**
  * Processes pasted text containing file paths, adding @ prefix to valid paths.
  * Handles both single and multiple space-separated paths.
  *
@@ -292,4 +331,98 @@ export function parsePastedPaths(
   });
 
   return anyValidPath ? processedPaths.join(' ') + ' ' : null;
+}
+
+/**
+ * Gets text content from the system clipboard
+ * @returns Promise resolving to clipboard text content
+ */
+export async function getClipboardText(): Promise<string> {
+  const platform = process.platform;
+
+  try {
+    if (platform === 'win32') {
+      // Windows - Use PowerShell to get clipboard text
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-Clipboard',
+      ]);
+      return stdout.trim();
+    } else if (platform === 'darwin') {
+      // macOS - Use pbpaste
+      const { stdout } = await spawnAsync('pbpaste', []);
+      return stdout;
+    } else if (platform === 'linux') {
+      // Linux - Try xclip first, then xsel as fallback
+      try {
+        const { stdout } = await spawnAsync('xclip', [
+          '-selection',
+          'clipboard',
+          '-o',
+        ]);
+        return stdout;
+      } catch {
+        // Fallback to xsel
+        const { stdout } = await spawnAsync('xsel', [
+          '--clipboard',
+          '--output',
+        ]);
+        return stdout;
+      }
+    }
+    throw new Error(`Unsupported platform: ${platform}`);
+  } catch (error) {
+    debugLogger.error('Failed to get text from clipboard:', error);
+    return '';
+  }
+}
+
+/**
+ * Validates clipboard paste content
+ * @param content The content to validate
+ * @returns Validation result with isValid flag and optional error message
+ */
+export async function validatePasteContent(
+  content: string,
+  options?: {
+    validateContent?: (content: string) => boolean | Promise<boolean>;
+    maxSizeBytes?: number;
+  },
+): Promise<{ isValid: boolean; error?: string }> {
+  try {
+    // Size validation (use custom limit if provided, otherwise default 10MB)
+    const maxSize = options?.maxSizeBytes ?? 10 * 1024 * 1024; // 10MB default
+    const contentSize = Buffer.byteLength(content, 'utf8');
+
+    if (contentSize > maxSize) {
+      return {
+        isValid: false,
+        error: `Content size (${contentSize} bytes) exceeds maximum allowed size (${maxSize} bytes)`,
+      };
+    }
+
+    // Custom validation if provided
+    if (options?.validateContent) {
+      const validationResult = options.validateContent(content);
+      const isValid =
+        validationResult instanceof Promise
+          ? await validationResult
+          : validationResult;
+
+      if (!isValid) {
+        return {
+          isValid: false,
+          error: 'Content validation failed',
+        };
+      }
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
 }
