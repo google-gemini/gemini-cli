@@ -39,7 +39,6 @@ export const FRONTMATTER_REGEX =
 function parseFrontmatter(
   content: string,
 ): { name: string; description: string } | null {
-  // Try YAML parsing first
   try {
     const parsed = yaml.load(content);
     if (parsed && typeof parsed === 'object') {
@@ -48,12 +47,13 @@ function parseFrontmatter(
         return { name, description };
       }
     }
-  } catch {
-    // YAML parsing failed, try simple key-value parsing
+  } catch (yamlError) {
+    debugLogger.debug(
+      'YAML frontmatter parsing failed, falling back to simple parser:',
+      yamlError,
+    );
   }
 
-  // Fallback: simple key-value parsing for name and description
-  // This handles cases like "description: text with colons: like this"
   return parseSimpleFrontmatter(content);
 }
 
@@ -71,36 +71,30 @@ function parseSimpleFrontmatter(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Match "name:" at the start of the line
     if (line.startsWith('name:')) {
       name = line.substring(5).trim();
       continue;
     }
 
-    // Match "description:" at the start of the line
     if (line.startsWith('description:')) {
-      // The description value is everything after "description:"
-      // It may continue on subsequent indented lines (YAML multi-line format)
-      let descValue = line.substring(12).trim();
+      const descLines = [line.substring(12).trim()];
 
-      // Check for multi-line description (indented continuation lines)
       while (i + 1 < lines.length) {
         const nextLine = lines[i + 1];
-        // If next line is indented, it's a continuation of the description
         if (nextLine.match(/^[ \t]+\S/)) {
-          descValue += ' ' + nextLine.trim();
+          descLines.push(nextLine.trim());
           i++;
         } else {
           break;
         }
       }
 
-      description = descValue;
+      description = descLines.filter(Boolean).join(' ');
       continue;
     }
   }
 
-  if (name && description) {
+  if (name !== undefined && description !== undefined) {
     return { name, description };
   }
   return null;
