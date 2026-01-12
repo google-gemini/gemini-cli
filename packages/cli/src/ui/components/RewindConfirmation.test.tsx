@@ -48,7 +48,7 @@ describe('RewindConfirmation', () => {
       addedLines: 10,
       removedLines: 5,
       fileCount: 1,
-      firstFileName: 'test.ts',
+      details: [{ fileName: 'test.ts', diff: '' }],
     };
     const onConfirm = vi.fn();
     const { lastFrame } = render(
