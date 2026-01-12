@@ -57,8 +57,12 @@ import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
-import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type {
+  ModelConfigKey,
+  ResolvedModelConfig,
+} from '../services/modelConfigService.js';
 import { getModelConfigAlias } from './registry.js';
+import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
   mockSendMessageStream,
@@ -98,6 +102,10 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
 
 vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
+}));
+
+vi.mock('../utils/version.js', () => ({
+  getVersion: vi.fn().mockResolvedValue('1.2.3'),
 }));
 
 vi.mock('../utils/environmentContext.js');
@@ -194,9 +202,7 @@ let parentToolRegistry: ToolRegistry;
  * Type-safe helper to create agent definitions for tests.
  */
 
-export const createTestDefinition = <
-  TOutput extends z.ZodTypeAny = z.ZodUnknown,
->(
+const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
   tools: Array<string | MockTool> = [LS_TOOL_NAME],
   runConfigOverrides: Partial<LocalAgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',
@@ -267,8 +273,13 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
-    parentToolRegistry = new ToolRegistry(mockConfig);
-    parentToolRegistry.registerTool(new LSTool(mockConfig));
+    parentToolRegistry = new ToolRegistry(
+      mockConfig,
+      mockConfig.getMessageBus(),
+    );
+    parentToolRegistry.registerTool(
+      new LSTool(mockConfig, mockConfig.getMessageBus()),
+    );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );
@@ -301,11 +312,14 @@ describe('LocalAgentExecutor', () => {
       expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
-    it('SECURITY: should throw if a tool is not on the non-interactive allowlist', async () => {
+    it('should allow any tool for experimentation (formerly SECURITY check)', async () => {
       const definition = createTestDefinition([MOCK_TOOL_NOT_ALLOWED.name]);
-      await expect(
-        LocalAgentExecutor.create(definition, mockConfig, onActivity),
-      ).rejects.toThrow(/not on the allow-list for non-interactive execution/);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      expect(executor).toBeInstanceOf(LocalAgentExecutor);
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
@@ -605,7 +619,13 @@ describe('LocalAgentExecutor', () => {
       });
 
       mockModelResponse(
-        [{ name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' }],
+        [
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { result: 'All work done' },
+            id: 'call2',
+          },
+        ],
         'Task finished.',
       );
 
@@ -622,12 +642,12 @@ describe('LocalAgentExecutor', () => {
       const completeToolDef = sentTools!.find(
         (t) => t.name === TASK_COMPLETE_TOOL_NAME,
       );
-      expect(completeToolDef?.parameters?.required).toEqual([]);
+      expect(completeToolDef?.parameters?.required).toEqual(['result']);
       expect(completeToolDef?.description).toContain(
-        'signal that you have completed',
+        'submit your final findings',
       );
 
-      expect(output.result).toBe('Task completed successfully.');
+      expect(output.result).toBe('All work done');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
     });
 
@@ -780,8 +800,16 @@ describe('LocalAgentExecutor', () => {
 
       // Turn 1: Duplicate calls
       mockModelResponse([
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call1' },
-        { name: TASK_COMPLETE_TOOL_NAME, args: {}, id: 'call2' },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'done' },
+          id: 'call1',
+        },
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'ignored' },
+          id: 'call2',
+        },
       ]);
 
       const output = await executor.run({ goal: 'Dup test' }, signal);
@@ -1165,6 +1193,101 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(output.result).toBe('Aborted due to tool failure.');
+    });
+  });
+
+  describe('Model Routing', () => {
+    it('should use model routing when the agent model is "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'auto';
+
+      const mockRouter = {
+        route: vi.fn().mockResolvedValue({
+          model: 'routed-model',
+          metadata: { source: 'test', reasoning: 'test' },
+        }),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'auto'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'auto',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT use model routing when the agent model is NOT "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'concrete-model';
+
+      const mockRouter = {
+        route: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'concrete-model'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'concrete-model',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'concrete-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
     });
   });
 

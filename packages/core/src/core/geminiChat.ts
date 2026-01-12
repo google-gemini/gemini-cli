@@ -61,11 +61,17 @@ export enum StreamEventType {
   /** A signal that a retry is about to happen. The UI should discard any partial
    * content from the attempt that just failed. */
   RETRY = 'retry',
+  /** A signal that the agent execution has been stopped by a hook. */
+  AGENT_EXECUTION_STOPPED = 'agent_execution_stopped',
+  /** A signal that the agent execution has been blocked by a hook. */
+  AGENT_EXECUTION_BLOCKED = 'agent_execution_blocked',
 }
 
 export type StreamEvent =
   | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
-  | { type: StreamEventType.RETRY };
+  | { type: StreamEventType.RETRY }
+  | { type: StreamEventType.AGENT_EXECUTION_STOPPED; reason: string }
+  | { type: StreamEventType.AGENT_EXECUTION_BLOCKED; reason: string };
 
 /**
  * Options for retrying due to invalid content from the model.
@@ -198,6 +204,29 @@ export class InvalidStreamError extends Error {
 }
 
 /**
+ * Custom error to signal that agent execution has been stopped.
+ */
+export class AgentExecutionStoppedError extends Error {
+  constructor(public reason: string) {
+    super(reason);
+    this.name = 'AgentExecutionStoppedError';
+  }
+}
+
+/**
+ * Custom error to signal that agent execution has been blocked.
+ */
+export class AgentExecutionBlockedError extends Error {
+  constructor(
+    public reason: string,
+    public syntheticResponse?: GenerateContentResponse,
+  ) {
+    super(reason);
+    this.name = 'AgentExecutionBlockedError';
+  }
+}
+
+/**
  * Chat session that enables sending messages to the model with previous
  * conversation context.
  *
@@ -263,10 +292,6 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
-    // Preview Model Bypass mode for the new request.
-    // This ensures that we attempt to use Preview Model for every new user turn
-    // (unless the "Always" fallback mode is active, which is handled separately).
-    this.config.setPreviewModelBypassMode(false);
     let streamDoneResolver: () => void;
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
@@ -299,12 +324,7 @@ export class GeminiChat {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
 
-        let maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
-        // If we are in Preview Model Fallback Mode, we want to fail fast (1 attempt)
-        // when probing the Preview Model.
-        if (this.config.isPreviewModelFallbackMode() && isPreviewModel(model)) {
-          maxAttempts = 1;
-        }
+        const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -334,6 +354,30 @@ export class GeminiChat {
             lastError = null;
             break;
           } catch (error) {
+            if (error instanceof AgentExecutionStoppedError) {
+              yield {
+                type: StreamEventType.AGENT_EXECUTION_STOPPED,
+                reason: error.reason,
+              };
+              lastError = null; // Clear error as this is an expected stop
+              return; // Stop the generator
+            }
+
+            if (error instanceof AgentExecutionBlockedError) {
+              yield {
+                type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+                reason: error.reason,
+              };
+              if (error.syntheticResponse) {
+                yield {
+                  type: StreamEventType.CHUNK,
+                  value: error.syntheticResponse,
+                };
+              }
+              lastError = null; // Clear error as this is an expected stop
+              return; // Stop the generator
+            }
+
             if (isConnectionPhase) {
               throw error;
             }
@@ -378,15 +422,6 @@ export class GeminiChat {
             );
           }
           throw lastError;
-        } else {
-          // Preview Model successfully used, disable fallback mode.
-          // We only do this if we didn't bypass Preview Model (i.e. we actually used it).
-          if (
-            isPreviewModel(model) &&
-            !this.config.isPreviewModelBypassMode()
-          ) {
-            this.config.setPreviewModelFallbackMode(false);
-          }
         }
       } finally {
         streamDoneResolver!();
@@ -475,19 +510,35 @@ export class GeminiChat {
           contents: contentsToUse,
         });
 
+        // Check if hook requested to stop execution
+        if (beforeModelResult.stopped) {
+          throw new AgentExecutionStoppedError(
+            beforeModelResult.reason || 'Agent execution stopped by hook',
+          );
+        }
+
         // Check if hook blocked the model call
         if (beforeModelResult.blocked) {
           // Return a synthetic response generator
           const syntheticResponse = beforeModelResult.syntheticResponse;
           if (syntheticResponse) {
-            return (async function* () {
-              yield syntheticResponse;
-            })();
+            // Ensure synthetic response has a finish reason to prevent InvalidStreamError
+            if (
+              syntheticResponse.candidates &&
+              syntheticResponse.candidates.length > 0
+            ) {
+              for (const candidate of syntheticResponse.candidates) {
+                if (!candidate.finishReason) {
+                  candidate.finishReason = FinishReason.STOP;
+                }
+              }
+            }
           }
-          // If blocked without synthetic response, return empty generator
-          return (async function* () {
-            // Empty generator - no response
-          })();
+
+          throw new AgentExecutionBlockedError(
+            beforeModelResult.reason || 'Model call blocked by hook',
+            syntheticResponse,
+          );
         }
 
         // Apply modifications from BeforeModel hook
@@ -548,12 +599,7 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
-      maxAttempts:
-        availabilityMaxAttempts ??
-        (this.config.isPreviewModelFallbackMode() &&
-        isPreviewModel(lastModelToUse)
-          ? 1
-          : undefined),
+      maxAttempts: availabilityMaxAttempts,
       getAvailabilityContext,
     });
 
@@ -771,6 +817,20 @@ export class GeminiChat {
           originalRequest,
           chunk,
         );
+
+        if (hookResult.stopped) {
+          throw new AgentExecutionStoppedError(
+            hookResult.reason || 'Agent execution stopped by hook',
+          );
+        }
+
+        if (hookResult.blocked) {
+          throw new AgentExecutionBlockedError(
+            hookResult.reason || 'Agent execution blocked by hook',
+            hookResult.response,
+          );
+        }
+
         yield hookResult.response;
       } else {
         yield chunk; // Yield every chunk to the UI immediately.
@@ -861,7 +921,10 @@ export class GeminiChat {
     const toolCallRecords = toolCalls.map((call) => {
       const resultDisplayRaw = call.response?.resultDisplay;
       const resultDisplay =
-        typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+        typeof resultDisplayRaw === 'string' ||
+        (typeof resultDisplayRaw === 'object' && resultDisplayRaw !== null)
+          ? resultDisplayRaw
+          : undefined;
 
       return {
         id: call.request.callId,

@@ -23,7 +23,7 @@ import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
-import { getVersion, getEffectiveModel } from '../../index.js';
+import { getVersion, resolveModel } from '../../index.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -114,10 +114,13 @@ export async function createContentGenerator(
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
     if (gcConfig.fakeResponses) {
-      return FakeContentGenerator.fromFile(gcConfig.fakeResponses);
+      return new LoggingContentGenerator(
+        await FakeContentGenerator.fromFile(gcConfig.fakeResponses),
+        gcConfig,
+      );
     }
     const version = await getVersion();
-    const model = getEffectiveModel(
+    const model = resolveModel(
       gcConfig.getModel(),
       gcConfig.getPreviewFeatures(),
     );

@@ -71,6 +71,30 @@ describe('<HistoryItemDisplay />', () => {
     },
   );
 
+  it('renders AgentsStatus for "agents_list" type', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.AGENTS_LIST,
+      agents: [
+        {
+          name: 'local_agent',
+          displayName: 'Local Agent',
+          description: '  Local agent description.\n    Second line.',
+          kind: 'local',
+        },
+        {
+          name: 'remote_agent',
+          description: 'Remote agent description.',
+          kind: 'remote',
+        },
+      ],
+    };
+    const { lastFrame } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders StatsDisplay for "stats" type', () => {
     const item: HistoryItem = {
       ...baseItem,

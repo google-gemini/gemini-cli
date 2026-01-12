@@ -32,6 +32,7 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const [view, setView] = useState<'main' | 'manual'>('main');
+  const [persistMode, setPersistMode] = useState(false);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -61,6 +62,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         } else {
           onClose();
         }
+      }
+      if (key.name === 'tab') {
+        setPersistMode((prev) => !prev);
       }
     },
     { isActive: true },
@@ -157,13 +161,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       if (config) {
-        config.setModel(model);
+        config.setModel(model, persistMode ? false : true);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
       onClose();
     },
-    [config, onClose],
+    [config, onClose, persistMode],
   );
 
   let header;
@@ -204,7 +208,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         )}
         {subheader && <Text>{subheader}</Text>}
       </Box>
-
       <Box marginTop={1}>
         <DescriptiveRadioButtonSelect
           items={options}
@@ -214,8 +217,19 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         />
       </Box>
       <Box marginTop={1} flexDirection="column">
+        <Box>
+          <Text color={theme.text.primary}>
+            Remember model for future sessions:{' '}
+          </Text>
+          <Text color={theme.text.secondary}>
+            {persistMode ? 'true' : 'false'}
+          </Text>
+        </Box>
+        <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>
-          {'To use a specific Gemini model on startup, use the --model flag.'}
+          {'> To use a specific Gemini model on startup, use the --model flag.'}
         </Text>
       </Box>
       <Box marginTop={1} flexDirection="column">

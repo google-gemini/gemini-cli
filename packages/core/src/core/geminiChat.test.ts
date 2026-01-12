@@ -17,12 +17,7 @@ import {
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_THINKING_MODE,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_FLASH_MODEL,
-} from '../config/models.js';
+import { DEFAULT_THINKING_MODE } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
@@ -33,6 +28,18 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import {
+  fireBeforeModelHook,
+  fireAfterModelHook,
+  fireBeforeToolSelectionHook,
+} from './geminiChatHookTriggers.js';
+
+// Mock hook triggers
+vi.mock('./geminiChatHookTriggers.js', () => ({
+  fireBeforeModelHook: vi.fn(),
+  fireAfterModelHook: vi.fn(),
+  fireBeforeToolSelectionHook: vi.fn().mockResolvedValue({}),
+}));
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -146,7 +153,6 @@ describe('GeminiChat', () => {
         // When model is explicitly set, active model usually resets or updates to it
         currentActiveModel = m;
       }),
-      isInFallbackMode: vi.fn().mockReturnValue(false),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       flashFallbackHandler: undefined,
@@ -179,10 +185,6 @@ describe('GeminiChat', () => {
           };
         }),
       },
-      isPreviewModelBypassMode: vi.fn().mockReturnValue(false),
-      setPreviewModelBypassMode: vi.fn(),
-      isPreviewModelFallbackMode: vi.fn().mockReturnValue(false),
-      setPreviewModelFallbackMode: vi.fn(),
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
@@ -545,105 +547,6 @@ describe('GeminiChat', () => {
       expect(modelTurn?.parts?.length).toBe(1);
       expect(modelTurn?.parts![0].text).toBe(
         'This is the visible text that should not be lost.',
-      );
-    });
-
-    it('should use maxAttempts=1 for retryWithBackoff when in Preview Model Fallback Mode', async () => {
-      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          yield {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Success' }] },
-                finishReason: 'STOP',
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: PREVIEW_GEMINI_MODEL },
-        'test',
-        'prompt-id-fast-retry',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({
-          maxAttempts: 1,
-        }),
-      );
-    });
-
-    it('should use maxAttempts=1 for retryWithBackoff when in Preview Model Fallback Mode (Flash)', async () => {
-      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          yield {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Success' }] },
-                finishReason: 'STOP',
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: PREVIEW_GEMINI_FLASH_MODEL },
-        'test',
-        'prompt-id-fast-retry-flash',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({
-          maxAttempts: 1,
-        }),
-      );
-    });
-
-    it('should NOT use maxAttempts=1 for other models even in Preview Model Fallback Mode', async () => {
-      vi.mocked(mockConfig.isPreviewModelFallbackMode).mockReturnValue(true);
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          yield {
-            candidates: [
-              {
-                content: { parts: [{ text: 'Success' }] },
-                finishReason: 'STOP',
-              },
-            ],
-          } as unknown as GenerateContentResponse;
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        { model: DEFAULT_GEMINI_FLASH_MODEL },
-        'test',
-        'prompt-id-normal-retry',
-        new AbortController().signal,
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      expect(mockRetryWithBackoff).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({
-          maxAttempts: undefined, // Should use default
-        }),
       );
     });
 
@@ -1880,9 +1783,6 @@ describe('GeminiChat', () => {
         authType,
       });
 
-      const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
-      isInFallbackModeSpy.mockReturnValue(false);
-
       vi.mocked(mockContentGenerator.generateContentStream)
         .mockRejectedValueOnce(error429) // Attempt 1 fails
         .mockResolvedValueOnce(
@@ -1899,10 +1799,9 @@ describe('GeminiChat', () => {
           })(),
         );
 
-      mockHandleFallback.mockImplementation(async () => {
-        isInFallbackModeSpy.mockReturnValue(true);
-        return true; // Signal retry
-      });
+      mockHandleFallback.mockImplementation(
+        async () => true, // Signal retry
+      );
 
       const stream = await chat.sendMessageStream(
         { model: 'test-model' },
@@ -1930,34 +1829,6 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
       const modelTurn = history[1];
       expect(modelTurn.parts![0].text).toBe('Success on retry');
-    });
-
-    it('should stop retrying if handleFallback returns false (e.g., auth intent)', async () => {
-      vi.mocked(mockConfig.getModel).mockReturnValue('gemini-pro');
-      vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
-        error429,
-      );
-      mockHandleFallback.mockResolvedValue(false);
-
-      const stream = await chat.sendMessageStream(
-        { model: 'gemini-2.0-flash' },
-        'test stop',
-        'prompt-id-fb2',
-        new AbortController().signal,
-      );
-
-      await expect(
-        (async () => {
-          for await (const _ of stream) {
-            /* consume stream */
-          }
-        })(),
-      ).rejects.toThrow(error429);
-
-      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(mockHandleFallback).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2408,6 +2279,153 @@ describe('GeminiChat', () => {
         }),
         expect.any(String),
       );
+    });
+  });
+
+  describe('Hook execution control', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
+      // Default to allowing execution
+      vi.mocked(fireBeforeModelHook).mockResolvedValue({ blocked: false });
+      vi.mocked(fireAfterModelHook).mockResolvedValue({
+        response: {} as GenerateContentResponse,
+      });
+      vi.mocked(fireBeforeToolSelectionHook).mockResolvedValue({});
+    });
+
+    it('should yield AGENT_EXECUTION_STOPPED when BeforeModel hook stops execution', async () => {
+      vi.mocked(fireBeforeModelHook).mockResolvedValue({
+        blocked: true,
+        stopped: true,
+        reason: 'stopped by hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        type: StreamEventType.AGENT_EXECUTION_STOPPED,
+        reason: 'stopped by hook',
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_BLOCKED and synthetic response when BeforeModel hook blocks execution', async () => {
+      const syntheticResponse = {
+        candidates: [{ content: { parts: [{ text: 'blocked' }] } }],
+      } as GenerateContentResponse;
+
+      vi.mocked(fireBeforeModelHook).mockResolvedValue({
+        blocked: true,
+        reason: 'blocked by hook',
+        syntheticResponse,
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(2);
+      expect(events[0]).toEqual({
+        type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+        reason: 'blocked by hook',
+      });
+      expect(events[1]).toEqual({
+        type: StreamEventType.CHUNK,
+        value: syntheticResponse,
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_STOPPED when AfterModel hook stops execution', async () => {
+      // Mock content generator to return a stream
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'response' }] } }],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      vi.mocked(fireAfterModelHook).mockResolvedValue({
+        response: {} as GenerateContentResponse,
+        stopped: true,
+        reason: 'stopped by after hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toContainEqual({
+        type: StreamEventType.AGENT_EXECUTION_STOPPED,
+        reason: 'stopped by after hook',
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_BLOCKED and response when AfterModel hook blocks execution', async () => {
+      const response = {
+        candidates: [{ content: { parts: [{ text: 'response' }] } }],
+      } as unknown as GenerateContentResponse;
+
+      // Mock content generator to return a stream
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield response;
+        })(),
+      );
+
+      vi.mocked(fireAfterModelHook).mockResolvedValue({
+        response,
+        blocked: true,
+        reason: 'blocked by after hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toContainEqual({
+        type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+        reason: 'blocked by after hook',
+      });
+      // Should also contain the chunk (hook response)
+      expect(events).toContainEqual({
+        type: StreamEventType.CHUNK,
+        value: response,
+      });
     });
   });
 });

@@ -168,6 +168,7 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
+          BUILD_SANDBOX_FLAGS: '--cache-from type=gha --cache-to type=gha,mode=max'
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then

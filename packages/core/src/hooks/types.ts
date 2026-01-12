@@ -18,6 +18,16 @@ import type {
 import { defaultHookTranslator } from './hookTranslator.js';
 
 /**
+ * Configuration source levels in precedence order (highest to lowest)
+ */
+export enum ConfigSource {
+  Project = 'project',
+  User = 'user',
+  System = 'system',
+  Extensions = 'extensions',
+}
+
+/**
  * Event names for the hook system
  */
 export enum HookEventName {
@@ -40,7 +50,10 @@ export enum HookEventName {
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  name?: string;
+  description?: string;
   timeout?: number;
+  source?: ConfigSource;
 }
 
 export type HookConfig = CommandHookConfig;
@@ -59,6 +72,15 @@ export interface HookDefinition {
  */
 export enum HookType {
   Command = 'command',
+}
+
+/**
+ * Generate a unique key for a hook configuration
+ */
+export function getHookKey(hook: HookConfig): string {
+  const name = hook.name || '';
+  const command = hook.command || '';
+  return `${name}:${command}`;
 }
 
 /**
@@ -111,6 +133,8 @@ export function createHookOutput(
       return new AfterModelHookOutput(data);
     case 'BeforeToolSelection':
       return new BeforeToolSelectionHookOutput(data);
+    case 'BeforeTool':
+      return new BeforeToolHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -156,7 +180,7 @@ export class DefaultHookOutput implements HookOutput {
    * Get the effective reason for blocking or stopping
    */
   getEffectiveReason(): string {
-    return this.reason || this.stopReason || 'No reason provided';
+    return this.stopReason || this.reason || 'No reason provided';
   }
 
   /**
@@ -212,43 +236,24 @@ export class DefaultHookOutput implements HookOutput {
 }
 
 /**
- * Specific hook output class for BeforeTool events with compatibility support
+ * Specific hook output class for BeforeTool events.
  */
 export class BeforeToolHookOutput extends DefaultHookOutput {
   /**
-   * Get the effective blocking reason, considering compatibility fields
+   * Get modified tool input if provided by hook
    */
-  override getEffectiveReason(): string {
-    // Check for compatibility fields first
-    if (this.hookSpecificOutput) {
-      if ('permissionDecisionReason' in this.hookSpecificOutput) {
-        const compatReason =
-          this.hookSpecificOutput['permissionDecisionReason'];
-        if (typeof compatReason === 'string') {
-          return compatReason;
-        }
+  getModifiedToolInput(): Record<string, unknown> | undefined {
+    if (this.hookSpecificOutput && 'tool_input' in this.hookSpecificOutput) {
+      const input = this.hookSpecificOutput['tool_input'];
+      if (
+        typeof input === 'object' &&
+        input !== null &&
+        !Array.isArray(input)
+      ) {
+        return input as Record<string, unknown>;
       }
     }
-
-    return super.getEffectiveReason();
-  }
-
-  /**
-   * Check if this output represents a blocking decision, considering compatibility fields
-   */
-  override isBlockingDecision(): boolean {
-    // Check compatibility field first
-    if (
-      this.hookSpecificOutput &&
-      'permissionDecision' in this.hookSpecificOutput
-    ) {
-      const compatDecision = this.hookSpecificOutput['permissionDecision'];
-      if (compatDecision === 'block' || compatDecision === 'deny') {
-        return true;
-      }
-    }
-
-    return super.isBlockingDecision();
+    return undefined;
   }
 }
 
@@ -348,24 +353,32 @@ export class AfterModelHookOutput extends DefaultHookOutput {
       }
     }
 
-    // If hook wants to stop execution, create a synthetic stop response
-    if (this.shouldStopExecution()) {
-      const stopResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: [this.getEffectiveReason() || 'Execution stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      return defaultHookTranslator.fromHookLLMResponse(stopResponse);
-    }
-
     return undefined;
   }
+}
+
+/**
+ * Context for MCP tool executions.
+ * Contains non-sensitive connection information about the MCP server
+ * identity. Since server_name is user controlled and arbitrary, we
+ * also include connection information (e.g., command or url) to
+ * help identify the MCP server.
+ *
+ * NOTE: In the future, consider defining a shared sanitized interface
+ * from MCPServerConfig to avoid duplication and ensure consistency.
+ */
+export interface McpToolContext {
+  server_name: string;
+  tool_name: string; // Original tool name from the MCP server
+
+  // Connection info (mutually exclusive based on transport type)
+  command?: string; // For stdio transport
+  args?: string[]; // For stdio transport
+  cwd?: string; // For stdio transport
+
+  url?: string; // For SSE/HTTP transport
+
+  tcp?: string; // For WebSocket transport
 }
 
 /**
@@ -374,6 +387,7 @@ export class AfterModelHookOutput extends DefaultHookOutput {
 export interface BeforeToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
+  mcp_context?: McpToolContext; // Only present for MCP tools
 }
 
 /**
@@ -382,8 +396,7 @@ export interface BeforeToolInput extends HookInput {
 export interface BeforeToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'BeforeTool';
-    permissionDecision?: HookDecision;
-    permissionDecisionReason?: string;
+    tool_input?: Record<string, unknown>;
   };
 }
 
@@ -394,6 +407,7 @@ export interface AfterToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
   tool_response: Record<string, unknown>;
+  mcp_context?: McpToolContext; // Only present for MCP tools
 }
 
 /**
