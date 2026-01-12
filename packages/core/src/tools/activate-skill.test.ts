@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ActivateSkillTool } from './activate-skill.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('../utils/getFolderStructure.js', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock folder structure'),
@@ -16,13 +17,10 @@ vi.mock('../utils/getFolderStructure.js', () => ({
 describe('ActivateSkillTool', () => {
   let mockConfig: Config;
   let tool: ActivateSkillTool;
-  const mockMessageBus = {
-    publish: vi.fn(),
-    subscribe: vi.fn(),
-    unsubscribe: vi.fn(),
-  } as unknown as MessageBus;
+  let mockMessageBus: MessageBus;
 
   beforeEach(() => {
+    mockMessageBus = createMockMessageBus();
     const skills = [
       {
         name: 'test-skill',
@@ -31,6 +29,9 @@ describe('ActivateSkillTool', () => {
       },
     ];
     mockConfig = {
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addDirectory: vi.fn(),
+      }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue(skills),
         getAllSkills: vi.fn().mockReturnValue(skills),
@@ -75,6 +76,34 @@ describe('ActivateSkillTool', () => {
     expect(details.prompt).toContain('Mock folder structure');
   });
 
+  it('should skip confirmation for built-in skills', async () => {
+    const builtinSkill = {
+      name: 'builtin-skill',
+      description: 'A built-in skill',
+      location: '/path/to/builtin/SKILL.md',
+      isBuiltin: true,
+      body: 'Built-in instructions',
+    };
+    vi.mocked(mockConfig.getSkillManager().getSkill).mockReturnValue(
+      builtinSkill,
+    );
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([
+      builtinSkill,
+    ]);
+
+    const params = { name: 'builtin-skill' };
+    const toolWithBuiltin = new ActivateSkillTool(mockConfig, mockMessageBus);
+    const invocation = toolWithBuiltin.build(params);
+
+    const details = await (
+      invocation as unknown as {
+        getConfirmationDetails: (signal: AbortSignal) => Promise<unknown>;
+      }
+    ).getConfirmationDetails(new AbortController().signal);
+
+    expect(details).toBe(false);
+  });
+
   it('should activate a valid skill and return its content in XML tags', async () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);
@@ -83,14 +112,17 @@ describe('ActivateSkillTool', () => {
     expect(mockConfig.getSkillManager().activateSkill).toHaveBeenCalledWith(
       'test-skill',
     );
-    expect(result.llmContent).toContain('<ACTIVATED_SKILL name="test-skill">');
-    expect(result.llmContent).toContain('<INSTRUCTIONS>');
+    expect(mockConfig.getWorkspaceContext().addDirectory).toHaveBeenCalledWith(
+      '/path/to/test-skill',
+    );
+    expect(result.llmContent).toContain('<activated_skill name="test-skill">');
+    expect(result.llmContent).toContain('<instructions>');
     expect(result.llmContent).toContain('Skill instructions content.');
-    expect(result.llmContent).toContain('</INSTRUCTIONS>');
-    expect(result.llmContent).toContain('<AVAILABLE_RESOURCES>');
+    expect(result.llmContent).toContain('</instructions>');
+    expect(result.llmContent).toContain('<available_resources>');
     expect(result.llmContent).toContain('Mock folder structure');
-    expect(result.llmContent).toContain('</AVAILABLE_RESOURCES>');
-    expect(result.llmContent).toContain('</ACTIVATED_SKILL>');
+    expect(result.llmContent).toContain('</available_resources>');
+    expect(result.llmContent).toContain('</activated_skill>');
     expect(result.returnDisplay).toContain('Skill **test-skill** activated');
     expect(result.returnDisplay).toContain('Mock folder structure');
   });

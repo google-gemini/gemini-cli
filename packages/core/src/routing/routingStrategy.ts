@@ -35,6 +35,8 @@ export interface RoutingContext {
   request: PartListUnion;
   /** An abort signal to cancel an LLM call during routing. */
   signal: AbortSignal;
+  /** The model string requested for this turn, if any. */
+  requestedModel?: string;
 }
 
 /**

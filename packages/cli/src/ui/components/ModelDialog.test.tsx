@@ -47,7 +47,7 @@ describe('<ModelDialog />', () => {
   const mockGetHasAccessToPreviewModel = vi.fn();
 
   interface MockConfig extends Partial<Config> {
-    setModel: (model: string) => void;
+    setModel: (model: string, isTemporary?: boolean) => void;
     getModel: () => string;
     getPreviewFeatures: () => boolean;
     getHasAccessToPreviewModel: () => boolean;
@@ -89,9 +89,7 @@ describe('<ModelDialog />', () => {
   it('renders the initial "main" view correctly', () => {
     const { lastFrame } = renderComponent();
     expect(lastFrame()).toContain('Select Model');
-    expect(lastFrame()).toContain(
-      'Applies to this session and future Gemini CLI sessions.',
-    );
+    expect(lastFrame()).toContain('Remember model for future sessions: false');
     expect(lastFrame()).toContain('Auto');
     expect(lastFrame()).toContain('Manual');
   });
@@ -148,7 +146,10 @@ describe('<ModelDialog />', () => {
     stdin.write('\r');
     await waitForUpdate();
 
-    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(mockSetModel).toHaveBeenCalledWith(
+      DEFAULT_GEMINI_MODEL_AUTO,
+      true, // Session only by default
+    );
     expect(mockOnClose).toHaveBeenCalled();
   });
 
@@ -165,7 +166,29 @@ describe('<ModelDialog />', () => {
     stdin.write('\r');
     await waitForUpdate();
 
-    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL, true);
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('toggles persist mode with Tab key', async () => {
+    const { lastFrame, stdin } = renderComponent();
+
+    expect(lastFrame()).toContain('Remember model for future sessions: false');
+
+    // Press Tab to toggle persist mode
+    stdin.write('\t');
+    await waitForUpdate();
+
+    expect(lastFrame()).toContain('Remember model for future sessions: true');
+
+    // Select "Auto" (index 0)
+    stdin.write('\r');
+    await waitForUpdate();
+
+    expect(mockSetModel).toHaveBeenCalledWith(
+      DEFAULT_GEMINI_MODEL_AUTO,
+      false, // Persist enabled
+    );
     expect(mockOnClose).toHaveBeenCalled();
   });
 

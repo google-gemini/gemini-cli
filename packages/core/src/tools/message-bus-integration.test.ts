@@ -81,14 +81,24 @@ class TestTool extends BaseDeclarativeTool<TestParams, TestResult> {
         },
         required: ['testParam'],
       },
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
-  protected createInvocation(params: TestParams, messageBus: MessageBus) {
-    return new TestToolInvocation(params, messageBus);
+  protected createInvocation(
+    params: TestParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    return new TestToolInvocation(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
 
@@ -128,7 +138,7 @@ describe('Message Bus Integration', () => {
       expect(publishSpy).toHaveBeenCalledWith({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: {
-          name: 'TestToolInvocation',
+          name: 'test-tool',
           args: { testParam: 'test-value' },
         },
         correlationId: 'test-correlation-id',
