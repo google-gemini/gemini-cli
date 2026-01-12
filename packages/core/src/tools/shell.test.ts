@@ -184,7 +184,7 @@ describe('ShellTool', () => {
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
       ).toThrow(
-        `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
+        /Path must be within one of the workspace directories:/,
       );
     });
 
@@ -194,6 +194,32 @@ describe('ShellTool', () => {
         dir_path: path.join(tempRootDir, 'subdir'),
       });
       expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if command argument is a path outside the workspace', () => {
+        expect(() =>
+          shellTool.build({ command: 'ls /tmp' }),
+        ).toThrow(
+          /Path must be within one of the workspace directories:/,
+        );
+    });
+
+    it('should throw an error if command argument is a relative path outside the workspace', () => {
+        expect(() =>
+          shellTool.build({ command: 'ls ../outside' }),
+        ).toThrow(
+          /Path must be within one of the workspace directories:/,
+        );
+    });
+
+    it('should allow command arguments that are paths within the workspace', () => {
+        const invocation = shellTool.build({ command: 'ls subdir' });
+        expect(invocation).toBeDefined();
+    });
+
+    it('should allow non-path arguments', () => {
+        const invocation = shellTool.build({ command: 'echo "hello world"' });
+        expect(invocation).toBeDefined();
     });
   });
 
