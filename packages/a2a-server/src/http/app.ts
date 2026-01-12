@@ -319,7 +319,7 @@ export async function createApp() {
     return expressApp;
   } catch (error) {
     logger.error('[CoreAgent] Error during startup:', error);
-    process.exit(1);
+    throw error;
   }
 }
 

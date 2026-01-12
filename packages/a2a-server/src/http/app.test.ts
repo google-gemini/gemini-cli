@@ -8,6 +8,7 @@ import type { Config } from '@google/gemini-cli-core';
 import {
   GeminiEventType,
   ApprovalMode,
+  PolicyDecision,
   type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import type {
@@ -33,7 +34,6 @@ import {
   assertUniqueFinalEventIsLast,
   assertTaskCreationAndWorkingStatus,
   createStreamMessageRequest,
-  createMockConfig,
 } from '../utils/testing_utils.js';
 // Import MockTool from specific path to avoid vitest dependency in main core bundle
 import { MockTool } from '@google/gemini-cli-core/src/test-utils/mock-tool.js';
@@ -61,23 +61,39 @@ const streamToSSEEvents = (
 // Mock the logger to avoid polluting test output
 // Comment out to debug tests
 vi.mock('../utils/logger.js', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 let config: Config;
-const getToolRegistrySpy = vi.fn().mockReturnValue(ApprovalMode.DEFAULT);
-const getApprovalModeSpy = vi.fn();
-const getShellExecutionConfigSpy = vi.fn();
-const getExtensionsSpy = vi.fn();
+
+const {
+  getToolRegistrySpy,
+  getApprovalModeSpy,
+  mockPolicyEngineSpy,
+  getShellExecutionConfigSpy,
+  getExtensionsSpy,
+} = vi.hoisted(() => ({
+  getToolRegistrySpy: vi.fn(),
+  getApprovalModeSpy: vi.fn(),
+  mockPolicyEngineSpy: vi.fn(),
+  getShellExecutionConfigSpy: vi.fn(),
+  getExtensionsSpy: vi.fn(),
+}));
 
 vi.mock('../config/config.js', async () => {
   const actual = await vi.importActual('../config/config.js');
   return {
     ...actual,
     loadConfig: vi.fn().mockImplementation(async () => {
+      const { createMockConfig } = await import('../utils/testing_utils.js');
       const mockConfig = createMockConfig({
         getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
+        getPolicyEngine: mockPolicyEngineSpy,
         getShellExecutionConfig: getShellExecutionConfigSpy,
         getExtensions: getExtensionsSpy,
       });
@@ -113,6 +129,17 @@ describe('E2E Tests', () => {
 
   beforeEach(() => {
     getApprovalModeSpy.mockReturnValue(ApprovalMode.DEFAULT);
+    mockPolicyEngineSpy.mockImplementation(() => ({
+      check: async () => {
+        // If YOLO mode is enabled (either via config or override), allow everything
+        if (getApprovalModeSpy() === ApprovalMode.YOLO) {
+          return { decision: PolicyDecision.ALLOW };
+        }
+        return { decision: PolicyDecision.ASK_USER };
+      },
+      getApprovalMode: getApprovalModeSpy,
+      setApprovalMode: () => {},
+    }));
   });
 
   afterAll(
@@ -545,6 +572,13 @@ describe('E2E Tests', () => {
   });
 
   it('should handle tool calls that do not require approval', async () => {
+    // Override policy engine to allow for this test
+    mockPolicyEngineSpy.mockImplementation(() => ({
+      check: async () => ({ decision: PolicyDecision.ALLOW }),
+      getApprovalMode: getApprovalModeSpy,
+      setApprovalMode: () => {},
+    }));
+
     // First call yields the tool request
     sendMessageStreamSpy.mockImplementationOnce(async function* () {
       yield* [
@@ -724,12 +758,12 @@ describe('E2E Tests', () => {
     const events = streamToSSEEvents(res.text);
     assertTaskCreationAndWorkingStatus(events);
 
-    // Status update: working
+    // Status update: working (index 2)
     const workingEvent2 = events[2].result as TaskStatusUpdateEvent;
     expect(workingEvent2.kind).toBe('status-update');
     expect(workingEvent2.status.state).toBe('working');
 
-    // Status update: tool-call-update (validating)
+    // Status update: tool-call-update (validating) (index 3)
     const validatingEvent = events[3].result as TaskStatusUpdateEvent;
     expect(validatingEvent.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
@@ -743,12 +777,12 @@ describe('E2E Tests', () => {
       },
     ]);
 
-    // Status update: tool-call-update (scheduled)
-    const awaitingEvent = events[4].result as TaskStatusUpdateEvent;
-    expect(awaitingEvent.metadata?.['coderAgent']).toMatchObject({
+    // Status update: tool-call-update (scheduled) (index 4)
+    const scheduledEvent = events[4].result as TaskStatusUpdateEvent;
+    expect(scheduledEvent.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
     });
-    expect(awaitingEvent.status.message?.parts).toMatchObject([
+    expect(scheduledEvent.status.message?.parts).toMatchObject([
       {
         data: {
           status: 'scheduled',
@@ -757,7 +791,7 @@ describe('E2E Tests', () => {
       },
     ]);
 
-    // Status update: tool-call-update (executing)
+    // Status update: tool-call-update (executing) (index 5)
     const executingEvent = events[5].result as TaskStatusUpdateEvent;
     expect(executingEvent.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
@@ -771,7 +805,7 @@ describe('E2E Tests', () => {
       },
     ]);
 
-    // Status update: tool-call-update (success)
+    // Status update: tool-call-update (success) (index 6)
     const successEvent = events[6].result as TaskStatusUpdateEvent;
     expect(successEvent.metadata?.['coderAgent']).toMatchObject({
       kind: 'tool-call-update',
@@ -785,12 +819,12 @@ describe('E2E Tests', () => {
       },
     ]);
 
-    // Status update: working (before sending tool result to LLM)
+    // Status update: working (before sending tool result to LLM) (index 7)
     const workingEvent3 = events[7].result as TaskStatusUpdateEvent;
     expect(workingEvent3.kind).toBe('status-update');
     expect(workingEvent3.status.state).toBe('working');
 
-    // Status update: text-content (final LLM response)
+    // Status update: text-content (final LLM response) (index 8)
     const textContentEvent = events[8].result as TaskStatusUpdateEvent;
     expect(textContentEvent.metadata?.['coderAgent']).toMatchObject({
       kind: 'text-content',
@@ -798,6 +832,11 @@ describe('E2E Tests', () => {
     expect(textContentEvent.status.message?.parts).toMatchObject([
       { text: 'Tool executed successfully.' },
     ]);
+
+    // Status update: state-change (input-required) (index 9)
+    const finalEvent = events[9].result as TaskStatusUpdateEvent;
+    expect(finalEvent.final).toBe(true);
+    expect(finalEvent.status.state).toBe('input-required');
 
     assertUniqueFinalEventIsLast(events);
     expect(events.length).toBe(10);

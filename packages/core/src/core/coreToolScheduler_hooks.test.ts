@@ -79,7 +79,19 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => true,
-    getPolicyEngine: () => null,
+    getPolicyEngine: () =>
+      ({
+        check: async () => {
+          const mode = overrides.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
+          if (mode === ApprovalMode.YOLO) {
+            return { decision: 'allow' };
+          }
+          return { decision: 'ask_user' };
+        },
+        getApprovalMode: () =>
+          overrides.getApprovalMode?.() ?? ApprovalMode.DEFAULT,
+        setApprovalMode: () => {},
+      }) as unknown,
     getExperiments: () => {},
   } as unknown as Config;
 

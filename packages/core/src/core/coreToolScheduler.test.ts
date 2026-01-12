@@ -286,7 +286,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         check: async (toolCall: { name: string; args: object }) => {
           // Mock simple policy logic for tests
           const mode = finalConfig.getApprovalMode();
-          if (mode === ApprovalMode.YOLO) {
+          if (mode === ApprovalMode.YOLO || mode === ApprovalMode.AUTO_EDIT) {
             return { decision: PolicyDecision.ALLOW };
           }
           const allowed = finalConfig.getAllowedTools();

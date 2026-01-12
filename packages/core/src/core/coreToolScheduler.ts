@@ -19,6 +19,7 @@ import { BeforeToolHookOutput } from '../hooks/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
@@ -701,9 +702,13 @@ export class CoreToolScheduler {
           await invocation.shouldConfirmExecute(signal);
 
         const requiresConfirmation =
-          !!confirmationDetails ||
           hookDecision === 'ask' ||
-          decision === PolicyDecision.ASK_USER;
+          (decision !== PolicyDecision.ALLOW &&
+            (decision === PolicyDecision.ASK_USER || !!confirmationDetails));
+
+        debugLogger.debug(
+          `[_processNextInQueue] callId=${reqInfo.callId}, decision=${decision}, hookDecision=${hookDecision}, requiresConfirmation=${requiresConfirmation}`,
+        );
 
         if (!requiresConfirmation) {
           this.setToolCallOutcome(
@@ -712,7 +717,7 @@ export class CoreToolScheduler {
           );
           this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
         } else {
-          // PolicyDecision.ASK_USER or Hook 'ask'
+          // PolicyDecision.ASK_USER, Hook 'ask', or tool-level confirmation required
 
           if (!this.config.isInteractive()) {
             throw new Error(
@@ -825,7 +830,10 @@ export class CoreToolScheduler {
 
   async handleConfirmationResponse(
     callId: string,
-    originalOnConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>,
+    originalOnConfirm: (
+      outcome: ToolConfirmationOutcome,
+      payload?: ToolConfirmationPayload,
+    ) => Promise<void>,
     outcome: ToolConfirmationOutcome,
     signal: AbortSignal,
     payload?: ToolConfirmationPayload,
@@ -835,7 +843,9 @@ export class CoreToolScheduler {
     );
 
     if (toolCall && toolCall.status === 'awaiting_approval') {
-      await originalOnConfirm(outcome);
+      if (typeof originalOnConfirm === 'function') {
+        await originalOnConfirm(outcome, payload);
+      }
     }
 
     this.setToolCallOutcome(callId, outcome);
@@ -1075,12 +1085,11 @@ export class CoreToolScheduler {
   }
 
   private notifyToolCallsUpdate(): void {
+    debugLogger.debug(
+      `[notifyToolCallsUpdate] count=${this.toolCalls.length}, statuses=${this.toolCalls.map((c) => c.status).join(',')}`,
+    );
     if (this.onToolCallsUpdate) {
-      this.onToolCallsUpdate([
-        ...this.completedToolCallsForBatch,
-        ...this.toolCalls,
-        ...this.toolCallQueue,
-      ]);
+      this.onToolCallsUpdate([...this.toolCalls, ...this.toolCallQueue]);
     }
   }
 

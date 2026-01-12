@@ -79,15 +79,17 @@ export function createMockConfig(
     .fn()
     .mockReturnValue(new GeminiClient(mockConfig));
 
-  mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
-    check: async () => {
-      const mode = mockConfig.getApprovalMode();
-      if (mode === ApprovalMode.YOLO) {
-        return { decision: PolicyDecision.ALLOW };
-      }
-      return { decision: PolicyDecision.ASK_USER };
-    },
-  });
+  if (!overrides.getPolicyEngine) {
+    mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+      check: async () => {
+        const mode = mockConfig.getApprovalMode();
+        if (mode === ApprovalMode.YOLO) {
+          return { decision: PolicyDecision.ALLOW };
+        }
+        return { decision: PolicyDecision.ASK_USER };
+      },
+    });
+  }
 
   return mockConfig;
 }

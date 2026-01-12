@@ -81,20 +81,34 @@ const mockConfig = {
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
   getMessageBus: () => null,
-  isInteractive: () => false,
-  getExperiments: () => {},
+  isInteractive: () => true,
+  getExperiments: () => ({ experimentIds: [] }),
   getEnableHooks: () => false,
 } as unknown as Config;
 mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
 mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
 mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
-  check: async () => {
+  check: async (toolCall: any) => {
     const mode = mockConfig.getApprovalMode();
     if (mode === ApprovalMode.YOLO) {
       return { decision: PolicyDecision.ALLOW };
     }
+    if (mode === ApprovalMode.AUTO_EDIT && toolCall.name === 'mockTool') {
+      return { decision: PolicyDecision.ALLOW };
+    }
+    // For these tests, we want to allow mockTool unless we are testing confirmation
+    if (
+      toolCall.name === 'mockTool' ||
+      toolCall.name === 'mockToolWithLiveOutput' ||
+      toolCall.name === 'tool1' ||
+      toolCall.name === 'tool2'
+    ) {
+      return { decision: PolicyDecision.ALLOW };
+    }
     return { decision: PolicyDecision.ASK_USER };
   },
+  getApprovalMode: () => mockConfig.getApprovalMode(),
+  setApprovalMode: () => {},
 });
 
 function createMockConfigOverride(overrides: Partial<Config> = {}): Config {
@@ -540,6 +554,7 @@ describe('useReactToolScheduler', () => {
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+      undefined,
     );
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalled();
 
@@ -585,6 +600,7 @@ describe('useReactToolScheduler', () => {
 
     expect(mockOnUserConfirmForToolConfirmation).toHaveBeenCalledWith(
       ToolConfirmationOutcome.Cancel,
+      undefined,
     );
 
     const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
