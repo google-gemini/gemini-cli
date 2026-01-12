@@ -83,7 +83,9 @@ The processor automatically detects and prevents circular imports:
 # file-a.md
 
 @./file-b.md
+```
 
+```markdown
 # file-b.md
 
 @./file-a.md <!-- This will be detected and prevented -->
