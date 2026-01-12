@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { MemoryCommand } from './memory.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionsCommand } from './extensions.js';
 import { InitCommand } from './init.js';
@@ -22,6 +23,7 @@ export class CommandRegistry {
     this.register(new ExtensionsCommand());
     this.register(new RestoreCommand());
     this.register(new InitCommand());
+    this.register(new MemoryCommand());
   }
 
   register(command: Command) {
