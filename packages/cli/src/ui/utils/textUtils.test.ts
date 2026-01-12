@@ -9,9 +9,21 @@ import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { escapeAnsiCtrlCodes, stripUnsafeCharacters } from './textUtils.js';
+import {
+  escapeAnsiCtrlCodes,
+  stripUnsafeCharacters,
+  getCachedStringWidth,
+} from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('getCachedStringWidth', () => {
+    it('should handle unicode characters that crash string-width', () => {
+      // U+0602 caused string-width to crash (see #16418)
+      const char = '؂';
+      expect(getCachedStringWidth(char)).toBe(1);
+    });
+  });
+
   describe('stripUnsafeCharacters', () => {
     it('should not strip tab characters', () => {
       const input = 'hello	world';
