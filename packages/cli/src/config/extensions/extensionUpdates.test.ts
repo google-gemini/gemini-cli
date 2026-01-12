@@ -154,7 +154,11 @@ describe('extensionUpdates', () => {
       );
       await userKeychain.setSecret('VAR2', 'val2');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
 
@@ -166,7 +170,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s1');
     });
@@ -181,7 +189,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s2');
     });
@@ -201,7 +213,11 @@ describe('extensionUpdates', () => {
       );
       fs.writeFileSync(workspaceEnvPath, 'VAR1=val1');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
   });
@@ -266,26 +282,6 @@ describe('extensionUpdates', () => {
       vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
       vi.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
       vi.mocked(fs.existsSync).mockReturnValue(false); // No hooks
-
-      // Mock copyExtension? It's imported.
-      // We can rely on ignoring the failure if we mock enough.
-      // Actually copyExtension is called. We need to mock it if it does real IO.
-      // But we can just let it fail or mock fs.cp if it uses it.
-      // Let's assume the other mocks cover the critical path to the warning.
-      // Warning happens BEFORE copyExtension?
-      // No, warning is after copyExtension usually.
-      // But in my code:
-      // const missingSettings = await getMissingSettings(...)
-      // if (missingSettings.length > 0) debugLogger.warn(...)
-      // ...
-      // copyExtension(...)
-
-      // Wait, let's check extension-manager.ts order.
-      // Line 303: getMissingSettings
-      // Line 317: if (installMetadata.type === 'local' ...) copyExtension
-
-      // So getMissingSettings is called BEFORE copyExtension.
-
       try {
         await manager.installOrUpdateExtension(installMetadata, previousConfig);
       } catch (_) {
@@ -300,7 +296,7 @@ describe('extensionUpdates', () => {
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'warning',
         expect.stringContaining(
-          'Please run "gemini extensions settings test-ext <setting-name>"',
+          'Please run "gemini extensions config test-ext [setting-name]"',
         ),
       );
     });

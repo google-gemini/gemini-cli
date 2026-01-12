@@ -38,6 +38,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import type {
@@ -45,9 +46,8 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { HookSystem } from '../hooks/hookSystem.js';
-import type { DefaultHookOutput } from '../hooks/types.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { partToString } from '../utils/partUtils.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -136,15 +136,22 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
   },
 }));
 vi.mock('../hooks/hookSystem.js');
-vi.mock('./clientHookTriggers.js', () => ({
-  fireBeforeAgentHook: vi.fn(),
-  fireAfterAgentHook: vi.fn().mockResolvedValue({
-    decision: 'allow',
-    continue: false,
-    suppressOutput: false,
-    systemMessage: undefined,
+const mockHookSystem = {
+  fireBeforeAgentEvent: vi.fn().mockResolvedValue({
+    success: true,
+    finalOutput: undefined,
+    allOutputs: [],
+    errors: [],
+    totalDuration: 0,
   }),
-}));
+  fireAfterAgentEvent: vi.fn().mockResolvedValue({
+    success: true,
+    finalOutput: undefined,
+    allOutputs: [],
+    errors: [],
+    totalDuration: 0,
+  }),
+};
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -285,9 +292,7 @@ describe('Gemini Client (client.ts)', () => {
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
     } as unknown as Config;
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
@@ -397,6 +402,10 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
         getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversation: vi.fn().mockReturnValue(null),
+          getConversationFilePath: vi.fn().mockReturnValue(null),
+        }),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
 
@@ -616,6 +625,34 @@ describe('Gemini Client (client.ts)', () => {
         originalTokenCount: 50,
         newTokenCount: 50,
       });
+    });
+
+    it('should resume the session file when compression succeeds', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockConversation = { some: 'conversation' };
+      const mockFilePath = '/tmp/session.json';
+
+      // Override the mock to return values
+      const mockRecordingService = {
+        getConversation: vi.fn().mockReturnValue(mockConversation),
+        getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+      };
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue(
+        mockRecordingService as unknown as ChatRecordingService,
+      );
+
+      await client.tryCompressChat('prompt-id', false);
+
+      expect(client['startChat']).toHaveBeenCalledWith(
+        expect.anything(), // newHistory
+        {
+          conversation: mockConversation,
+          filePath: mockFilePath,
+        },
+      );
     });
   });
 
@@ -2655,9 +2692,6 @@ ${JSON.stringify(
         const promptId = 'test-prompt-hook-1';
         const request = { text: 'Hello Hooks' };
         const signal = new AbortController().signal;
-        const { fireBeforeAgentHook, fireAfterAgentHook } = await import(
-          './clientHookTriggers.js'
-        );
 
         mockTurnRunFn.mockImplementation(async function* (
           this: MockTurnContext,
@@ -2669,11 +2703,10 @@ ${JSON.stringify(
         const stream = client.sendMessageStream(request, signal, promptId);
         while (!(await stream.next()).done);
 
-        expect(fireBeforeAgentHook).toHaveBeenCalledTimes(1);
-        expect(fireAfterAgentHook).toHaveBeenCalledTimes(1);
-        expect(fireAfterAgentHook).toHaveBeenCalledWith(
-          expect.anything(),
-          request,
+        expect(mockHookSystem.fireBeforeAgentEvent).toHaveBeenCalledTimes(1);
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledTimes(1);
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
           'Hook Response',
         );
 
@@ -2692,9 +2725,6 @@ ${JSON.stringify(
         const promptId = 'test-prompt-hook-recursive';
         const request = { text: 'Recursion Test' };
         const signal = new AbortController().signal;
-        const { fireBeforeAgentHook, fireAfterAgentHook } = await import(
-          './clientHookTriggers.js'
-        );
 
         let callCount = 0;
         mockTurnRunFn.mockImplementation(async function* (
@@ -2710,15 +2740,14 @@ ${JSON.stringify(
         while (!(await stream.next()).done);
 
         // BeforeAgent should fire ONLY once despite multiple internal turns
-        expect(fireBeforeAgentHook).toHaveBeenCalledTimes(1);
+        expect(mockHookSystem.fireBeforeAgentEvent).toHaveBeenCalledTimes(1);
 
         // AfterAgent should fire ONLY when the stack unwinds
-        expect(fireAfterAgentHook).toHaveBeenCalledTimes(1);
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledTimes(1);
 
         // Check cumulative response (separated by newline)
-        expect(fireAfterAgentHook).toHaveBeenCalledWith(
-          expect.anything(),
-          request,
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request),
           'Response 1\nResponse 2',
         );
 
@@ -2736,7 +2765,6 @@ ${JSON.stringify(
         const promptId = 'test-prompt-hook-original-req';
         const request = { text: 'Do something' };
         const signal = new AbortController().signal;
-        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
 
         mockTurnRunFn.mockImplementation(async function* (
           this: MockTurnContext,
@@ -2748,9 +2776,8 @@ ${JSON.stringify(
         const stream = client.sendMessageStream(request, signal, promptId);
         while (!(await stream.next()).done);
 
-        expect(fireAfterAgentHook).toHaveBeenCalledWith(
-          expect.anything(),
-          request, // Should be 'Do something'
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+          partToString(request), // Should be 'Do something'
           expect.stringContaining('Ok'),
         );
       });
@@ -2784,11 +2811,17 @@ ${JSON.stringify(
       });
 
       it('should stop execution in BeforeAgent when hook returns continue: false', async () => {
-        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
-        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
-          shouldStopExecution: () => true,
-          getEffectiveReason: () => 'Stopped by hook',
-        } as DefaultHookOutput);
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          success: true,
+          finalOutput: {
+            shouldStopExecution: () => true,
+            getEffectiveReason: () => 'Stopped by hook',
+            systemMessage: undefined,
+          },
+          allOutputs: [],
+          errors: [],
+          totalDuration: 0,
+        });
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
@@ -2817,12 +2850,18 @@ ${JSON.stringify(
       });
 
       it('should block execution in BeforeAgent when hook returns decision: block', async () => {
-        const { fireBeforeAgentHook } = await import('./clientHookTriggers.js');
-        vi.mocked(fireBeforeAgentHook).mockResolvedValue({
-          shouldStopExecution: () => false,
-          isBlockingDecision: () => true,
-          getEffectiveReason: () => 'Blocked by hook',
-        } as DefaultHookOutput);
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          success: true,
+          finalOutput: {
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Blocked by hook',
+            systemMessage: undefined,
+          },
+          allOutputs: [],
+          errors: [],
+          totalDuration: 0,
+        });
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
@@ -2850,11 +2889,17 @@ ${JSON.stringify(
       });
 
       it('should stop execution in AfterAgent when hook returns continue: false', async () => {
-        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
-        vi.mocked(fireAfterAgentHook).mockResolvedValue({
-          shouldStopExecution: () => true,
-          getEffectiveReason: () => 'Stopped after agent',
-        } as DefaultHookOutput);
+        mockHookSystem.fireAfterAgentEvent.mockResolvedValue({
+          success: true,
+          finalOutput: {
+            shouldStopExecution: () => true,
+            getEffectiveReason: () => 'Stopped after agent',
+            systemMessage: undefined,
+          },
+          allOutputs: [],
+          errors: [],
+          totalDuration: 0,
+        });
 
         mockTurnRunFn.mockImplementation(async function* () {
           yield { type: GeminiEventType.Content, value: 'Hello' };
@@ -2876,17 +2921,30 @@ ${JSON.stringify(
       });
 
       it('should yield AgentExecutionBlocked and recurse in AfterAgent when hook returns decision: block', async () => {
-        const { fireAfterAgentHook } = await import('./clientHookTriggers.js');
-        vi.mocked(fireAfterAgentHook)
+        mockHookSystem.fireAfterAgentEvent
           .mockResolvedValueOnce({
-            shouldStopExecution: () => false,
-            isBlockingDecision: () => true,
-            getEffectiveReason: () => 'Please explain',
-          } as DefaultHookOutput)
+            success: true,
+            finalOutput: {
+              shouldStopExecution: () => false,
+              isBlockingDecision: () => true,
+              getEffectiveReason: () => 'Please explain',
+              systemMessage: undefined,
+            },
+            allOutputs: [],
+            errors: [],
+            totalDuration: 0,
+          })
           .mockResolvedValueOnce({
-            shouldStopExecution: () => false,
-            isBlockingDecision: () => false,
-          } as DefaultHookOutput);
+            success: true,
+            finalOutput: {
+              shouldStopExecution: () => false,
+              isBlockingDecision: () => false,
+              systemMessage: undefined,
+            },
+            allOutputs: [],
+            errors: [],
+            totalDuration: 0,
+          });
 
         mockTurnRunFn.mockImplementation(async function* () {
           yield { type: GeminiEventType.Content, value: 'Response' };

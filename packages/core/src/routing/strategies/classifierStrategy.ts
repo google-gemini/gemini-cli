@@ -181,7 +181,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
       const selectedModel = resolveClassifierModel(
-        config.getModel(),
+        context.requestedModel ?? config.getModel(),
         routerResponse.model_choice,
         config.getPreviewFeatures(),
       );
