@@ -172,7 +172,24 @@ async function main() {
 
   const skillName = args[0];
   const basePath = path.resolve(args[2]);
+
+  // Prevent path traversal
+  if (
+    skillName.includes(path.sep) ||
+    skillName.includes('/') ||
+    skillName.includes('\\')
+  ) {
+    console.error('❌ Error: Skill name cannot contain path separators.');
+    process.exit(1);
+  }
+
   const skillDir = path.join(basePath, skillName);
+
+  // Additional check to ensure the resolved skillDir is actually inside basePath
+  if (!skillDir.startsWith(basePath)) {
+    console.error('❌ Error: Invalid skill name or path.');
+    process.exit(1);
+  }
 
   if (fs.existsSync(skillDir)) {
     console.error(`❌ Error: Skill directory already exists: ${skillDir}`);

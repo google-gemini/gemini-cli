@@ -10,7 +10,7 @@
  */
 
 const path = require('node:path');
-const { execSync } = require('node:child_process');
+const { spawnSync } = require('node:child_process');
 const { validateSkill } = require('./validate_skill.cjs');
 
 async function main() {
@@ -22,8 +22,19 @@ async function main() {
     process.exit(1);
   }
 
-  const skillPath = path.resolve(args[0]);
-  const outputDir = args[1] ? path.resolve(args[1]) : process.cwd();
+  const skillPathArg = args[0];
+  const outputDirArg = args[1];
+
+  if (
+    skillPathArg.includes('..') ||
+    (outputDirArg && outputDirArg.includes('..'))
+  ) {
+    console.error('❌ Error: Path traversal detected in arguments.');
+    process.exit(1);
+  }
+
+  const skillPath = path.resolve(skillPathArg);
+  const outputDir = outputDirArg ? path.resolve(outputDirArg) : process.cwd();
   const skillName = path.basename(skillPath);
 
   // 1. Validate first
@@ -53,7 +64,19 @@ async function main() {
     // -r: recursive
     // -x: exclude patterns
     // Run the zip command from within the directory to avoid parent folder nesting
-    execSync(`cd "${skillPath}" && zip -r "${outputFilename}" .`);
+    const zipProcess = spawnSync('zip', ['-r', outputFilename, '.'], {
+      cwd: skillPath,
+      stdio: 'inherit',
+    });
+
+    if (zipProcess.error) {
+      throw zipProcess.error;
+    }
+
+    if (zipProcess.status !== 0) {
+      throw new Error(`zip command failed with exit code ${zipProcess.status}`);
+    }
+
     console.log(`✅ Successfully packaged skill to: ${outputFilename}`);
   } catch (err) {
     console.error(`❌ Error packaging: ${err.message}`);

@@ -9,6 +9,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function validateSkill(skillPath) {
+  if (!fs.existsSync(skillPath) || !fs.statSync(skillPath).isDirectory()) {
+    return { valid: false, message: `Path is not a directory: ${skillPath}` };
+  }
+
   const skillMdPath = path.join(skillPath, 'SKILL.md');
   if (!fs.existsSync(skillMdPath)) {
     return { valid: false, message: 'SKILL.md not found' };
@@ -41,7 +45,13 @@ function validateSkill(skillPath) {
     };
 
   const name = nameMatch[1].trim();
-  const description = (descMatch[1] || descMatch[2] || descMatch[3]).trim();
+  const description = (
+    descMatch[1] !== undefined
+      ? descMatch[1]
+      : descMatch[2] !== undefined
+        ? descMatch[2]
+        : descMatch[3] || ''
+  ).trim();
 
   if (description.includes('\n')) {
     return {
@@ -95,7 +105,14 @@ if (require.main === module) {
     console.log('Usage: node validate_skill.js <skill_directory>');
     process.exit(1);
   }
-  const result = validateSkill(path.resolve(args[0]));
+
+  const skillDirArg = args[0];
+  if (skillDirArg.includes('..')) {
+    console.error('❌ Error: Path traversal detected in skill directory path.');
+    process.exit(1);
+  }
+
+  const result = validateSkill(path.resolve(skillDirArg));
   if (result.warning) {
     console.warn(`⚠️  ${result.warning}`);
   }
