@@ -20,11 +20,7 @@ import {
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
-import {
-  loadSettings,
-  migrateDeprecatedSettings,
-  SettingScope,
-} from './config/settings.js';
+import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -93,9 +89,7 @@ import {
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
-import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
@@ -315,19 +309,6 @@ export async function main() {
     );
   });
 
-  const migrateHandle = startupProfiler.start('migrate_settings');
-  migrateDeprecatedSettings(
-    settings,
-    // Temporary extension manager only used during this non-interactive UI phase.
-    new ExtensionManager({
-      workspaceDir: process.cwd(),
-      settings: settings.merged,
-      enabledExtensionOverrides: [],
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: null,
-    }),
-  );
-  migrateHandle?.end();
   await cleanupCheckpoints();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
@@ -484,6 +465,13 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
 
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
