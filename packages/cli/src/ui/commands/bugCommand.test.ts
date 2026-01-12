@@ -12,11 +12,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-
-const strictEncodeURIComponent = (value: string): string =>
-  encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
-    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
+import { strictEncodeURIComponent } from '../utils/uriUtils.js';
 
 // Mock dependencies
 vi.mock('open');

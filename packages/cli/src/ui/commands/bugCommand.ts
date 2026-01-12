@@ -23,12 +23,8 @@ import {
 } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
+import { strictEncodeURIComponent } from '../utils/uriUtils.js';
 import path from 'node:path';
-
-const strictEncodeURIComponent = (value: string): string =>
-  encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
-    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
