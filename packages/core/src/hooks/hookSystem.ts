@@ -20,6 +20,7 @@ import type {
   PreCompressTrigger,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
+import type { GenerateContentParameters } from '@google/genai';
 /**
  * Main hook system that coordinates all hook-related functionality
  */
@@ -116,5 +117,14 @@ export class HookSystem {
       return undefined;
     }
     return this.hookEventHandler.firePreCompressEvent(trigger);
+  }
+
+  async fireBeforeToolSelectionEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeToolSelectionEvent(llmRequest);
   }
 }
