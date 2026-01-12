@@ -180,6 +180,15 @@ describe('useVim hook', () => {
       vimMoveWordForward: vi.fn(),
       vimMoveWordBackward: vi.fn(),
       vimMoveWordEnd: vi.fn(),
+      vimMoveBigWordForward: vi.fn(),
+      vimMoveBigWordBackward: vi.fn(),
+      vimMoveBigWordEnd: vi.fn(),
+      vimDeleteBigWordForward: vi.fn(),
+      vimDeleteBigWordBackward: vi.fn(),
+      vimDeleteBigWordEnd: vi.fn(),
+      vimChangeBigWordForward: vi.fn(),
+      vimChangeBigWordBackward: vi.fn(),
+      vimChangeBigWordEnd: vi.fn(),
       vimDeleteChar: vi.fn(),
       vimInsertAtCursor: vi.fn(),
       vimAppendAtCursor: vi.fn().mockImplementation(() => {
@@ -644,6 +653,98 @@ describe('useVim hook', () => {
     });
   });
 
+  describe('Big Word movement', () => {
+    it('should handle W (next big word)', () => {
+      const testBuffer = createMockBuffer('hello world test');
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle B (previous big word)', () => {
+      const testBuffer = createMockBuffer('hello world test', [0, 6]);
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'B' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordBackward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle E (end of big word)', () => {
+      const testBuffer = createMockBuffer('hello world test');
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'E' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordEnd).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle dW (delete big word forward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle cW (change big word forward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'c' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimChangeBigWordForward).toHaveBeenCalledWith(1);
+      expect(result.current.mode).toBe('INSERT');
+    });
+
+    it('should handle dB (delete big word backward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 11]);
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'B' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordBackward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle dE (delete big word end)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'E' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordEnd).toHaveBeenCalledWith(1);
+    });
+  });
+
   describe('Disabled vim mode', () => {
     it('should not respond to vim commands when disabled', () => {
       mockVimContext.vimEnabled = false;
@@ -674,7 +775,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle / input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: '/' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '/' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
@@ -686,7 +790,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle : input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: ':' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: ':' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');
@@ -698,7 +805,10 @@ describe('useVim hook', () => {
     it('should switch to INSERT mode and handle ? input', () => {
       const { result } = renderVimHook();
 
-      const handled = result.current.handleInput(createKey({ sequence: '?' }));
+      let handled: boolean | undefined;
+      act(() => {
+        handled = result.current.handleInput(createKey({ sequence: '?' }));
+      });
 
       expect(handled).toBe(true);
       expect(mockVimContext.setVimMode).toHaveBeenCalledWith('INSERT');

@@ -29,8 +29,11 @@ Or you can enable it via the settings menu (`/settings`).
 
 - `h`, `j`, `k`, `l`: Move cursor left, down, up, right.
 - `w`: Move forward to the start of the next word.
+- `W`: Move forward to the start of the next BIG word (space-delimited).
 - `b`: Move backward to the start of the previous word.
+- `B`: Move backward to the start of the previous BIG word.
 - `e`: Move forward to the end of the current word.
+- `E`: Move forward to the end of the current BIG word.
 - `0`: Move to the beginning of the line.
 - `$`: Move to the end of the line.
 - `^`: Move to the first non-whitespace character of the line.
@@ -52,13 +55,19 @@ Or you can enable it via the settings menu (`/settings`).
 - `x`: Delete the character under the cursor.
 - `dd`: Delete the current line.
 - `dw`: Delete from cursor to the start of the next word.
+- `dW`: Delete from cursor to the start of the next BIG word.
 - `db`: Delete from cursor to the start of the previous word.
+- `dB`: Delete from cursor to the start of the previous BIG word.
 - `de`: Delete from cursor to the end of the current word.
+- `dE`: Delete from cursor to the end of the current BIG word.
 - `D`: Delete from cursor to the end of the line.
 - `cc`: Change (replace) the current line.
 - `cw`: Change from cursor to the start of the next word.
+- `cW`: Change from cursor to the start of the next BIG word.
 - `cb`: Change from cursor to the start of the previous word.
+- `cB`: Change from cursor to the start of the previous BIG word.
 - `ce`: Change from cursor to the end of the current word.
+- `cE`: Change from cursor to the end of the current BIG word.
 - `C`: Change from cursor to the end of the line.
 - `u`: Undo the last change.
 - `Ctrl+r`: Redo the last undone change.

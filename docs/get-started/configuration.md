@@ -110,6 +110,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.disableVimCommandMode`** (boolean):
+  - **Description:** Disable Vim command mode
+  - **Default:** `false`
+
+- **`general.vimModeStyle`** (enum):
+  - **Description:** Vim navigation style: "vim-editor" (full buffer) or
+    "bash-vim" (command line history).
+  - **Default:** `"vim-editor"`
+  - **Values:** `"vim-editor"`, `"bash-vim"`
+
 - **`general.disableAutoUpdate`** (boolean):
   - **Description:** Disable automatic updates
   - **Default:** `false`
