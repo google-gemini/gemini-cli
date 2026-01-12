@@ -9,8 +9,7 @@ import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 import { ExitCodes } from '@google/gemini-cli-core/src/index.js';
 
-// TODO: Enable these tests once we figure out why they are flaky in CI.
-describe.skip('JSON output', () => {
+describe('JSON output', () => {
   let rig: TestRig;
 
   beforeEach(async () => {
@@ -22,7 +21,12 @@ describe.skip('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
-    await rig.setup('json-output-response-stats');
+    await rig.setup('json-output-france', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.france.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['What is the capital of France?', '--output-format', 'json'],
     });
@@ -37,7 +41,12 @@ describe.skip('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
-    await rig.setup('json-output-session-id');
+    await rig.setup('json-output-session-id', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.session-id.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['Hello', '--output-format', 'json'],
     });
@@ -104,7 +113,7 @@ describe.skip('JSON output', () => {
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
-    rig.setup('json-output-error', {
+    await rig.setup('json-output-error', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'json-output.error.responses',
