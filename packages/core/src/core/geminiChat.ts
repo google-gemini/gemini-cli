@@ -842,7 +842,7 @@ export class GeminiChat {
         }
 
         const afterModelOutput = hookResult as AfterModelHookOutput | undefined;
-        const modifiedResponse = afterModelOutput?.getModifiedResponse?.();
+        const modifiedResponse = afterModelOutput?.getModifiedResponse();
         yield modifiedResponse || chunk;
       } else {
         yield chunk; // Yield every chunk to the UI immediately.
