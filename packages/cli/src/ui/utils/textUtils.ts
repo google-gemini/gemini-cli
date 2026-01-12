@@ -142,7 +142,7 @@ export const getCachedStringWidth = (str: string): number => {
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418
-    width = toCodePoints(str).length;
+    width = toCodePoints(stripAnsi(str)).length;
   }
 
   stringWidthCache.set(str, width);

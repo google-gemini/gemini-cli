@@ -22,6 +22,11 @@ describe('textUtils', () => {
       const char = '؂';
       expect(getCachedStringWidth(char)).toBe(1);
     });
+
+    it('should handle unicode characters that crash string-width with ANSI codes', () => {
+      const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
+      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+    });
   });
 
   describe('stripUnsafeCharacters', () => {
