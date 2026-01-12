@@ -13,6 +13,6 @@
     "src/**/*.json",
     "./package.json"
   ],
-  "exclude": ["node_modules", "dist", "src/commands/extensions/examples"],
+  "exclude": ["node_modules", "dist"],
   "references": [{ "path": "../core" }]
 }
