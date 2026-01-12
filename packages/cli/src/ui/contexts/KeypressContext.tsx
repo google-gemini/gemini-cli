@@ -268,13 +268,15 @@ function createDataListener(keypressHandler: KeypressHandler) {
 
     // Detect unbracketed paste ONLY if:
     // 1. NOT currently in a bracketed paste session
-    // 2. Data contains NO escape sequences
+    // 2. Data contains NO terminal control characters (excludes TAB, LF, CR
+    //    which appear in normal text)
     // 3. Data meets minimum length threshold (avoids false positives from
     //    key repeat, SSH latency batching, or IME composition)
-    const hasAnyEsc = data.includes('\x1B');
+    // eslint-disable-next-line no-control-regex
+    const hasTerminalControlChars = /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(data);
     const isLikelyUnbracketedPaste =
       !inBracketedPaste &&
-      !hasAnyEsc &&
+      !hasTerminalControlChars &&
       data.length >= UNBRACKETED_PASTE_MIN_LENGTH;
 
     // Exit bracketed paste mode when we see paste-end
