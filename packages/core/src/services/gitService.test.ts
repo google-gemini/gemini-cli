@@ -18,7 +18,11 @@ import { Storage } from '../config/storage.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
+import {
+  getProjectHash,
+  GEMINI_DIR,
+  homedir as pathsHomedir,
+} from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
 
 vi.mock('../utils/shell-utils.js', () => ({
@@ -52,11 +56,19 @@ vi.mock('../utils/gitUtils.js', () => ({
 }));
 
 const hoistedMockHomedir = vi.hoisted(() => vi.fn());
-vi.mock('os', async (importOriginal) => {
+vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
   return {
     ...actual,
     homedir: hoistedMockHomedir,
+  };
+});
+
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
   };
 });
 
@@ -93,6 +105,7 @@ describe('GitService', () => {
     });
 
     hoistedMockHomedir.mockReturnValue(homedir);
+    (pathsHomedir as Mock).mockReturnValue(homedir);
 
     hoistedMockEnv.mockImplementation(() => ({
       checkIsRepo: hoistedMockCheckIsRepo,

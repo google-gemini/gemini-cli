@@ -7,10 +7,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Config } from './config.js';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from './models.js';
+import { logFlashFallback } from '../telemetry/loggers.js';
+import { FlashFallbackEvent } from '../telemetry/types.js';
 
 import fs from 'node:fs';
 
 vi.mock('node:fs');
+vi.mock('../telemetry/loggers.js', () => ({
+  logFlashFallback: vi.fn(),
+  logRipgrepFallback: vi.fn(),
+}));
 
 describe('Flash Model Fallback Configuration', () => {
   let config: Config;
@@ -55,6 +61,20 @@ describe('Flash Model Fallback Configuration', () => {
       });
 
       expect(newConfig.getModel()).toBe('custom-model');
+    });
+  });
+
+  describe('activateFallbackMode', () => {
+    it('should set active model to fallback and log event', () => {
+      config.activateFallbackMode(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getActiveModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      // Ensure the persisted model setting is NOT changed (to preserve AUTO behavior)
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+
+      expect(logFlashFallback).toHaveBeenCalledWith(
+        config,
+        expect.any(FlashFallbackEvent),
+      );
     });
   });
 });

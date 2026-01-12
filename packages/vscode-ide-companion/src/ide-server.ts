@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
+import { tmpdir } from '@google/gemini-cli-core';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -343,7 +343,7 @@ export class IDEServer {
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
           let portFile: string | undefined;
           try {
-            const portDir = path.join(os.tmpdir(), 'gemini', 'ide');
+            const portDir = path.join(tmpdir(), 'gemini', 'ide');
             await fs.mkdir(portDir, { recursive: true });
             portFile = path.join(
               portDir,
