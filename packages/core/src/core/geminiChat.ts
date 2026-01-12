@@ -49,11 +49,11 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  fireAfterModelHook,
-  fireBeforeModelHook,
-  fireBeforeToolSelectionHook,
-} from './geminiChatHookTriggers.js';
+import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
+import type {
+  AfterModelHookOutput,
+  BeforeModelHookOutput,
+} from '../hooks/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -504,23 +504,29 @@ export class GeminiChat {
       const messageBus = this.config.getMessageBus();
       if (hooksEnabled && messageBus) {
         // Fire BeforeModel hook
-        const beforeModelResult = await fireBeforeModelHook(messageBus, {
+        const llmRequest = {
           model: modelToUse,
           config,
           contents: contentsToUse,
-        });
+        };
+        const hookResult = await this.config
+          .getHookSystem()
+          ?.fireBeforeModelEvent(llmRequest);
+        const beforeModelResult = hookResult?.finalOutput;
 
         // Check if hook requested to stop execution
-        if (beforeModelResult.stopped) {
+        if (beforeModelResult?.shouldStopExecution()) {
           throw new AgentExecutionStoppedError(
-            beforeModelResult.reason || 'Agent execution stopped by hook',
+            beforeModelResult.getEffectiveReason() ||
+              'Agent execution stopped by hook',
           );
         }
 
+        const beforeModelOutput = beforeModelResult as BeforeModelHookOutput;
         // Check if hook blocked the model call
-        if (beforeModelResult.blocked) {
+        if (beforeModelResult?.getBlockingError()?.blocked) {
           // Return a synthetic response generator
-          const syntheticResponse = beforeModelResult.syntheticResponse;
+          const syntheticResponse = beforeModelOutput.getSyntheticResponse();
           if (syntheticResponse) {
             // Ensure synthetic response has a finish reason to prevent InvalidStreamError
             if (
@@ -536,20 +542,25 @@ export class GeminiChat {
           }
 
           throw new AgentExecutionBlockedError(
-            beforeModelResult.reason || 'Model call blocked by hook',
+            beforeModelResult.getEffectiveReason() ||
+              'Model call blocked by hook',
             syntheticResponse,
           );
         }
 
-        // Apply modifications from BeforeModel hook
-        if (beforeModelResult.modifiedConfig) {
-          Object.assign(config, beforeModelResult.modifiedConfig);
-        }
-        if (
-          beforeModelResult.modifiedContents &&
-          Array.isArray(beforeModelResult.modifiedContents)
-        ) {
-          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        if (beforeModelOutput) {
+          const modifiedRequest =
+            beforeModelOutput.applyLLMRequestModifications(llmRequest);
+          // Apply modifications from BeforeModel hook
+          if (modifiedRequest.config) {
+            Object.assign(config, modifiedRequest.config);
+          }
+          if (
+            modifiedRequest.contents &&
+            Array.isArray(modifiedRequest.contents)
+          ) {
+            contentsToUse = modifiedRequest.contents as Content[];
+          }
         }
 
         // Fire BeforeToolSelection hook
@@ -809,29 +820,30 @@ export class GeminiChat {
       }
 
       // Fire AfterModel hook through MessageBus (only if hooks are enabled)
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus && originalRequest && chunk) {
-        const hookResult = await fireAfterModelHook(
-          messageBus,
-          originalRequest,
-          chunk,
-        );
+      if (originalRequest && chunk) {
+        const afterModelResult = await this.config
+          .getHookSystem()
+          ?.fireAfterModelEvent(originalRequest, chunk);
+        const hookResult = afterModelResult?.finalOutput;
 
-        if (hookResult.stopped) {
+        if (hookResult?.shouldStopExecution()) {
           throw new AgentExecutionStoppedError(
-            hookResult.reason || 'Agent execution stopped by hook',
+            hookResult.getEffectiveReason() ||
+              'Agent execution stopped by hook',
           );
         }
 
-        if (hookResult.blocked) {
+        if (hookResult?.getBlockingError()?.blocked) {
           throw new AgentExecutionBlockedError(
-            hookResult.reason || 'Agent execution blocked by hook',
-            hookResult.response,
+            hookResult.getEffectiveReason() ||
+              'Agent execution blocked by hook',
+            chunk,
           );
         }
 
-        yield hookResult.response;
+        const afterModelOutput = hookResult as AfterModelHookOutput | undefined;
+        const modifiedResponse = afterModelOutput?.getModifiedResponse?.();
+        yield modifiedResponse || chunk;
       } else {
         yield chunk; // Yield every chunk to the UI immediately.
       }

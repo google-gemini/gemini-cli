@@ -22,24 +22,34 @@ import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
-import {
-  fireBeforeModelHook,
-  fireAfterModelHook,
-  fireBeforeToolSelectionHook,
-} from './geminiChatHookTriggers.js';
+import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
 
 // Mock hook triggers
 vi.mock('./geminiChatHookTriggers.js', () => ({
-  fireBeforeModelHook: vi.fn(),
-  fireAfterModelHook: vi.fn(),
   fireBeforeToolSelectionHook: vi.fn().mockResolvedValue({}),
 }));
+
+const mockHookSystem = {
+  fireBeforeModelEvent: vi.fn().mockResolvedValue({
+    success: true,
+    finalOutput: undefined,
+    allOutputs: [],
+    errors: [],
+    totalDuration: 0,
+  }),
+  fireAfterModelEvent: vi.fn().mockResolvedValue({
+    success: true,
+    finalOutput: undefined,
+    allOutputs: [],
+    errors: [],
+    totalDuration: 0,
+  }),
+};
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -204,9 +214,7 @@ describe('GeminiChat', () => {
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
   });
 
   afterEach(() => {
@@ -2286,18 +2294,33 @@ describe('GeminiChat', () => {
     beforeEach(() => {
       vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
       // Default to allowing execution
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({ blocked: false });
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
-        response: {} as GenerateContentResponse,
+      mockHookSystem.fireBeforeModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: undefined,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
+      });
+      mockHookSystem.fireAfterModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: undefined,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
       });
       vi.mocked(fireBeforeToolSelectionHook).mockResolvedValue({});
     });
 
     it('should yield AGENT_EXECUTION_STOPPED when BeforeModel hook stops execution', async () => {
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({
-        blocked: true,
-        stopped: true,
-        reason: 'stopped by hook',
+      mockHookSystem.fireBeforeModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: {
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'stopped by hook',
+        },
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
       });
 
       const stream = await chat.sendMessageStream(
@@ -2324,10 +2347,20 @@ describe('GeminiChat', () => {
         candidates: [{ content: { parts: [{ text: 'blocked' }] } }],
       } as GenerateContentResponse;
 
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({
-        blocked: true,
-        reason: 'blocked by hook',
-        syntheticResponse,
+      mockHookSystem.fireBeforeModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: {
+          shouldStopExecution: () => false,
+          getBlockingError: () => ({
+            blocked: true,
+            reason: 'blocked by hook',
+          }),
+          getEffectiveReason: () => 'blocked by hook',
+          getSyntheticResponse: () => syntheticResponse,
+        },
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
       });
 
       const stream = await chat.sendMessageStream(
@@ -2363,10 +2396,15 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
-        response: {} as GenerateContentResponse,
-        stopped: true,
-        reason: 'stopped by after hook',
+      mockHookSystem.fireAfterModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: {
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'stopped by after hook',
+        },
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
       });
 
       const stream = await chat.sendMessageStream(
@@ -2399,10 +2437,16 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
-        response,
-        blocked: true,
-        reason: 'blocked by after hook',
+      mockHookSystem.fireAfterModelEvent.mockResolvedValue({
+        success: true,
+        finalOutput: {
+          shouldStopExecution: () => false,
+          getBlockingError: () => ({ blocked: true }),
+          getEffectiveReason: () => 'blocked by after hook',
+        },
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
       });
 
       const stream = await chat.sendMessageStream(
