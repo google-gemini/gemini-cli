@@ -118,7 +118,6 @@ export async function createContentGenerator(
         gcConfig.fakeResponses,
       );
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
-
     }
     const version = await getVersion();
     const model = resolveModel(
