@@ -66,14 +66,14 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
   // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
   // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight && !isAlternateBuffer && renderOutputAsMarkdown) {
-    if (typeof truncatedResultDisplay === 'string') {
+  if (renderOutputAsMarkdown) {
+    if (typeof truncatedResultDisplay !== 'string') {
+      renderOutputAsMarkdown = false;
+    } else if (availableHeight && !isAlternateBuffer) {
       const lineCount = truncatedResultDisplay.split('\n').length;
       if (lineCount > availableHeight) {
         renderOutputAsMarkdown = false;
       }
-    } else {
-      renderOutputAsMarkdown = false;
     }
   }
 
