@@ -5,7 +5,9 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 
 describe('RewindConfirmation', () => {
@@ -49,7 +51,6 @@ describe('RewindConfirmation', () => {
 
   it('calls onConfirm with Cancel on Escape', async () => {
     const onConfirm = vi.fn();
-    vi.useFakeTimers();
     const { stdin } = renderWithProviders(
       <RewindConfirmation
         stats={null}
@@ -59,9 +60,13 @@ describe('RewindConfirmation', () => {
       { width: 80 },
     );
 
-    stdin.write('\x1b');
-    await vi.advanceTimersByTimeAsync(100);
-    expect(onConfirm).toHaveBeenCalledWith(RewindOutcome.Cancel);
+    await act(async () => {
+      stdin.write('\x1b');
+    });
+
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledWith(RewindOutcome.Cancel);
+    });
   });
 
   it('renders timestamp when provided', () => {

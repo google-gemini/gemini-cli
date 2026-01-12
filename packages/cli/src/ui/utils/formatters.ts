@@ -79,19 +79,16 @@ export const formatTimeAgo = (date: string | number | Date): string => {
 const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
 const REFERENCE_CONTENT_END = '--- End of content ---';
 
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function stripReferenceContent(text: string): string {
-  const startIndex = text.indexOf(REFERENCE_CONTENT_START);
-  if (startIndex === -1) return text;
+  const start = escapeRegExp(REFERENCE_CONTENT_START);
+  const end = escapeRegExp(REFERENCE_CONTENT_END);
 
-  const endIndex = text.lastIndexOf(REFERENCE_CONTENT_END);
-  if (endIndex === -1 || endIndex < startIndex) return text;
+  // Match optional newline, the start marker, content (non-greedy), and the end marker
+  const pattern = new RegExp(`\\n?${start}[\\s\\S]*?${end}`, 'g');
 
-  let removeStart = startIndex;
-  if (removeStart > 0 && text[removeStart - 1] === '\n') {
-    removeStart--;
-  }
-
-  const removeEnd = endIndex + REFERENCE_CONTENT_END.length;
-
-  return (text.slice(0, removeStart) + text.slice(removeEnd)).trim();
+  return text.replace(pattern, '').trim();
 }
