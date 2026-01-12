@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { skillsCommand } from './skillsCommand.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemSkillsList } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
 import type { Config, SkillDefinition } from '@google/gemini-cli-core';
@@ -136,6 +136,51 @@ describe('skillsCommand', () => {
     );
   });
 
+  it('should filter built-in skills by default and show them with "all"', async () => {
+    const skillManager = context.services.config!.getSkillManager();
+    const mockSkills = [
+      {
+        name: 'regular',
+        description: 'desc1',
+        location: '/loc1',
+        body: 'body1',
+      },
+      {
+        name: 'builtin',
+        description: 'desc2',
+        location: '/loc2',
+        body: 'body2',
+        isBuiltin: true,
+      },
+    ];
+    vi.mocked(skillManager.getAllSkills).mockReturnValue(mockSkills);
+
+    const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
+
+    // By default, only regular skills
+    await listCmd.action!(context, '');
+    let lastCall = vi
+      .mocked(context.ui.addItem)
+      .mock.calls.at(-1)![0] as HistoryItemSkillsList;
+    expect(lastCall.skills).toHaveLength(1);
+    expect(lastCall.skills[0].name).toBe('regular');
+
+    // With "all", show both
+    await listCmd.action!(context, 'all');
+    lastCall = vi
+      .mocked(context.ui.addItem)
+      .mock.calls.at(-1)![0] as HistoryItemSkillsList;
+    expect(lastCall.skills).toHaveLength(2);
+    expect(lastCall.skills.map((s) => s.name)).toContain('builtin');
+
+    // With "--all", show both
+    await listCmd.action!(context, '--all');
+    lastCall = vi
+      .mocked(context.ui.addItem)
+      .mock.calls.at(-1)![0] as HistoryItemSkillsList;
+    expect(lastCall.skills).toHaveLength(2);
+  });
+
   describe('disable/enable', () => {
     beforeEach(() => {
       context.services.settings.merged.skills = { disabled: [] };
@@ -182,7 +227,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" disabled by adding it to the disabled list in project settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" disabled by adding it to the disabled list in project (/workspace) settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );
@@ -211,7 +256,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project and user settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );
@@ -251,7 +296,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project and user settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
         expect.any(Number),
       );

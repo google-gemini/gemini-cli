@@ -638,17 +638,15 @@ describe('extension tests', () => {
         name: 'test-extension',
         version: '1.0.0',
       });
-      const loadedSettings = loadSettings(tempWorkspaceDir);
-      loadedSettings.setValue(
-        SettingScope.System,
-        'admin.extensions.enabled',
-        false,
-      );
+      const loadedSettings = loadSettings(tempWorkspaceDir).merged;
+      (loadedSettings.admin ??= {}).extensions ??= {};
+      loadedSettings.admin.extensions.enabled = false;
+
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: loadedSettings.merged,
+        settings: loadedSettings,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -664,13 +662,15 @@ describe('extension tests', () => {
           'test-server': { command: 'echo', args: ['hello'] },
         },
       });
-      const loadedSettings = loadSettings(tempWorkspaceDir);
-      loadedSettings.setValue(SettingScope.System, 'admin.mcp.enabled', false);
+      const loadedSettings = loadSettings(tempWorkspaceDir).merged;
+      (loadedSettings.admin ??= {}).mcp ??= {};
+      loadedSettings.admin.mcp.enabled = false;
+
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: loadedSettings.merged,
+        settings: loadedSettings,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -687,13 +687,15 @@ describe('extension tests', () => {
           'test-server': { command: 'echo', args: ['hello'] },
         },
       });
-      const loadedSettings = loadSettings(tempWorkspaceDir);
-      loadedSettings.setValue(SettingScope.System, 'admin.mcp.enabled', true);
+      const loadedSettings = loadSettings(tempWorkspaceDir).merged;
+      (loadedSettings.admin ??= {}).mcp ??= {};
+      loadedSettings.admin.mcp.enabled = true;
+
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
-        settings: loadedSettings.merged,
+        settings: loadedSettings,
       });
 
       const extensions = await extensionManager.loadExtensions();

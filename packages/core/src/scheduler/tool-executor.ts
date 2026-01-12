@@ -98,6 +98,7 @@ export class ToolExecutor {
               liveOutputCallback,
               shellExecutionConfig,
               setPidCallback,
+              this.config,
             );
           } else {
             promise = executeToolWithHooks(
@@ -109,6 +110,8 @@ export class ToolExecutor {
               tool,
               liveOutputCallback,
               shellExecutionConfig,
+              undefined,
+              this.config,
             );
           }
 

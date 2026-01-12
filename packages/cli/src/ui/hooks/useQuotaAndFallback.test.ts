@@ -70,6 +70,8 @@ describe('useQuotaAndFallback', () => {
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
     vi.spyOn(mockConfig, 'setModel');
+    vi.spyOn(mockConfig, 'setActiveModel');
+    vi.spyOn(mockConfig, 'activateFallbackMode');
   });
 
   afterEach(() => {
@@ -164,8 +166,10 @@ describe('useQuotaAndFallback', () => {
         const intent = await promise!;
         expect(intent).toBe('retry_always');
 
-        // Verify setModel was called with isFallbackModel=true
-        expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-flash', true);
+        // Verify activateFallbackMode was called
+        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+          'gemini-flash',
+        );
 
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
@@ -278,8 +282,10 @@ describe('useQuotaAndFallback', () => {
           const intent = await promise!;
           expect(intent).toBe('retry_always');
 
-          // Verify setModel was called with isFallbackModel=true
-          expect(mockConfig.setModel).toHaveBeenCalledWith('model-B', true);
+          // Verify activateFallbackMode was called
+          expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+            'model-B',
+          );
 
           // The pending request should be cleared from the state
           expect(result.current.proQuotaRequest).toBeNull();
@@ -336,10 +342,9 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         const intent = await promise!;
         expect(intent).toBe('retry_always');
 
-        // Verify setModel was called with isFallbackModel=true
-        expect(mockConfig.setModel).toHaveBeenCalledWith(
+        // Verify activateFallbackMode was called
+        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
           'gemini-2.5-pro',
-          true,
         );
 
         expect(result.current.proQuotaRequest).toBeNull();
@@ -425,8 +430,14 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
 
-      // Verify setModel was called with isFallbackModel=true
-      expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-flash', true);
+      // Verify activateFallbackMode was called
+      expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
+        'gemini-flash',
+      );
+
+      // Verify quota error flags are reset
+      expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(false);
+      expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(false);
 
       // Check for the "Switched to fallback model" message
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);

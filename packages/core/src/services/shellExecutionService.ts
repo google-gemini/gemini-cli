@@ -585,7 +585,7 @@ export class ShellExecutionService {
 
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
-        name: 'xterm',
+        name: 'xterm-256color',
         cols,
         rows,
         env: {

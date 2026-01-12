@@ -105,6 +105,15 @@ export class A2AClientManager {
   }
 
   /**
+   * Invalidates all cached clients and agent cards.
+   */
+  clearCache(): void {
+    this.clients.clear();
+    this.agentCards.clear();
+    debugLogger.debug('[A2AClientManager] Cache cleared.');
+  }
+
+  /**
    * Sends a message to a loaded agent.
    * @param agentName The name of the agent to send the message to.
    * @param message The message content.
@@ -232,25 +241,24 @@ export function createAdapterFetch(baseFetch: typeof fetch): typeof fetch {
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    const urlStr = input as string;
-
-    // 2. Dialect Mapping (Request)
-    let body = init?.body;
-    let isRpc = false;
-    let rpcId: string | number | undefined;
-
+    const body = init?.body;
+    // Protocol Detection
+    // JSON-RPC requests bypass the adapter as they are standard-compliant and
+    // don't require the dialect translation intended for Vertex AI REST bindings.
+    // This logic can be removed when a2a-js/sdk is fully compliant.
+    let effectiveBody = body;
     if (typeof body === 'string') {
       try {
-        let jsonBody = JSON.parse(body);
+        const jsonBody = JSON.parse(body);
 
-        // Unwrap JSON-RPC if present
+        // If the SDK decided to use JSON-RPC, we bypass the adapter because
+        // JSON-RPC requests are correctly supported in a2a-js/sdk.
         if (jsonBody.jsonrpc === '2.0') {
-          isRpc = true;
-          rpcId = jsonBody.id;
-          jsonBody = jsonBody.params;
+          return await baseFetch(input, init);
         }
 
-        // Apply dialect translation to the message object
+        // Dialect Mapping (REST / HTTP+JSON)
+        // Apply translation for Vertex AI Agent Engine compatibility.
         const message = jsonBody.message || jsonBody;
         if (message && typeof message === 'object') {
           // Role: user -> ROLE_USER, agent/model -> ROLE_AGENT
@@ -277,23 +285,20 @@ export function createAdapterFetch(baseFetch: typeof fetch): typeof fetch {
           }
         }
 
-        body = JSON.stringify(jsonBody);
+        effectiveBody = JSON.stringify(jsonBody);
       } catch (error) {
         debugLogger.debug(
           '[A2AClientManager] Failed to parse request body for dialect translation:',
           error,
         );
-        // Non-JSON or parse error; let the baseFetch handle it.
       }
     }
 
-    const response = await baseFetch(urlStr, { ...init, body });
+    const response = await baseFetch(input, { ...init, body: effectiveBody });
 
-    // Map response back
     if (response.ok) {
       try {
         const responseData = await response.clone().json();
-
         const result =
           responseData.task || responseData.message || responseData;
 
@@ -337,16 +342,6 @@ export function createAdapterFetch(baseFetch: typeof fetch): typeof fetch {
           result.status.state = mapTaskState(result.status.state);
         }
 
-        if (isRpc) {
-          return new Response(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              id: rpcId,
-              result,
-            }),
-            response,
-          );
-        }
         return new Response(JSON.stringify(result), response);
       } catch (_e) {
         // Non-JSON response or unwrapping failure
