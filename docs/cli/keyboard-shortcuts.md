@@ -91,17 +91,18 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys          |
-| ----------------------------------------------------------------- | ------------- |
-| Toggle detailed error information.                                | `F12`         |
-| Toggle the full TODO list.                                        | `Ctrl + T`    |
-| Toggle IDE context details.                                       | `Ctrl + G`    |
-| Toggle Markdown rendering.                                        | `Cmd + M`     |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`    |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`    |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab` |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`    |
-| Toggle focus between the shell and Gemini input.                  | `Ctrl + F`    |
+| Action                                                            | Keys                                |
+| ----------------------------------------------------------------- | ----------------------------------- |
+| Toggle detailed error information.                                | `F12`                               |
+| Toggle the full TODO list.                                        | `Ctrl + T`                          |
+| Toggle IDE context details.                                       | `Ctrl + G`                          |
+| Toggle Markdown rendering.                                        | `Cmd + M`                           |
+| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`                          |
+| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`                          |
+| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`                       |
+| Expand a height-constrained response to show additional lines.    | `Ctrl + S`                          |
+| Toggle focus between the shell and Gemini input.                  | `Tab (no Shift)`                    |
+| Toggle focus out of the interactive shell and into Gemini input.  | `Tab (no Shift)`<br />`Shift + Tab` |
 
 #### Session Control
 
