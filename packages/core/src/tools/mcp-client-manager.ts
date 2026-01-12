@@ -124,11 +124,8 @@ export class McpClientManager {
         );
       } finally {
         // This is required to update the content generator configuration with the
-        // new tool configuration.
-        const geminiClient = this.cliConfig.getGeminiClient();
-        if (geminiClient.isInitialized()) {
-          await geminiClient.setTools();
-        }
+        // new tool configuration and system instructions.
+        await this.cliConfig.refreshMcpContext();
       }
     }
   }
@@ -183,10 +180,7 @@ export class McpClientManager {
               this.cliConfig.getDebugMode(),
               async () => {
                 debugLogger.log('Tools changed, updating Gemini context...');
-                const geminiClient = this.cliConfig.getGeminiClient();
-                if (geminiClient.isInitialized()) {
-                  await geminiClient.setTools();
-                }
+                await this.cliConfig.refreshMcpContext();
               },
             );
           if (!existing) {
@@ -220,11 +214,8 @@ export class McpClientManager {
           );
         } finally {
           // This is required to update the content generator configuration with the
-          // new tool configuration.
-          const geminiClient = this.cliConfig.getGeminiClient();
-          if (geminiClient.isInitialized()) {
-            await geminiClient.setTools();
-          }
+          // new tool configuration and system instructions.
+          await this.cliConfig.refreshMcpContext();
           resolve();
         }
       })().catch(reject);

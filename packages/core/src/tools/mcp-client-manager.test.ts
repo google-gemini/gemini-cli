@@ -53,6 +53,7 @@ describe('McpClientManager', () => {
       getGeminiClient: vi.fn().mockReturnValue({
         isInitialized: vi.fn(),
       }),
+      refreshMcpContext: vi.fn(),
     } as unknown as Config);
     toolRegistry = {} as ToolRegistry;
   });
@@ -69,6 +70,7 @@ describe('McpClientManager', () => {
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
+    expect(mockConfig.refreshMcpContext).toHaveBeenCalledOnce();
   });
 
   it('should not discover tools if folder is not trusted', async () => {
