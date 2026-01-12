@@ -60,7 +60,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { resolveModel } from '../config/models.js';
+import { isAutoModel, resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 
 const MAX_TURNS = 100;
@@ -617,9 +617,19 @@ export class GeminiClient {
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
-      const router = this.config.getModelRouterService();
-      const decision = await router.route(routingContext);
-      modelToUse = decision.model;
+      const requestedModel = this.config.getModel();
+      if (isAutoModel(requestedModel)) {
+        // Only invoke the router/classifier for auto models
+        const router = this.config.getModelRouterService();
+        const decision = await router.route(routingContext);
+        modelToUse = decision.model;
+      } else {
+        // Skip routing entirely when a specific model is set
+        modelToUse = resolveModel(
+          requestedModel,
+          this.config.getPreviewFeatures(),
+        );
+      }
     }
 
     // availability logic
