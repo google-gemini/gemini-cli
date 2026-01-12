@@ -949,8 +949,7 @@ export class Config {
   }
 
   activateFallbackMode(model: string): void {
-    this.setActiveModel(model);
-    coreEvents.emitModelChanged(model);
+    this.setModel(model, true);
     const authType = this.getContentGeneratorConfig()?.authType;
     if (authType) {
       logFlashFallback(this, new FlashFallbackEvent(authType));
