@@ -35,8 +35,22 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
 
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
-  const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S*[^.,?!:;。，？！、：；\s]|\b[\w-]+\/[\w./-]+\.\w+\b)/g;
+  const bold = /\*\*.*?\*\*/.source;
+  const italic = /\*.*?\*|_.*?_/.source;
+  const strikethrough = /~~.*?~~/.source;
+  const link = /\[.*?\]\(.*?\)/.source;
+  const code = /`+.+?`+/.source;
+  const underline = /<u>.*?<\/u>/.source;
+  const url =
+    /https?:\/\/[^.,?!:;。，？！、：；\s]+(?:[.,?!:;。，？！、：；]+[^.,?!:;。，？！、：；\s]+)*/
+      .source;
+  // ReDoS safe path regex: prevent backtracking overlap between [\w./-]+ and \.
+  const path = /\b[\w-]+\/[\w/-]+(?:\.+[\w/-]+)*\.\w+\b/.source;
+
+  const inlineRegex = new RegExp(
+    `(${bold}|${italic}|${strikethrough}|${link}|${code}|${underline}|${url}|${path})`,
+    'g',
+  );
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -143,7 +157,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
             {fullMatch}
           </Text>
         );
-      } else if (fullMatch.match(/^[\w-]+\/[\w./-]+\.\w+$/)) {
+      } else if (fullMatch.match(new RegExp(`^${path}$`))) {
         renderedNode = (
           <Text key={key} color={theme.text.accent}>
             {fullMatch}
