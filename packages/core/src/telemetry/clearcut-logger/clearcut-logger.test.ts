@@ -698,16 +698,18 @@ describe('ClearcutLogger', () => {
     it('should evict the oldest event when the queue is full', async () => {
       const { logger } = setup();
 
-      const eventsToEnqueue = await Promise.all(
-        Array.from({ length: TEST_ONLY.MAX_EVENTS }, (_, i) =>
-          logger!.createLogEvent(EventNames.API_ERROR, [
+      // Sequentially create events to avoid timeout with fake timers.
+      const eventsToEnqueue = [];
+      for (let i = 0; i < TEST_ONLY.MAX_EVENTS; i++) {
+        eventsToEnqueue.push(
+          await logger!.createLogEvent(EventNames.API_ERROR, [
             {
               gemini_cli_key: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
               value: `${i}`,
             },
           ]),
-        ),
-      );
+        );
+      }
 
       for (const event of eventsToEnqueue) {
         logger!.enqueueLogEvent(event);
