@@ -11,6 +11,15 @@ import * as path from 'node:path';
 import { SkillManager } from './skillManager.js';
 import { Storage } from '../config/storage.js';
 import { type GeminiCLIExtension } from '../config/config.js';
+import { loadSkillsFromDir, type SkillDefinition } from './skillLoader.js';
+
+vi.mock('./skillLoader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./skillLoader.js')>();
+  return {
+    ...actual,
+    loadSkillsFromDir: vi.fn(actual.loadSkillsFromDir),
+  };
+});
 
 describe('SkillManager', () => {
   let testRootDir: string;
@@ -140,6 +149,34 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
     await service.discoverSkills(storage, [mockExtension]);
     expect(service.getSkills()[0].description).toBe('user-desc');
+  });
+
+  it('should discover built-in skills', async () => {
+    const service = new SkillManager();
+    const mockBuiltinSkill: SkillDefinition = {
+      name: 'builtin-skill',
+      description: 'builtin-desc',
+      location: 'builtin-loc',
+      body: 'builtin-body',
+    };
+
+    vi.mocked(loadSkillsFromDir).mockImplementation(async (dir) => {
+      if (dir.endsWith('builtin')) {
+        return [{ ...mockBuiltinSkill }];
+      }
+      return [];
+    });
+
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+
+    await service.discoverSkills(storage);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('builtin-skill');
+    expect(skills[0].isBuiltin).toBe(true);
   });
 
   it('should filter disabled skills in getSkills but not in getAllSkills', async () => {
