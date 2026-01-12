@@ -148,8 +148,8 @@
       "properties": {
         "format": {
           "title": "Output Format",
-          "description": "The format of the CLI output.",
-          "markdownDescription": "The format of the CLI output.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
+          "description": "The format of the CLI output. Can be `text` or `json`.",
+          "markdownDescription": "The format of the CLI output. Can be `text` or `json`.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
           "default": "text",
           "type": "string",
           "enum": ["text", "json"]
@@ -192,6 +192,13 @@
           "description": "Show Gemini CLI status and thoughts in the terminal window title",
           "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "showHomeDirectoryWarning": {
+          "title": "Show Home Directory Warning",
+          "description": "Show a warning when running Gemini CLI in the home directory.",
+          "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideTips": {
@@ -355,8 +362,8 @@
       "properties": {
         "enabled": {
           "title": "IDE Mode",
-          "description": "Enable IDE integration mode",
-          "markdownDescription": "Enable IDE integration mode\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Enable IDE integration mode.",
+          "markdownDescription": "Enable IDE integration mode.\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -964,15 +971,15 @@
           "properties": {
             "respectGitIgnore": {
               "title": "Respect .gitignore",
-              "description": "Respect .gitignore files when searching",
-              "markdownDescription": "Respect .gitignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "Respect .gitignore files when searching.",
+              "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "respectGeminiIgnore": {
               "title": "Respect .geminiignore",
-              "description": "Respect .geminiignore files when searching",
-              "markdownDescription": "Respect .geminiignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "Respect .geminiignore files when searching.",
+              "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -1425,18 +1432,18 @@
           "default": false,
           "type": "boolean"
         },
-        "introspectionAgentSettings": {
-          "title": "Introspection Agent Settings",
-          "description": "Configuration for Introspection Agent.",
-          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+        "cliHelpAgentSettings": {
+          "title": "CLI Help Agent Settings",
+          "description": "Configuration for CLI Help Agent.",
+          "markdownDescription": "Configuration for CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
           "default": {},
           "type": "object",
           "properties": {
             "enabled": {
-              "title": "Enable Introspection Agent",
-              "description": "Enable the Introspection Agent.",
-              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "title": "Enable CLI Help Agent",
+              "description": "Enable the CLI Help Agent.",
+              "markdownDescription": "Enable the CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },

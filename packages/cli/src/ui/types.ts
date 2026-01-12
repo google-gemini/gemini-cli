@@ -14,6 +14,7 @@ import type {
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
   SkillDefinition,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -215,6 +216,16 @@ export type HistoryItemSkillsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
+export type AgentDefinitionJson = Pick<
+  AgentDefinition,
+  'name' | 'displayName' | 'description' | 'kind'
+>;
+
+export type HistoryItemAgentsList = HistoryItemBase & {
+  type: 'agents_list';
+  agents: AgentDefinitionJson[];
+};
+
 // JSON-friendly types for using as a simple data model showing info about an
 // MCP Server.
 export interface JsonMcpTool {
@@ -294,6 +305,7 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
+  | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemHooksList;
@@ -317,6 +329,7 @@ export enum MessageType {
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
+  AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HOOKS_LIST = 'hooks_list',

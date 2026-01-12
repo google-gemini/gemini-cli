@@ -323,7 +323,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: 'text',
-        description: 'The format of the CLI output.',
+        description: 'The format of the CLI output. Can be `text` or `json`.',
         showInDialog: true,
         options: [
           { value: 'text', label: 'Text' },
@@ -382,6 +382,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Show Gemini CLI status and thoughts in the terminal window title',
+        showInDialog: true,
+      },
+      showHomeDirectoryWarning: {
+        type: 'boolean',
+        label: 'Show Home Directory Warning',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
       hideTips: {
@@ -595,7 +605,7 @@ const SETTINGS_SCHEMA = {
         category: 'IDE',
         requiresRestart: true,
         default: false,
-        description: 'Enable IDE integration mode',
+        description: 'Enable IDE integration mode.',
         showInDialog: true,
       },
       hasSeenNudge: {
@@ -844,7 +854,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .gitignore files when searching',
+            description: 'Respect .gitignore files when searching.',
             showInDialog: true,
           },
           respectGeminiIgnore: {
@@ -853,7 +863,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .geminiignore files when searching',
+            description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
@@ -1453,22 +1463,22 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
       },
-      introspectionAgentSettings: {
+      cliHelpAgentSettings: {
         type: 'object',
-        label: 'Introspection Agent Settings',
+        label: 'CLI Help Agent Settings',
         category: 'Experimental',
         requiresRestart: true,
         default: {},
-        description: 'Configuration for Introspection Agent.',
+        description: 'Configuration for CLI Help Agent.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Introspection Agent',
+            label: 'Enable CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
-            default: false,
-            description: 'Enable the Introspection Agent.',
+            default: true,
+            description: 'Enable the CLI Help Agent.',
             showInDialog: true,
           },
         },
@@ -2136,8 +2146,10 @@ type InferSettings<T extends SettingsSchema> = {
 
 export type Settings = InferSettings<SettingsSchemaType>;
 
+export function getEnableHooksUI(settings: Settings): boolean {
+  return settings.tools?.enableHooks ?? true;
+}
+
 export function getEnableHooks(settings: Settings): boolean {
-  return (
-    (settings.tools?.enableHooks ?? true) && (settings.hooks?.enabled ?? false)
-  );
+  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
 }

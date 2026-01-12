@@ -852,5 +852,5 @@ console.log(JSON.stringify(sanitizeOutput(hookOutput)));
 
 - [Hooks Reference](index.md) - Complete API reference
 - [Writing Hooks](writing-hooks.md) - Tutorial and examples
-- [Configuration](../cli/configuration.md) - Gemini CLI settings
+- [Configuration](../get-started/configuration.md) - Gemini CLI settings
 - [Hooks Design Document](../hooks-design.md) - Technical architecture
