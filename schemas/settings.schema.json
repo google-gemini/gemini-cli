@@ -188,10 +188,17 @@
           "type": "boolean"
         },
         "showStatusInTitle": {
-          "title": "Show Status in Title",
-          "description": "Show Gemini CLI status and thoughts in the terminal window title",
-          "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Show Thoughts in Title",
+          "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",
+          "markdownDescription": "Show Gemini CLI model thoughts in the terminal window title during the working phase\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "dynamicWindowTitle": {
+          "title": "Dynamic Window Title",
+          "description": "Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)",
+          "markdownDescription": "Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showHomeDirectoryWarning": {
