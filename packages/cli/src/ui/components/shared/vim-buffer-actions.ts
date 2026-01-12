@@ -16,6 +16,8 @@ import {
   findPrevWordAcrossLines,
   findNextBigWordAcrossLines,
   findPrevBigWordAcrossLines,
+  findWordEndInLine,
+  findBigWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 import { assumeExhaustive } from '@google/gemini-cli-core';
@@ -84,9 +86,15 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, delete/change to end of line
+          // No more words. Check if we can delete to the end of the current word.
           const currentLine = lines[endRow] || '';
-          endCol = cpLen(currentLine);
+          const wordEnd = findWordEndInLine(currentLine, endCol);
+
+          if (wordEnd !== null) {
+            // Found word end, delete up to (and including) it
+            endCol = wordEnd + 1;
+          }
+          // If wordEnd is null, we are likely on trailing whitespace, so do nothing.
           break;
         }
       }
@@ -122,9 +130,13 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, delete/change to end of line
+          // No more words. Check if we can delete to the end of the current big word.
           const currentLine = lines[endRow] || '';
-          endCol = cpLen(currentLine);
+          const wordEnd = findBigWordEndInLine(currentLine, endCol);
+
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1;
+          }
           break;
         }
       }
