@@ -23,6 +23,15 @@ vi.mock('../utils/formatters.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/formatters.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../utils/formatters.js')>();
+  return {
+    ...original,
+    formatTimeAgo: () => 'some time ago',
+  };
+});
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
