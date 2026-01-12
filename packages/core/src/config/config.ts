@@ -1889,6 +1889,10 @@ export class Config {
     if (client?.isInitialized()) {
       await client.setTools();
       await client.updateSystemInstruction();
+    } else {
+      debugLogger.debug(
+        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
+      );
     }
   };
 
@@ -1897,6 +1901,9 @@ export class Config {
    */
   async dispose(): Promise<void> {
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    if (this.agentRegistry) {
+      this.agentRegistry.dispose();
+    }
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }

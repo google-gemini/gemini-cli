@@ -46,17 +46,19 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.refreshAgents().catch((e) => {
-        debugLogger.error(
-          '[AgentRegistry] Failed to refresh agents on model change:',
-          e,
-        );
-      });
-    });
+    coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
   }
+
+  private onModelChanged = () => {
+    this.refreshAgents().catch((e) => {
+      debugLogger.error(
+        '[AgentRegistry] Failed to refresh agents on model change:',
+        e,
+      );
+    });
+  };
 
   /**
    * Clears the current registry and re-scans for agents.
@@ -66,6 +68,13 @@ export class AgentRegistry {
     this.agents.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
+  }
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  dispose(): void {
+    coreEvents.off(CoreEvent.ModelChanged, this.onModelChanged);
   }
 
   private async loadAgents(): Promise<void> {
