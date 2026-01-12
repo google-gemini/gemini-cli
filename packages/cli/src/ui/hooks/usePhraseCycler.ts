@@ -12,7 +12,7 @@ import { useInactivityTimer } from './useInactivityTimer.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  'Interactive shell awaiting input... press Ctrl+f to focus shell';
+  'Interactive shell awaiting input... press tab to focus shell';
 
 /**
  * Custom hook to manage cycling through loading phrases.
