@@ -180,7 +180,15 @@ export const useShellCommandProcessor = (
         if (!shell) return;
 
         if (event.type === 'data') {
-          shell.output = event.chunk;
+          if (typeof event.chunk === 'string') {
+            if (typeof shell.output === 'string') {
+              shell.output += event.chunk;
+            } else {
+              shell.output = event.chunk;
+            }
+          } else {
+            shell.output = event.chunk;
+          }
         } else if (event.type === 'binary_detected') {
           shell.isBinary = true;
         } else if (event.type === 'binary_progress') {
@@ -274,16 +282,17 @@ export const useShellCommandProcessor = (
                 switch (event.type) {
                   case 'data':
                     if (isBinaryStream) break;
-                    if (config.getEnableInteractiveShell()) {
+                    if (typeof event.chunk === 'string') {
+                      if (typeof cumulativeStdout === 'string') {
+                        cumulativeStdout += event.chunk;
+                      } else {
+                        cumulativeStdout = event.chunk;
+                      }
+                    } else {
+                      // AnsiOutput (PTY) is always the full state
                       cumulativeStdout = event.chunk;
-                      shouldUpdate = true;
-                    } else if (
-                      typeof event.chunk === 'string' &&
-                      typeof cumulativeStdout === 'string'
-                    ) {
-                      cumulativeStdout += event.chunk;
-                      shouldUpdate = true;
                     }
+                    shouldUpdate = true;
                     break;
                   case 'binary_detected':
                     isBinaryStream = true;
@@ -293,6 +302,9 @@ export const useShellCommandProcessor = (
                     isBinaryStream = true;
                     binaryBytesReceived = event.bytesReceived;
                     shouldUpdate = true;
+                    break;
+                  case 'exit':
+                    // No action needed for exit event during streaming
                     break;
                   default:
                     throw new Error('An unhandled ShellOutputEvent was found.');

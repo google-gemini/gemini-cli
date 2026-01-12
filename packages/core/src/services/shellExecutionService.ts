@@ -7,7 +7,7 @@
 import stripAnsi from 'strip-ansi';
 import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
-import { spawn as cpSpawn } from 'node:child_process';
+import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
@@ -90,6 +90,7 @@ export interface ShellExecutionConfig {
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
+  maxSerializedLines?: number;
 }
 
 /**
@@ -124,6 +125,18 @@ export type ShellOutputEvent =
 interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
+  maxSerializedLines?: number;
+}
+
+interface ActiveChildProcess {
+  process: ChildProcess;
+  state: {
+    stdout: string;
+    stderr: string;
+    stdoutTruncated: boolean;
+    stderrTruncated: boolean;
+    outputChunks: Buffer[];
+  };
 }
 
 const getFullBufferText = (terminal: pkg.Terminal): string => {
@@ -171,6 +184,7 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
+  private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static exitedPtyInfo = new Map<
     number,
     { exitCode: number; signal?: number }
@@ -258,6 +272,13 @@ export class ShellExecutionService {
     return { newBuffer: truncatedBuffer + chunk, truncated: true };
   }
 
+  private static emitEvent(pid: number, event: ShellOutputEvent): void {
+    const listeners = this.activeListeners.get(pid);
+    if (listeners) {
+      listeners.forEach((listener) => listener(event));
+    }
+  }
+
   private static childProcessFallback(
     commandToExecute: string,
     cwd: string,
@@ -286,15 +307,28 @@ export class ShellExecutionService {
         },
       });
 
+      const state = {
+        stdout: '',
+        stderr: '',
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        outputChunks: [] as Buffer[],
+      };
+
+      if (child.pid) {
+        this.activeChildProcesses.set(child.pid, {
+          process: child,
+          state,
+        });
+      }
+
       const result = new Promise<ShellExecutionResult>((resolve) => {
+        if (child.pid) {
+          this.activeResolvers.set(child.pid, resolve);
+        }
+
         let stdoutDecoder: TextDecoder | null = null;
         let stderrDecoder: TextDecoder | null = null;
-
-        let stdout = '';
-        let stderr = '';
-        let stdoutTruncated = false;
-        let stderrTruncated = false;
-        const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
 
@@ -314,14 +348,17 @@ export class ShellExecutionService {
             }
           }
 
-          outputChunks.push(data);
+          state.outputChunks.push(data);
 
           if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+            const sniffBuffer = Buffer.concat(state.outputChunks.slice(0, 20));
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
               isStreamingRawContent = false;
+              const event: ShellOutputEvent = { type: 'binary_detected' };
+              onOutputEvent(event);
+              if (child.pid) ShellExecutionService.emitEvent(child.pid, event);
             }
           }
 
@@ -331,25 +368,45 @@ export class ShellExecutionService {
 
             if (stream === 'stdout') {
               const { newBuffer, truncated } = this.appendAndTruncate(
-                stdout,
+                state.stdout,
                 decodedChunk,
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
-              stdout = newBuffer;
+              state.stdout = newBuffer;
               if (truncated) {
-                stdoutTruncated = true;
+                state.stdoutTruncated = true;
               }
             } else {
               const { newBuffer, truncated } = this.appendAndTruncate(
-                stderr,
+                state.stderr,
                 decodedChunk,
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
-              stderr = newBuffer;
+              state.stderr = newBuffer;
               if (truncated) {
-                stderrTruncated = true;
+                state.stderrTruncated = true;
               }
             }
+
+            if (decodedChunk) {
+              const event: ShellOutputEvent = {
+                type: 'data',
+                chunk: decodedChunk,
+              };
+              onOutputEvent(event);
+              if (child.pid) ShellExecutionService.emitEvent(child.pid, event);
+            }
+          } else {
+            const totalBytes = state.outputChunks.reduce(
+              (sum, chunk) => sum + chunk.length,
+              0,
+            );
+            const event: ShellOutputEvent = {
+              type: 'binary_progress',
+              bytesReceived: totalBytes,
+            };
+            onOutputEvent(event);
+            if (child.pid) ShellExecutionService.emitEvent(child.pid, event);
           }
         };
 
@@ -359,11 +416,14 @@ export class ShellExecutionService {
         ) => {
           const { finalBuffer } = cleanup();
           // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
+          const separator = state.stdout.endsWith('\n') ? '' : '\n';
           let combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+            state.stdout +
+            (state.stderr
+              ? (state.stdout ? separator : '') + state.stderr
+              : '');
 
-          if (stdoutTruncated || stderrTruncated) {
+          if (state.stdoutTruncated || state.stderrTruncated) {
             const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
               MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
             }MB.]`;
@@ -371,23 +431,43 @@ export class ShellExecutionService {
           }
 
           const finalStrippedOutput = stripAnsi(combinedOutput).trim();
+          const exitCode = code;
+          const exitSignal = signal ? os.constants.signals[signal] : null;
 
-          if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
+          if (child.pid) {
+            const event: ShellOutputEvent = {
+              type: 'exit',
+              exitCode,
+              signal: exitSignal,
+            };
+            onOutputEvent(event);
+            ShellExecutionService.emitEvent(child.pid, event);
+
+            // Store exit info for late subscribers
+            this.exitedPtyInfo.set(child.pid, {
+              exitCode: exitCode ?? 0,
+              signal: exitSignal ?? undefined,
+            });
+            setTimeout(
+              () => {
+                if (child.pid) this.exitedPtyInfo.delete(child.pid);
+              },
+              5 * 60 * 1000,
+            ).unref();
+
+            this.activeChildProcesses.delete(child.pid);
+            this.activeResolvers.delete(child.pid);
+            this.activeListeners.delete(child.pid);
           }
 
           resolve({
             rawOutput: finalBuffer,
             output: finalStrippedOutput,
-            exitCode: code,
-            signal: signal ? os.constants.signals[signal] : null,
+            exitCode,
+            signal: exitSignal,
             error,
             aborted: abortSignal.aborted,
-            pid: undefined,
+            pid: child.pid,
             executionMethod: 'child_process',
           });
         };
@@ -420,9 +500,6 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
         child.on('exit', (code, signal) => {
-          if (child.pid) {
-            this.activePtys.delete(child.pid);
-          }
           handleExit(code, signal);
         });
 
@@ -432,23 +509,43 @@ export class ShellExecutionService {
           if (stdoutDecoder) {
             const remaining = stdoutDecoder.decode();
             if (remaining) {
-              stdout += remaining;
+              state.stdout += remaining;
+              // If there's remaining output, we should technically emit it too,
+              // but it's rare to have partial utf8 chars at the very end of stream.
+              if (isStreamingRawContent && remaining) {
+                const event: ShellOutputEvent = {
+                  type: 'data',
+                  chunk: remaining,
+                };
+                onOutputEvent(event);
+                if (child.pid)
+                  ShellExecutionService.emitEvent(child.pid, event);
+              }
             }
           }
           if (stderrDecoder) {
             const remaining = stderrDecoder.decode();
             if (remaining) {
-              stderr += remaining;
+              state.stderr += remaining;
+              if (isStreamingRawContent && remaining) {
+                const event: ShellOutputEvent = {
+                  type: 'data',
+                  chunk: remaining,
+                };
+                onOutputEvent(event);
+                if (child.pid)
+                  ShellExecutionService.emitEvent(child.pid, event);
+              }
             }
           }
 
-          const finalBuffer = Buffer.concat(outputChunks);
+          const finalBuffer = Buffer.concat(state.outputChunks);
 
-          return { stdout, stderr, finalBuffer };
+          return { finalBuffer };
         }
       });
 
-      return { pid: undefined, result };
+      return { pid: child.pid, result };
     } catch (e) {
       const error = e as Error;
       return {
@@ -515,7 +612,11 @@ export class ShellExecutionService {
         });
         headlessTerminal.scrollToTop();
 
-        this.activePtys.set(ptyProcess.pid, { ptyProcess, headlessTerminal });
+        this.activePtys.set(ptyProcess.pid, {
+          ptyProcess,
+          headlessTerminal,
+          maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+        });
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
@@ -549,17 +650,29 @@ export class ShellExecutionService {
           }
 
           const buffer = headlessTerminal.buffer.active;
+          const endLine = buffer.length;
+          const startLine = Math.max(
+            0,
+            endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+          );
+
           let newOutput: AnsiOutput;
           if (shellExecutionConfig.showColor) {
-            newOutput = serializeTerminalToObject(headlessTerminal);
+            newOutput = serializeTerminalToObject(
+              headlessTerminal,
+              startLine,
+              endLine,
+            );
           } else {
-            newOutput = (serializeTerminalToObject(headlessTerminal) || []).map(
-              (line) =>
-                line.map((token) => {
-                  token.fg = '';
-                  token.bg = '';
-                  return token;
-                }),
+            newOutput = (
+              serializeTerminalToObject(headlessTerminal, startLine, endLine) ||
+              []
+            ).map((line) =>
+              line.map((token) => {
+                token.fg = '';
+                token.bg = '';
+                return token;
+              }),
             );
           }
 
@@ -577,8 +690,11 @@ export class ShellExecutionService {
             }
           }
 
-          if (buffer.cursorY > lastNonEmptyLine) {
-            lastNonEmptyLine = buffer.cursorY;
+          const absoluteCursorY = buffer.baseY + buffer.cursorY;
+          const cursorRelativeIndex = absoluteCursorY - startLine;
+
+          if (cursorRelativeIndex > lastNonEmptyLine) {
+            lastNonEmptyLine = cursorRelativeIndex;
           }
 
           const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
@@ -594,12 +710,7 @@ export class ShellExecutionService {
               chunk: finalOutput,
             };
             onOutputEvent(event);
-            const listeners = ShellExecutionService.activeListeners.get(
-              ptyProcess.pid,
-            );
-            if (listeners) {
-              listeners.forEach((listener) => listener(event));
-            }
+            ShellExecutionService.emitEvent(ptyProcess.pid, event);
           }
         };
 
@@ -651,12 +762,7 @@ export class ShellExecutionService {
                     isStreamingRawContent = false;
                     const event: ShellOutputEvent = { type: 'binary_detected' };
                     onOutputEvent(event);
-                    const listeners = ShellExecutionService.activeListeners.get(
-                      ptyProcess.pid,
-                    );
-                    if (listeners) {
-                      listeners.forEach((listener) => listener(event));
-                    }
+                    ShellExecutionService.emitEvent(ptyProcess.pid, event);
                   }
                 }
 
@@ -682,12 +788,7 @@ export class ShellExecutionService {
                     bytesReceived: totalBytes,
                   };
                   onOutputEvent(event);
-                  const listeners = ShellExecutionService.activeListeners.get(
-                    ptyProcess.pid,
-                  );
-                  if (listeners) {
-                    listeners.forEach((listener) => listener(event));
-                  }
+                  ShellExecutionService.emitEvent(ptyProcess.pid, event);
                   resolve();
                 }
               }),
@@ -704,33 +805,30 @@ export class ShellExecutionService {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
 
-            // Store exit info for late subscribers (e.g. backgrounding race condition)
-            this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
-            setTimeout(
-              () => {
-                this.exitedPtyInfo.delete(ptyProcess.pid);
-              },
-              5 * 60 * 1000,
-            ).unref();
-
-            this.activePtys.delete(ptyProcess.pid);
-            this.activeResolvers.delete(ptyProcess.pid);
-
-            const event: ShellOutputEvent = {
-              type: 'exit',
-              exitCode,
-              signal: signal ?? null,
-            };
-            const listeners = ShellExecutionService.activeListeners.get(
-              ptyProcess.pid,
-            );
-            if (listeners) {
-              listeners.forEach((listener) => listener(event));
-            }
-            this.activeListeners.delete(ptyProcess.pid);
-
             const finalize = () => {
               render(true);
+
+              // Store exit info for late subscribers (e.g. backgrounding race condition)
+              this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
+              setTimeout(
+                () => {
+                  this.exitedPtyInfo.delete(ptyProcess.pid);
+                },
+                5 * 60 * 1000,
+              ).unref();
+
+              this.activePtys.delete(ptyProcess.pid);
+              this.activeResolvers.delete(ptyProcess.pid);
+
+              const event: ShellOutputEvent = {
+                type: 'exit',
+                exitCode,
+                signal: signal ?? null,
+              };
+              onOutputEvent(event);
+              ShellExecutionService.emitEvent(ptyProcess.pid, event);
+              this.activeListeners.delete(ptyProcess.pid);
+
               const finalBuffer = Buffer.concat(outputChunks);
 
               resolve({
@@ -830,6 +928,14 @@ export class ShellExecutionService {
    * @param input The string to write to the terminal.
    */
   static writeToPty(pid: number, input: string): void {
+    if (this.activeChildProcesses.has(pid)) {
+      const activeChild = this.activeChildProcesses.get(pid);
+      if (activeChild) {
+        activeChild.process.stdin?.write(input);
+      }
+      return;
+    }
+
     if (!this.isPtyActive(pid)) {
       return;
     }
@@ -841,6 +947,14 @@ export class ShellExecutionService {
   }
 
   static isPtyActive(pid: number): boolean {
+    if (this.activeChildProcesses.has(pid)) {
+      try {
+        return process.kill(pid, 0);
+      } catch {
+        return false;
+      }
+    }
+
     try {
       // process.kill with signal 0 is a way to check for the existence of a process.
       // It doesn't actually send a signal.
@@ -869,6 +983,20 @@ export class ShellExecutionService {
           disposable.dispose();
         },
       );
+    } else if (this.activeChildProcesses.has(pid)) {
+      const activeChild = this.activeChildProcesses.get(pid);
+      activeChild?.process.on('exit', (code, signal) => {
+        // ChildProcess signals are strings (e.g. 'SIGTERM'), but callback expects number or undefined
+        // Map string signal to number if possible, or leave as undefined since existing interface might expect number.
+        // However, child_process 'exit' event provides (code: number | null, signal: NodeJS.Signals | null).
+        // ptyProcess.onExit provides { exitCode: number, signal?: number }.
+        // We need to normalize.
+        let signalNumber: number | undefined;
+        if (signal) {
+          signalNumber = os.constants.signals[signal];
+        }
+        callback(code ?? 0, signalNumber);
+      });
     } else {
       // Check if it already exited recently
       const exitedInfo = this.exitedPtyInfo.get(pid);
@@ -885,24 +1013,42 @@ export class ShellExecutionService {
    */
   static kill(pid: number): void {
     const activePty = this.activePtys.get(pid);
-    if (!activePty) return;
+    const activeChild = this.activeChildProcesses.get(pid);
 
-    try {
+    if (activeChild) {
       if (os.platform() === 'win32') {
-        activePty.ptyProcess.kill();
+        cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
       } else {
-        // Try killing the process group first
         try {
           process.kill(-pid, 'SIGKILL');
         } catch {
-          // Fallback to killing the specific process
-          activePty.ptyProcess.kill('SIGKILL');
+          try {
+            process.kill(pid, 'SIGKILL');
+          } catch {
+            // ignore
+          }
         }
       }
-    } catch {
-      // Ignore errors if process is already dead
+      this.activeChildProcesses.delete(pid);
+    } else if (activePty) {
+      try {
+        if (os.platform() === 'win32') {
+          activePty.ptyProcess.kill();
+        } else {
+          // Try killing the process group first
+          try {
+            process.kill(-pid, 'SIGKILL');
+          } catch {
+            // Fallback to killing the specific process
+            activePty.ptyProcess.kill('SIGKILL');
+          }
+        }
+      } catch {
+        // Ignore errors if process is already dead
+      }
+      this.activePtys.delete(pid);
     }
-    this.activePtys.delete(pid);
+
     this.activeResolvers.delete(pid);
     this.activeListeners.delete(pid);
   }
@@ -916,25 +1062,46 @@ export class ShellExecutionService {
   static background(pid: number): void {
     const resolve = this.activeResolvers.get(pid);
     if (resolve) {
-      const activePty = this.activePtys.get(pid);
       let output = '';
       const rawOutput = Buffer.from('');
 
+      const activePty = this.activePtys.get(pid);
+      const activeChild = this.activeChildProcesses.get(pid);
+
       if (activePty) {
         output = getFullBufferText(activePty.headlessTerminal);
-      }
+        resolve({
+          rawOutput,
+          output,
+          exitCode: null,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid,
+          executionMethod: 'node-pty',
+          backgrounded: true,
+        });
+      } else if (activeChild) {
+        const separator = activeChild.state.stdout.endsWith('\n') ? '' : '\n';
+        output =
+          activeChild.state.stdout +
+          (activeChild.state.stderr
+            ? (activeChild.state.stdout ? separator : '') +
+              activeChild.state.stderr
+            : '');
 
-      resolve({
-        rawOutput,
-        output,
-        exitCode: null,
-        signal: null,
-        error: null,
-        aborted: false,
-        pid,
-        executionMethod: 'node-pty',
-        backgrounded: true,
-      });
+        resolve({
+          rawOutput,
+          output,
+          exitCode: null,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid,
+          executionMethod: 'child_process',
+          backgrounded: true,
+        });
+      }
 
       this.activeResolvers.delete(pid);
     }
@@ -951,11 +1118,33 @@ export class ShellExecutionService {
 
     // Send current buffer content immediately
     const activePty = this.activePtys.get(pid);
+    const activeChild = this.activeChildProcesses.get(pid);
+
     if (activePty) {
       // Use serializeTerminalToObject to preserve colors and structure
-      const bufferData = serializeTerminalToObject(activePty.headlessTerminal);
+      const endLine = activePty.headlessTerminal.buffer.active.length;
+      const startLine = Math.max(
+        0,
+        endLine - (activePty.maxSerializedLines ?? 2000),
+      );
+      const bufferData = serializeTerminalToObject(
+        activePty.headlessTerminal,
+        startLine,
+        endLine,
+      );
       if (bufferData && bufferData.length > 0) {
         listener({ type: 'data', chunk: bufferData });
+      }
+    } else if (activeChild) {
+      const separator = activeChild.state.stdout.endsWith('\n') ? '' : '\n';
+      const output =
+        activeChild.state.stdout +
+        (activeChild.state.stderr
+          ? (activeChild.state.stdout ? separator : '') +
+            activeChild.state.stderr
+          : '');
+      if (output) {
+        listener({ type: 'data', chunk: output });
       }
     }
 
@@ -1005,7 +1194,16 @@ export class ShellExecutionService {
 
     // Force emit the new state after resize
     if (activePty) {
-      const bufferData = serializeTerminalToObject(activePty.headlessTerminal);
+      const endLine = activePty.headlessTerminal.buffer.active.length;
+      const startLine = Math.max(
+        0,
+        endLine - (activePty.maxSerializedLines ?? 2000),
+      );
+      const bufferData = serializeTerminalToObject(
+        activePty.headlessTerminal,
+        startLine,
+        endLine,
+      );
       const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
       const listeners = ShellExecutionService.activeListeners.get(pid);
       if (listeners) {

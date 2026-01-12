@@ -67,7 +67,13 @@ vi.mock('../utils/getPty.js', () => ({
   getPty: mockGetPty,
 }));
 vi.mock('../utils/terminalSerializer.js', () => ({
-  serializeTerminalToObject: mockSerializeTerminalToObject,
+  // Avoid passing the heavy Terminal object to the spy to prevent OOM
+  serializeTerminalToObject: (
+    _terminal: unknown,
+    ...args: [number | undefined, number | undefined]
+  ) => mockSerializeTerminalToObject(...args),
+  convertColorToHex: () => '#000000',
+  ColorMode: { DEFAULT: 0, PALETTE: 1, RGB: 2 },
 }));
 vi.mock('../utils/systemEncoding.js', () => ({
   getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
@@ -304,6 +310,7 @@ describe('ShellExecutionService', () => {
           }
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
+        { ...shellExecutionConfig, maxSerializedLines: 100 },
       );
 
       expect(result.exitCode).toBe(0);
@@ -661,7 +668,7 @@ describe('ShellExecutionService', () => {
       expect(result.rawOutput).toEqual(
         Buffer.concat([binaryChunk1, binaryChunk2]),
       );
-      expect(onOutputEventMock).toHaveBeenCalledTimes(3);
+      expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
       });
@@ -672,6 +679,11 @@ describe('ShellExecutionService', () => {
       expect(onOutputEventMock.mock.calls[2][0]).toEqual({
         type: 'binary_progress',
         bytesReceived: 8,
+      });
+      expect(onOutputEventMock.mock.calls[3][0]).toEqual({
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
       });
     });
 
@@ -691,6 +703,7 @@ describe('ShellExecutionService', () => {
         'binary_detected',
         'binary_progress',
         'binary_progress',
+        'exit',
       ]);
     });
   });
@@ -749,9 +762,7 @@ describe('ShellExecutionService', () => {
         coloredShellExecutionConfig,
       );
 
-      expect(mockSerializeTerminalToObject).toHaveBeenCalledWith(
-        expect.anything(), // The terminal object
-      );
+      expect(mockSerializeTerminalToObject).toHaveBeenCalled();
 
       expect(onOutputEventMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -893,11 +904,20 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(result.error).toBeNull();
       expect(result.aborted).toBe(false);
       expect(result.output).toBe('file1.txt\na warning');
-      expect(handle.pid).toBe(undefined);
+      expect(handle.pid).toBe(12345);
 
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
-        chunk: 'file1.txt\na warning',
+        chunk: 'file1.txt\n',
+      });
+      expect(onOutputEventMock).toHaveBeenCalledWith({
+        type: 'data',
+        chunk: 'a warning',
+      });
+      expect(onOutputEventMock).toHaveBeenCalledWith({
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
       });
     });
 
@@ -909,12 +929,15 @@ describe('ShellExecutionService child_process fallback', () => {
       });
 
       expect(result.output.trim()).toBe('aredword');
-      expect(onOutputEventMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'data',
-          chunk: 'aredword',
-        }),
-      );
+      expect(onOutputEventMock).toHaveBeenCalledWith({
+        type: 'data',
+        chunk: 'a\u001b[31mred\u001b[0mword',
+      });
+      expect(onOutputEventMock).toHaveBeenCalledWith({
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
+      });
     });
 
     it('should correctly decode multi-byte characters split across chunks', async () => {
@@ -935,7 +958,11 @@ describe('ShellExecutionService child_process fallback', () => {
       });
 
       expect(result.output.trim()).toBe('');
-      expect(onOutputEventMock).not.toHaveBeenCalled();
+      expect(onOutputEventMock).toHaveBeenCalledWith({
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
+      });
     });
 
     it.skip('should truncate stdout using a sliding window and show a warning', async () => {
@@ -1134,9 +1161,22 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(result.rawOutput).toEqual(
         Buffer.concat([binaryChunk1, binaryChunk2]),
       );
-      expect(onOutputEventMock).toHaveBeenCalledTimes(1);
+      expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
+      });
+      expect(onOutputEventMock.mock.calls[1][0]).toEqual({
+        type: 'binary_progress',
+        bytesReceived: 4,
+      });
+      expect(onOutputEventMock.mock.calls[2][0]).toEqual({
+        type: 'binary_progress',
+        bytesReceived: 8,
+      });
+      expect(onOutputEventMock.mock.calls[3][0]).toEqual({
+        type: 'exit',
+        exitCode: 0,
+        signal: null,
       });
     });
 
@@ -1144,16 +1184,21 @@ describe('ShellExecutionService child_process fallback', () => {
       mockIsBinary.mockImplementation((buffer) => buffer.includes(0x00));
 
       await simulateExecution('cat mixed_file', (cp) => {
-        cp.stdout?.emit('data', Buffer.from('some text'));
         cp.stdout?.emit('data', Buffer.from([0x00, 0x01, 0x02]));
         cp.stdout?.emit('data', Buffer.from('more text'));
         cp.emit('exit', 0, null);
+        cp.emit('close', 0, null);
       });
 
       const eventTypes = onOutputEventMock.mock.calls.map(
         (call: [ShellOutputEvent]) => call[0].type,
       );
-      expect(eventTypes).toEqual(['binary_detected']);
+      expect(eventTypes).toEqual([
+        'binary_detected',
+        'binary_progress',
+        'binary_progress',
+        'exit',
+      ]);
     });
   });
 

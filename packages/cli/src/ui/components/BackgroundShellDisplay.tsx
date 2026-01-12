@@ -11,9 +11,10 @@ import { theme } from '../semantic-colors.js';
 import {
   ShellExecutionService,
   type AnsiOutput,
+  type AnsiLine,
+  type AnsiToken,
 } from '@google/gemini-cli-core';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
-import { AnsiOutputText } from './AnsiOutput.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import {
@@ -56,14 +57,14 @@ export const BackgroundShellDisplay = ({
   );
   const [listSelectionIndex, setListSelectionIndex] = useState(0);
   const listRef = useRef<ScrollableListRef<BackgroundShell>>(null);
+  const outputRef = useRef<ScrollableListRef<AnsiLine | string>>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const subscribedRef = useRef(false);
 
   useEffect(() => {
     if (!activePid) return;
 
-    const ptyWidth = Math.max(
-      1,
-      width - TAB_DISPLAY_HORIZONTAL_PADDING / 2 - CONTENT_PADDING_X * 2,
-    );
+    const ptyWidth = Math.max(1, width - BORDER_WIDTH - CONTENT_PADDING_X * 2);
     const ptyHeight = Math.max(1, height - HEADER_HEIGHT);
     ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
   }, [activePid, width, height]);
@@ -80,17 +81,41 @@ export const BackgroundShellDisplay = ({
       setOutput(shell.output);
     }
 
+    subscribedRef.current = false;
+
     // Subscribe to live updates for the active shell
     const unsubscribe = ShellExecutionService.subscribe(activePid, (event) => {
       if (event.type === 'data') {
-        setOutput(event.chunk);
+        if (typeof event.chunk === 'string') {
+          if (!subscribedRef.current) {
+            // Initial synchronous update contains full history
+            setOutput(event.chunk);
+          } else {
+            // Subsequent updates are deltas for child_process
+            setOutput((prev) =>
+              typeof prev === 'string' ? prev + event.chunk : event.chunk,
+            );
+          }
+        } else {
+          // PTY always sends full AnsiOutput
+          setOutput(event.chunk);
+        }
       }
     });
 
+    subscribedRef.current = true;
+
     return () => {
       unsubscribe();
+      subscribedRef.current = false;
     };
   }, [activePid, shells]);
+
+  useEffect(() => {
+    if (!isListOpenProp && outputRef.current && isAtBottom) {
+      outputRef.current.scrollToEnd();
+    }
+  }, [output, isListOpenProp, isAtBottom]);
 
   useEffect(() => {
     if (isListOpenProp && activeShell) {
@@ -159,6 +184,30 @@ export const BackgroundShellDisplay = ({
 
       if (key.ctrl && key.name === 'o') {
         setIsBackgroundShellListOpen(true);
+        return;
+      }
+
+      const checkAtBottom = () => {
+        setTimeout(() => {
+          if (outputRef.current) {
+            const state = outputRef.current.getScrollState();
+            const atBottom =
+              state.scrollTop + state.innerHeight >= state.scrollHeight - 1;
+            setIsAtBottom(atBottom);
+          }
+        }, 50);
+      };
+
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        // Check if we are at the bottom after scrolling
+        checkAtBottom();
         return;
       }
 
@@ -292,6 +341,45 @@ export const BackgroundShellDisplay = ({
     );
   };
 
+  const renderOutput = () => {
+    const lines = typeof output === 'string' ? output.split('\n') : output;
+
+    return (
+      <ScrollableList
+        ref={outputRef}
+        data={lines}
+        renderItem={({ item: line, index }) => {
+          if (typeof line === 'string') {
+            return <Text key={index}>{line}</Text>;
+          }
+          return (
+            <Text key={index} wrap="truncate">
+              {line.length > 0
+                ? line.map((token: AnsiToken, tokenIndex: number) => (
+                    <Text
+                      key={tokenIndex}
+                      color={token.fg}
+                      backgroundColor={token.bg}
+                      inverse={token.inverse}
+                      dimColor={token.dim}
+                      bold={token.bold}
+                      italic={token.italic}
+                      underline={token.underline}
+                    >
+                      {token.text}
+                    </Text>
+                  ))
+                : null}
+            </Text>
+          );
+        }}
+        estimatedItemHeight={() => 1}
+        keyExtractor={(_, index) => index.toString()}
+        hasFocus={isFocused}
+      />
+    );
+  };
+
   return (
     <Box
       flexDirection="column"
@@ -321,17 +409,7 @@ export const BackgroundShellDisplay = ({
         <Text color={theme.text.accent}>{RIGHT_TEXT} | Ctrl+O List</Text>
       </Box>
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
-        {isListOpenProp ? (
-          renderProcessList()
-        ) : typeof output === 'string' ? (
-          <Text>{output}</Text>
-        ) : (
-          <AnsiOutputText
-            data={output}
-            width={Math.max(1, width - BORDER_WIDTH - CONTENT_PADDING_X * 2)}
-            availableTerminalHeight={Math.max(1, height - HEADER_HEIGHT)}
-          />
-        )}
+        {isListOpenProp ? renderProcessList() : renderOutput()}
       </Box>
     </Box>
   );

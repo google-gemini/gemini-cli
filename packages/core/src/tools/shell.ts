@@ -232,6 +232,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   shouldUpdate = true;
                 }
                 break;
+              case 'exit':
+                break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
