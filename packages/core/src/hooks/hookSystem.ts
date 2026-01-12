@@ -117,4 +117,28 @@ export class HookSystem {
     }
     return this.hookEventHandler.firePreCompressEvent(trigger);
   }
+
+  async fireBeforeAgentEvent(
+    prompt: string,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeAgentEvent(prompt);
+  }
+
+  async fireAfterAgentEvent(
+    prompt: string,
+    response: string,
+    stopHookActive: boolean = false,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireAfterAgentEvent(
+      prompt,
+      response,
+      stopHookActive,
+    );
+  }
 }
