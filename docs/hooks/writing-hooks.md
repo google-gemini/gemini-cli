@@ -43,7 +43,29 @@ chmod +x .gemini/hooks/log-tools.sh
 
 ### Step 2: Configure the hook
 
-Add the hook configuration to `.gemini/settings.json`:
+You can add the hook configuration in two ways:
+
+**Option 1: Use the interactive wizard (recommended)**
+
+Run the interactive wizard to add your hook:
+
+```bash
+/hooks add
+```
+
+Or as a CLI command:
+
+```bash
+gemini hooks add
+```
+
+The wizard will guide you through selecting the event, configuring the matcher,
+and entering hook details. See
+[Managing hooks](../hooks/index.md#managing-hooks) for more details.
+
+**Option 2: Manually edit settings**
+
+Alternatively, add the hook configuration directly to `.gemini/settings.json`:
 
 ```json
 {
