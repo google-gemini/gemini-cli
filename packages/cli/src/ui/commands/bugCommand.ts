@@ -25,6 +25,11 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 import path from 'node:path';
 
+const strictEncodeURIComponent = (value: string): string =>
+  encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
 export const bugCommand: SlashCommand = {
   name: 'bug',
   description: 'Submit a bug report',
@@ -103,9 +108,9 @@ export const bugCommand: SlashCommand = {
     }
 
     bugReportUrl = bugReportUrl
-      .replace('{title}', encodeURIComponent(bugDescription))
-      .replace('{info}', encodeURIComponent(info))
-      .replace('{problem}', encodeURIComponent(problemValue));
+      .replace('{title}', strictEncodeURIComponent(bugDescription))
+      .replace('{info}', strictEncodeURIComponent(info))
+      .replace('{problem}', strictEncodeURIComponent(problemValue));
 
     context.ui.addItem(
       {

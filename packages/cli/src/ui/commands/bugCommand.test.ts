@@ -13,6 +13,11 @@ import { getVersion } from '@google/gemini-cli-core';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 
+const strictEncodeURIComponent = (value: string): string =>
+  encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
 // Mock dependencies
 vi.mock('open');
 vi.mock('../utils/formatters.js');
@@ -112,7 +117,7 @@ describe('bugCommand', () => {
 * **Kitty Keyboard Protocol:** Supported
 * **IDE Client:** VSCode
 `;
-    const expectedUrl = `https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title=A%20test%20bug&info=${encodeURIComponent(expectedInfo)}&problem=A%20test%20bug`;
+    const expectedUrl = `https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title=A%20test%20bug&info=${strictEncodeURIComponent(expectedInfo)}&problem=A%20test%20bug`;
 
     expect(open).toHaveBeenCalledWith(expectedUrl);
   });
@@ -161,7 +166,7 @@ describe('bugCommand', () => {
     expect(messageText).toContain('problem=');
     const reminder =
       '\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.';
-    expect(messageText).toContain(encodeURIComponent(reminder));
+    expect(messageText).toContain(strictEncodeURIComponent(reminder));
   });
 
   it('should use a custom URL template from config if provided', async () => {
@@ -199,8 +204,8 @@ describe('bugCommand', () => {
 * **IDE Client:** VSCode
 `;
     const expectedUrl = customTemplate
-      .replace('{title}', encodeURIComponent('A custom bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo));
+      .replace('{title}', strictEncodeURIComponent('A custom bug'))
+      .replace('{info}', strictEncodeURIComponent(expectedInfo));
 
     expect(open).toHaveBeenCalledWith(expectedUrl);
   });
