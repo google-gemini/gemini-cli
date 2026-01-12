@@ -21,11 +21,15 @@ describe('hooksCommand', () => {
   };
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
+    getEnableHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
       hooks?: {
         disabled?: string[];
+      };
+      tools?: {
+        enableHooks?: boolean;
       };
     };
     setValue: ReturnType<typeof vi.fn>;
@@ -46,6 +50,7 @@ describe('hooksCommand', () => {
     // Create mock config
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
+      getEnableHooks: vi.fn().mockReturnValue(true),
     };
 
     // Create mock settings
@@ -79,12 +84,14 @@ describe('hooksCommand', () => {
 
     it('should have all expected subcommands', () => {
       expect(hooksCommand.subCommands).toBeDefined();
-      expect(hooksCommand.subCommands).toHaveLength(3);
+      expect(hooksCommand.subCommands).toHaveLength(5);
 
       const subCommandNames = hooksCommand.subCommands!.map((cmd) => cmd.name);
       expect(subCommandNames).toContain('panel');
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
+      expect(subCommandNames).toContain('enable-all');
+      expect(subCommandNames).toContain('disable-all');
     });
 
     it('should delegate to panel action when invoked without subcommand', async () => {
@@ -131,7 +138,7 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should return info message when hook system is not enabled', async () => {
+    it('should display panel even when hook system is not enabled', async () => {
       mockConfig.getHookSystem.mockReturnValue(null);
 
       const panelCmd = hooksCommand.subCommands!.find(
@@ -141,18 +148,22 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(mockContext, '');
+      await panelCmd.action(mockContext, '');
 
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          'Hook system is not enabled. Enable it in settings with hooks.enabled.',
-      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.HOOKS_LIST,
+          hooks: [],
+        }),
+        expect.any(Number),
+      );
     });
 
-    it('should return info message when no hooks are configured', async () => {
+    it('should display panel when no hooks are configured', async () => {
       mockHookSystem.getAllHooks.mockReturnValue([]);
+      (mockContext.services.settings.merged as Record<string, unknown>)[
+        'tools'
+      ] = { enableHooks: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -161,14 +172,15 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      const result = await panelCmd.action(mockContext, '');
+      await panelCmd.action(mockContext, '');
 
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          'No hooks configured. Add hooks to your settings to get started.',
-      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.HOOKS_LIST,
+          hooks: [],
+        }),
+        expect.any(Number),
+      );
     });
 
     it('should display hooks list when hooks are configured', async () => {
@@ -178,6 +190,9 @@ describe('hooksCommand', () => {
       ];
 
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
+      (mockContext.services.settings.merged as Record<string, unknown>)[
+        'tools'
+      ] = { enableHooks: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -560,6 +575,254 @@ describe('hooksCommand', () => {
 
       const result = enableCmd.completion(mockContext, 'test');
       expect(result).toEqual(['test-hook']);
+    });
+  });
+
+  describe('enable-all subcommand', () => {
+    it('should return error when config is not loaded', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: {
+          config: null,
+        },
+      });
+
+      const enableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable-all',
+      );
+      if (!enableAllCmd?.action) {
+        throw new Error('enable-all command must have an action');
+      }
+
+      const result = await enableAllCmd.action(contextWithoutConfig, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      });
+    });
+
+    it('should return error when hook system is not enabled', async () => {
+      mockConfig.getHookSystem.mockReturnValue(null);
+
+      const enableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable-all',
+      );
+      if (!enableAllCmd?.action) {
+        throw new Error('enable-all command must have an action');
+      }
+
+      const result = await enableAllCmd.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Hook system is not enabled.',
+      });
+    });
+
+    it('should enable all disabled hooks', async () => {
+      const mockHooks = [
+        createMockHook('hook-1', HookEventName.BeforeTool, false),
+        createMockHook('hook-2', HookEventName.AfterTool, false),
+        createMockHook('hook-3', HookEventName.BeforeAgent, true), // already enabled
+      ];
+      mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
+
+      const enableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable-all',
+      );
+      if (!enableAllCmd?.action) {
+        throw new Error('enable-all command must have an action');
+      }
+
+      const result = await enableAllCmd.action(mockContext, '');
+
+      expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
+        expect.any(String),
+        'hooks.disabled',
+        [],
+      );
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'hook-1',
+        true,
+      );
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'hook-2',
+        true,
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Enabled 2 hook(s) successfully.',
+      });
+    });
+
+    it('should return info when no hooks are configured', async () => {
+      mockHookSystem.getAllHooks.mockReturnValue([]);
+
+      const enableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable-all',
+      );
+      if (!enableAllCmd?.action) {
+        throw new Error('enable-all command must have an action');
+      }
+
+      const result = await enableAllCmd.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No hooks configured.',
+      });
+    });
+
+    it('should return info when all hooks are already enabled', async () => {
+      const mockHooks = [
+        createMockHook('hook-1', HookEventName.BeforeTool, true),
+        createMockHook('hook-2', HookEventName.AfterTool, true),
+      ];
+      mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
+
+      const enableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'enable-all',
+      );
+      if (!enableAllCmd?.action) {
+        throw new Error('enable-all command must have an action');
+      }
+
+      const result = await enableAllCmd.action(mockContext, '');
+
+      expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'All hooks are already enabled.',
+      });
+    });
+  });
+
+  describe('disable-all subcommand', () => {
+    it('should return error when config is not loaded', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: {
+          config: null,
+        },
+      });
+
+      const disableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable-all',
+      );
+      if (!disableAllCmd?.action) {
+        throw new Error('disable-all command must have an action');
+      }
+
+      const result = await disableAllCmd.action(contextWithoutConfig, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      });
+    });
+
+    it('should return error when hook system is not enabled', async () => {
+      mockConfig.getHookSystem.mockReturnValue(null);
+
+      const disableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable-all',
+      );
+      if (!disableAllCmd?.action) {
+        throw new Error('disable-all command must have an action');
+      }
+
+      const result = await disableAllCmd.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Hook system is not enabled.',
+      });
+    });
+
+    it('should disable all enabled hooks', async () => {
+      const mockHooks = [
+        createMockHook('hook-1', HookEventName.BeforeTool, true),
+        createMockHook('hook-2', HookEventName.AfterTool, true),
+        createMockHook('hook-3', HookEventName.BeforeAgent, false), // already disabled
+      ];
+      mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
+
+      const disableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable-all',
+      );
+      if (!disableAllCmd?.action) {
+        throw new Error('disable-all command must have an action');
+      }
+
+      const result = await disableAllCmd.action(mockContext, '');
+
+      expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
+        expect.any(String),
+        'hooks.disabled',
+        ['hook-1', 'hook-2', 'hook-3'],
+      );
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'hook-1',
+        false,
+      );
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'hook-2',
+        false,
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Disabled 2 hook(s) successfully.',
+      });
+    });
+
+    it('should return info when no hooks are configured', async () => {
+      mockHookSystem.getAllHooks.mockReturnValue([]);
+
+      const disableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable-all',
+      );
+      if (!disableAllCmd?.action) {
+        throw new Error('disable-all command must have an action');
+      }
+
+      const result = await disableAllCmd.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'No hooks configured.',
+      });
+    });
+
+    it('should return info when all hooks are already disabled', async () => {
+      const mockHooks = [
+        createMockHook('hook-1', HookEventName.BeforeTool, false),
+        createMockHook('hook-2', HookEventName.AfterTool, false),
+      ];
+      mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
+
+      const disableAllCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable-all',
+      );
+      if (!disableAllCmd?.action) {
+        throw new Error('disable-all command must have an action');
+      }
+
+      const result = await disableAllCmd.action(mockContext, '');
+
+      expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'All hooks are already disabled.',
+      });
     });
   });
 });
