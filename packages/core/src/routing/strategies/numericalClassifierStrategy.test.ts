@@ -86,13 +86,12 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     // Verify user content wrapping for security
-    const userContent = generateJsonCall.contents[
-      generateJsonCall.contents.length - 1
-    ];
-    const textPart = userContent.parts[0];
-    expect(textPart.text).toContain('<user_request>');
-    expect(textPart.text).toContain('simple task');
-    expect(textPart.text).toContain('</user_request>');
+    const userContent =
+      generateJsonCall.contents[generateJsonCall.contents.length - 1];
+    const textPart = userContent.parts?.[0];
+    expect(textPart?.text).toContain('<user_request>');
+    expect(textPart?.text).toContain('simple task');
+    expect(textPart?.text).toContain('</user_request>');
   });
 
   describe('A/B Testing Logic (Deterministic)', () => {

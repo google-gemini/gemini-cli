@@ -161,7 +161,14 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       // Wrap the user's request in tags to prevent prompt injection
-      const sanitizedRequest = context.request.map((part) => {
+      const requestParts = Array.isArray(context.request)
+        ? context.request
+        : [context.request];
+
+      const sanitizedRequest = requestParts.map((part) => {
+        if (typeof part === 'string') {
+          return { text: `<user_request>\n${part}\n</user_request>` };
+        }
         if (part.text) {
           return { text: `<user_request>\n${part.text}\n</user_request>` };
         }
