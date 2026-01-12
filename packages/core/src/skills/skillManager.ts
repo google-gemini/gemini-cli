@@ -15,12 +15,36 @@ export { type SkillDefinition };
 export class SkillManager {
   private skills: SkillDefinition[] = [];
   private activeSkillNames: Set<string> = new Set();
+  private adminSkillsEnabled = true;
+  private adminDisabledSkills: string[] = [];
 
   /**
    * Clears all discovered skills.
    */
   clearSkills(): void {
     this.skills = [];
+  }
+
+  /**
+   * Sets administrative settings for skills.
+   */
+  setAdminSettings(enabled: boolean, disabled: string[]): void {
+    this.adminSkillsEnabled = enabled;
+    this.adminDisabledSkills = disabled.map((n) => n.toLowerCase());
+  }
+
+  /**
+   * Returns true if skills are enabled by the admin.
+   */
+  isAdminEnabled(): boolean {
+    return this.adminSkillsEnabled;
+  }
+
+  /**
+   * Returns the list of skill names disabled by the admin.
+   */
+  getAdminDisabledSkills(): string[] {
+    return this.adminDisabledSkills;
   }
 
   /**
@@ -82,7 +106,13 @@ export class SkillManager {
    * Returns the list of enabled discovered skills.
    */
   getSkills(): SkillDefinition[] {
-    return this.skills.filter((s) => !s.disabled);
+    if (!this.adminSkillsEnabled) {
+      return [];
+    }
+    return this.skills.filter(
+      (s) =>
+        !s.disabled && !this.adminDisabledSkills.includes(s.name.toLowerCase()),
+    );
   }
 
   /**
@@ -90,14 +120,29 @@ export class SkillManager {
    * This excludes built-in skills.
    */
   getDisplayableSkills(): SkillDefinition[] {
-    return this.skills.filter((s) => !s.disabled && !s.isBuiltin);
+    if (!this.adminSkillsEnabled) {
+      return [];
+    }
+    return this.skills.filter(
+      (s) =>
+        !s.disabled &&
+        !s.isBuiltin &&
+        !this.adminDisabledSkills.includes(s.name.toLowerCase()),
+    );
   }
 
   /**
    * Returns all discovered skills, including disabled ones.
    */
   getAllSkills(): SkillDefinition[] {
-    return this.skills;
+    if (!this.adminSkillsEnabled) {
+      return [];
+    }
+    return this.skills
+      .filter((s) => !this.adminDisabledSkills.includes(s.name.toLowerCase()))
+      .map((s) => ({
+        ...s,
+      }));
   }
 
   /**
@@ -123,7 +168,13 @@ export class SkillManager {
    * Reads the full content (metadata + body) of a skill by name.
    */
   getSkill(name: string): SkillDefinition | null {
+    if (!this.adminSkillsEnabled) {
+      return null;
+    }
     const lowercaseName = name.toLowerCase();
+    if (this.adminDisabledSkills.includes(lowercaseName)) {
+      return null;
+    }
     return (
       this.skills.find((s) => s.name.toLowerCase() === lowercaseName) ?? null
     );

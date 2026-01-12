@@ -1839,6 +1839,34 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
+
+    it('should correctly handle remote admin skills settings', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockReturnValue('{}');
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify defaults
+      expect(loadedSettings.merged.admin?.skills?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.skills?.disabled).toEqual([]);
+
+      // Set remote settings
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          skillsSetting: {
+            skillsEnabled: false,
+            disabledSkills: ['skill-a', 'skill-b'],
+          },
+        },
+      });
+
+      // Verify remote settings are applied
+      expect(loadedSettings.merged.admin?.skills?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.skills?.disabled).toEqual([
+        'skill-a',
+        'skill-b',
+      ]);
+    });
   });
 
   describe('getDefaultsFromSchema', () => {

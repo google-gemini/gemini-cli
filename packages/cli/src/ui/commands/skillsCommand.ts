@@ -79,12 +79,31 @@ async function disableAction(
     return;
   }
   const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Agent skills are disabled by your admin.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
   const skill = skillManager?.getSkill(skillName);
   if (!skill) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Skill "${skillName}" not found.`,
-    });
+    const isAdminDisabled = skillManager
+      ?.getAdminDisabledSkills()
+      .includes(skillName.toLowerCase());
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: isAdminDisabled
+          ? `Skill "${skillName}" is disabled by your admin.`
+          : `Skill "${skillName}" not found.`,
+      },
+      Date.now(),
+    );
     return;
   }
 
@@ -118,6 +137,32 @@ async function enableAction(
       type: MessageType.ERROR,
       text: 'Please provide a skill name to enable.',
     });
+    return;
+  }
+
+  const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Agent skills are disabled by your admin.',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  const isAdminDisabled = skillManager
+    ?.getAdminDisabledSkills()
+    .includes(skillName.toLowerCase());
+  if (isAdminDisabled) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: `Skill "${skillName}" is disabled by your admin.`,
+      },
+      Date.now(),
+    );
     return;
   }
 

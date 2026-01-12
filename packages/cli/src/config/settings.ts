@@ -333,14 +333,23 @@ export class LoadedSettings {
       admin.mcp = { enabled: remoteSettings.mcpSetting.mcpEnabled };
     }
 
-    if (
-      remoteSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
-      undefined
-    ) {
+    const extensionsSetting =
+      remoteSettings.cliFeatureSetting?.extensionsSetting;
+    if (extensionsSetting?.extensionsEnabled !== undefined) {
       admin.extensions = {
-        enabled:
-          remoteSettings.cliFeatureSetting.extensionsSetting.extensionsEnabled,
+        enabled: extensionsSetting.extensionsEnabled,
       };
+    }
+
+    const skillsSetting = remoteSettings.cliFeatureSetting?.skillsSetting;
+    if (skillsSetting !== undefined) {
+      admin.skills = {};
+      if (skillsSetting.skillsEnabled !== undefined) {
+        admin.skills.enabled = skillsSetting.skillsEnabled;
+      }
+      if (skillsSetting.disabledSkills !== undefined) {
+        admin.skills.disabled = skillsSetting.disabledSkills;
+      }
     }
 
     this._remoteAdminSettings = { admin };

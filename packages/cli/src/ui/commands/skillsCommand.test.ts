@@ -46,6 +46,8 @@ describe('skillsCommand', () => {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
+            isAdminEnabled: vi.fn().mockReturnValue(true),
+            getAdminDisabledSkills: vi.fn().mockReturnValue([]),
             getSkill: vi
               .fn()
               .mockImplementation(

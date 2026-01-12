@@ -266,6 +266,39 @@ approval.
 This setting is highly recommended in an enterprise environment to prevent
 unintended tool execution.
 
+## Managing Agent Skills
+
+Administrators can control the availability and use of
+[Agent Skills](./skills.md) across the organization. This is particularly useful
+for ensuring that only vetted expertise is available to users.
+
+### Enforcing skill availability
+
+You can globally enable or disable the Agent Skills feature, or prevent specific
+skills from being used.
+
+**Example:** Enable skills but disable a specific, forbidden skill.
+
+```json
+{
+  "admin": {
+    "skills": {
+      "enabled": true,
+      "disabled": ["dangerous-skill"]
+    }
+  }
+}
+```
+
+When a skill is disabled by an administrator:
+
+- It will not appear in the `/skills list` output.
+- Users will receive an error if they attempt to manually enable it.
+- The model will not be able to discover or activate it.
+
+If `admin.skills.enabled` is set to `false`, the entire Agent Skills ecosystem
+is deactivated for all users, regardless of their individual settings.
+
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via

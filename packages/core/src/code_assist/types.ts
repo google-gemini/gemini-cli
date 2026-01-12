@@ -303,8 +303,14 @@ export interface McpConfig {
 
 export interface CliFeatureSetting {
   extensionsSetting?: ExtensionsSetting;
+  skillsSetting?: SkillsSetting;
 }
 
 export interface ExtensionsSetting {
   extensionsEnabled?: boolean;
+}
+
+export interface SkillsSetting {
+  skillsEnabled?: boolean;
+  disabledSkills?: string[];
 }

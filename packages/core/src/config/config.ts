@@ -377,13 +377,19 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
+  adminSkillsEnabled?: boolean;
+  adminDisabledSkills?: string[];
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
-  onReload?: () => Promise<{ disabledSkills?: string[] }>;
+  onReload?: () => Promise<{
+    disabledSkills?: string[];
+    adminSkillsEnabled?: boolean;
+    adminDisabledSkills?: string[];
+  }>;
 }
 
 export class Config {
@@ -511,13 +517,19 @@ export class Config {
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
-    | (() => Promise<{ disabledSkills?: string[] }>)
+    | (() => Promise<{
+        disabledSkills?: string[];
+        adminSkillsEnabled?: boolean;
+        adminDisabledSkills?: string[];
+      }>)
     | undefined;
 
   private readonly enableAgents: boolean;
   private readonly agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
+  private readonly adminSkillsEnabled: boolean;
+  private readonly adminDisabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -594,6 +606,8 @@ export class Config {
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
+    this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
+    this.adminDisabledSkills = params.adminDisabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
@@ -779,6 +793,10 @@ export class Config {
 
     // Discover skills if enabled
     if (this.skillsSupport) {
+      this.getSkillManager().setAdminSettings(
+        this.adminSkillsEnabled,
+        this.adminDisabledSkills,
+      );
       await this.getSkillManager().discoverSkills(
         this.storage,
         this.getExtensions(),
@@ -1593,6 +1611,10 @@ export class Config {
     if (this.onReload) {
       const refreshed = await this.onReload();
       this.disabledSkills = refreshed.disabledSkills ?? [];
+      this.getSkillManager().setAdminSettings(
+        refreshed.adminSkillsEnabled ?? this.adminSkillsEnabled,
+        refreshed.adminDisabledSkills ?? this.adminDisabledSkills,
+      );
     }
 
     await this.getSkillManager().discoverSkills(
