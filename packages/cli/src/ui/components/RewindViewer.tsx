@@ -19,15 +19,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-=======
->>>>>>> 51fa436b2 (address feedback from first round of review)
-=======
-import { MaxSizedBox } from './shared/MaxSizedBox.js';
->>>>>>> d501c94a8 (address feedback from second round of review)
 
 interface RewindViewerProps {
   conversation: ConversationRecord;

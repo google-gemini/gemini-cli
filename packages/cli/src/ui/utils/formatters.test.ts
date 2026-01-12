@@ -156,14 +156,11 @@ describe('formatters', () => {
         'A--- Content from referenced files ---B--- End of content ---C';
       expect(stripReferenceContent(text)).toBe('AC');
     });
-<<<<<<< HEAD
 
     it('should strip multiple blocks correctly and preserve text in between', () => {
       const text =
         'Start\n--- Content from referenced files ---\nBlock1\n--- End of content ---\nMiddle\n--- Content from referenced files ---\nBlock2\n--- End of content ---\nEnd';
       expect(stripReferenceContent(text)).toBe('Start\nMiddle\nEnd');
     });
-=======
->>>>>>> 51fa436b2 (address feedback from first round of review)
   });
 });
