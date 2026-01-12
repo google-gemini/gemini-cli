@@ -25,7 +25,6 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
-  private static readonly BRACKETED_PASTE_QUERY = '\x1b[?2004$p';
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -43,20 +42,14 @@ export class TerminalCapabilityManager {
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
-  // DECRQM response for bracketed paste: CSI ? 2004 ; Ps $ y
-  // Ps = 1 (set), 2 (reset), 3 (permanently set), 4 (permanently reset)
-  // eslint-disable-next-line no-control-regex
-  private static readonly BRACKETED_PASTE_REGEX = /\x1b\[\?2004;([1-4])\$y/;
 
+  private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
-  private detectionComplete = false;
   private terminalName: string | undefined;
-  private modifyOtherKeysSupported = false;
-  private modifyOtherKeysEnabled = false;
-  private bracketedPasteSupported = false;
-  private bracketedPasteEnabled = false;
+  private modifyOtherKeysSupported?: boolean;
+  private deviceAttributesSupported = false;
 
   private constructor() {}
 
@@ -107,7 +100,6 @@ export class TerminalCapabilityManager {
       let deviceAttributesReceived = false;
       let bgReceived = false;
       let modifyOtherKeysReceived = false;
-      let bracketedPasteReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -172,17 +164,6 @@ export class TerminalCapabilityManager {
           }
         }
 
-        // check for bracketed paste support
-        if (!bracketedPasteReceived) {
-          const match = buffer.match(
-            TerminalCapabilityManager.BRACKETED_PASTE_REGEX,
-          );
-          if (match) {
-            bracketedPasteReceived = true;
-            this.bracketedPasteSupported = true;
-          }
-        }
-
         // Check for Terminal Name/Version response.
         if (!terminalNameReceived) {
           const match = buffer.match(
@@ -205,6 +186,7 @@ export class TerminalCapabilityManager {
           );
           if (match) {
             deviceAttributesReceived = true;
+            this.deviceAttributesSupported = true;
             cleanup();
           }
         }
@@ -219,7 +201,6 @@ export class TerminalCapabilityManager {
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
-            TerminalCapabilityManager.BRACKETED_PASTE_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
         );
       } catch (e) {
@@ -234,14 +215,17 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (this.modifyOtherKeysSupported) {
+      } else if (
+        this.modifyOtherKeysSupported === true ||
+        // If device attributes were received it's safe to try enabling
+        // anyways, since it will be ignored if unsupported
+        (this.modifyOtherKeysSupported === undefined &&
+          this.deviceAttributesSupported)
+      ) {
         enableModifyOtherKeys();
-        this.modifyOtherKeysEnabled = true;
       }
-      if (this.bracketedPasteSupported) {
-        enableBracketedPasteMode();
-        this.bracketedPasteEnabled = true;
-      }
+      // Always enable bracketed paste since it'll be ignored if unsupported.
+      enableBracketedPasteMode();
     } catch (e) {
       debugLogger.warn('Failed to enable keyboard protocols:', e);
     }
@@ -257,18 +241,6 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
-  }
-
-  isBracketedPasteSupported(): boolean {
-    return this.bracketedPasteSupported;
-  }
-
-  isBracketedPasteEnabled(): boolean {
-    return this.bracketedPasteEnabled;
-  }
-
-  isModifyOtherKeysEnabled(): boolean {
-    return this.modifyOtherKeysEnabled;
   }
 
   private parseColor(rHex: string, gHex: string, bHex: string): string {

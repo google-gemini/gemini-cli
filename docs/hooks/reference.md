@@ -94,15 +94,15 @@ If the hook exits with `0`, the CLI attempts to parse `stdout` as JSON.
 
 ### Common Output Fields
 
-| Field                | Type      | Description                                                              |
-| :------------------- | :-------- | :----------------------------------------------------------------------- |
-| `decision`           | `string`  | One of: `allow`, `deny`, `block`, `ask`, `approve`.                      |
-| `reason`             | `string`  | Explanation shown to the **agent** when a decision is `deny` or `block`. |
-| `systemMessage`      | `string`  | Message displayed to the **user** in the CLI terminal.                   |
-| `continue`           | `boolean` | If `false`, immediately terminates the agent loop for this turn.         |
-| `stopReason`         | `string`  | Message shown to the user when `continue` is `false`.                    |
-| `suppressOutput`     | `boolean` | If `true`, the hook execution is hidden from the CLI transcript.         |
-| `hookSpecificOutput` | `object`  | Container for event-specific data (see below).                           |
+| Field                | Type      | Description                                                                            |
+| :------------------- | :-------- | :------------------------------------------------------------------------------------- |
+| `decision`           | `string`  | One of: `allow`, `deny`, `block`, `ask`, `approve`.                                    |
+| `reason`             | `string`  | Explanation shown to the **agent** when a decision is `deny` or `block`.               |
+| `systemMessage`      | `string`  | Message displayed in Gemini CLI terminal to provide warning or context to the **user** |
+| `continue`           | `boolean` | If `false`, immediately terminates the agent loop for this turn.                       |
+| `stopReason`         | `string`  | Message shown to the user when `continue` is `false`.                                  |
+| `suppressOutput`     | `boolean` | If `true`, the hook execution is hidden from the CLI transcript.                       |
+| `hookSpecificOutput` | `object`  | Container for event-specific data (see below).                                         |
 
 ### `hookSpecificOutput` Reference
 
