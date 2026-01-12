@@ -63,8 +63,6 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
       if (Object.prototype.hasOwnProperty.call(commandMap, command)) {
         return commandMap[command];
       }
-      // Fallback for simple commands not in map, or throw if strictness preferred
-      // For now, assume it's atomic if not in map, but logically we should ensure map coverage
       const known = commandMap[command];
       if (known) return known;
       // Default fallback for unmatched simple cases in development, but explicit map is better
@@ -189,8 +187,6 @@ describe('Shell Safety Policy', () => {
     // `splitCommands` recursively finds nested commands (e.g., `rm` inside `echo $()`).
     // The policy engine requires ALL extracted commands to be allowed.
     // Since `rm` does not match the allowed prefix, this should result in ASK_USER.
-
-    // Let's try with a rule that allows `echo`
     const echoPolicy = createPolicyEngineWithPrefix('echo');
     const result = await echoPolicy.check(toolCall, undefined);
     expect(result.decision).toBe(PolicyDecision.ASK_USER);
