@@ -506,6 +506,16 @@ export class ShellTool extends BaseDeclarativeTool<
           arg.startsWith('~');
 
         if (isPathLike) {
+          // If any component of the path is too long (typically > 255 bytes),
+          // it's likely not a valid path (or at least fs.realpathSync will throw ENAMETOOLONG).
+          // In this case, we can skip the check as the system call would likely fail anyway,
+          // and it's probably just a long text argument (like a git commit message).
+          // We use a safe upper bound of 255 characters per component.
+          const components = arg.split(/[/\\]/);
+          if (components.some((c) => c.length > 255)) {
+            continue;
+          }
+
           // Handle ~ expansion for validation
           let argPath = arg;
           if (argPath.startsWith('~')) {

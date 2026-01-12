@@ -217,6 +217,14 @@ describe('ShellTool', () => {
         expect(invocation).toBeDefined();
     });
 
+    it('should allow printf with long text containing slashes and newlines', () => {
+      // Create a string with a component > 255 chars to trigger the skip logic
+      const longComponent = 'a'.repeat(256);
+      const longText = `## Summary\\n\\nThis PR enhances... ${longComponent}/foo ...`;
+      const invocation = shellTool.build({ command: `printf "${longText}"` });
+      expect(invocation).toBeDefined();
+    });
+
     it('should allow non-path arguments', () => {
         const invocation = shellTool.build({ command: 'echo "hello world"' });
         expect(invocation).toBeDefined();
