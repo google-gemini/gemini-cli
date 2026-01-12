@@ -353,8 +353,6 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
-    const cpus = os.cpus();
-
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -372,22 +370,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
         value: process.platform,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
-        value: cpus[0].model,
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
-        value: cpus.length.toString(),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
-        value: (os.totalmem() / 1024 ** 3).toFixed(2).toString(),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
-        value: await getGpuInfo(),
       },
     ];
 
@@ -616,6 +598,29 @@ export class ClearcutLogger {
         value: event.extension_ids.toString(),
       },
     ];
+
+    // Add hardware information only to the start session event
+    const cpus = os.cpus();
+    data.push(
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        value: cpus[0].model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        value: cpus.length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+        value: (os.totalmem() / 1024 ** 3).toFixed(2).toString(),
+      },
+    );
+
+    const gpuInfo = await getGpuInfo();
+    data.push({
+      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+      value: gpuInfo,
+    });
     this.sessionData = data;
 
     // Flush after experiments finish loading from CCPA server
@@ -1618,4 +1623,7 @@ export const TEST_ONLY = {
   MAX_RETRY_EVENTS,
   MAX_EVENTS,
   refreshGpuInfo,
+  resetCachedGpuInfoForTesting: () => {
+    cachedGpuInfo = undefined;
+  },
 };
