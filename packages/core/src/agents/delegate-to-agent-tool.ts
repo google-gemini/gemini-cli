@@ -172,7 +172,8 @@ class DelegateInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition || definition.kind !== 'remote') {
-      return super.shouldConfirmExecute(abortSignal);
+      // Local agents should execute silently
+      return false;
     }
 
     const { agent_name: _agent_name, ...agentArgs } = this.params;
