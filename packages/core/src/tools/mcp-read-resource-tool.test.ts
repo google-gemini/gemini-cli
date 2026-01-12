@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReadResourceTool } from './mcp-read-resource-tool.js';
 import type { Config } from '../config/config.js';
 import type { DiscoveredMCPResource } from '../resources/resource-registry.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('ReadResourceTool', () => {
   let mockConfig: Partial<Config>;
@@ -38,7 +39,8 @@ describe('ReadResourceTool', () => {
     vi.restoreAllMocks();
   });
 
-  const buildTool = () => new ReadResourceTool(mockConfig as Config);
+  const buildTool = () =>
+    new ReadResourceTool(mockConfig as Config, createMockMessageBus());
 
   it('returns error when URI is unknown', async () => {
     const tool = buildTool();

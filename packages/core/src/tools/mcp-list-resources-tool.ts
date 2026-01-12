@@ -25,7 +25,7 @@ class ListResourcesToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ListResourcesToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     toolDisplayName?: string,
   ) {
@@ -101,7 +101,7 @@ export class ListResourcesTool extends BaseDeclarativeTool<
   // More details here: https://github.com/google-gemini/gemini-cli/pull/14854#pullrequestreview-3567996525
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       ListResourcesTool.Name,
@@ -118,22 +118,24 @@ export class ListResourcesTool extends BaseDeclarativeTool<
         },
         additionalProperties: false,
       },
-      false,
-      false,
       messageBus,
+      false,
+      false,
     );
   }
 
   protected override createInvocation(
     params: ListResourcesToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): BaseToolInvocation<ListResourcesToolParams, ToolResult> {
     return new ListResourcesToolInvocation(
       this.config,
       params,
       messageBus,
-      this.name,
-      this.displayName,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }

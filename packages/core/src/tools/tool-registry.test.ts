@@ -350,8 +350,8 @@ describe('ToolRegistry', () => {
       const resourceRegistry = new ResourceRegistry();
       vi.spyOn(config, 'getResourceRegistry').mockReturnValue(resourceRegistry);
 
-      const listResourcesTool = new ListResourcesTool(config);
-      const readResourceTool = new ReadResourceTool(config);
+      const listResourcesTool = new ListResourcesTool(config, mockMessageBus);
+      const readResourceTool = new ReadResourceTool(config, mockMessageBus);
       toolRegistry.registerTool(listResourcesTool);
       toolRegistry.registerTool(readResourceTool);
 

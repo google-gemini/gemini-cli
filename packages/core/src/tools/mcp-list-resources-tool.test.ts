@@ -12,6 +12,7 @@ import {
 import type { Config } from '../config/config.js';
 import type { DiscoveredMCPResource } from '../resources/resource-registry.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('ListResourcesTool', () => {
   let mockConfig: Partial<Config>;
@@ -24,7 +25,7 @@ describe('ListResourcesTool', () => {
         getAllResources: vi.fn().mockReturnValue([]),
       }),
     } as unknown as Partial<Config>;
-    tool = new ListResourcesTool(mockConfig as Config);
+    tool = new ListResourcesTool(mockConfig as Config, createMockMessageBus());
   });
 
   afterEach(() => {
@@ -53,7 +54,7 @@ describe('ListResourcesTool', () => {
     mockConfig.getResourceRegistry = vi.fn().mockReturnValue({
       getAllResources: vi.fn().mockReturnValue(resources),
     });
-    tool = new ListResourcesTool(mockConfig as Config);
+    tool = new ListResourcesTool(mockConfig as Config, createMockMessageBus());
     invocation = tool.build({});
     const result = await invocation.execute(new AbortController().signal);
     expect(result.llmContent).toContain('server-a:file:///project/src/main.rs');
@@ -78,7 +79,7 @@ describe('ListResourcesTool', () => {
     mockConfig.getResourceRegistry = vi.fn().mockReturnValue({
       getAllResources: vi.fn().mockReturnValue(resources),
     });
-    tool = new ListResourcesTool(mockConfig as Config);
+    tool = new ListResourcesTool(mockConfig as Config, createMockMessageBus());
     invocation = tool.build({ server_name: 'server-b' });
     const result = await invocation.execute(new AbortController().signal);
     expect(result.llmContent).toContain('server-b:file:///resource/b');
