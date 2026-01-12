@@ -14,9 +14,15 @@ on:
         description: 'issue number to triage'
         required: true
         type: 'number'
+  workflow_call:
+    inputs:
+      issue_number:
+        description: 'issue number to triage'
+        required: false
+        type: 'string'
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number }}'
+  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || inputs.issue_number }}'
   cancel-in-progress: true
 
 defaults:
@@ -34,7 +40,7 @@ permissions:
 jobs:
   triage-issue:
     if: |-
-      github.repository == 'google-gemini/gemini-cli' &&
+      (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') &&
       (
         github.event_name == 'workflow_dispatch' ||
         (
@@ -57,10 +63,11 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
+            const issueNumber = ${{ github.event.inputs.issue_number || inputs.issue_number }};
             const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: ${{ github.event.inputs.issue_number }},
+              issue_number: issueNumber,
             });
             core.setOutput('title', issue.title);
             core.setOutput('body', issue.body);
@@ -71,7 +78,7 @@ jobs:
         if: |-
           github.event_name == 'workflow_dispatch'
         env:
-          ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number }}'
+          ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number || inputs.issue_number }}'
           LABELS: '${{ steps.get_issue_data.outputs.labels }}'
         run: |
           if echo "${LABELS}" | grep -q 'area/'; then
@@ -86,6 +93,9 @@ jobs:
 
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
+        env:
+          APP_ID: '${{ secrets.APP_ID }}'
+        if: "${{ env.APP_ID != '' }}"
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -96,7 +106,7 @@ jobs:
         id: 'get_labels'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
             const { data: labels } = await github.rest.issues.listLabelsForRepo({
               owner: context.repo.owner,
@@ -127,7 +137,7 @@ jobs:
           ISSUE_BODY: >-
             ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}
           ISSUE_NUMBER: >-
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.issue_number || github.event.issue.number }}
+            ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.issue_number || inputs.issue_number) || github.event.issue.number }}
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
@@ -253,7 +263,7 @@ jobs:
           LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |
             const rawOutput = process.env.LABELS_OUTPUT;
             core.info(`Raw output from model: ${rawOutput}`);
@@ -319,7 +329,7 @@ jobs:
           RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
             github.rest.issues.createComment({
               owner: context.repo.owner,

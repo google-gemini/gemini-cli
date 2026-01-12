@@ -19,12 +19,7 @@ import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
-import type { ModifyContext } from '../tools/modifiable-tool.js';
-import {
-  isModifiableDeclarativeTool,
-  modifyWithEditor,
-} from '../tools/modifiable-tool.js';
-import * as Diff from 'diff';
+import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -124,6 +119,7 @@ export class CoreToolScheduler {
   private toolCallQueue: ToolCall[] = [];
   private completedToolCallsForBatch: CompletedToolCall[] = [];
   private toolExecutor: ToolExecutor;
+  private toolModifier: ToolModificationHandler;
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -132,6 +128,7 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
     this.toolExecutor = new ToolExecutor(this.config);
+    this.toolModifier = new ToolModificationHandler();
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
@@ -279,6 +276,7 @@ export class CoreToolScheduler {
                 originalContent:
                   waitingCall.confirmationDetails.originalContent,
                 newContent: waitingCall.confirmationDetails.newContent,
+                filePath: waitingCall.confirmationDetails.filePath,
               };
             }
           }
@@ -748,103 +746,59 @@ export class CoreToolScheduler {
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
-      if (isModifiableDeclarativeTool(waitingToolCall.tool)) {
-        const modifyContext = waitingToolCall.tool.getModifyContext(signal);
-        const editorType = this.getPreferredEditor();
-        if (!editorType) {
-          return;
-        }
 
+      const editorType = this.getPreferredEditor();
+      if (!editorType) {
+        return;
+      }
+
+      this.setStatusInternal(callId, 'awaiting_approval', signal, {
+        ...waitingToolCall.confirmationDetails,
+        isModifying: true,
+      } as ToolCallConfirmationDetails);
+
+      const result = await this.toolModifier.handleModifyWithEditor(
+        waitingToolCall,
+        editorType,
+        signal,
+      );
+
+      // Restore status (isModifying: false) and update diff if result exists
+      if (result) {
+        this.setArgsInternal(callId, result.updatedParams);
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
-          isModifying: true,
+          fileDiff: result.updatedDiff,
+          isModifying: false,
         } as ToolCallConfirmationDetails);
-
-        const contentOverrides =
-          waitingToolCall.confirmationDetails.type === 'edit'
-            ? {
-                currentContent:
-                  waitingToolCall.confirmationDetails.originalContent,
-                proposedContent: waitingToolCall.confirmationDetails.newContent,
-              }
-            : undefined;
-
-        const { updatedParams, updatedDiff } = await modifyWithEditor<
-          typeof waitingToolCall.request.args
-        >(
-          waitingToolCall.request.args,
-          modifyContext as ModifyContext<typeof waitingToolCall.request.args>,
-          editorType,
-          signal,
-          contentOverrides,
-        );
-        this.setArgsInternal(callId, updatedParams);
+      } else {
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
-          fileDiff: updatedDiff,
           isModifying: false,
         } as ToolCallConfirmationDetails);
       }
     } else {
-      // If the client provided new content, apply it before scheduling.
+      // If the client provided new content, apply it and wait for
+      // re-confirmation.
       if (payload?.newContent && toolCall) {
-        await this._applyInlineModify(
+        const result = await this.toolModifier.applyInlineModify(
           toolCall as WaitingToolCall,
           payload,
           signal,
         );
+        if (result) {
+          this.setArgsInternal(callId, result.updatedParams);
+          this.setStatusInternal(callId, 'awaiting_approval', signal, {
+            ...(toolCall as WaitingToolCall).confirmationDetails,
+            fileDiff: result.updatedDiff,
+          } as ToolCallConfirmationDetails);
+          // After an inline modification, wait for another user confirmation.
+          return;
+        }
       }
       this.setStatusInternal(callId, 'scheduled', signal);
     }
     await this.attemptExecutionOfScheduledCalls(signal);
-  }
-
-  /**
-   * Applies user-provided content changes to a tool call that is awaiting confirmation.
-   * This method updates the tool's arguments and refreshes the confirmation prompt with a new diff
-   * before the tool is scheduled for execution.
-   * @private
-   */
-  private async _applyInlineModify(
-    toolCall: WaitingToolCall,
-    payload: ToolConfirmationPayload,
-    signal: AbortSignal,
-  ): Promise<void> {
-    if (
-      toolCall.confirmationDetails.type !== 'edit' ||
-      !isModifiableDeclarativeTool(toolCall.tool)
-    ) {
-      return;
-    }
-
-    const modifyContext = toolCall.tool.getModifyContext(signal);
-    const currentContent = await modifyContext.getCurrentContent(
-      toolCall.request.args,
-    );
-
-    const updatedParams = modifyContext.createUpdatedParams(
-      currentContent,
-      payload.newContent,
-      toolCall.request.args,
-    );
-    const updatedDiff = Diff.createPatch(
-      modifyContext.getFilePath(toolCall.request.args),
-      currentContent,
-      payload.newContent,
-      'Current',
-      'Proposed',
-    );
-
-    this.setArgsInternal(toolCall.request.callId, updatedParams);
-    this.setStatusInternal(
-      toolCall.request.callId,
-      'awaiting_approval',
-      signal,
-      {
-        ...toolCall.confirmationDetails,
-        fileDiff: updatedDiff,
-      },
-    );
   }
 
   private async attemptExecutionOfScheduledCalls(

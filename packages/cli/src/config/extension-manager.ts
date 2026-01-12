@@ -59,9 +59,12 @@ import {
 } from './extensions/variables.js';
 import {
   getEnvContents,
+  getEnvFilePath,
   maybePromptForSettings,
   getMissingSettings,
   type ExtensionSetting,
+  getScopedEnvContents,
+  ExtensionSettingScope,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { getEnableHooks } from './settingsSchema.js';
@@ -277,6 +280,7 @@ Would you like to attempt to install via "git clone" instead?`,
           previousSettings = await getEnvContents(
             previousExtensionConfig,
             extensionId,
+            this.workspaceDir,
           );
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
@@ -303,13 +307,14 @@ Would you like to attempt to install via "git clone" instead?`,
         const missingSettings = await getMissingSettings(
           newExtensionConfig,
           extensionId,
+          this.workspaceDir,
         );
         if (missingSettings.length > 0) {
           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
             .map((s) => s.name)
             .join(
               ', ',
-            )}. Please run "gemini extensions settings ${newExtensionConfig.name} <setting-name>" to configure them.`;
+            )}. Please run "gemini extensions config ${newExtensionConfig.name} [setting-name]" to configure them.`;
           debugLogger.warn(message);
           coreEvents.emitFeedback('warning', message);
         }
@@ -465,6 +470,12 @@ Would you like to attempt to install via "git clone" instead?`,
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
+
+    if (this.settings.admin?.extensions?.enabled === false) {
+      this.loadedExtensions = [];
+      return this.loadedExtensions;
+    }
+
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
     if (!fs.existsSync(extensionsDir)) {
@@ -512,16 +523,51 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
-      const customEnv = await getEnvContents(
+      const extensionId = getExtensionId(config, installMetadata);
+
+      const userSettings = await getScopedEnvContents(
         config,
-        getExtensionId(config, installMetadata),
+        extensionId,
+        ExtensionSettingScope.USER,
       );
+      const workspaceSettings = await getScopedEnvContents(
+        config,
+        extensionId,
+        ExtensionSettingScope.WORKSPACE,
+        this.workspaceDir,
+      );
+
+      const customEnv = { ...userSettings, ...workspaceSettings };
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
       if (config.settings) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
+          let scope: 'user' | 'workspace' | undefined;
+          let source: string | undefined;
+
+          // Note: strict check for undefined, as empty string is a valid value
+          if (workspaceSettings[setting.envVar] !== undefined) {
+            scope = 'workspace';
+            if (setting.sensitive) {
+              source = 'Keychain';
+            } else {
+              source = getEnvFilePath(
+                config.name,
+                ExtensionSettingScope.WORKSPACE,
+                this.workspaceDir,
+              );
+            }
+          } else if (userSettings[setting.envVar] !== undefined) {
+            scope = 'user';
+            if (setting.sensitive) {
+              source = 'Keychain';
+            } else {
+              source = getEnvFilePath(config.name, ExtensionSettingScope.USER);
+            }
+          }
+
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
@@ -532,17 +578,23 @@ Would you like to attempt to install via "git clone" instead?`,
                   ? '***'
                   : value,
             sensitive: setting.sensitive ?? false,
+            scope,
+            source,
           });
         }
       }
 
       if (config.mcpServers) {
-        config.mcpServers = Object.fromEntries(
-          Object.entries(config.mcpServers).map(([key, value]) => [
-            key,
-            filterMcpConfig(value),
-          ]),
-        );
+        if (this.settings.admin?.mcp?.enabled === false) {
+          config.mcpServers = undefined;
+        } else {
+          config.mcpServers = Object.fromEntries(
+            Object.entries(config.mcpServers).map(([key, value]) => [
+              key,
+              filterMcpConfig(value),
+            ]),
+          );
+        }
       }
 
       const contextFiles = getContextFileNames(config)
@@ -744,7 +796,15 @@ Would you like to attempt to install via "git clone" instead?`,
     if (resolvedSettings && resolvedSettings.length > 0) {
       output += `\n Settings:`;
       resolvedSettings.forEach((setting) => {
-        output += `\n  ${setting.name}: ${setting.value}`;
+        let scope = '';
+        if (setting.scope) {
+          scope = setting.scope === 'workspace' ? '(Workspace' : '(User';
+          if (setting.source) {
+            scope += ` - ${setting.source}`;
+          }
+          scope += ')';
+        }
+        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
       });
     }
     return output;
