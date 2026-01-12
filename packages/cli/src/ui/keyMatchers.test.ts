@@ -119,6 +119,8 @@ describe('keyMatchers', () => {
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
+        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
+        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
         createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],

@@ -26,17 +26,17 @@ available combinations.
 
 #### Editing
 
-| Action                                           | Keys                                                      |
-| ------------------------------------------------ | --------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
-| Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
-| Clear all text in the input field.               | `Ctrl + C`                                                |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
-| Delete the character to the left.                | `Backspace`<br />`""`<br />`Ctrl + H`                    |
-| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
-| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
+| Action                                           | Keys                                                                                         |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                                                   |
+| Delete from the cursor to the start of the line. | `Ctrl + U`                                                                                   |
+| Clear all text in the input field.               | `Ctrl + C`                                                                                   |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + ""`<br />`Cmd + ""`<br />`Ctrl + W` |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                                                          |
+| Delete the character to the left.                | `Backspace`<br />`""`<br />`Ctrl + H`                                                       |
+| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                                                     |
+| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                                                        |
+| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                                                           |
 
 #### Screen Control
 
