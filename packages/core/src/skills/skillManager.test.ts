@@ -71,6 +71,8 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage, [mockExtension]);
 
     const skills = service.getSkills();
@@ -126,6 +128,8 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage, [mockExtension]);
 
     const skills = service.getSkills();
@@ -156,6 +160,8 @@ description: desc1
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage);
     service.setDisabledSkills(['skill1']);
 
