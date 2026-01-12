@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 describe('CliHelpAgent', () => {
   const fakeConfig = {
     getMessageBus: () => ({}),
+    isAgentsEnabled: () => false,
   } as unknown as Config;
   const localAgent = CliHelpAgent(fakeConfig) as LocalAgentDefinition;
 
@@ -50,6 +51,22 @@ describe('CliHelpAgent', () => {
 
     const query = localAgent.promptConfig.query || '';
     expect(query).toContain('${question}');
+  });
+
+  it('should include sub-agent information when agents are enabled', () => {
+    const enabledConfig = {
+      getMessageBus: () => ({}),
+      isAgentsEnabled: () => true,
+      getAgentRegistry: () => ({
+        getDirectoryContext: () => 'Mock Agent Directory',
+      }),
+    } as unknown as Config;
+    const agent = CliHelpAgent(enabledConfig) as LocalAgentDefinition;
+    const systemPrompt = agent.promptConfig.systemPrompt || '';
+
+    expect(systemPrompt).toContain('### Sub-Agents (Local & Remote)');
+    expect(systemPrompt).toContain('Remote Agent (A2A)');
+    expect(systemPrompt).toContain('Agent2Agent functionality');
   });
 
   it('should process output to a formatted JSON string', () => {
