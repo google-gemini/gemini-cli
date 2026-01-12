@@ -134,7 +134,7 @@ export const INFORMATIVE_TIPS = [
   'List your saved chat checkpoints with /chat list...',
   'Save your current conversation with /chat save <tag>...',
   'Browse and resume previous sessions interactively with /resume...',
-  'Search or delete sessions directly within the /resume interactive browser...',
+  'Search or delete sessions directly within the /resume session browser...',
   'Delete a conversation checkpoint with /chat delete <tag>...',
   'Share your conversation to a file with /chat share <file>...',
   'Clear the screen and history with /clear...',
