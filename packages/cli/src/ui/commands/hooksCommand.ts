@@ -30,24 +30,7 @@ async function panelAction(
   }
 
   const hookSystem = config.getHookSystem();
-  if (!hookSystem) {
-    return {
-      type: 'message',
-      messageType: 'info',
-      content:
-        'Hook system is not enabled. Enable it in settings with hooks.enabled.',
-    };
-  }
-
-  const allHooks = hookSystem.getAllHooks();
-  if (allHooks.length === 0) {
-    return {
-      type: 'message',
-      messageType: 'info',
-      content:
-        'No hooks configured. Add hooks to your settings to get started.',
-    };
-  }
+  const allHooks = hookSystem?.getAllHooks() || [];
 
   const hooksListItem: HistoryItemHooksList = {
     type: MessageType.HOOKS_LIST,
@@ -102,7 +85,10 @@ async function enableAction(
 
   // Update settings (setValue automatically saves)
   try {
-    settings.setValue(SettingScope.User, 'hooks.disabled', newDisabledHooks);
+    const scope = settings.workspace
+      ? SettingScope.Workspace
+      : SettingScope.User;
+    settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
 
     // Enable in hook system
     hookSystem.setHookEnabled(hookName, true);
@@ -165,7 +151,10 @@ async function disableAction(
 
     // Update settings (setValue automatically saves)
     try {
-      settings.setValue(SettingScope.User, 'hooks.disabled', newDisabledHooks);
+      const scope = settings.workspace
+        ? SettingScope.Workspace
+        : SettingScope.User;
+      settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
 
       // Disable in hook system
       hookSystem.setHookEnabled(hookName, false);
@@ -216,6 +205,145 @@ function getHookDisplayName(hook: HookRegistryEntry): string {
   return hook.config.name || hook.config.command || 'unknown-hook';
 }
 
+/**
+ * Enable all hooks by clearing the disabled list
+ */
+async function enableAllAction(
+  context: CommandContext,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const hookSystem = config.getHookSystem();
+  if (!hookSystem) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Hook system is not enabled.',
+    };
+  }
+
+  const settings = context.services.settings;
+  const allHooks = hookSystem.getAllHooks();
+
+  if (allHooks.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'No hooks configured.',
+    };
+  }
+
+  const disabledHooks = allHooks.filter((hook) => !hook.enabled);
+  if (disabledHooks.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'All hooks are already enabled.',
+    };
+  }
+
+  try {
+    const scope = settings.workspace
+      ? SettingScope.Workspace
+      : SettingScope.User;
+    settings.setValue(scope, 'hooks.disabled', []);
+
+    for (const hook of disabledHooks) {
+      const hookName = getHookDisplayName(hook);
+      hookSystem.setHookEnabled(hookName, true);
+    }
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Enabled ${disabledHooks.length} hook(s) successfully.`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to enable hooks: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
+/**
+ * Disable all hooks by adding all hooks to the disabled list
+ */
+async function disableAllAction(
+  context: CommandContext,
+): Promise<void | MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const hookSystem = config.getHookSystem();
+  if (!hookSystem) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Hook system is not enabled.',
+    };
+  }
+
+  const settings = context.services.settings;
+  const allHooks = hookSystem.getAllHooks();
+
+  if (allHooks.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'No hooks configured.',
+    };
+  }
+
+  const enabledHooks = allHooks.filter((hook) => hook.enabled);
+  if (enabledHooks.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'All hooks are already disabled.',
+    };
+  }
+
+  try {
+    const allHookNames = allHooks.map((hook) => getHookDisplayName(hook));
+    const scope = settings.workspace
+      ? SettingScope.Workspace
+      : SettingScope.User;
+    settings.setValue(scope, 'hooks.disabled', allHookNames);
+
+    for (const hook of enabledHooks) {
+      const hookName = getHookDisplayName(hook);
+      hookSystem.setHookEnabled(hookName, false);
+    }
+
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Disabled ${enabledHooks.length} hook(s) successfully.`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to disable hooks: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
 const panelCommand: SlashCommand = {
   name: 'panel',
   altNames: ['list', 'show'],
@@ -242,10 +370,34 @@ const disableCommand: SlashCommand = {
   completion: completeHookNames,
 };
 
+const enableAllCommand: SlashCommand = {
+  name: 'enable-all',
+  altNames: ['enableall'],
+  description: 'Enable all disabled hooks',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: enableAllAction,
+};
+
+const disableAllCommand: SlashCommand = {
+  name: 'disable-all',
+  altNames: ['disableall'],
+  description: 'Disable all enabled hooks',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: disableAllAction,
+};
+
 export const hooksCommand: SlashCommand = {
   name: 'hooks',
   description: 'Manage hooks',
   kind: CommandKind.BUILT_IN,
-  subCommands: [panelCommand, enableCommand, disableCommand],
+  subCommands: [
+    panelCommand,
+    enableCommand,
+    disableCommand,
+    enableAllCommand,
+    disableAllCommand,
+  ],
   action: async (context: CommandContext) => panelCommand.action!(context, ''),
 };

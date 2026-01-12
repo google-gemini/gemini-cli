@@ -12,6 +12,7 @@ import type {
   FunctionCallingConfig,
 } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { getResponseText } from '../utils/partUtils.js';
 
 /**
  * Decoupled LLM request format - stable across Gemini CLI versions
@@ -267,7 +268,7 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
    */
   toHookLLMResponse(sdkResponse: GenerateContentResponse): LLMResponse {
     return {
-      text: sdkResponse.text,
+      text: getResponseText(sdkResponse) ?? undefined,
       candidates: (sdkResponse.candidates || []).map((candidate) => {
         // Extract text parts from the candidate
         const textParts =
