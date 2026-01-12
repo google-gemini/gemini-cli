@@ -31,6 +31,7 @@ interface AuthDialogProps {
   setAuthState: (state: AuthState) => void;
   authError: string | null;
   onAuthError: (error: string | null) => void;
+  setAuthContext: (context: { requiresRestart?: boolean }) => void;
 }
 
 export function AuthDialog({
@@ -39,6 +40,7 @@ export function AuthDialog({
   setAuthState,
   authError,
   onAuthError,
+  setAuthContext,
 }: AuthDialogProps): React.JSX.Element {
   const [exiting, setExiting] = useState(false);
   let items = [
@@ -116,6 +118,11 @@ export function AuthDialog({
         return;
       }
       if (authType) {
+        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+          setAuthContext({ requiresRestart: true });
+        } else {
+          setAuthContext({});
+        }
         await clearCachedCredentialFile();
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
@@ -143,7 +150,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting],
+    [settings, config, setAuthState, exiting, setAuthContext],
   );
 
   const handleAuthSelect = (authMethod: AuthType) => {

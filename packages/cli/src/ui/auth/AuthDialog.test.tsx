@@ -72,6 +72,7 @@ describe('AuthDialog', () => {
     setAuthState: (state: AuthState) => void;
     authError: string | null;
     onAuthError: (error: string | null) => void;
+    setAuthContext: (context: { requiresRestart?: boolean }) => void;
   };
   const originalEnv = { ...process.env };
 
@@ -94,6 +95,7 @@ describe('AuthDialog', () => {
       setAuthState: vi.fn(),
       authError: null,
       onAuthError: vi.fn(),
+      setAuthContext: vi.fn(),
     };
   });
 
@@ -215,6 +217,28 @@ describe('AuthDialog', () => {
       );
       expect(props.onAuthError).toHaveBeenCalledWith('Invalid method');
       expect(props.settings.setValue).not.toHaveBeenCalled();
+    });
+
+    it('sets auth context with requiresRestart: true for LOGIN_WITH_GOOGLE', async () => {
+      mockedValidateAuthMethod.mockReturnValue(null);
+      renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(props.setAuthContext).toHaveBeenCalledWith({
+        requiresRestart: true,
+      });
+    });
+
+    it('sets auth context with empty object for other auth types', async () => {
+      mockedValidateAuthMethod.mockReturnValue(null);
+      renderWithProviders(<AuthDialog {...props} />);
+      const { onSelect: handleAuthSelect } =
+        mockedRadioButtonSelect.mock.calls[0][0];
+      await handleAuthSelect(AuthType.USE_GEMINI);
+
+      expect(props.setAuthContext).toHaveBeenCalledWith({});
     });
 
     it('skips API key dialog on initial setup if env var is present', async () => {
