@@ -463,9 +463,6 @@ Would you like to attempt to install via "git clone" instead?`,
     );
   }
 
-  /**
-   * Loads all installed extensions, should only be called once.
-   */
   async loadExtensions(): Promise<GeminiCLIExtension[]> {
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
@@ -479,7 +476,6 @@ Would you like to attempt to install via "git clone" instead?`,
     const extensionsDir = ExtensionStorage.getUserExtensionsDir();
     this.loadedExtensions = [];
 
-    // Use async readdir instead of sync
     let subdirs: string[];
     try {
       subdirs = await fs.promises.readdir(extensionsDir);
@@ -488,7 +484,6 @@ Would you like to attempt to install via "git clone" instead?`,
       return this.loadedExtensions;
     }
 
-    // Load all extensions in parallel
     const loadPromises = subdirs.map((subdir) => {
       const extensionDir = path.join(extensionsDir, subdir);
       return this.loadExtension(extensionDir);
@@ -500,16 +495,15 @@ Would you like to attempt to install via "git clone" instead?`,
     const names = new Set<string>();
     const extensions: GeminiCLIExtension[] = [];
 
-    for (const ext of results) {
-      if (ext === null) continue;
+    for (const result of results) {
+      if (result === null) continue;
 
-      // Detect duplicate extension names
-      if (names.has(ext.name)) {
-        debugLogger.error(`Duplicate extension name detected: ${ext.name}`);
+      if (names.has(result.name)) {
+        debugLogger.error(`Duplicate extension name detected: ${result.name}`);
         continue;
       }
-      names.add(ext.name);
-      extensions.push(ext);
+      names.add(result.name);
+      extensions.push(result);
     }
 
     // Single atomic update to shared state
@@ -524,21 +518,23 @@ Would you like to attempt to install via "git clone" instead?`,
   }
 
   /**
-   * Adds `extension` to the list of extensions and starts it if appropriate.
+   * Loads an extension configuration from the given directory.
+   *
+   * Note: The caller is responsible for:
+   * - Adding the returned extension to the `this.loadedExtensions` array.
+   * - Calling `this.maybeStartExtension(extension)` to activate it.
    */
   private async loadExtension(
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
     this.loadedExtensions ??= [];
 
-    // Use async stat instead of sync
     try {
       const stats = await fs.promises.stat(extensionDir);
       if (!stats.isDirectory()) {
         return null;
       }
     } catch {
-      // Path doesn't exist or can't be accessed
       return null;
     }
 
@@ -677,11 +673,6 @@ Would you like to attempt to install via "git clone" instead?`,
         skills,
       };
 
-      // NOTE: Caller (loadExtensions) is now responsible for:
-      // - Adding extension to this.loadedExtensions array
-      // - Calling this.maybeStartExtension(extension)
-      // This separation allows for parallel loading in the future.
-
       return extension;
     } catch (e) {
       debugLogger.error(
@@ -763,7 +754,6 @@ Would you like to attempt to install via "git clone" instead?`,
         return undefined;
       }
 
-      // Hydrate variables in the hooks configuration
       const hydratedHooks = recursivelyHydrateStrings(
         rawHooks.hooks as unknown as JsonObject,
         {
