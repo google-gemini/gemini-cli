@@ -172,7 +172,7 @@ class DelegateInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition || definition.kind !== 'remote') {
-      // Local agents should execute silently
+      // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
       return false;
     }
 
