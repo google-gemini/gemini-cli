@@ -36,17 +36,26 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
-  const historyItems = uiState.history.map((h) => (
-    <HistoryItemDisplay
-      terminalWidth={mainAreaWidth}
-      availableTerminalHeight={staticAreaMaxItemHeight}
-      availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-      key={h.id}
-      item={h}
-      isPending={false}
-      commands={uiState.slashCommands}
-    />
-  ));
+  const historyItems = useMemo(
+    () =>
+      uiState.history.map((h) => (
+        <MemoizedHistoryItemDisplay
+          terminalWidth={mainAreaWidth}
+          availableTerminalHeight={staticAreaMaxItemHeight}
+          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+          key={h.id}
+          item={h}
+          isPending={false}
+          commands={uiState.slashCommands}
+        />
+      )),
+    [
+      uiState.history,
+      mainAreaWidth,
+      staticAreaMaxItemHeight,
+      uiState.slashCommands,
+    ],
+  );
 
   const pendingItems = useMemo(
     () => (
