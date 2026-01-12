@@ -200,12 +200,14 @@ export interface ToolDefinition {
   name: string;
   displayName: string;
   description?: string;
+  schema?: unknown;
 }
 
 export type HistoryItemToolsList = HistoryItemBase & {
   type: 'tools_list';
   tools: ToolDefinition[];
   showDescriptions: boolean;
+  showSchema: boolean;
 };
 
 export type HistoryItemSkillsList = HistoryItemBase & {
