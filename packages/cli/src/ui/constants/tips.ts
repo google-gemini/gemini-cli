@@ -81,12 +81,9 @@ export const INFORMATIVE_TIPS = [
   'Enable experimental subagents for task delegation (/settings)...',
   'Enable extension management features (settings.json)...',
   'Enable extension reloading within the CLI session (settings.json)...',
-  'Opt out of usage statistics collection (settings.json)...',
-  'Use fuzzy search to quickly find what you need in the /settings editor...',
+  'Search through available settings in the /settings editor...',
   'Try out the latest Gemini 3 models by enabling Preview Features in /settings...',
   'Set a thinking budget for models with reasoning capabilities (settings.json)...',
-  'Access external data and documentation with MCP Resources (settings.json)...',
-  'Enable the Introspection Agent to help the model reflect on its plans (/settings)...',
   'Enable Just-In-Time (JIT) context loading for faster initial startup (/settings)...',
   //Settings tips end here
   // Keyboard shortcut tips start here
@@ -120,9 +117,6 @@ export const INFORMATIVE_TIPS = [
   'Undo text edits in the input with Ctrl+Z...',
   'Redo undone text edits with Ctrl+Shift+Z...',
   'Open the current prompt in an external editor with Ctrl+X or Meta+Enter...',
-  'Scroll output with Shift+Up/Down or PageUp/PageDown...',
-  'Toggle focus between the shell and Gemini input with Ctrl+F...',
-  'Insert a newline without submitting using Shift+Enter or Ctrl+Enter...',
   'In menus, move up/down with k/j or the arrow keys...',
   'In menus, select an item by typing its number...',
   "If you're using an IDE, see the context with Ctrl+G...",
