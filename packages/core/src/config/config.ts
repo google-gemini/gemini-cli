@@ -1888,7 +1888,6 @@ export class Config {
     debugLogger.debug('Experiments loaded', summaryString);
   }
 
-
   /**
    * Get event based on an event type
    */
