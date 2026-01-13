@@ -18,7 +18,7 @@ export interface UseHistoryManagerReturn {
   history: HistoryItem[];
   addItem: (
     itemData: Omit<HistoryItem, 'id'>,
-    baseTimestamp: number,
+    baseTimestamp?: number,
     isResuming?: boolean,
   ) => number; // Returns the generated ID
   updateItem: (
@@ -59,7 +59,7 @@ export function useHistory({
   const addItem = useCallback(
     (
       itemData: Omit<HistoryItem, 'id'>,
-      baseTimestamp: number,
+      baseTimestamp: number = Date.now(),
       isResuming: boolean = false,
     ): number => {
       // Cast to string to safely index into VERBOSITY_MAPPING
