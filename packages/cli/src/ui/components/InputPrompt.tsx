@@ -492,11 +492,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for clearing input
+        // Handle double ESC for rewind
         if (escPressCount.current === 0) {
-          if (buffer.text === '') {
-            return;
-          }
           escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
@@ -506,10 +503,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-          // clear input and immediately reset state
-          buffer.setText('');
-          resetCompletionState();
+          // Second ESC triggers rewind
           resetEscapeState();
+          onSubmit('/rewind');
         }
         return;
       }
@@ -870,6 +866,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      onSubmit,
     ],
   );
 

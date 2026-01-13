@@ -6,12 +6,14 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { useMemo } from 'react';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import type { FileChangeStats } from '../utils/rewindFileOps.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatTimeAgo } from '../utils/formatters.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export enum RewindOutcome {
   RewindAndRevert = 'rewind_and_revert',
@@ -58,7 +60,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
 }) => {
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
+      if (keyMatchers[Command.ESCAPE](key)) {
         onConfirm(RewindOutcome.Cancel);
       }
     },
@@ -68,6 +70,17 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
   const handleSelect = (outcome: RewindOutcome) => {
     onConfirm(outcome);
   };
+
+  const options = useMemo(() => {
+    if (stats) {
+      return REWIND_OPTIONS;
+    }
+    return REWIND_OPTIONS.filter(
+      (option) =>
+        option.value !== RewindOutcome.RewindAndRevert &&
+        option.value !== RewindOutcome.RevertOnly,
+    );
+  }, [stats]);
 
   return (
     <Box
@@ -134,7 +147,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
       </Box>
 
       <RadioButtonSelect
-        items={REWIND_OPTIONS}
+        items={options}
         onSelect={handleSelect}
         isFocused={true}
       />

@@ -55,6 +55,7 @@ available combinations.
 | Start reverse search through history.        | `Ctrl + R`            |
 | Insert the selected reverse-search match.    | `Enter (no Ctrl)`     |
 | Accept a suggestion while reverse searching. | `Tab`                 |
+| Browse and revert previous interactions.     | `Esc + Esc`           |
 
 #### Navigation
 
@@ -136,7 +137,7 @@ available combinations.
 - `Ctrl+Z` / `Ctrl+Shift+Z`: Undo or redo the most recent text edit.
 - `Meta+Enter`: Open the current input in an external editor (alias for
   `Ctrl+X`).
-- `Esc` pressed twice quickly: Clear the current input buffer.
+- `Esc` pressed twice: Browse and revert previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to

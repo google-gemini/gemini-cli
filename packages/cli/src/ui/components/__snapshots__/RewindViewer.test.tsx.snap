@@ -28,20 +28,6 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`RewindViewer > Interaction Selection > 'cancels on Escape' > after-cancel 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│ ● Original Prompt                                                                                                    │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`RewindViewer > Interaction Selection > 'cancels on Escape' > confirmation-dialog 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
@@ -51,10 +37,8 @@ exports[`RewindViewer > Interaction Selection > 'cancels on Escape' > confirmati
 │                                                                                                                      │
 │ Select an action:                                                                                                    │
 │                                                                                                                      │
-│ ● 1. Rewind conversation and revert code changes                                                                     │
-│   2. Rewind conversation                                                                                             │
-│   3. Revert code changes                                                                                             │
-│   4. Do nothing (esc)                                                                                                │
+│ ● 1. Rewind conversation                                                                                             │
+│   2. Do nothing (esc)                                                                                                │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -68,10 +52,8 @@ exports[`RewindViewer > Interaction Selection > 'confirms on Enter' > confirmati
 │                                                                                                                      │
 │ Select an action:                                                                                                    │
 │                                                                                                                      │
-│ ● 1. Rewind conversation and revert code changes                                                                     │
-│   2. Rewind conversation                                                                                             │
-│   3. Revert code changes                                                                                             │
-│   4. Do nothing (esc)                                                                                                │
+│ ● 1. Rewind conversation                                                                                             │
+│   2. Do nothing (esc)                                                                                                │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

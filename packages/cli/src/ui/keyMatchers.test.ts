@@ -79,6 +79,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 'f',
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
+    [Command.REWIND]: (key: Key) =>
+      key.name === 'escape' && key.name === 'escape',
   };
 
   // Test data for each command with positive and negative test cases

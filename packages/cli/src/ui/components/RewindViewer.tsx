@@ -20,6 +20,7 @@ import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -67,7 +68,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   useKeypress(
     (key) => {
       if (!selectedMessageId) {
-        if (key.name === 'escape') {
+        if (keyMatchers[Command.ESCAPE](key)) {
           onExit();
         }
       }

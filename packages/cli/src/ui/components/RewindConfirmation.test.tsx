@@ -33,6 +33,7 @@ describe('RewindConfirmation', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toContain('Revert code changes');
   });
 
   it('renders correctly without stats', () => {
@@ -47,6 +48,8 @@ describe('RewindConfirmation', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).not.toContain('Revert code changes');
+    expect(lastFrame()).toContain('Rewind conversation');
   });
 
   it('calls onConfirm with Cancel on Escape', async () => {
@@ -83,5 +86,6 @@ describe('RewindConfirmation', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).not.toContain('Revert code changes');
   });
 });
