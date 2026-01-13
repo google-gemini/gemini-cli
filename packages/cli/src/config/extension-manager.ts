@@ -288,7 +288,7 @@ Would you like to attempt to install via "git clone" instead?`,
         await fs.promises.mkdir(destinationPath, { recursive: true });
         if (
           this.requestSetting &&
-          (this.settings.experimental?.extensionConfig ?? true)
+          (this.settings.experimental?.extensionConfig ?? false)
         ) {
           if (isUpdate) {
             await maybePromptForSettings(
@@ -308,7 +308,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         const missingSettings =
-          (this.settings.experimental?.extensionConfig ?? true)
+          (this.settings.experimental?.extensionConfig ?? false)
             ? await getMissingSettings(
                 newExtensionConfig,
                 extensionId,
@@ -534,7 +534,7 @@ Would you like to attempt to install via "git clone" instead?`,
       let userSettings: Record<string, string> = {};
       let workspaceSettings: Record<string, string> = {};
 
-      if (this.settings.experimental?.extensionConfig ?? true) {
+      if (this.settings.experimental?.extensionConfig ?? false) {
         userSettings = await getScopedEnvContents(
           config,
           extensionId,
@@ -554,7 +554,7 @@ Would you like to attempt to install via "git clone" instead?`,
       const resolvedSettings: ResolvedExtensionSetting[] = [];
       if (
         config.settings &&
-        (this.settings.experimental?.extensionConfig ?? true)
+        (this.settings.experimental?.extensionConfig ?? false)
       ) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
