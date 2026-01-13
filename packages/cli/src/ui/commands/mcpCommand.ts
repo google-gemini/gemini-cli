@@ -91,19 +91,16 @@ const authCommand: SlashCommand = {
     // The authentication process will discover OAuth requirements automatically
 
     const displayListener = (message: string) => {
-      context.ui.addItem({ type: 'info', text: message }, Date.now());
+      context.ui.addItem({ type: 'info', text: message });
     };
 
     appEvents.on(AppEvent.OauthDisplayMessage, displayListener);
 
     try {
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `Starting OAuth authentication for MCP server '${serverName}'...`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `Starting OAuth authentication for MCP server '${serverName}'...`,
+      });
 
       // Import dynamically to avoid circular dependencies
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
@@ -122,24 +119,18 @@ const authCommand: SlashCommand = {
         appEvents,
       );
 
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
+      });
 
       // Trigger tool re-discovery to pick up authenticated server
       const mcpClientManager = config.getMcpClientManager();
       if (mcpClientManager) {
-        context.ui.addItem(
-          {
-            type: 'info',
-            text: `Restarting MCP server '${serverName}'...`,
-          },
-          Date.now(),
-        );
+        context.ui.addItem({
+          type: 'info',
+          text: `Restarting MCP server '${serverName}'...`,
+        });
         await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
@@ -279,7 +270,7 @@ const listAction = async (
     showSchema,
   };
 
-  context.ui.addItem(mcpStatusItem, Date.now());
+  context.ui.addItem(mcpStatusItem);
 };
 
 const listCommand: SlashCommand = {
@@ -335,13 +326,10 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: 'Restarting MCP servers...',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: 'info',
+      text: 'Restarting MCP servers...',
+    });
 
     await mcpClientManager.restart();
 

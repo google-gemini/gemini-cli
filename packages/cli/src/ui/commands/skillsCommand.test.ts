@@ -91,7 +91,6 @@ describe('skillsCommand', () => {
         ],
         showDescriptions: true,
       }),
-      expect.any(Number),
     );
   });
 
@@ -120,7 +119,6 @@ describe('skillsCommand', () => {
         ],
         showDescriptions: true,
       }),
-      expect.any(Number),
     );
   });
 
@@ -132,7 +130,6 @@ describe('skillsCommand', () => {
       expect.objectContaining({
         showDescriptions: false,
       }),
-      expect.any(Number),
     );
   });
 
@@ -229,7 +226,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Skill "skill1" disabled by adding it to the disabled list in project (/workspace) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -258,7 +254,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -298,7 +293,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -313,7 +307,6 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Skill "non-existent" not found.',
         }),
-        expect.any(Number),
       );
     });
   });
@@ -359,7 +352,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -385,7 +377,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -409,7 +400,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 skill no longer available.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -434,7 +424,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill and 1 skill no longer available.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -451,7 +440,6 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Could not retrieve configuration.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -477,7 +465,6 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Failed to reload skills: Reload failed',
         }),
-        expect.any(Number),
       );
     });
   });

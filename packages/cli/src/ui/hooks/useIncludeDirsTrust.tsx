@@ -18,18 +18,18 @@ import { MessageType, type HistoryItem } from '../types.js';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number,
   added: string[],
   errors: string[],
 ) {
   if (!config) {
-    addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     return;
   }
 
@@ -49,7 +49,7 @@ async function finishAddingDirectories(
   }
 
   if (errors.length > 0) {
-    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') });
   }
 }
 

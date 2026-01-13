@@ -231,7 +231,6 @@ describe('mcpCommand', () => {
             }),
           ]),
         }),
-        expect.any(Number),
       );
     });
 
@@ -246,7 +245,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: true,
         }),
-        expect.any(Number),
       );
     });
 
@@ -261,7 +259,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: false,
         }),
-        expect.any(Number),
       );
     });
   });

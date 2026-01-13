@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -132,7 +132,6 @@ describe('useIncludeDirsTrust', () => {
             expect.objectContaining({
               text: expect.stringContaining("Error adding '/dir2': Test error"),
             }),
-            expect.any(Number),
           );
           expect(
             mockConfig.clearPendingIncludeDirectories,

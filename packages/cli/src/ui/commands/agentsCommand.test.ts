@@ -79,7 +79,6 @@ describe('agentsCommand', () => {
         type: MessageType.AGENTS_LIST,
         agents: mockAgents,
       }),
-      expect.any(Number),
     );
   });
 
