@@ -25,6 +25,7 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
@@ -2220,38 +2221,20 @@ export function useTextBuffer({
           input === '\\r') // VSCode terminal represents shift + enter this way
       )
         newline();
-      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
-      else if (key.ctrl && key.name === 'b') move('left');
-      else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
-      else if (key.ctrl && key.name === 'f') move('right');
+      else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
+      else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
       else if (key.name === 'up') move('up');
       else if (key.name === 'down') move('down');
-      else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
-      else if (key.meta && key.name === 'b') move('wordLeft');
-      else if ((key.ctrl || key.meta) && key.name === 'right')
-        move('wordRight');
-      else if (key.meta && key.name === 'f') move('wordRight');
-      else if (key.name === 'home') move('home');
-      else if (key.ctrl && key.name === 'a') move('home');
-      else if (key.name === 'end') move('end');
-      else if (key.ctrl && key.name === 'e') move('end');
-      else if (key.ctrl && key.name === 'w') deleteWordLeft();
-      else if (
-        (key.meta || key.ctrl) &&
-        (key.name === 'backspace' || input === '\x7f')
-      )
-        deleteWordLeft();
-      else if ((key.meta || key.ctrl) && key.name === 'delete')
-        deleteWordRight();
-      else if (
-        key.name === 'backspace' ||
-        input === '\x7f' ||
-        (key.ctrl && key.name === 'h')
-      )
-        backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
-      else if (key.ctrl && !key.shift && key.name === 'z') undo();
-      else if (key.ctrl && key.shift && key.name === 'z') redo();
+      else if (keyMatchers[Command.MOVE_WORD_LEFT](key)) move('wordLeft');
+      else if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) move('wordRight');
+      else if (keyMatchers[Command.HOME](key)) move('home');
+      else if (keyMatchers[Command.END](key)) move('end');
+      else if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) deleteWordLeft();
+      else if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) deleteWordRight();
+      else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) backspace();
+      else if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) del();
+      else if (keyMatchers[Command.UNDO](key)) undo();
+      else if (keyMatchers[Command.REDO](key)) redo();
       else if (key.insertable) {
         insert(input, { paste: key.paste });
       }
