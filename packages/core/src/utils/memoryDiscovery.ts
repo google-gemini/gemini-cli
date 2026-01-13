@@ -252,6 +252,18 @@ async function readGeminiMdFiles(
     const batchPromises = batch.map(
       async (filePath): Promise<GeminiFileContent> => {
         try {
+          // Check if path is a directory before attempting to read
+          const stats = await fs.lstat(filePath);
+          if (stats.isDirectory()) {
+            // Skip directories silently - they're valid memory folders
+            if (debugMode) {
+              logger.debug(
+                `Skipping directory ${filePath} (expected file). Using parent directory for memory discovery instead.`,
+              );
+            }
+            return { filePath, content: null };
+          }
+
           const content = await fs.readFile(filePath, 'utf-8');
 
           // Process imports in the content
@@ -528,9 +540,12 @@ export async function loadServerHierarchicalMemory(
     debugMode,
     importFormat,
   );
+  const validContents = contentsWithPaths.filter(
+    (item) => item.content !== null,
+  );
   // Pass CWD for relative path display in concatenated content
   const combinedInstructions = concatenateInstructions(
-    contentsWithPaths,
+    validContents,
     currentWorkingDirectory,
   );
   if (debugMode)
@@ -543,8 +558,8 @@ export async function loadServerHierarchicalMemory(
     );
   return {
     memoryContent: combinedInstructions,
-    fileCount: contentsWithPaths.length,
-    filePaths,
+    fileCount: validContents.length,
+    filePaths: validContents.map((item) => item.filePath),
   };
 }
 

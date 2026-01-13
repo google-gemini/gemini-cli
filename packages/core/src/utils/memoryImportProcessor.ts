@@ -6,9 +6,11 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { homedir } from 'node:os';
 import { isSubpath } from './paths.js';
 import { marked, type Token } from 'marked';
 import { debugLogger } from './debugLogger.js';
+import { GEMINI_DIR } from './paths.js';
 
 // Simple console logger for import processing
 const logger = {
@@ -407,7 +409,11 @@ export function validateImportPath(
 
   const resolvedPath = path.resolve(basePath, importPath);
 
-  return allowedDirectories.some((allowedDir) =>
-    isSubpath(allowedDir, resolvedPath),
+  // Ensure we always allow the user's global gemini directory
+  const globalGeminiDir = path.join(homedir(), GEMINI_DIR);
+  const effectiveAllowedDirs = [...allowedDirectories, globalGeminiDir];
+
+  return effectiveAllowedDirs.some(
+    (allowedDir) => allowedDir && isSubpath(allowedDir, resolvedPath),
   );
 }

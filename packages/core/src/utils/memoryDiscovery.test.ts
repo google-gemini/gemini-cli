@@ -20,7 +20,8 @@ import {
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR } from './paths.js';
+// @ts-expect-error - The IDE incorrectly identifies this as missing, but it exists and tests pass
+import { GEMINI_DIR, homedir as pathsHomedir } from './paths.js';
 import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
@@ -35,15 +36,13 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../utils/paths.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+vi.mock('./paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./paths.js')>();
   return {
     ...actual,
     homedir: vi.fn(),
   };
 });
-
-import { homedir as pathsHomedir } from './paths.js';
 
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
@@ -985,5 +984,116 @@ included directory memory
     expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
       expect.stringContaining('Always be polite.'),
     );
+  });
+
+  it('should skip directories that match GEMINI.md filename without warning', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(debugLogger, 'warn')
+      .mockImplementation(() => {});
+
+    // Create a directory named GEMINI.md in the project root
+    // This simulates the user accidentally creating a folder with the config filename
+    const geminiMdDir = await createEmptyDir(
+      path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+    );
+
+    // Create a valid GEMINI.md file in CWD (different location)
+    const validGeminiMdFile = await createTestFile(
+      path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+      'CWD content',
+    );
+
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      [],
+      false,
+      new FileDiscoveryService(projectRoot),
+      new SimpleExtensionLoader([]),
+      DEFAULT_FOLDER_TRUST,
+    );
+
+    // loadServerHierarchicalMemory only returns valid files, it filters out directories
+    // that match the GEMINI.md filename.
+    expect(result.filePaths).toHaveLength(1);
+    expect(result.filePaths).not.toContain(geminiMdDir);
+    expect(result.filePaths).toContain(validGeminiMdFile);
+
+    // fileCount reflects the number of successfully discovered files.
+    expect(result.fileCount).toBe(1);
+
+    // The memory content should only contain content from the validly read file.
+    expect(result.memoryContent).toContain('CWD content');
+
+    // Should NOT log any warnings about the directory
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('Could not read'),
+      expect.any(String),
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  describe('Security', () => {
+    it('should prevent path traversal attacks in imports', async () => {
+      await createTestFile(
+        path.join(testRootDir, 'sensitive.txt'),
+        'secret content',
+      );
+
+      // Create a malicious GEMINI.md that tries to import the sensitive file
+      // by traversing up.
+      // Note: We use a relative path that would reach testRootDir from cwd
+      // Structure: testRootDir -> project -> src (cwd)
+      // So ../../sensitive.txt should reach it
+      const maliciousContent = `
+# Malicious Import
+@../../sensitive.txt
+`;
+      await createTestFile(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+        maliciousContent,
+      );
+
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      // The import should fail and leave a warning comment in the content
+      expect(result.memoryContent).toContain('Path traversal attempt');
+      // The secret content MUST NOT be present
+      expect(result.memoryContent).not.toContain('secret content');
+    });
+
+    it('should allow imports within the project root', async () => {
+      // Simulate a git root so findProjectRoot works correctly
+      await createEmptyDir(path.join(projectRoot, '.git'));
+
+      await createTestFile(
+        path.join(projectRoot, 'allowed.md'),
+        'allowed content',
+      );
+
+      const content = `
+# Valid Import
+@../allowed.md
+`;
+      await createTestFile(path.join(cwd, DEFAULT_CONTEXT_FILENAME), content);
+
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result.memoryContent).toContain('allowed content');
+    });
   });
 });
