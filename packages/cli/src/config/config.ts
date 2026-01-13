@@ -660,6 +660,7 @@ export async function loadCliConfig(
     mcpServers: mcpEnabled ? settings.mcpServers : {},
     mcpEnabled,
     extensionsEnabled,
+    agents: settings.agents,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -737,6 +738,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
+    disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: getEnableHooks(settings),
