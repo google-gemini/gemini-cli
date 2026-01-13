@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -66,16 +65,7 @@ export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
-  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
-    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
-  }
-  if (platform() === 'darwin') {
-    return '/Library/Application Support/GeminiCli/settings.json';
-  } else if (platform() === 'win32') {
-    return 'C:\\ProgramData\\gemini-cli\\settings.json';
-  } else {
-    return '/etc/gemini-cli/settings.json';
-  }
+  return Storage.getSystemSettingsPath();
 }
 
 export function getSystemDefaultsPath(): string {
@@ -288,10 +278,11 @@ export class LoadedSettings {
       const adminDefaults = getDefaultsFromSchema(adminSchema);
 
       // The final admin settings are the defaults overridden by remote settings.
-      // Any admin settings from files are ignored.
+      // File-based admin settings are also included.
       merged.admin = customDeepMerge(
         (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
         adminDefaults,
+        merged.admin ?? {},
         this._remoteAdminSettings?.admin ?? {},
       ) as Settings['admin'];
     }

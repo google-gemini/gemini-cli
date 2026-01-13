@@ -70,13 +70,32 @@ export class Storage {
     if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
       return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
     }
-    if (os.platform() === 'darwin') {
-      return '/Library/Application Support/GeminiCli/settings.json';
-    } else if (os.platform() === 'win32') {
-      return 'C:\\ProgramData\\gemini-cli\\settings.json';
+
+    const platform = os.platform();
+    let pathsToCheck: string[] = [];
+
+    if (platform === 'darwin') {
+      pathsToCheck = [
+        '/Library/Application Support/GeminiCli/settings.json',
+        '/etc/gemini-cli/settings.json',
+        '/etc/.gemini/settings.json',
+      ];
+    } else if (platform === 'win32') {
+      pathsToCheck = ['C:\\ProgramData\\gemini-cli\\settings.json'];
     } else {
-      return '/etc/gemini-cli/settings.json';
+      pathsToCheck = [
+        '/etc/gemini-cli/settings.json',
+        '/etc/.gemini/settings.json',
+      ];
     }
+
+    for (const p of pathsToCheck) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+
+    return pathsToCheck[0];
   }
 
   static getSystemPoliciesDir(): string {

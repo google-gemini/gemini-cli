@@ -100,7 +100,7 @@ vi.mock('fs', async (importOriginal) => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
-    realpathSync: (p: string) => p,
+    realpathSync: vi.fn((p: string) => p),
   };
 });
 
@@ -207,12 +207,13 @@ describe('Settings Loading and Merging', () => {
     );
 
     it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {
-      (mockFsExistsSync as Mock).mockImplementation(
-        (p: fs.PathLike) =>
-          p === getSystemSettingsPath() ||
-          p === USER_SETTINGS_PATH ||
-          p === MOCK_WORKSPACE_SETTINGS_PATH,
-      );
+          (mockFsExistsSync as Mock).mockImplementation(
+            (p: fs.PathLike) =>
+              p === '/etc/gemini-cli/settings.json' ||
+              p === USER_SETTINGS_PATH ||
+              p === MOCK_WORKSPACE_SETTINGS_PATH,
+          );
+      
       const systemSettingsContent = {
         ui: {
           theme: 'system-theme',
@@ -1455,6 +1456,53 @@ describe('Settings Loading and Merging', () => {
         });
       });
     });
+
+    it('should handle path resolution with relative workspace path', () => {
+      const relativeWorkspace = './local-project';
+
+      (fs.realpathSync as Mock).mockImplementation((p) => {
+        if (p === relativeWorkspace) return '/mock/cwd/local-project';
+        return p as string;
+      });
+
+      (mockFsExistsSync as Mock).mockImplementation((p) => {
+        return p === 'local-project/.gemini/settings.json';
+      });
+
+      (fs.readFileSync as Mock).mockImplementation((p) => {
+        if (p === 'local-project/.gemini/settings.json') {
+          return JSON.stringify({
+            ui: { theme: 'relative-theme' },
+          });
+        }
+        return '{}';
+      });
+
+      const settings = loadSettings(relativeWorkspace);
+
+      // Path stored in LoadedSettings is relative
+      expect(settings.workspace.path).toBe('local-project/.gemini/settings.json');
+      expect(settings.merged.ui?.theme).toBe('relative-theme');
+    });
+
+    it('should not crash if homedir does not exist', () => {
+      const nonExistentHome = '/non/existent/home';
+      vi.mocked(osActual.homedir).mockReturnValue(nonExistentHome);
+
+      (fs.realpathSync as Mock).mockImplementation((p) => {
+        if (p === nonExistentHome) {
+          const err = new Error(
+            'ENOENT: no such file or directory, realpath /non/existent/home',
+          );
+          (err as any).code = 'ENOENT';
+          throw err;
+        }
+        return p as string;
+      });
+
+      // Should not throw
+      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).not.toThrow();
+    });
   });
 
   describe('excludedProjectEnvVars integration', () => {
@@ -1665,7 +1713,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemSettingsContent = {
         admin: {
-          // These should be ignored
+          // These should now be loaded (used to be ignored)
           secureModeEnabled: true,
           mcp: { enabled: false },
           extensions: { enabled: false },
@@ -1685,22 +1733,22 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // 1. Verify that on initial load, file-based admin settings are ignored
-      //    and schema defaults are used instead.
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false); // default: false
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // default: true
+      // 1. Verify that on initial load, file-based admin settings are loaded.
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true); // file: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // file: false
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // file: false
       expect(loadedSettings.merged.ui?.theme).toBe('system-theme'); // non-admin setting should be loaded
 
       // 2. Now, set remote admin settings.
+      // We'll toggle secureModeEnabled to false via remote to prove it overrides file (true).
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        secureModeEnabled: false,
+        mcpSetting: { mcpEnabled: false }, // same as file
+        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } }, // same as file
       });
 
       // 3. Verify that remote admin settings take precedence.
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false); // remote: false (overrides file: true)
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
       // non-admin setting should remain unchanged
@@ -1728,33 +1776,33 @@ describe('Settings Loading and Merging', () => {
       );
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      // Ensure initial state from defaults (as file-based admin settings are ignored)
+      // Ensure initial state from file
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       const newRemoteSettings = {
         secureModeEnabled: true,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        mcpSetting: { mcpEnabled: true }, // Override file: false
+        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: true } }, // Override file: false
       };
 
       loadedSettings.setRemoteAdminSettings(newRemoteSettings);
 
       // Verify that remote admin settings are applied
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
       // Non-admin settings should remain untouched
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
-      // and missing properties revert to schema defaults.
+      // and missing properties revert to file settings (or defaults if file doesn't have them).
       loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Reverts to file: false
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Reverts to file: false
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -1773,14 +1821,14 @@ describe('Settings Loading and Merging', () => {
       );
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      // Should have default admin settings
+      // Should have default admin settings since file has none
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
       loadedSettings.setRemoteAdminSettings({}); // Set empty remote settings
 
-      // Admin settings should revert to defaults because there are no remote overrides
+      // Admin settings should remain defaults
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
@@ -1804,18 +1852,18 @@ describe('Settings Loading and Merging', () => {
       );
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      // Ensure initial state from defaults (as file-based admin settings are ignored)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      // Ensure initial state from file
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // default
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // default
 
       // Set remote settings with only secureModeEnabled
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        secureModeEnabled: false, // Override file: true
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      // Verify secureModeEnabled is updated, others remain defaults/file
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
@@ -1824,8 +1872,8 @@ describe('Settings Loading and Merging', () => {
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      // Verify mcpEnabled is updated, others revert to file/defaults
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true); // Reverts to file: true
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
@@ -1834,9 +1882,9 @@ describe('Settings Loading and Merging', () => {
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       });
 
-      // Verify extensionsEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      // Verify extensionsEnabled is updated, others revert to file/defaults
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true); // Reverts to file: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
   });
