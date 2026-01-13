@@ -21,25 +21,39 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const compact = settings.merged.ui?.compact;
 
   const { bannerText } = useBanner(bannerData, config);
 
-  return (
+  const showHeader = !(
+    settings.merged.ui?.hideBanner || config.getScreenReader()
+  );
+  const showTips = !(settings.merged.ui?.hideTips || config.getScreenReader());
+
+  const headerContent = showHeader && (
     <Box flexDirection="column">
-      {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
-        <>
-          <Header version={version} nightly={nightly} />
-          {bannerVisible && bannerText && (
-            <Banner
-              width={mainAreaWidth}
-              bannerText={bannerText}
-              isWarning={bannerData.warningText !== ''}
-            />
-          )}
-        </>
+      <Header version={version} nightly={nightly} />
+      {bannerVisible && bannerText && (
+        <Banner
+          width={mainAreaWidth}
+          bannerText={bannerText}
+          isWarning={bannerData.warningText !== ''}
+        />
       )}
-      {!(settings.merged.ui?.hideTips || config.getScreenReader()) && (
-        <Tips config={config} />
+    </Box>
+  );
+
+  const tipsContent = showTips && <Tips config={config} />;
+
+  return (
+    <Box
+      flexDirection={compact ? 'row' : 'column'}
+      marginTop={compact ? 1 : 0}
+      marginBottom={0}
+    >
+      {headerContent}
+      {tipsContent && (
+        <Box marginLeft={compact && showHeader ? 4 : 0}>{tipsContent}</Box>
       )}
     </Box>
   );

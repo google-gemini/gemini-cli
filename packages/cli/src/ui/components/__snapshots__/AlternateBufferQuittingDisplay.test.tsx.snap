@@ -1,8 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`AlternateBufferQuittingDisplay > renders with active and pending tool messages > with_history_and_pending 1`] = `
-"
- ███         █████████
+"███         █████████
 ░░░███      ███░░░░░███
   ░░░███   ███     ░░░
     ░░░███░███
@@ -10,7 +9,6 @@ exports[`AlternateBufferQuittingDisplay > renders with active and pending tool m
    ███░   ░░███  ░░███
  ███░      ░░█████████
 ░░░         ░░░░░░░░░
-
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
@@ -31,8 +29,7 @@ Tips for getting started:
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with empty history and no pending items > empty 1`] = `
-"
- ███         █████████
+"███         █████████
 ░░░███      ███░░░░░███
   ░░░███   ███     ░░░
     ░░░███░███
@@ -40,7 +37,6 @@ exports[`AlternateBufferQuittingDisplay > renders with empty history and no pend
    ███░   ░░███  ░░███
  ███░      ░░█████████
 ░░░         ░░░░░░░░░
-
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
@@ -49,8 +45,7 @@ Tips for getting started:
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with history but no pending items > with_history_no_pending 1`] = `
-"
- ███         █████████
+"███         █████████
 ░░░███      ███░░░░░███
   ░░░███   ███     ░░░
     ░░░███░███
@@ -58,7 +53,6 @@ exports[`AlternateBufferQuittingDisplay > renders with history but no pending it
    ███░   ░░███  ░░███
  ███░      ░░█████████
 ░░░         ░░░░░░░░░
-
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
@@ -75,8 +69,7 @@ Tips for getting started:
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with pending items but no history > with_pending_no_history 1`] = `
-"
- ███         █████████
+"███         █████████
 ░░░███      ███░░░░░███
   ░░░███   ███     ░░░
     ░░░███░███
@@ -84,7 +77,6 @@ exports[`AlternateBufferQuittingDisplay > renders with pending items but no hist
    ███░   ░░███  ░░███
  ███░      ░░█████████
 ░░░         ░░░░░░░░░
-
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
@@ -97,8 +89,7 @@ Tips for getting started:
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `
-"
- ███         █████████
+"███         █████████
 ░░░███      ███░░░░░███
   ░░░███   ███     ░░░
     ░░░███░███
@@ -106,7 +97,6 @@ exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages 
    ███░   ░░███  ░░███
  ███░      ░░█████████
 ░░░         ░░░░░░░░░
-
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
