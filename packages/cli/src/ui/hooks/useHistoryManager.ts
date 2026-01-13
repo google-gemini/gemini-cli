@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react';
 import type { HistoryItem } from '../types.js';
+import { VERBOSITY_MAPPING, Verbosity } from '../types.js';
 import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
 // Type for the updater function passed to updateHistoryItem
@@ -36,8 +37,10 @@ export interface UseHistoryManagerReturn {
  */
 export function useHistory({
   chatRecordingService,
+  verbosity = 'info',
 }: {
   chatRecordingService?: ChatRecordingService | null;
+  verbosity?: string;
 } = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
@@ -59,6 +62,17 @@ export function useHistory({
       baseTimestamp: number,
       isResuming: boolean = false,
     ): number => {
+      // Cast to string to safely index into VERBOSITY_MAPPING
+      const itemType = itemData.type as string;
+      const currentVerbosity =
+        VERBOSITY_MAPPING[verbosity ?? 'info'] ?? Verbosity.INFO;
+      const itemVerbosity = VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
+
+      if (itemVerbosity > currentVerbosity) {
+        // Skip adding the item to the UI history if it exceeds the current verbosity level
+        return -1;
+      }
+
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
@@ -80,27 +94,31 @@ export function useHistory({
       // Record UI-specific messages, but don't do it if we're actually loading
       // an existing session.
       if (!isResuming && chatRecordingService) {
+        // Safe access to text property
+        const content = 'text' in itemData ? (itemData.text as string) : '';
+
         switch (itemData.type) {
           case 'compression':
+          case 'verbose':
           case 'info':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'info',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'warning':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'warning',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'error':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'error',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'user':
@@ -116,7 +134,7 @@ export function useHistory({
 
       return id; // Return the generated ID (even if not added, to keep signature)
     },
-    [getNextMessageId, chatRecordingService],
+    [getNextMessageId, chatRecordingService, verbosity],
   );
 
   /**

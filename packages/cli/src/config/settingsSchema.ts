@@ -257,6 +257,26 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      verbosity: {
+        type: 'enum',
+        label: 'Verbosity Level',
+        category: 'General',
+        requiresRestart: false,
+        default: 'info',
+        description: 'Controls the level of output detail in the history.',
+        showInDialog: true,
+        options: [
+          { value: 'error', label: 'Error - Critical failures only' },
+          { value: 'warn', label: 'Warn - Warnings and errors' },
+          {
+            value: 'info',
+            label: 'Info - Standard interactive output (Default)',
+          },
+          { value: 'verbose', label: 'Verbose - Operational status messages' },
+          { value: 'debug', label: 'Debug - Low-level system logs' },
+          { value: 'trace', label: 'Trace - Everything' },
+        ],
+      },
       sessionRetention: {
         type: 'object',
         label: 'Session Retention',
