@@ -147,7 +147,6 @@ export const useGeminiStream = (
           mapTrackedToolCallsToDisplay(
             completedToolCallsFromScheduler as TrackedToolCall[],
           ),
-          Date.now(),
         );
 
         // Clear the live-updating display now that the final state is in history.
@@ -246,10 +245,7 @@ export const useGeminiStream = (
       prevActiveShellPtyIdRef.current !== null &&
       activeShellPtyId === null
     ) {
-      addItem(
-        { type: MessageType.INFO, text: 'Request cancelled.' },
-        Date.now(),
-      );
+      addItem({ type: MessageType.INFO, text: 'Request cancelled.' });
       setIsResponding(false);
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
