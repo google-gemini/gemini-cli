@@ -48,7 +48,7 @@ export function estimateTokenCountSync(parts: Part[]): number {
 
       if (mimeType?.startsWith('image/')) {
         totalTokens += IMAGE_TOKEN_ESTIMATE;
-      } else if (mimeType === 'application/pdf') {
+      } else if (mimeType?.startsWith('application/pdf')) {
         totalTokens += PDF_TOKEN_ESTIMATE;
       } else {
         // For other non-text parts (functionCall, functionResponse, etc.),
