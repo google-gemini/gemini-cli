@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { A2AClientManager } from './a2a-client-manager.js';
@@ -20,6 +20,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
 import * as tomlLoader from './agentLoader.js';
+import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -230,7 +231,7 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
-    it('should NOT register CLI help agent if disabled', async () => {
+    it('should register CLI help agent if disabled', async () => {
       const config = makeFakeConfig({
         cliHelpAgentSettings: { enabled: false },
       });
@@ -239,6 +240,59 @@ describe('AgentRegistry', () => {
       await registry.initialize();
 
       expect(registry.getDefinition('cli_help')).toBeUndefined();
+    });
+
+    it('should load agents from active extensions', async () => {
+      const extensionAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'extension-agent',
+      };
+      const extensions: GeminiCLIExtension[] = [
+        {
+          name: 'test-extension',
+          isActive: true,
+          agents: [extensionAgent],
+          version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
+        },
+      ];
+      const mockConfig = makeFakeConfig({
+        extensionLoader: new SimpleExtensionLoader(extensions),
+        enableAgents: true,
+      });
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('extension-agent')).toEqual(extensionAgent);
+    });
+
+    it('should NOT load agents from inactive extensions', async () => {
+      const extensionAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'extension-agent',
+      };
+      const extensions: GeminiCLIExtension[] = [
+        {
+          name: 'test-extension',
+          isActive: false,
+          agents: [extensionAgent],
+          version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
+        },
+      ];
+      const mockConfig = makeFakeConfig({
+        extensionLoader: new SimpleExtensionLoader(extensions),
+      });
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('extension-agent')).toBeUndefined();
     });
   });
 

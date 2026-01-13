@@ -14,6 +14,7 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
+import type { GenerateContentConfig } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -118,6 +119,15 @@ export class AgentRegistry {
         'info',
         'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
       );
+    }
+
+    // Load agents from extensions
+    for (const extension of this.config.getExtensions()) {
+      if (extension.isActive && extension.agents) {
+        await Promise.allSettled(
+          extension.agents.map((agent) => this.registerAgent(agent)),
+        );
+      }
     }
 
     if (this.config.getDebugMode()) {
@@ -233,7 +243,7 @@ export class AgentRegistry {
       model = this.config.getModel();
     }
 
-    const generateContentConfig = {
+    const generateContentConfig: GenerateContentConfig = {
       temperature: modelConfig.temp,
       topP: modelConfig.top_p,
       thinkingConfig: {
