@@ -83,6 +83,8 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** The prompt ID of the last Gemini response, used for feedback. */
+    lastGeminiResponsePromptId?: string;
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;

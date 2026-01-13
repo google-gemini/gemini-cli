@@ -48,6 +48,7 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
+  UserPositiveFeedbackEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
   StartupStatsEvent,
@@ -656,19 +657,11 @@ export function logWebFetchFallbackAttempt(
   });
 }
 
-export function logLlmLoopCheck(
+export function logUserPositiveFeedback(
   config: Config,
-  event: LlmLoopCheckEvent,
+  event: UserPositiveFeedbackEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logLlmLoopCheckEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
-  });
 }
 
 export function logHookCall(config: Config, event: HookCallEvent): void {

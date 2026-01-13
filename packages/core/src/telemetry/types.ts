@@ -1551,6 +1551,8 @@ export type TelemetryEvent =
   | AgentStartEvent
   | AgentFinishEvent
   | RecoveryAttemptEvent
+  | WebFetchFallbackAttemptEvent
+  | UserPositiveFeedbackEvent;
   | LlmLoopCheckEvent
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
@@ -1844,85 +1846,31 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
-export class HookCallEvent implements BaseTelemetryEvent {
-  'event.name': string;
+export const EVENT_USER_POSITIVE_FEEDBACK = 'gemini_cli.user_positive_feedback';
+export class UserPositiveFeedbackEvent implements BaseTelemetryEvent {
+  'event.name': 'user_positive_feedback';
   'event.timestamp': string;
-  hook_event_name: string;
-  hook_type: 'command';
-  hook_name: string;
-  hook_input: Record<string, unknown>;
-  hook_output?: Record<string, unknown>;
-  exit_code?: number;
-  stdout?: string;
-  stderr?: string;
-  duration_ms: number;
-  success: boolean;
-  error?: string;
+  prompt_id: string;
+  feedback_type: 'positive';
 
-  constructor(
-    hookEventName: string,
-    hookType: 'command',
-    hookName: string,
-    hookInput: Record<string, unknown>,
-    durationMs: number,
-    success: boolean,
-    hookOutput?: Record<string, unknown>,
-    exitCode?: number,
-    stdout?: string,
-    stderr?: string,
-    error?: string,
-  ) {
-    this['event.name'] = 'hook_call';
+  constructor(prompt_id: string) {
+    this['event.name'] = 'user_positive_feedback';
     this['event.timestamp'] = new Date().toISOString();
-    this.hook_event_name = hookEventName;
-    this.hook_type = hookType;
-    this.hook_name = hookName;
-    this.hook_input = hookInput;
-    this.hook_output = hookOutput;
-    this.exit_code = exitCode;
-    this.stdout = stdout;
-    this.stderr = stderr;
-    this.duration_ms = durationMs;
-    this.success = success;
-    this.error = error;
+    this.prompt_id = prompt_id;
+    this.feedback_type = 'positive';
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
-    const attributes: LogAttributes = {
+    return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_HOOK_CALL,
+      'event.name': EVENT_USER_POSITIVE_FEEDBACK,
       'event.timestamp': this['event.timestamp'],
-      hook_event_name: this.hook_event_name,
-      hook_type: this.hook_type,
-      // Sanitize hook_name unless full logging is enabled
-      hook_name: config.getTelemetryLogPromptsEnabled()
-        ? this.hook_name
-        : sanitizeHookName(this.hook_name),
-      duration_ms: this.duration_ms,
-      success: this.success,
-      exit_code: this.exit_code,
+      prompt_id: this.prompt_id,
+      feedback_type: this.feedback_type,
     };
-
-    // Only include potentially sensitive data if telemetry logging of prompts is enabled
-    if (config.getTelemetryLogPromptsEnabled()) {
-      attributes['hook_input'] = safeJsonStringify(this.hook_input, 2);
-      attributes['hook_output'] = safeJsonStringify(this.hook_output, 2);
-      attributes['stdout'] = this.stdout;
-      attributes['stderr'] = this.stderr;
-    }
-
-    if (this.error) {
-      // Always log errors
-      attributes['error'] = this.error;
-    }
-
-    return attributes;
   }
 
   toLogBody(): string {
-    const hookId = `${this.hook_event_name}.${this.hook_name}`;
-    const status = `${this.success ? 'succeeded' : 'failed'}`;
-    return `Hook call ${hookId} ${status} in ${this.duration_ms}ms`;
+    return `User provided positive feedback for prompt ID: ${this.prompt_id}`;
   }
 }
