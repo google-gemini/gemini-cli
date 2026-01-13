@@ -1904,4 +1904,83 @@ describe('CoreToolScheduler Sequential Execution', () => {
       serverName,
     );
   });
+
+  it('should not double-report completed tools when concurrent completions occur', async () => {
+    // Arrange
+    const executeFn = vi.fn().mockResolvedValue({ llmContent: 'success' });
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    let completionCallCount = 0;
+    const onAllToolCallsComplete = vi.fn().mockImplementation(async () => {
+      completionCallCount++;
+      // Simulate slow reporting (e.g. Gemini API call)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-1',
+    };
+
+    // Act
+    // 1. Start execution
+    const schedulePromise = scheduler.schedule(
+      [request],
+      abortController.signal,
+    );
+
+    // 2. Wait just enough for it to finish and enter checkAndNotifyCompletion
+    // (awaiting our slow mock)
+    await vi.waitFor(() => {
+      expect(completionCallCount).toBe(1);
+    });
+
+    // 3. Trigger a concurrent completion event (e.g. via cancelAll)
+    scheduler.cancelAll(abortController.signal);
+
+    await schedulePromise;
+
+    // Assert
+    // Even though cancelAll was called while the first completion was in
+    // progress, it should not have triggered a SECOND completion call because
+    // the first one was still 'finalizing' and will drain any new tools.
+    expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+  });
 });
