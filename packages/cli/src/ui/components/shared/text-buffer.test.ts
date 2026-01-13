@@ -24,6 +24,10 @@ import {
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
+  calculateTransformationsForLine,
+  calculateTransformedLine,
+  getTransformUnderCursor,
+  getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
 
@@ -31,6 +35,8 @@ const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
   logicalToVisualMap: [[[0, 0]]],
   visualToLogicalMap: [[0, 0]],
+  transformedToLogicalMaps: [[]],
+  visualToTransformedMap: [],
 };
 
 const initialState: TextBufferState = {
@@ -44,6 +50,7 @@ const initialState: TextBufferState = {
   selectionAnchor: null,
   viewportWidth: 80,
   viewportHeight: 24,
+  transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
 };
 
@@ -636,6 +643,46 @@ describe('useTextBuffer', () => {
       const shortText = 'ab';
       act(() => result.current.insert(shortText, { paste: true }));
       expect(getBufferState(result).text).toBe(shortText);
+    });
+
+    it('should prepend @ to multiple valid file paths on insert', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/file1.txt', '/path/to/file2.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/file1.txt /path/to/file2.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/file1.txt @/path/to/file2.txt ',
+      );
+    });
+
+    it('should handle multiple paths with escaped spaces', () => {
+      // Use Set to model reality: individual paths exist, combined string doesn't
+      const validPaths = new Set(['/path/to/my file.txt', '/other/path.txt']);
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: (p) => validPaths.has(p) }),
+      );
+      const filePaths = '/path/to/my\\ file.txt /other/path.txt';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/path/to/my\\ file.txt @/other/path.txt ',
+      );
+    });
+
+    it('should only prepend @ to valid paths in multi-path paste', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport,
+          isValidPath: (p) => p.endsWith('.txt'),
+        }),
+      );
+      const filePaths = '/valid/file.txt /invalid/file.jpg';
+      act(() => result.current.insert(filePaths, { paste: true }));
+      expect(getBufferState(result).text).toBe(
+        '@/valid/file.txt /invalid/file.jpg ',
+      );
     });
   });
 
@@ -2338,6 +2385,185 @@ describe('Unicode helper functions', () => {
       // wordLeft -> start of line (should stay at 0)
       act(() => result.current.move('wordLeft'));
       expect(result.current.cursor[1]).toBe(0);
+    });
+  });
+});
+
+describe('Transformation Utilities', () => {
+  describe('getTransformedImagePath', () => {
+    it('should transform a simple image path', () => {
+      expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
+    });
+
+    it('should handle paths with directories', () => {
+      expect(getTransformedImagePath('@path/to/image.jpg')).toBe(
+        '[Image image.jpg]',
+      );
+    });
+
+    it('should truncate long filenames', () => {
+      expect(getTransformedImagePath('@verylongfilename1234567890.png')).toBe(
+        '[Image ...1234567890.png]',
+      );
+    });
+
+    it('should handle different image extensions', () => {
+      expect(getTransformedImagePath('@test.jpg')).toBe('[Image test.jpg]');
+      expect(getTransformedImagePath('@test.jpeg')).toBe('[Image test.jpeg]');
+      expect(getTransformedImagePath('@test.gif')).toBe('[Image test.gif]');
+      expect(getTransformedImagePath('@test.webp')).toBe('[Image test.webp]');
+      expect(getTransformedImagePath('@test.svg')).toBe('[Image test.svg]');
+      expect(getTransformedImagePath('@test.bmp')).toBe('[Image test.bmp]');
+    });
+
+    it('should handle POSIX-style forward-slash paths on any platform', () => {
+      const input = '@C:/Users/foo/screenshots/image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle Windows-style backslash paths on any platform', () => {
+      const input = '@C:\\Users\\foo\\screenshots\\image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle escaped spaces in paths', () => {
+      const input = '@path/to/my\\ file.png';
+      expect(getTransformedImagePath(input)).toBe('[Image my file.png]');
+    });
+  });
+
+  describe('getTransformationsForLine', () => {
+    it('should find transformations in a line', () => {
+      const line = 'Check out @test.png and @another.jpg';
+      const result = calculateTransformationsForLine(line);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        logicalText: '@test.png',
+        collapsedText: '[Image test.png]',
+      });
+      expect(result[1]).toMatchObject({
+        logicalText: '@another.jpg',
+        collapsedText: '[Image another.jpg]',
+      });
+    });
+
+    it('should handle no transformations', () => {
+      const line = 'Just some regular text';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformationsForLine('');
+      expect(result).toEqual([]);
+    });
+
+    it('should keep adjacent image paths as separate transformations', () => {
+      const line = '@a.png@b.png@c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+      expect(result[0].logicalText).toBe('@a.png');
+      expect(result[1].logicalText).toBe('@b.png');
+      expect(result[2].logicalText).toBe('@c.png');
+    });
+
+    it('should handle multiple transformations in a row', () => {
+      const line = '@a.png @b.png @c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  describe('getTransformUnderCursor', () => {
+    const transformations = [
+      {
+        logStart: 5,
+        logEnd: 14,
+        logicalText: '@test.png',
+        collapsedText: '[Image @test.png]',
+      },
+      {
+        logStart: 20,
+        logEnd: 31,
+        logicalText: '@another.jpg',
+        collapsedText: '[Image @another.jpg]',
+      },
+    ];
+
+    it('should find transformation when cursor is inside it', () => {
+      const result = getTransformUnderCursor(0, 7, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at start', () => {
+      const result = getTransformUnderCursor(0, 5, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at end', () => {
+      const result = getTransformUnderCursor(0, 14, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should return null when cursor is not on a transformation', () => {
+      const result = getTransformUnderCursor(0, 2, [transformations]);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty transformations array', () => {
+      const result = getTransformUnderCursor(0, 5, []);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('calculateTransformedLine', () => {
+    it('should transform a line with one transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      const result = calculateTransformedLine(line, 0, [0, 0], transformations);
+
+      expect(result.transformedLine).toBe('Check out [Image test.png]');
+      expect(result.transformedToLogMap).toHaveLength(27); // Length includes all characters in the transformed line
+
+      // Test that we have proper mappings
+      expect(result.transformedToLogMap[0]).toBe(0); // 'C'
+      expect(result.transformedToLogMap[9]).toBe(9); // ' ' before transformation
+    });
+
+    it('should handle cursor inside transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      // Cursor at '@' (position 10 in the line)
+      const result = calculateTransformedLine(
+        line,
+        0,
+        [0, 10],
+        transformations,
+      );
+
+      // Should show full path when cursor is on it
+      expect(result.transformedLine).toBe('Check out @test.png');
+      // When expanded, each character maps to itself
+      expect(result.transformedToLogMap[10]).toBe(10); // '@'
+    });
+
+    it('should handle line with no transformations', () => {
+      const line = 'Just some text';
+      const result = calculateTransformedLine(line, 0, [0, 0], []);
+
+      expect(result.transformedLine).toBe(line);
+      // Each visual position should map directly to logical position + trailing
+      expect(result.transformedToLogMap).toHaveLength(15); // 14 chars + 1 trailing
+      expect(result.transformedToLogMap[0]).toBe(0);
+      expect(result.transformedToLogMap[13]).toBe(13);
+      expect(result.transformedToLogMap[14]).toBe(14); // Trailing position
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformedLine('', 0, [0, 0], []);
+      expect(result.transformedLine).toBe('');
+      expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
     });
   });
 });
