@@ -125,6 +125,10 @@ describe('mcp list command', () => {
           'stdio-server': { command: '/path/to/server', args: ['arg1'] },
           'sse-server': { url: 'https://example.com/sse' },
           'http-server': { httpUrl: 'https://example.com/http' },
+          'http-server-with-type': {
+            url: 'https://example.com/http',
+            type: 'http',
+          },
         },
       },
     });
@@ -148,6 +152,11 @@ describe('mcp list command', () => {
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
         'http-server: https://example.com/http (http) - Connected',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'http-server-with-type: https://example.com/http (http) - Connected',
       ),
     );
   });
