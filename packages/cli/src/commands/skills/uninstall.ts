@@ -41,7 +41,7 @@ export async function handleUninstall(args: UninstallArgs) {
 }
 
 export const uninstallCommand: CommandModule = {
-  command: 'uninstall <name>',
+  command: 'uninstall <name> [--scope]',
   describe: 'Uninstalls an agent skill by name.',
   builder: (yargs) =>
     yargs

@@ -46,7 +46,7 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install <source>',
+  command: 'install <source> [--scope] [--path]',
   describe:
     'Installs an agent skill from a git repository URL or a local path.',
   builder: (yargs) =>
