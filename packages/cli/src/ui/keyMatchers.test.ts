@@ -39,7 +39,7 @@ describe('keyMatchers', () => {
     // Cursor movement
     {
       command: Command.HOME,
-      positive: [createKey('a', { ctrl: true })],
+      positive: [createKey('a', { ctrl: true }), createKey('home')],
       negative: [
         createKey('a'),
         createKey('a', { shift: true }),
@@ -48,12 +48,40 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.END,
-      positive: [createKey('e', { ctrl: true })],
+      positive: [createKey('e', { ctrl: true }), createKey('end')],
       negative: [
         createKey('e'),
         createKey('e', { shift: true }),
         createKey('a', { ctrl: true }),
       ],
+    },
+    {
+      command: Command.MOVE_LEFT,
+      positive: [createKey('left'), createKey('b', { ctrl: true })],
+      negative: [createKey('left', { ctrl: true }), createKey('b')],
+    },
+    {
+      command: Command.MOVE_RIGHT,
+      positive: [createKey('right'), createKey('f', { ctrl: true })],
+      negative: [createKey('right', { ctrl: true }), createKey('f')],
+    },
+    {
+      command: Command.MOVE_WORD_LEFT,
+      positive: [
+        createKey('left', { ctrl: true }),
+        createKey('left', { meta: true }),
+        createKey('b', { meta: true }),
+      ],
+      negative: [createKey('left'), createKey('b', { ctrl: true })],
+    },
+    {
+      command: Command.MOVE_WORD_RIGHT,
+      positive: [
+        createKey('right', { ctrl: true }),
+        createKey('right', { meta: true }),
+        createKey('f', { meta: true }),
+      ],
+      negative: [createKey('right'), createKey('f', { ctrl: true })],
     },
 
     // Text deletion
@@ -73,12 +101,47 @@ describe('keyMatchers', () => {
       negative: [createKey('c'), createKey('k', { ctrl: true })],
     },
     {
+      command: Command.DELETE_CHAR_LEFT,
+      positive: [
+        createKey('backspace'),
+        { ...createKey('\x7f'), sequence: '\x7f' },
+        createKey('h', { ctrl: true }),
+      ],
+      negative: [createKey('h'), createKey('x', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_CHAR_RIGHT,
+      positive: [createKey('delete'), createKey('d', { ctrl: true })],
+      negative: [createKey('d'), createKey('x', { ctrl: true })],
+    },
+    {
       command: Command.DELETE_WORD_BACKWARD,
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
+        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
+        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
+        createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_WORD_FORWARD,
+      positive: [
+        createKey('delete', { ctrl: true }),
+        createKey('delete', { meta: true }),
+      ],
+      negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
+    },
+    {
+      command: Command.UNDO,
+      positive: [createKey('z', { ctrl: true, shift: false })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: true })],
+    },
+    {
+      command: Command.REDO,
+      positive: [createKey('z', { ctrl: true, shift: true })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: false })],
     },
 
     // Screen control

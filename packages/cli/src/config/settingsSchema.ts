@@ -376,12 +376,22 @@ const SETTINGS_SCHEMA = {
       },
       showStatusInTitle: {
         type: 'boolean',
-        label: 'Show Status in Title',
+        label: 'Show Thoughts in Title',
         category: 'UI',
         requiresRestart: false,
         default: false,
         description:
-          'Show Gemini CLI status and thoughts in the terminal window title',
+          'Show Gemini CLI model thoughts in the terminal window title during the working phase',
+        showInDialog: true,
+      },
+      dynamicWindowTitle: {
+        type: 'boolean',
+        label: 'Dynamic Window Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)',
         showInDialog: true,
       },
       showHomeDirectoryWarning: {
@@ -1081,6 +1091,18 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
         description: 'The number of lines to keep when truncating tool output.',
+        showInDialog: true,
+      },
+      disableLLMCorrection: {
+        type: 'boolean',
+        label: 'Disable LLM Correction',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: oneLine`
+          Disable LLM-based error correction for edit tools.
+          When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
+        `,
         showInDialog: true,
       },
       enableHooks: {
