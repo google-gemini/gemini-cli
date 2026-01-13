@@ -12,9 +12,11 @@ import { vi } from 'vitest';
 
 describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
+  const mockColorizeLine = vi.spyOn(CodeColorizer, 'colorizeLine');
 
   beforeEach(() => {
     mockColorizeCode.mockClear();
+    mockColorizeLine.mockClear();
   });
 
   const sanitizeOutput = (output: string | undefined, terminalWidth: number) =>
@@ -112,6 +114,8 @@ index 0000000..e69de29
       it('should render diff content for existing file (not calling colorizeCode directly for the whole block)', () => {
         const existingFileDiffContent = `
 
+  it('should render modified pair without calling colorizeLine for whole lines (uses intra-line spans)', () => {
+    const existingFileDiffContent = `
 diff --git a/test.txt b/test.txt
 index 0000001..0000002 100644
 --- a/test.txt
@@ -120,32 +124,51 @@ index 0000001..0000002 100644
 -old line
 +new line
 `;
-        const { lastFrame } = renderWithProviders(
-          <OverflowProvider>
-            <DiffRenderer
-              diffContent={existingFileDiffContent}
-              filename="test.txt"
-              terminalWidth={80}
-            />
-          </OverflowProvider>,
-          { useAlternateBuffer },
-        );
-        // colorizeCode is used internally by the line-by-line rendering, not for the whole block
-        expect(mockColorizeCode).not.toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: expect.stringContaining('old line'),
-          }),
-        );
-        expect(mockColorizeCode).not.toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: expect.stringContaining('new line'),
-          }),
-        );
-        expect(lastFrame()).toMatchSnapshot();
-      });
+    const { lastFrame } = render(
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={existingFileDiffContent}
+          filename="test.txt"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
+    );
+    // We don't call colorizeCode for the whole block, nor colorizeLine for paired lines
+    expect(mockColorizeCode).not.toHaveBeenCalled();
+    expect(mockColorizeLine).not.toHaveBeenCalled();
+    const output = lastFrame();
+    const lines = output!.split('\n');
+    expect(lines[0]).toBe('1 - old line');
+    expect(lines[1]).toBe('1 + new line');
+  });
 
-      it('should handle diff with only header and no changes', () => {
-        const noChangeDiff = `diff --git a/file.txt b/file.txt
+  it('should call colorizeLine for context lines', () => {
+    const diffWithContext = `
+diff --git a/example.js b/example.js
+index 111..222 100644
+--- a/example.js
+++ b/example.js
+@@ -1,3 +1,3 @@
+ const keep = 1
+-const oldValue = 2
++const newValue = 2
+ const alsoKeep = 3
+`;
+    render(
+      <OverflowProvider>
+        <DiffRenderer
+          diffContent={diffWithContext}
+          filename="example.js"
+          terminalWidth={80}
+        />
+      </OverflowProvider>,
+    );
+    // Should be called at least for the two context lines
+    expect(mockColorizeLine).toHaveBeenCalled();
+  });
+
+  it('should handle diff with only header and no changes', () => {
+    const noChangeDiff = `diff --git a/file.txt b/file.txt
 index 1234567..1234567 100644
 --- a/file.txt
 +++ b/file.txt

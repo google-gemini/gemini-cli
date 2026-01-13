@@ -7,6 +7,7 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { diffWords, diffChars } from 'diff';
 import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -264,44 +265,178 @@ const renderDiffContent = (
   let lastLineNumber: number | null = null;
   const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
 
-  const content = displayableLines.reduce<React.ReactNode[]>(
-    (acc, line, index) => {
-      // Determine the relevant line number for gap calculation based on type
-      let relevantLineNumberForGapCalc: number | null = null;
-      if (line.type === 'add' || line.type === 'context') {
-        relevantLineNumberForGapCalc = line.newLine ?? null;
-      } else if (line.type === 'del') {
-        // For deletions, the gap is typically in relation to the original file's line numbering
-        relevantLineNumberForGapCalc = line.oldLine ?? null;
-      }
+  // Build render items, pairing adjacent deletion and addition lines to enable intra-line highlighting
+  type RenderItem =
+    | { kind: 'context'; line: DiffLine }
+    | { kind: 'add'; line: DiffLine }
+    | { kind: 'del'; line: DiffLine }
+    | { kind: 'pair'; delLine: DiffLine; addLine: DiffLine };
 
-      if (
-        lastLineNumber !== null &&
-        relevantLineNumberForGapCalc !== null &&
-        relevantLineNumberForGapCalc >
-          lastLineNumber + MAX_CONTEXT_LINES_WITHOUT_GAP + 1
-      ) {
-        acc.push(
-          <Box key={`gap-${index}`}>
-            {useMaxSizedBox ? (
+  const renderItems: RenderItem[] = [];
+  for (let i = 0; i < displayableLines.length; i++) {
+    const current = displayableLines[i];
+    const next = displayableLines[i + 1];
+    if (current.type === 'del' && next && next.type === 'add') {
+      renderItems.push({ kind: 'pair', delLine: current, addLine: next });
+      i++; // skip the paired add line
+      continue;
+    }
+    if (current.type === 'context') {
+      renderItems.push({ kind: 'context', line: current });
+    } else if (current.type === 'add') {
+      renderItems.push({ kind: 'add', line: current });
+    } else if (current.type === 'del') {
+      renderItems.push({ kind: 'del', line: current });
+    }
+  }
+
+  // Helper: compute inline diff parts for pair rendering
+  function computeInlineParts(oldText: string, newText: string) {
+    let parts = diffWords(oldText, newText, { ignoreCase: false });
+    if (parts.every((p) => !p.added && !p.removed)) {
+      parts = diffChars(oldText, newText);
+    }
+    return parts;
+  }
+
+  return (
+    <MaxSizedBox
+      maxHeight={availableTerminalHeight}
+      maxWidth={terminalWidth}
+      key={key}
+    >
+      {renderItems.reduce<React.ReactNode[]>((acc, item, index) => {
+        // Determine the relevant line number for gap calculation based on type
+        let relevantLineNumberForGapCalc: number | null = null;
+        if (item.kind === 'add' || item.kind === 'context') {
+          relevantLineNumberForGapCalc = item.line.newLine ?? null;
+        } else if (item.kind === 'del') {
+          // For deletions, the gap is typically in relation to the original file's line numbering
+          relevantLineNumberForGapCalc = item.line.oldLine ?? null;
+        } else if (item.kind === 'pair') {
+          // For pairs, use the addition side for gap calculation (consistent with how added/context advance)
+          relevantLineNumberForGapCalc = item.addLine.newLine ?? null;
+        }
+
+        if (
+          lastLineNumber !== null &&
+          relevantLineNumberForGapCalc !== null &&
+          relevantLineNumberForGapCalc >
+            lastLineNumber + MAX_CONTEXT_LINES_WITHOUT_GAP + 1
+        ) {
+          acc.push(
+            <Box key={`gap-${index}`}>
               <Text wrap="truncate" color={semanticTheme.text.secondary}>
                 {'═'.repeat(terminalWidth)}
               </Text>
-            ) : (
-              // We can use a proper separator when not using max sized box.
-              <Box
-                borderStyle="double"
-                borderLeft={false}
-                borderRight={false}
-                borderBottom={false}
-                width={terminalWidth}
-                borderColor={semanticTheme.text.secondary}
-                marginRight={1}
-              ></Box>
-            )}
-          </Box>,
-        );
-      }
+            </Box>,
+          );
+        }
+
+        const lineKey = `diff-line-${index}`;
+        let gutterNumStr = '';
+        let prefixSymbol = ' ';
+
+        switch (item.kind) {
+          case 'add':
+            gutterNumStr = (item.line.newLine ?? '').toString();
+            prefixSymbol = '+';
+            lastLineNumber = item.line.newLine ?? null;
+            break;
+          case 'del':
+            gutterNumStr = (item.line.oldLine ?? '').toString();
+            prefixSymbol = '-';
+            // For deletions, update lastLineNumber based on oldLine if it's advancing.
+            // This helps manage gaps correctly if there are multiple consecutive deletions
+            // or if a deletion is followed by a context line far away in the original file.
+            if (item.line.oldLine !== undefined) {
+              lastLineNumber = item.line.oldLine;
+            }
+            break;
+          case 'context':
+            gutterNumStr = (item.line.newLine ?? '').toString();
+            prefixSymbol = ' ';
+            lastLineNumber = item.line.newLine ?? null;
+            break;
+          case 'pair':
+            lastLineNumber = item.addLine.newLine ?? null;
+            break;
+          default:
+            return acc;
+        }
+
+        // Pair-specific rendering with intra-line highlights
+        if (item.kind === 'pair') {
+          const delContent = item.delLine.content.substring(baseIndentation);
+          const addContent = item.addLine.content.substring(baseIndentation);
+          const parts = computeInlineParts(delContent, addContent);
+
+          const delGutter = (item.delLine.oldLine ?? '').toString();
+          const addGutter = (item.addLine.newLine ?? '').toString();
+
+          acc.push(
+            <Box key={`${lineKey}-del`} flexDirection="row">
+              <Text
+                color={semanticTheme.text.secondary}
+                backgroundColor={semanticTheme.background.diff.removed}
+              >
+                {delGutter.padStart(gutterWidth)}{' '}
+              </Text>
+              <Text
+                backgroundColor={semanticTheme.background.diff.removed}
+                wrap="wrap"
+              >
+                <Text color={semanticTheme.status.error}>-</Text>{' '}
+                {parts.map((p, i) =>
+                  p.removed ? (
+                    <Text
+                      key={`d-${i}`}
+                      inverse
+                      color={semanticTheme.status.error}
+                    >
+                      {p.value}
+                    </Text>
+                  ) : !p.added ? (
+                    <Text key={`d-${i}`}>{p.value}</Text>
+                  ) : null,
+                )}
+              </Text>
+            </Box>,
+          );
+
+          acc.push(
+            <Box key={`${lineKey}-add`} flexDirection="row">
+              <Text
+                color={semanticTheme.text.secondary}
+                backgroundColor={semanticTheme.background.diff.added}
+              >
+                {addGutter.padStart(gutterWidth)}{' '}
+              </Text>
+              <Text
+                backgroundColor={semanticTheme.background.diff.added}
+                wrap="wrap"
+              >
+                <Text color={semanticTheme.status.success}>+</Text>{' '}
+                {parts.map((p, i) =>
+                  p.added ? (
+                    <Text
+                      key={`a-${i}`}
+                      inverse
+                      color={semanticTheme.status.success}
+                    >
+                      {p.value}
+                    </Text>
+                  ) : !p.removed ? (
+                    <Text key={`a-${i}`}>{p.value}</Text>
+                  ) : null,
+                )}
+              </Text>
+            </Box>,
+          );
+          return acc;
+        }
+
+        const displayContent = item.line.content.substring(baseIndentation);
 
       const lineKey = `diff-line-${index}`;
       let gutterNumStr = '';
@@ -368,47 +503,48 @@ const renderDiffContent = (
           ) : (
             <Text
               backgroundColor={
-                line.type === 'add'
+                item.kind === 'add'
                   ? semanticTheme.background.diff.added
-                  : semanticTheme.background.diff.removed
+                  : item.kind === 'del'
+                    ? semanticTheme.background.diff.removed
+                    : undefined
               }
               wrap="wrap"
             >
+              {gutterNumStr.padStart(gutterWidth)}{' '}
+            </Text>
+            {item.kind === 'context' ? (
+              <>
+                <Text>{prefixSymbol} </Text>
+                <Text wrap="wrap">
+                  {colorizeLine(displayContent, language)}
+                </Text>
+              </>
+            ) : (
               <Text
-                color={
-                  line.type === 'add'
-                    ? semanticTheme.status.success
-                    : semanticTheme.status.error
+                backgroundColor={
+                  item.kind === 'add'
+                    ? semanticTheme.background.diff.added
+                    : semanticTheme.background.diff.removed
                 }
               >
-                {prefixSymbol}
-              </Text>{' '}
-              {colorizeLine(displayContent, language)}
-            </Text>
-          )}
-        </Box>,
-      );
-      return acc;
-    },
-    [],
-  );
-
-  if (useMaxSizedBox) {
-    return (
-      <MaxSizedBox
-        maxHeight={availableTerminalHeight}
-        maxWidth={terminalWidth}
-        key={key}
-      >
-        {content}
-      </MaxSizedBox>
-    );
-  }
-
-  return (
-    <Box key={key} flexDirection="column" width={terminalWidth} flexShrink={0}>
-      {content}
-    </Box>
+                <Text
+                  color={
+                    item.kind === 'add'
+                      ? semanticTheme.status.success
+                      : semanticTheme.status.error
+                  }
+                >
+                  {prefixSymbol}
+                </Text>{' '}
+                {colorizeLine(displayContent, language)}
+              </Text>
+            )}
+          </Box>,
+        );
+        return acc;
+      }, [])}
+    </MaxSizedBox>
   );
 };
 
