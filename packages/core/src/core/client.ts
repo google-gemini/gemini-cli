@@ -40,6 +40,7 @@ import {
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
 import type { DefaultHookOutput } from '../hooks/types.js';
+import type { AfterAgentHookOutput } from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -800,26 +801,37 @@ export class GeminiClient {
           turn,
         );
 
-        if (hookOutput?.shouldStopExecution()) {
+        // Cast to AfterAgentHookOutput for access to shouldClearContext()
+        const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
+
+        if (afterAgentOutput?.shouldStopExecution()) {
           yield {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
-              reason: hookOutput.getEffectiveReason(),
-              systemMessage: hookOutput.systemMessage,
+              reason: afterAgentOutput.getEffectiveReason(),
+              systemMessage: afterAgentOutput.systemMessage,
             },
           };
+          // Clear context if requested (honor both stop + clear)
+          if (afterAgentOutput.shouldClearContext()) {
+            await this.resetChat();
+          }
           return turn;
         }
 
-        if (hookOutput?.isBlockingDecision()) {
-          const continueReason = hookOutput.getEffectiveReason();
+        if (afterAgentOutput?.isBlockingDecision()) {
+          const continueReason = afterAgentOutput.getEffectiveReason();
           yield {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
-              systemMessage: hookOutput.systemMessage,
+              systemMessage: afterAgentOutput.systemMessage,
             },
           };
+          // Clear context if requested
+          if (afterAgentOutput.shouldClearContext()) {
+            await this.resetChat();
+          }
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,

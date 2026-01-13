@@ -151,6 +151,49 @@ describe('Hooks Agent Flow', () => {
       // The fake response contains "Hello World"
       expect(afterAgentLog?.hookCall.stdout).toContain('Hello World');
     });
+
+    it('should process clearContext in AfterAgent hook output', async () => {
+      await rig.setup('should process clearContext in AfterAgent hook output', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-agent.responses',
+        ),
+        settings: {
+          hooks: {
+            enabled: true,
+            AfterAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node -e "console.log(JSON.stringify({decision: 'block', reason: 'Security policy triggered', hookSpecificOutput: {hookEventName: 'AfterAgent', clearContext: true}}))"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      const result = await rig.run({ args: 'Hello test' });
+
+      // Verify the hook fired
+      const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
+      expect(hookTelemetryFound).toBeTruthy();
+
+      const hookLogs = rig.readHookLogs();
+      const afterAgentLog = hookLogs.find(
+        (log) => log.hookCall.hook_event_name === 'AfterAgent',
+      );
+
+      expect(afterAgentLog).toBeDefined();
+      // Verify hook output contains clearContext
+      expect(afterAgentLog?.hookCall.stdout).toContain('clearContext');
+      expect(afterAgentLog?.hookCall.stdout).toContain('true');
+      // Verify blocking reason is present
+      expect(result).toContain('Security policy triggered');
+    });
   });
 
   describe('Multi-step Loops', () => {

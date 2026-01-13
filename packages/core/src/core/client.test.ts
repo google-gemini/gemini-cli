@@ -2894,6 +2894,7 @@ ${JSON.stringify(
           finalOutput: {
             shouldStopExecution: () => true,
             getEffectiveReason: () => 'Stopped after agent',
+            shouldClearContext: () => false,
             systemMessage: undefined,
           },
           allOutputs: [],
@@ -2928,6 +2929,7 @@ ${JSON.stringify(
               shouldStopExecution: () => false,
               isBlockingDecision: () => true,
               getEffectiveReason: () => 'Please explain',
+              shouldClearContext: () => false,
               systemMessage: undefined,
             },
             allOutputs: [],
@@ -2939,6 +2941,7 @@ ${JSON.stringify(
             finalOutput: {
               shouldStopExecution: () => false,
               isBlockingDecision: () => false,
+              shouldClearContext: () => false,
               systemMessage: undefined,
             },
             allOutputs: [],
