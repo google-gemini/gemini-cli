@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { Config } from '../config/config.js';
@@ -117,6 +118,26 @@ export class AgentRegistry {
       coreEvents.emitFeedback(
         'info',
         'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+      );
+    }
+
+    // Load extension-level agents from active extensions
+    const extensions = this.config.getExtensions();
+    const activeExtensions = extensions.filter((ext) => ext.isActive);
+    for (const extension of activeExtensions) {
+      const extensionAgentsDir = path.join(extension.path, 'agents');
+      const extensionAgents = await loadAgentsFromDirectory(extensionAgentsDir);
+      for (const error of extensionAgents.errors) {
+        debugLogger.warn(
+          `[AgentRegistry] Error loading agent from extension ${extension.name}: ${error.message}`,
+        );
+        coreEvents.emitFeedback(
+          'error',
+          `Agent loading error from extension ${extension.name}: ${error.message}`,
+        );
+      }
+      await Promise.allSettled(
+        extensionAgents.agents.map((agent) => this.registerAgent(agent)),
       );
     }
 

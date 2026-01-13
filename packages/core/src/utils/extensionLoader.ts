@@ -112,6 +112,11 @@ export abstract class ExtensionLoader {
       // cache, we want to only do it once.
       await refreshServerHierarchicalMemory(this.config);
       await this.config.getHookSystem()?.initialize();
+      
+      // Refresh agent registry to pick up any new agents from extensions
+      if (this.config.isAgentsEnabled()) {
+        await this.config.getAgentRegistry().reload();
+      }
     }
   }
 
