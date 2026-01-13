@@ -9,7 +9,7 @@ import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Config } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import type { SlashCommand, ToolActionReturn } from './types.js';
 
 describe('agentsCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -184,7 +184,7 @@ describe('agentsCommand', () => {
       });
     });
 
-    it('should return submit_prompt action with debug prompt for local agent', async () => {
+    it('should return tool action to delegate to agent-debugger', async () => {
       const mockAgent = {
         name: 'test-agent',
         description: 'A test agent',
@@ -199,15 +199,17 @@ describe('agentsCommand', () => {
       const result = (await debugCommand.action!(
         mockContext,
         'test-agent prompt failure',
-      )) as SlashCommandActionReturn;
+      )) as ToolActionReturn;
 
-      expect(result.type).toBe('submit_prompt');
-      if (result.type === 'submit_prompt') {
-        expect(result.content).toContain('I am debugging a custom agent named');
-        expect(result.content).toContain('test-agent');
-        expect(result.content).toContain('prompt failure');
-        expect(result.content).toContain('You are a helper.');
-      }
+      expect(result.type).toBe('tool');
+      expect(result.toolName).toBe('delegate_to_agent');
+      expect(result.toolArgs).toEqual({
+        agent_name: 'agent-debugger',
+        target_agent_name: 'test-agent',
+        agent_definition: expect.stringContaining('Name: test-agent'),
+        problem_description: 'prompt failure',
+      });
+      expect(result.toolArgs.agent_definition).toContain('You are a helper.');
     });
   });
 });

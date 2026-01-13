@@ -11,6 +11,7 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { AgentDebuggerAgent } from './agent-debugger.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
@@ -193,6 +194,8 @@ export class AgentRegistry {
     if (cliHelpSettings.enabled) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
+
+    this.registerLocalAgent(AgentDebuggerAgent);
   }
 
   private async refreshAgents(): Promise<void> {

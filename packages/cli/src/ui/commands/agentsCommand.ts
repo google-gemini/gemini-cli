@@ -82,7 +82,7 @@ const agentsRefreshCommand: SlashCommand = {
 
 const agentsDebugCommand: SlashCommand = {
   name: 'debug',
-  description: 'Debug a custom agent prompt',
+  description: "Debug why a sub agent isn't being called consistently",
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext, args: string) => {
@@ -135,27 +135,28 @@ const agentsDebugCommand: SlashCommand = {
       };
     }
 
-    let debugPrompt = `I am debugging a custom agent named "${agent.name}".\n`;
-    debugPrompt += `The user provided the following prompt which did not trigger the agent or worked incorrectly:\n"${problem}"\n\n`;
-    debugPrompt += `Here is the agent definition:\n`;
-    debugPrompt += `Name: ${agent.name}\n`;
-    debugPrompt += `Description: ${agent.description}\n`;
-    debugPrompt += `Kind: ${agent.kind}\n`;
+    let agentDefinition = `Name: ${agent.name}\n`;
+    agentDefinition += `Description: ${agent.description}\n`;
+    agentDefinition += `Kind: ${agent.kind}\n`;
 
     if (agent.kind === 'local') {
-      debugPrompt += `System Prompt:\n${
+      agentDefinition += `System Prompt:\n${
         agent.promptConfig.systemPrompt || '(No system prompt)'
       }\n`;
       if (agent.promptConfig.query) {
-        debugPrompt += `Query Template: ${agent.promptConfig.query}\n`;
+        agentDefinition += `Query Template: ${agent.promptConfig.query}\n`;
       }
     }
 
-    debugPrompt += `\nPlease diagnose why the custom agent wasn't called and offer suggestions.`;
-
     return {
-      type: 'submit_prompt',
-      content: debugPrompt,
+      type: 'tool',
+      toolName: 'delegate_to_agent',
+      toolArgs: {
+        agent_name: 'agent-debugger',
+        target_agent_name: agentName,
+        agent_definition: agentDefinition,
+        problem_description: problem,
+      },
     };
   },
 };
