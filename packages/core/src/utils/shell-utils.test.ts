@@ -242,6 +242,11 @@ describe('hasRedirection', () => {
     // A pipe is a 'pipeline' node.
     expect(hasRedirection('echo hello | cat')).toBe(false);
   });
+
+  it('should return false when redirection characters are inside quotes in bash', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(hasRedirection('echo "a > b"')).toBe(false);
+  });
 });
 
 describeWindowsOnly('PowerShell integration', () => {

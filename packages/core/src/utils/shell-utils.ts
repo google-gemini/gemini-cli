@@ -643,9 +643,7 @@ export function hasRedirection(command: string): boolean {
         if (child) stack.push(child);
       }
     }
-    // If tree traversal didn't find specific redirection nodes but we saw redirection chars,
-    // we use the fallback check. This is safer.
-    return fallbackCheck();
+    return false;
   }
 
   return fallbackCheck();
