@@ -100,6 +100,8 @@ vi.mock('./useKeypress.js', () => ({
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
+    activeShellPtyId: null,
+    lastShellOutputTime: 0,
   }),
 }));
 
@@ -238,6 +240,7 @@ describe('useGeminiStream', () => {
       mockMarkToolsAsSubmitted,
       vi.fn(), // setToolCallsForDisplay
       mockCancelAllToolCalls,
+      0, // lastToolOutputTime
     ]);
 
     // Reset mocks for GeminiClient instance methods (startChat and sendMessageStream)
@@ -2484,6 +2487,61 @@ describe('useGeminiStream', () => {
         'gemini-2.5-pro',
         'gemini-2.5-flash',
       );
+    });
+
+    it('should update lastOutputTime on Gemini thought and content events', async () => {
+      vi.useFakeTimers();
+      const startTime = 1000000;
+      vi.setSystemTime(startTime);
+
+      // Mock a stream that yields a thought then content
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { subject: 'Thinking...', description: '' },
+          };
+          // Advance time for the next event
+          vi.advanceTimersByTime(1000);
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Hello',
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      // Submit query
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      // Verify lastOutputTime was updated
+      // It should be the time of the last event (startTime + 1000)
+      expect(result.current.lastOutputTime).toBe(startTime + 1000);
+
+      vi.useRealTimers();
     });
   });
 
