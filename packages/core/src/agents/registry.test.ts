@@ -253,6 +253,9 @@ describe('AgentRegistry', () => {
           isActive: true,
           agents: [extensionAgent],
           version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
         },
       ];
       const mockConfig = makeFakeConfig({
@@ -277,6 +280,9 @@ describe('AgentRegistry', () => {
           isActive: false,
           agents: [extensionAgent],
           version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
         },
       ];
       const mockConfig = makeFakeConfig({
