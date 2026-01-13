@@ -24,6 +24,8 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import { OpenAICompatibleContentGenerator } from '../providers/openai/openAIContentGenerator.js';
+import { Provider, PROVIDER_DEFAULTS } from '../providers/types.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -52,6 +54,8 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
+  USE_GLM = 'glm-api-key',
+  USE_DEEPSEEK = 'deepseek-api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -59,6 +63,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  provider?: Provider;
 };
 
 export async function createContentGeneratorConfig(
@@ -73,6 +78,8 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+  const glmApiKey = process.env['GLM_API_KEY'] || undefined;
+  const deepseekApiKey = process.env['DEEPSEEK_API_KEY'] || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
@@ -101,6 +108,20 @@ export async function createContentGeneratorConfig(
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
+    return contentGeneratorConfig;
+  }
+
+  // GLM provider
+  if (authType === AuthType.USE_GLM && glmApiKey) {
+    contentGeneratorConfig.apiKey = glmApiKey;
+    contentGeneratorConfig.provider = Provider.GLM;
+    return contentGeneratorConfig;
+  }
+
+  // DeepSeek provider
+  if (authType === AuthType.USE_DEEPSEEK && deepseekApiKey) {
+    contentGeneratorConfig.apiKey = deepseekApiKey;
+    contentGeneratorConfig.provider = Provider.DEEPSEEK;
     return contentGeneratorConfig;
   }
 
@@ -182,6 +203,37 @@ export async function createContentGenerator(
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
+
+    // GLM provider (OpenAI-compatible)
+    if (config.authType === AuthType.USE_GLM && config.apiKey) {
+      const providerDefaults = PROVIDER_DEFAULTS[Provider.GLM];
+      return new LoggingContentGenerator(
+        new OpenAICompatibleContentGenerator({
+          provider: Provider.GLM,
+          apiKey: config.apiKey,
+          baseUrl: providerDefaults.baseUrl,
+          model: gcConfig.getModel(),
+          supportsThinking: providerDefaults.supportsThinking,
+        }),
+        gcConfig,
+      );
+    }
+
+    // DeepSeek provider (OpenAI-compatible)
+    if (config.authType === AuthType.USE_DEEPSEEK && config.apiKey) {
+      const providerDefaults = PROVIDER_DEFAULTS[Provider.DEEPSEEK];
+      return new LoggingContentGenerator(
+        new OpenAICompatibleContentGenerator({
+          provider: Provider.DEEPSEEK,
+          apiKey: config.apiKey,
+          baseUrl: providerDefaults.baseUrl,
+          model: gcConfig.getModel(),
+          supportsThinking: providerDefaults.supportsThinking,
+        }),
+        gcConfig,
+      );
+    }
+
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
     );

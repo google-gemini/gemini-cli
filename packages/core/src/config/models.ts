@@ -170,3 +170,62 @@ export function isAutoModel(model: string): boolean {
 export function supportsMultimodalFunctionResponse(model: string): boolean {
   return model.startsWith('gemini-3-');
 }
+
+// ============ GLM Models ============
+
+export const DEFAULT_GLM_MODEL = 'glm-z1-airx';
+
+export const GLM_MODELS = new Set([
+  'glm-z1-airx',
+  'glm-4-plus',
+  'glm-4-air',
+  'glm-4-airx',
+  'glm-4-long',
+  'glm-4-flash',
+]);
+
+/**
+ * Checks if the model is a GLM model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is a GLM model.
+ */
+export function isGLMModel(model: string): boolean {
+  return GLM_MODELS.has(model) || model.startsWith('glm-');
+}
+
+// ============ DeepSeek Models ============
+
+export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-reasoner';
+
+export const DEEPSEEK_MODELS = new Set([
+  'deepseek-reasoner',
+  'deepseek-chat',
+  'deepseek-coder',
+]);
+
+/**
+ * Checks if the model is a DeepSeek model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is a DeepSeek model.
+ */
+export function isDeepSeekModel(model: string): boolean {
+  return DEEPSEEK_MODELS.has(model) || model.startsWith('deepseek-');
+}
+
+// ============ Provider Detection ============
+
+export type ModelProvider = 'gemini' | 'glm' | 'deepseek';
+
+/**
+ * Determines the provider for a given model.
+ *
+ * @param model The model name to check.
+ * @returns The provider name ('gemini', 'glm', or 'deepseek').
+ */
+export function getProviderForModel(model: string): ModelProvider {
+  if (isGLMModel(model)) return 'glm';
+  if (isDeepSeekModel(model)) return 'deepseek';
+  return 'gemini';
+}

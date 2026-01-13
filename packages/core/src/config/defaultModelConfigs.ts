@@ -219,6 +219,74 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-2.5-pro',
       },
     },
+    // ============ GLM Models ============
+    'glm-z1-airx': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'glm-z1-airx',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      },
+    },
+    'glm-4-plus': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'glm-4-plus',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      },
+    },
+    'glm-4-flash': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'glm-4-flash',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      },
+    },
+    // ============ DeepSeek Models ============
+    'deepseek-reasoner': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'deepseek-reasoner',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+          },
+        },
+      },
+    },
+    'deepseek-chat': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'deepseek-chat',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: false,
+          },
+        },
+      },
+    },
+    'deepseek-coder': {
+      extends: 'chat-base',
+      modelConfig: {
+        model: 'deepseek-coder',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: false,
+          },
+        },
+      },
+    },
   },
   overrides: [
     {
