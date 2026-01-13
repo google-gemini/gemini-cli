@@ -29,9 +29,9 @@ topics on:
       added to your organization's Gemini Code Assist subscription.
 
 - **Error:
-  `Failed to login. Message: Your current account is not eligible for Gemini Code Assist for individuals because it is not currently available in your location.`**
+  `Failed to login. Message: Your current account is not eligible... because it is not currently available in your location.`**
   - **Cause:** Gemini CLI doeds not currently support your location. For a full
-    list of supported locations, see the following:
+    list of supported locations, see the following pages:
     - [Available locations for Gemini Code Assist for individuals](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
     - [Available locations for Google AI Pro and Ultra where Gemini Code Assist (and Gemini CLI) is also available](https://developers.google.com/gemini-code-assist/resources/locations-pro-ultra)
 
