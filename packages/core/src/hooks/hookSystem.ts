@@ -18,6 +18,7 @@ import type {
   SessionStartSource,
   SessionEndReason,
   PreCompressTrigger,
+  DefaultHookOutput,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
 /**
@@ -120,25 +121,27 @@ export class HookSystem {
 
   async fireBeforeAgentEvent(
     prompt: string,
-  ): Promise<AggregatedHookResult | undefined> {
+  ): Promise<DefaultHookOutput | undefined> {
     if (!this.config.getEnableHooks()) {
       return undefined;
     }
-    return this.hookEventHandler.fireBeforeAgentEvent(prompt);
+    const result = await this.hookEventHandler.fireBeforeAgentEvent(prompt);
+    return result.finalOutput;
   }
 
   async fireAfterAgentEvent(
     prompt: string,
     response: string,
     stopHookActive: boolean = false,
-  ): Promise<AggregatedHookResult | undefined> {
+  ): Promise<DefaultHookOutput | undefined> {
     if (!this.config.getEnableHooks()) {
       return undefined;
     }
-    return this.hookEventHandler.fireAfterAgentEvent(
+    const result = await this.hookEventHandler.fireAfterAgentEvent(
       prompt,
       response,
       stopHookActive,
     );
+    return result.finalOutput;
   }
 }

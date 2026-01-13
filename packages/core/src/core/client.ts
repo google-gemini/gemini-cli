@@ -133,10 +133,9 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireBeforeAgentEvent(partToString(request));
-    const hookOutput = hookResult?.finalOutput;
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -187,10 +186,9 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
-    const hookOutput = hookResult?.finalOutput;
 
     return hookOutput;
   }
