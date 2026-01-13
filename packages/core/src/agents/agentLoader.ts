@@ -163,7 +163,7 @@ export async function parseAgentMarkdown(
   if (!match) {
     throw new AgentLoadError(
       filePath,
-      'Invalid markdown format. File must start with YAML frontmatter enclosed in "---".',
+      'Invalid agent definition: Missing mandatory YAML frontmatter. Agent Markdown files MUST start with YAML frontmatter enclosed in triple-dashes "---" (e.g., ---\nname: my-agent\n---).',
     );
   }
 
