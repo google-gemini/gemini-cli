@@ -69,12 +69,27 @@ export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 let currentGeminiMdFilename: string | string[] = DEFAULT_CONTEXT_FILENAME;
 
 export function setGeminiMdFilename(newFilename: string | string[]): void {
+  const validateFilename = (name: string): string => {
+    const trimmed = name.trim();
+    if (
+      trimmed.includes('/') ||
+      trimmed.includes('\\') ||
+      trimmed === '.' ||
+      trimmed === '..'
+    ) {
+      throw new Error(
+        `Invalid GEMINI.md filename: ${trimmed}. Filenames cannot contain path separators or be '.' or '..'.`,
+      );
+    }
+    return trimmed;
+  };
+
   if (Array.isArray(newFilename)) {
     if (newFilename.length > 0) {
-      currentGeminiMdFilename = newFilename.map((name) => name.trim());
+      currentGeminiMdFilename = newFilename.map(validateFilename);
     }
   } else if (newFilename && newFilename.trim() !== '') {
-    currentGeminiMdFilename = newFilename.trim();
+    currentGeminiMdFilename = validateFilename(newFilename);
   }
 }
 
@@ -299,6 +314,7 @@ export class MemoryTool
   static readonly Name = MEMORY_TOOL_NAME;
 
   constructor(messageBus: MessageBus) {
+    // Initialize the tool with its specific properties
     super(
       MemoryTool.Name,
       'SaveMemory',

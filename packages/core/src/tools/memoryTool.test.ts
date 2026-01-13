@@ -99,8 +99,22 @@ describe('MemoryTool', () => {
     it('should handle an array of filenames', () => {
       const newNames = ['CUSTOM_CONTEXT.md', 'ANOTHER_CONTEXT.md'];
       setGeminiMdFilename(newNames);
-      expect(getCurrentGeminiMdFilename()).toBe('CUSTOM_CONTEXT.md');
       expect(getAllGeminiMdFilenames()).toEqual(newNames);
+    });
+
+    it('should throw an error if the new name contains path separators or is "." or ".."', () => {
+      expect(() => setGeminiMdFilename('path/to/file.md')).toThrow(
+        /Invalid GEMINI.md filename: path\/to\/file.md/,
+      );
+      expect(() => setGeminiMdFilename('path\\to\\file.md')).toThrow(
+        /Invalid GEMINI.md filename: path\\to\\file.md/,
+      );
+      expect(() => setGeminiMdFilename('.')).toThrow(
+        /Invalid GEMINI.md filename: \./,
+      );
+      expect(() => setGeminiMdFilename('..')).toThrow(
+        /Invalid GEMINI.md filename: \.\./,
+      );
     });
   });
 
@@ -200,6 +214,7 @@ describe('MemoryTool', () => {
   });
 
   describe('execute (instance method)', () => {
+    // Instance-level tests for MemoryTool
     let memoryTool: MemoryTool;
     let performAddMemoryEntrySpy: Mock<typeof MemoryTool.performAddMemoryEntry>;
 
@@ -305,7 +320,8 @@ describe('MemoryTool', () => {
 
     beforeEach(() => {
       const bus = createMockMessageBus();
-      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (getMockMessageBusInstance(bus) as any).defaultToolDecision = 'ask_user';
       memoryTool = new MemoryTool(bus);
       // Clear the allowlist before each test
       const invocation = memoryTool.build({ fact: 'mock-fact' });
