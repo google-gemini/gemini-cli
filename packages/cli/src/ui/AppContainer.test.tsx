@@ -1021,6 +1021,16 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
         cancelOngoingRequest: vi.fn(),
+        handleApprovalModeChange: vi.fn(),
+        activePtyId: null,
+        loopDetectionConfirmationRequest: null,
+        backgroundShellCount: 0,
+        isBackgroundShellVisible: false,
+        toggleBackgroundShell: vi.fn(),
+        backgroundCurrentShell: vi.fn(),
+        backgroundShells: new Map(),
+        registerBackgroundShell: vi.fn(),
+        dismissBackgroundShell: vi.fn(),
       });
 
       // Act: Render the container
@@ -1062,6 +1072,16 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
         cancelOngoingRequest: vi.fn(),
+        handleApprovalModeChange: vi.fn(),
+        activePtyId: null,
+        loopDetectionConfirmationRequest: null,
+        backgroundShellCount: 0,
+        isBackgroundShellVisible: false,
+        toggleBackgroundShell: vi.fn(),
+        backgroundCurrentShell: vi.fn(),
+        backgroundShells: new Map(),
+        registerBackgroundShell: vi.fn(),
+        dismissBackgroundShell: vi.fn(),
       });
 
       // Act: Render the container
@@ -1304,6 +1324,15 @@ describe('AppContainer State Management', () => {
           cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime: 0,
+          handleApprovalModeChange: vi.fn(),
+          loopDetectionConfirmationRequest: null,
+          backgroundShellCount: 0,
+          isBackgroundShellVisible: false,
+          toggleBackgroundShell: vi.fn(),
+          backgroundCurrentShell: vi.fn(),
+          backgroundShells: new Map(),
+          registerBackgroundShell: vi.fn(),
+          dismissBackgroundShell: vi.fn(),
         });
 
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
@@ -1365,6 +1394,15 @@ describe('AppContainer State Management', () => {
           cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
+          handleApprovalModeChange: vi.fn(),
+          loopDetectionConfirmationRequest: null,
+          backgroundShellCount: 0,
+          isBackgroundShellVisible: false,
+          toggleBackgroundShell: vi.fn(),
+          backgroundCurrentShell: vi.fn(),
+          backgroundShells: new Map(),
+          registerBackgroundShell: vi.fn(),
+          dismissBackgroundShell: vi.fn(),
         }));
 
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
@@ -1391,6 +1429,15 @@ describe('AppContainer State Management', () => {
           cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
+          handleApprovalModeChange: vi.fn(),
+          loopDetectionConfirmationRequest: null,
+          backgroundShellCount: 0,
+          isBackgroundShellVisible: false,
+          toggleBackgroundShell: vi.fn(),
+          backgroundCurrentShell: vi.fn(),
+          backgroundShells: new Map(),
+          registerBackgroundShell: vi.fn(),
+          dismissBackgroundShell: vi.fn(),
         }));
 
         // Rerender to propagate the new lastOutputTime
