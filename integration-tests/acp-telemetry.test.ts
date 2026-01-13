@@ -10,7 +10,12 @@ import { spawn, ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { Writable, Readable } from 'node:stream';
+import { env } from 'node:process';
 import * as acp from '@agentclientprotocol/sdk';
+
+// Skip in sandbox mode - test spawns CLI directly which behaves differently in containers
+const sandboxEnv = env['GEMINI_SANDBOX'];
+const itMaybe = sandboxEnv && sandboxEnv !== 'false' ? it.skip : it;
 
 // Reuse existing fake responses that return a simple "Hello" response
 const SIMPLE_RESPONSE_PATH = 'hooks-system.session-startup.responses';
@@ -41,7 +46,7 @@ describe('ACP telemetry', () => {
     await rig.cleanup();
   });
 
-  it('should flush telemetry when connection closes', async () => {
+  itMaybe('should flush telemetry when connection closes', async () => {
     rig.setup('acp-telemetry-flush', {
       fakeResponsesPath: join(import.meta.dirname, SIMPLE_RESPONSE_PATH),
     });
