@@ -64,6 +64,7 @@ describe('Tool Confirmation Policy Updates', () => {
       getFileFilteringOptions: () => ({}),
       getGeminiClient: () => ({}),
       getBaseLlmClient: () => ({}),
+      getDisableLLMCorrection: () => false,
       getIdeMode: () => false,
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,

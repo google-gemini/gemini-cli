@@ -695,6 +695,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `1000`
   - **Requires restart:** Yes
 
+- **`tools.disableLLMCorrection`** (boolean):
+  - **Description:** Disable LLM-based error correction for edit tools. When
+    enabled, tools will fail immediately if exact string matches are not found,
+    instead of attempting to self-correct.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`tools.enableHooks`** (boolean):
   - **Description:** Enables the hooks system experiment. When disabled, the
     hooks system is completely deactivated regardless of other settings.
