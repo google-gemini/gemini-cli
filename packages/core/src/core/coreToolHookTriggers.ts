@@ -348,49 +348,47 @@ export async function executeToolWithHooks(
       mcpContext,
     );
 
-    if (afterOutput) {
-      // Check if hook requested to stop entire agent execution
-      if (afterOutput.shouldStopExecution()) {
-        const reason = afterOutput.getEffectiveReason();
-        return {
-          llmContent: `Agent execution stopped by hook: ${reason}`,
-          returnDisplay: `Agent execution stopped by hook: ${reason}`,
-          error: {
-            type: ToolErrorType.STOP_EXECUTION,
-            message: reason,
-          },
-        };
-      }
+    // Check if hook requested to stop entire agent execution
+    if (afterOutput?.shouldStopExecution()) {
+      const reason = afterOutput.getEffectiveReason();
+      return {
+        llmContent: `Agent execution stopped by hook: ${reason}`,
+        returnDisplay: `Agent execution stopped by hook: ${reason}`,
+        error: {
+          type: ToolErrorType.STOP_EXECUTION,
+          message: reason,
+        },
+      };
+    }
 
-      // Check if hook blocked the tool result
-      const blockingError = afterOutput.getBlockingError();
-      if (blockingError.blocked) {
-        return {
-          llmContent: `Tool result blocked: ${blockingError.reason}`,
-          returnDisplay: `Tool result blocked: ${blockingError.reason}`,
-          error: {
-            type: ToolErrorType.EXECUTION_FAILED,
-            message: blockingError.reason,
-          },
-        };
-      }
+    // Check if hook blocked the tool result
+    const blockingError = afterOutput?.getBlockingError();
+    if (blockingError?.blocked) {
+      return {
+        llmContent: `Tool result blocked: ${blockingError.reason}`,
+        returnDisplay: `Tool result blocked: ${blockingError.reason}`,
+        error: {
+          type: ToolErrorType.EXECUTION_FAILED,
+          message: blockingError.reason,
+        },
+      };
+    }
 
-      // Add additional context from hooks to the tool result
-      const additionalContext = afterOutput.getAdditionalContext();
-      if (additionalContext) {
-        if (typeof toolResult.llmContent === 'string') {
-          toolResult.llmContent += '\n\n' + additionalContext;
-        } else if (Array.isArray(toolResult.llmContent)) {
-          toolResult.llmContent.push({ text: '\n\n' + additionalContext });
-        } else if (toolResult.llmContent) {
-          // Handle single Part case by converting to an array
-          toolResult.llmContent = [
-            toolResult.llmContent,
-            { text: '\n\n' + additionalContext },
-          ];
-        } else {
-          toolResult.llmContent = additionalContext;
-        }
+    // Add additional context from hooks to the tool result
+    const additionalContext = afterOutput?.getAdditionalContext();
+    if (additionalContext) {
+      if (typeof toolResult.llmContent === 'string') {
+        toolResult.llmContent += '\n\n' + additionalContext;
+      } else if (Array.isArray(toolResult.llmContent)) {
+        toolResult.llmContent.push({ text: '\n\n' + additionalContext });
+      } else if (toolResult.llmContent) {
+        // Handle single Part case by converting to an array
+        toolResult.llmContent = [
+          toolResult.llmContent,
+          { text: '\n\n' + additionalContext },
+        ];
+      } else {
+        toolResult.llmContent = additionalContext;
       }
     }
   }

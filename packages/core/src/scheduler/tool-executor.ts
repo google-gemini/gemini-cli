@@ -248,10 +248,7 @@ export class ToolExecutor {
       const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
       const lastPart = response[response.length - 1];
       if (lastPart?.functionResponse) {
-        const toolResponse = lastPart.functionResponse.response as Record<
-          string,
-          unknown
-        >;
+        const toolResponse = lastPart.functionResponse.response;
         if (typeof toolResponse === 'object' && toolResponse !== null) {
           if (typeof toolResponse['content'] === 'string') {
             toolResponse['content'] += modificationMsg;
