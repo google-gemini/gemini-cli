@@ -268,7 +268,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
-  [Command.REWIND]: [{ key: 'escape' }, { key: 'escape' }],
+  [Command.REWIND]: [{ key: 'Esc (×2)' }],
 };
 
 interface CommandCategory {
