@@ -184,7 +184,7 @@ describe('skills list command', () => {
     const command = listCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('list');
+      expect(command.command).toBe('list [--all]');
       expect(command.describe).toBe('Lists discovered agent skills.');
     });
   });
