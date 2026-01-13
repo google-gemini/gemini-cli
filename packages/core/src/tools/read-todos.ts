@@ -111,6 +111,7 @@ class ReadTodosToolInvocation extends BaseToolInvocation<
       if (inProgressTask) {
         statsString += `\nCurrently working on: Task ${todos.indexOf(inProgressTask) + 1}`;
       }
+    }
     if (stats.cancelled > 0) {
       statsString += `\n${stats.cancelled} task(s) cancelled`;
     }
