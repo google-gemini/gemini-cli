@@ -266,15 +266,9 @@ const SETTINGS_SCHEMA = {
         description: 'Controls the level of output detail in the history.',
         showInDialog: true,
         options: [
-          { value: 'error', label: 'Error - Critical failures only' },
-          { value: 'warn', label: 'Warn - Warnings and errors' },
-          {
-            value: 'info',
-            label: 'Info - Standard interactive output (Default)',
-          },
-          { value: 'verbose', label: 'Verbose - Operational status messages' },
-          { value: 'debug', label: 'Debug - Low-level system logs' },
-          { value: 'trace', label: 'Trace - Everything' },
+          { value: 'info', label: 'Default' },
+          { value: 'verbose', label: 'Verbose' },
+          { value: 'trace', label: 'Show all' },
         ],
       },
       sessionRetention: {

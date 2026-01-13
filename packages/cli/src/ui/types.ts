@@ -379,6 +379,8 @@ export const VERBOSITY_MAPPING: Record<string, Verbosity> = {
   help: Verbosity.INFO,
   verbose: Verbosity.VERBOSE,
   compression: Verbosity.VERBOSE,
+  debug: Verbosity.DEBUG,
+  trace: Verbosity.TRACE,
 };
 
 // Simplified message structure for internal feedback
