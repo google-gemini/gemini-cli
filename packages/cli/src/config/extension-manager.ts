@@ -38,6 +38,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  loadAgentsFromDirectory,
   homedir,
   type ExtensionEvents,
   type MCPServerConfig,
@@ -615,6 +616,17 @@ Would you like to attempt to install via "git clone" instead?`,
         path.join(effectiveExtensionPath, 'skills'),
       );
 
+      const agentLoadResult = await loadAgentsFromDirectory(
+        path.join(effectiveExtensionPath, 'agents'),
+      );
+
+      // Log errors but don't fail the entire extension load
+      for (const error of agentLoadResult.errors) {
+        debugLogger.warn(
+          `[ExtensionManager] Error loading agent from ${config.name}: ${error.message}`,
+        );
+      }
+
       const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
@@ -632,6 +644,7 @@ Would you like to attempt to install via "git clone" instead?`,
         settings: config.settings,
         resolvedSettings,
         skills,
+        agents: agentLoadResult.agents,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
