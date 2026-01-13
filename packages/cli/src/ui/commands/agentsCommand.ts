@@ -65,6 +65,14 @@ const agentsRefreshCommand: SlashCommand = {
       };
     }
 
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Refreshing agent registry...',
+      },
+      Date.now(),
+    );
+
     await agentRegistry.reload();
 
     return {
