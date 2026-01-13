@@ -25,7 +25,6 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { ExperimentFlags } from '../../code_assist/experiments/flagNames.js';
 
 vi.mock('../../core/baseLlmClient.js');
-vi.mock('../../utils/promptIdContext.js');
 
 describe('NumericalClassifierStrategy', () => {
   let strategy: NumericalClassifierStrategy;
@@ -63,7 +62,7 @@ describe('NumericalClassifierStrategy', () => {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
 
-    vi.mocked(promptIdContext.getStore).mockReturnValue('test-prompt-id');
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
 
   afterEach(() => {
@@ -572,7 +571,7 @@ describe('NumericalClassifierStrategy', () => {
     const consoleWarnSpy = vi
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
-    vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue(undefined);
     const mockApiResponse = {
       reasoning: 'Simple.',
       complexity_score: 10,
@@ -591,7 +590,7 @@ describe('NumericalClassifierStrategy', () => {
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Could not find promptId in context. This is unexpected. Using a fallback ID:',
+        'Could not find promptId in context for classifier-router. This is unexpected. Using a fallback ID:',
       ),
     );
   });

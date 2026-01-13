@@ -24,7 +24,6 @@ import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 vi.mock('../../core/baseLlmClient.js');
-vi.mock('../../utils/promptIdContext.js');
 
 describe('ClassifierStrategy', () => {
   let strategy: ClassifierStrategy;
@@ -58,7 +57,7 @@ describe('ClassifierStrategy', () => {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
 
-    vi.mocked(promptIdContext.getStore).mockReturnValue('test-prompt-id');
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
 
   it('should call generateJson with the correct parameters', async () => {
@@ -257,7 +256,7 @@ describe('ClassifierStrategy', () => {
     const consoleWarnSpy = vi
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
-    vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue(undefined);
     const mockApiResponse = {
       reasoning: 'Simple.',
       model_choice: 'flash',
@@ -276,7 +275,7 @@ describe('ClassifierStrategy', () => {
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Could not find promptId in context. This is unexpected. Using a fallback ID:',
+        'Could not find promptId in context for classifier-router. This is unexpected. Using a fallback ID:',
       ),
     );
     consoleWarnSpy.mockRestore();

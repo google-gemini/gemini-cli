@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import { promptIdContext } from '../../utils/promptIdContext.js';
+import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
   RoutingContext,
   RoutingDecision,
@@ -118,6 +118,10 @@ const ClassifierResponseSchema = z.object({
  * Deterministically calculates the routing threshold based on the session ID.
  * This ensures a consistent experience for the user within a session.
  *
+ * This implementation uses the Java String.hashCode() algorithm, which is a
+ * variant of the djb2 hash.
+ * @see https://en.wikipedia.org/wiki/Java_hashCode()
+ *
  * @param sessionId The unique session identifier.
  * @returns The threshold (50 or 80).
  */
@@ -145,15 +149,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
-      let promptId = promptIdContext.getStore();
-      if (!promptId) {
-        promptId = `classifier-router-fallback-${Date.now()}-${Math.random()
-          .toString(16)
-          .slice(2)}`;
-        debugLogger.warn(
-          `Could not find promptId in context. This is unexpected. Using a fallback ID: ${promptId}`,
-        );
-      }
+      const promptId = getPromptIdWithFallback('classifier-router');
 
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
       const cleanHistory = historySlice.filter(

@@ -26,8 +26,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 
 class DynamicClassifierStrategy implements RoutingStrategy {
   readonly name = 'dynamic_classifier';
-  private oldStrategy = new ClassifierStrategy();
-  private newStrategy = new NumericalClassifierStrategy();
+  private readonly oldStrategy = new ClassifierStrategy();
+  private readonly newStrategy = new NumericalClassifierStrategy();
 
   async route(
     context: RoutingContext,
