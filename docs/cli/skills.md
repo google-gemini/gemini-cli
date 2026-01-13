@@ -71,9 +71,26 @@ The `gemini skills` command provides management utilities:
 # List all discovered skills
 gemini skills list
 
-# Enable/disable skills. Can use --scope to specify project or user
+# Install a skill from a Git repository, local directory, or zipped skill file (.skill)
+# Uses the user scope by default (~/.gemini/skills)
+gemini skills install https://github.com/user/repo.git
+gemini skills install /path/to/local/skill
+gemini skills install /path/to/local/my-expertise.skill
+
+# Install a specific skill from a monorepo or subdirectory using --path
+gemini skills install https://github.com/my-org/my-skills.git --path skills/frontend-design
+
+# Install to the workspace scope (.gemini/skills)
+gemini skills install /path/to/skill --scope workspace
+
+# Uninstall a skill by name
+gemini skills uninstall my-expertise --scope workspace
+
+# Enable a skill (globally)
 gemini skills enable my-expertise
-gemini skills disable my-expertise
+
+# Disable a skill. Can use --scope to specify project or user (defaults to project)
+gemini skills disable my-expertise --scope project
 ```
 
 ## Creating a Skill

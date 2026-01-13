@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
@@ -31,22 +33,41 @@ export class SkillManager {
   ): Promise<void> {
     this.clearSkills();
 
-    // 1. Extension skills (lowest precedence)
+    // 1. Built-in skills (lowest precedence)
+    await this.discoverBuiltinSkills();
+
+    // 2. Extension skills
     for (const extension of extensions) {
       if (extension.isActive && extension.skills) {
         this.addSkillsWithPrecedence(extension.skills);
       }
     }
 
-    // 2. User skills
+    // 3. User skills
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
-    // 3. Project skills (highest precedence)
+    // 4. Project skills (highest precedence)
     const projectSkills = await loadSkillsFromDir(
       storage.getProjectSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectSkills);
+  }
+
+  /**
+   * Discovers built-in skills.
+   */
+  private async discoverBuiltinSkills(): Promise<void> {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const builtinDir = path.join(__dirname, 'builtin');
+
+    const builtinSkills = await loadSkillsFromDir(builtinDir);
+
+    for (const skill of builtinSkills) {
+      skill.isBuiltin = true;
+    }
+
+    this.addSkillsWithPrecedence(builtinSkills);
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
@@ -62,6 +83,14 @@ export class SkillManager {
    */
   getSkills(): SkillDefinition[] {
     return this.skills.filter((s) => !s.disabled);
+  }
+
+  /**
+   * Returns the list of enabled discovered skills that should be displayed in the UI.
+   * This excludes built-in skills.
+   */
+  getDisplayableSkills(): SkillDefinition[] {
+    return this.skills.filter((s) => !s.disabled && !s.isBuiltin);
   }
 
   /**
@@ -82,8 +111,11 @@ export class SkillManager {
    * Sets the list of disabled skill names.
    */
   setDisabledSkills(disabledNames: string[]): void {
+    const lowercaseDisabledNames = disabledNames.map((n) => n.toLowerCase());
     for (const skill of this.skills) {
-      skill.disabled = disabledNames.includes(skill.name);
+      skill.disabled = lowercaseDisabledNames.includes(
+        skill.name.toLowerCase(),
+      );
     }
   }
 
@@ -91,7 +123,10 @@ export class SkillManager {
    * Reads the full content (metadata + body) of a skill by name.
    */
   getSkill(name: string): SkillDefinition | null {
-    return this.skills.find((s) => s.name === name) ?? null;
+    const lowercaseName = name.toLowerCase();
+    return (
+      this.skills.find((s) => s.name.toLowerCase() === lowercaseName) ?? null
+    );
   }
 
   /**

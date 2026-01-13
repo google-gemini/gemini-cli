@@ -120,6 +120,8 @@ export const useGeminiStream = (
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+  const [lastGeminiActivityTime, setLastGeminiActivityTime] =
+    useState<number>(0);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
@@ -794,7 +796,7 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionStoppedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number) => {
+    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -802,7 +804,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: `Agent execution stopped: ${reason}`,
+          text: `Agent execution stopped: ${systemMessage?.trim() || reason}`,
         },
         userMessageTimestamp,
       );
@@ -812,7 +814,7 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number) => {
+    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -820,7 +822,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.WARNING,
-          text: `Agent execution blocked: ${reason}`,
+          text: `Agent execution blocked: ${systemMessage?.trim() || reason}`,
         },
         userMessageTimestamp,
       );
@@ -839,9 +841,11 @@ export const useGeminiStream = (
       for await (const event of stream) {
         switch (event.type) {
           case ServerGeminiEventType.Thought:
+            setLastGeminiActivityTime(Date.now());
             setThought(event.value);
             break;
           case ServerGeminiEventType.Content:
+            setLastGeminiActivityTime(Date.now());
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -861,12 +865,14 @@ export const useGeminiStream = (
             handleAgentExecutionStoppedEvent(
               event.value.reason,
               userMessageTimestamp,
+              event.value.systemMessage,
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
             handleAgentExecutionBlockedEvent(
               event.value.reason,
               userMessageTimestamp,
+              event.value.systemMessage,
             );
             break;
           case ServerGeminiEventType.ChatCompressed:
@@ -1369,7 +1375,11 @@ export const useGeminiStream = (
     storage,
   ]);
 
-  const lastOutputTime = Math.max(lastToolOutputTime, lastShellOutputTime);
+  const lastOutputTime = Math.max(
+    lastToolOutputTime,
+    lastShellOutputTime,
+    lastGeminiActivityTime,
+  );
 
   return {
     streamingState,

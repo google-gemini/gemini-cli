@@ -25,9 +25,12 @@ export interface SkillDefinition {
   body: string;
   /** Whether the skill is currently disabled. */
   disabled?: boolean;
+  /** Whether the skill is a built-in skill. */
+  isBuiltin?: boolean;
 }
 
-const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;
+export const FRONTMATTER_REGEX =
+  /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?/;
 
 /**
  * Discovers and loads all skills in the provided directory.
@@ -44,7 +47,7 @@ export async function loadSkillsFromDir(
       return [];
     }
 
-    const skillFiles = await glob('*/SKILL.md', {
+    const skillFiles = await glob(['SKILL.md', '*/SKILL.md'], {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
@@ -60,8 +63,7 @@ export async function loadSkillsFromDir(
     if (discoveredSkills.length === 0) {
       const files = await fs.readdir(absoluteSearchPath);
       if (files.length > 0) {
-        coreEvents.emitFeedback(
-          'warning',
+        debugLogger.debug(
           `Failed to load skills from ${absoluteSearchPath}. The directory is not empty but no valid skills were discovered. Please ensure SKILL.md files are present in subdirectories and have valid frontmatter.`,
         );
       }

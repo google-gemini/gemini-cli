@@ -35,10 +35,10 @@ import {
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
-import { terminalCapabilityManager } from '../../ui/utils/terminalCapabilityManager.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 // Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn();
+const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
 const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
@@ -105,7 +105,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -254,11 +254,12 @@ const renderDialog = (
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(
       terminalCapabilityManager,
-      'isBracketedPasteEnabled',
+      'isKittyProtocolEnabled',
     ).mockReturnValue(true);
-    mockToggleVimEnabled.mockResolvedValue(true);
+    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
