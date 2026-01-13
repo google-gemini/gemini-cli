@@ -62,7 +62,7 @@ available combinations.
 | Show the previous entry in history.          | `Ctrl + P (no Shift)` |
 | Show the next entry in history.              | `Ctrl + N (no Shift)` |
 | Start reverse search through history.        | `Ctrl + R`            |
-| Insert the selected reverse-search match.    | `Enter (no Ctrl)`     |
+| Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
 | Accept a suggestion while reverse searching. | `Tab`                 |
 
 #### Navigation
@@ -100,18 +100,18 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys                                |
-| ----------------------------------------------------------------- | ----------------------------------- |
-| Toggle detailed error information.                                | `F12`                               |
-| Toggle the full TODO list.                                        | `Ctrl + T`                          |
-| Toggle IDE context details.                                       | `Ctrl + G`                          |
-| Toggle Markdown rendering.                                        | `Cmd + M`                           |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`                          |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`                          |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`                       |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`                          |
-| Toggle focus between the shell and Gemini input.                  | `Tab (no Shift)`                    |
-| Toggle focus out of the interactive shell and into Gemini input.  | `Tab (no Shift)`<br />`Shift + Tab` |
+| Action                                                            | Keys             |
+| ----------------------------------------------------------------- | ---------------- |
+| Toggle detailed error information.                                | `F12`            |
+| Toggle the full TODO list.                                        | `Ctrl + T`       |
+| Show IDE context details.                                         | `Ctrl + G`       |
+| Toggle Markdown rendering.                                        | `Cmd + M`        |
+| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
+| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
+| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
+| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
+| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
+| Focus the Gemini input from the shell input.                      | `Tab`            |
 
 #### Session Control
 
