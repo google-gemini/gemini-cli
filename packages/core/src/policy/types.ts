@@ -96,6 +96,11 @@ export type SafetyCheckerConfig =
 
 export interface PolicyRule {
   /**
+   * A unique name for the policy rule, useful for identification and debugging.
+   */
+  name?: string;
+
+  /**
    * The name of the tool this rule applies to.
    * If undefined, the rule applies to all tools.
    */
@@ -117,6 +122,19 @@ export interface PolicyRule {
    * Default is 0.
    */
   priority?: number;
+
+  /**
+   * Approval modes this rule applies to.
+   * If undefined or empty, it applies to all modes.
+   */
+  modes?: ApprovalMode[];
+
+  /**
+   * If true, allows command redirection even if the policy engine would normally
+   * downgrade ALLOW to ASK_USER for redirected commands.
+   * Only applies when decision is ALLOW.
+   */
+  allowRedirection?: boolean;
 }
 
 export interface SafetyCheckerRule {
@@ -143,6 +161,12 @@ export interface SafetyCheckerRule {
    * additional validation of a tool call.
    */
   checker: SafetyCheckerConfig;
+
+  /**
+   * Approval modes this rule applies to.
+   * If undefined or empty, it applies to all modes.
+   */
+  modes?: ApprovalMode[];
 }
 
 export interface HookExecutionContext {
@@ -215,6 +239,12 @@ export interface PolicyEngineConfig {
    * Defaults to true.
    */
   allowHooks?: boolean;
+
+  /**
+   * Current approval mode.
+   * Used to filter rules that have specific 'modes' defined.
+   */
+  approvalMode?: ApprovalMode;
 }
 
 export interface PolicySettings {

@@ -30,10 +30,18 @@ import {
   populateMcpServerCommand,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { coreEvents } from '../utils/events.js';
+import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+
+const EMPTY_CONFIG: EnvironmentSanitizationConfig = {
+  enableEnvironmentVariableRedaction: true,
+  allowedEnvironmentVariables: [],
+  blockedEnvironmentVariables: [],
+};
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -77,6 +85,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
         listTools: vi.fn().mockResolvedValue({
           tools: [
@@ -105,15 +114,24 @@ describe('mcp-client', () => {
         sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
@@ -135,6 +153,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
 
         listTools: vi.fn().mockResolvedValue({
@@ -175,15 +194,24 @@ describe('mcp-client', () => {
         sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
@@ -201,6 +229,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
         listTools: vi.fn().mockResolvedValue({ tools: [] }),
         listPrompts: vi.fn().mockRejectedValue(new Error('Test error')),
@@ -216,20 +245,29 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
-        'No prompts or tools found on the server.',
+        'No prompts, tools, or resources found on the server.',
       );
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
@@ -246,6 +284,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
         listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
         request: vi.fn().mockResolvedValue({}),
@@ -261,20 +300,29 @@ describe('mcp-client', () => {
         sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
-        'No prompts or tools found on the server.',
+        'No prompts, tools, or resources found on the server.',
       );
     });
 
@@ -286,6 +334,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
         listTools: vi.fn().mockResolvedValue({
           tools: [
@@ -310,15 +359,24 @@ describe('mcp-client', () => {
         sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
@@ -334,6 +392,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
         listTools: vi.fn().mockResolvedValue({
           tools: [
@@ -373,15 +432,24 @@ describe('mcp-client', () => {
         sortTools: vi.fn(),
         getMessageBus: vi.fn().mockReturnValue(undefined),
       } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
           command: 'test-command',
         },
         mockedToolRegistry,
-        {} as PromptRegistry,
+        promptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
@@ -405,6 +473,165 @@ describe('mcp-client', () => {
       });
     });
 
+    it('should discover resources when a server only exposes resources', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ resources: {} }),
+        request: vi.fn().mockImplementation(({ method }) => {
+          if (method === 'resources/list') {
+            return Promise.resolve({
+              resources: [
+                {
+                  uri: 'file:///tmp/resource.txt',
+                  name: 'resource',
+                  description: 'Test Resource',
+                  mimeType: 'text/plain',
+                },
+              ],
+            });
+          }
+          return Promise.resolve({ prompts: [] });
+        }),
+      } as unknown as ClientLib.Client;
+      vi.mocked(ClientLib.Client).mockReturnValue(mockedClient);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+      expect(resourceRegistry.setResourcesForServer).toHaveBeenCalledWith(
+        'test-server',
+        [
+          expect.objectContaining({
+            uri: 'file:///tmp/resource.txt',
+            name: 'resource',
+          }),
+        ],
+      );
+    });
+
+    it('refreshes registry when resource list change notification is received', async () => {
+      let listCallCount = 0;
+      let resourceListHandler:
+        | ((notification: unknown) => Promise<void> | void)
+        | undefined;
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn((_, handler) => {
+          resourceListHandler = handler;
+        }),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ resources: { listChanged: true } }),
+        request: vi.fn().mockImplementation(({ method }) => {
+          if (method === 'resources/list') {
+            listCallCount += 1;
+            if (listCallCount === 1) {
+              return Promise.resolve({
+                resources: [
+                  {
+                    uri: 'file:///tmp/one.txt',
+                  },
+                ],
+              });
+            }
+            return Promise.resolve({
+              resources: [
+                {
+                  uri: 'file:///tmp/two.txt',
+                },
+              ],
+            });
+          }
+          return Promise.resolve({ prompts: [] });
+        }),
+      } as unknown as ClientLib.Client;
+      vi.mocked(ClientLib.Client).mockReturnValue(mockedClient);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
+
+      expect(mockedClient.setNotificationHandler).toHaveBeenCalledOnce();
+      expect(resourceListHandler).toBeDefined();
+
+      await resourceListHandler?.({
+        method: 'notifications/resources/list_changed',
+      });
+
+      expect(resourceRegistry.setResourcesForServer).toHaveBeenLastCalledWith(
+        'test-server',
+        [expect.objectContaining({ uri: 'file:///tmp/two.txt' })],
+      );
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Resources updated for server: test-server',
+      );
+    });
+
     it('should remove tools and prompts on disconnect', async () => {
       const mockedClient = {
         connect: vi.fn(),
@@ -412,6 +639,7 @@ describe('mcp-client', () => {
         getStatus: vi.fn(),
         registerCapabilities: vi.fn(),
         setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
         getServerCapabilities: vi
           .fn()
           .mockReturnValue({ tools: {}, prompts: {} }),
@@ -447,6 +675,10 @@ describe('mcp-client', () => {
         unregisterPrompt: vi.fn(),
         removePromptsByServer: vi.fn(),
       } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
       const client = new McpClient(
         'test-server',
         {
@@ -454,8 +686,9 @@ describe('mcp-client', () => {
         },
         mockedToolRegistry,
         mockedPromptRegistry,
+        resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
@@ -469,6 +702,7 @@ describe('mcp-client', () => {
       expect(mockedClient.close).toHaveBeenCalledOnce();
       expect(mockedToolRegistry.removeMcpToolsByServer).toHaveBeenCalledOnce();
       expect(mockedPromptRegistry.removePromptsByServer).toHaveBeenCalledOnce();
+      expect(resourceRegistry.removeResourcesByServer).toHaveBeenCalledOnce();
     });
   });
 
@@ -501,8 +735,9 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         {} as ToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
 
@@ -536,8 +771,9 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         {} as ToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
 
@@ -590,8 +826,9 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
         onToolsUpdatedSpy,
       );
@@ -659,8 +896,9 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
 
@@ -728,8 +966,9 @@ describe('mcp-client', () => {
         { command: 'cmd-a' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
         onToolsUpdatedSpy,
       );
@@ -739,8 +978,9 @@ describe('mcp-client', () => {
         { command: 'cmd-b' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
         onToolsUpdatedSpy,
       );
@@ -820,8 +1060,9 @@ describe('mcp-client', () => {
         { command: 'test-command', timeout: 100 },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
 
@@ -883,8 +1124,9 @@ describe('mcp-client', () => {
         { command: 'test-command' },
         mockedToolRegistry,
         {} as PromptRegistry,
+        {} as ResourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
         onToolsUpdatedSpy,
       );
@@ -935,6 +1177,7 @@ describe('mcp-client', () => {
             httpUrl: 'http://test-server',
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -952,6 +1195,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'derp' },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -972,6 +1216,7 @@ describe('mcp-client', () => {
             url: 'http://test-server',
           },
           false,
+          EMPTY_CONFIG,
         );
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         expect(transport).toMatchObject({
@@ -988,6 +1233,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'derp' },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1007,6 +1253,7 @@ describe('mcp-client', () => {
             type: 'http',
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1024,6 +1271,7 @@ describe('mcp-client', () => {
             type: 'sse',
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
@@ -1040,6 +1288,7 @@ describe('mcp-client', () => {
             url: 'http://test-server',
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1058,6 +1307,7 @@ describe('mcp-client', () => {
             headers: { Authorization: 'Bearer token' },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1078,6 +1328,7 @@ describe('mcp-client', () => {
             headers: { 'X-API-Key': 'key123' },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
@@ -1097,6 +1348,7 @@ describe('mcp-client', () => {
             url: 'http://test-server-url',
           },
           false,
+          EMPTY_CONFIG,
         );
 
         // httpUrl should take priority and create HTTP transport
@@ -1122,13 +1374,14 @@ describe('mcp-client', () => {
           cwd: 'test/cwd',
         },
         false,
+        EMPTY_CONFIG,
       );
 
       expect(mockedTransport).toHaveBeenCalledWith({
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: { ...process.env, FOO: 'bar' },
+        env: expect.objectContaining({ FOO: 'bar' }),
         stderr: 'pipe',
       });
     });
@@ -1158,6 +1411,7 @@ describe('mcp-client', () => {
             },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1190,6 +1444,7 @@ describe('mcp-client', () => {
             },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1221,6 +1476,7 @@ describe('mcp-client', () => {
             },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
@@ -1241,6 +1497,7 @@ describe('mcp-client', () => {
             },
           },
           false,
+          EMPTY_CONFIG,
         );
 
         expect(transport).toBeInstanceOf(SSEClientTransport);
@@ -1260,6 +1517,7 @@ describe('mcp-client', () => {
               },
             },
             false,
+            EMPTY_CONFIG,
           ),
         ).rejects.toThrow(
           'URL must be provided in the config for Google Credentials provider',
@@ -1421,6 +1679,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
+      EMPTY_CONFIG,
     );
 
     expect(client).toBe(mockedClient);
@@ -1465,6 +1724,7 @@ describe('connectToMcpServer with OAuth', () => {
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
       workspaceContext,
+      EMPTY_CONFIG,
     );
 
     expect(client).toBe(mockedClient);
@@ -1519,6 +1779,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'http' },
         false,
         workspaceContext,
+        EMPTY_CONFIG,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -1537,6 +1798,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server', type: 'sse' },
         false,
         workspaceContext,
+        EMPTY_CONFIG,
       ),
     ).rejects.toThrow('Connection failed');
 
@@ -1554,6 +1816,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
+      EMPTY_CONFIG,
     );
 
     expect(client).toBe(mockedClient);
@@ -1575,6 +1838,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
         { url: 'http://test-server' },
         false,
         workspaceContext,
+        EMPTY_CONFIG,
       ),
     ).rejects.toThrow('Server error');
 
@@ -1591,6 +1855,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       { url: 'http://test-server' },
       false,
       workspaceContext,
+      EMPTY_CONFIG,
     );
 
     expect(client).toBe(mockedClient);
@@ -1660,6 +1925,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       { url: 'http://test-server', oauth: { enabled: true } },
       false,
       workspaceContext,
+      EMPTY_CONFIG,
     );
 
     expect(client).toBe(mockedClient);

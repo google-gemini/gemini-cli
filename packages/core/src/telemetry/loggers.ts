@@ -41,8 +41,8 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
@@ -50,6 +50,7 @@ import type {
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
+  StartupStatsEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -78,7 +79,7 @@ export function logCliConfiguration(
   config: Config,
   event: StartSessionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
+  void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -567,11 +568,11 @@ export async function logExtensionDisable(
   });
 }
 
-export function logSmartEditStrategy(
+export function logEditStrategy(
   config: Config,
-  event: SmartEditStrategyEvent,
+  event: EditStrategyEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditStrategyEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -582,11 +583,11 @@ export function logSmartEditStrategy(
   });
 }
 
-export function logSmartEditCorrectionEvent(
+export function logEditCorrectionEvent(
   config: Config,
-  event: SmartEditCorrectionEvent,
+  event: EditCorrectionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditCorrectionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -671,6 +672,7 @@ export function logLlmLoopCheck(
 }
 
 export function logHookCall(config: Config, event: HookCallEvent): void {
+  ClearcutLogger.getInstance(config)?.logHookCallEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -686,5 +688,19 @@ export function logHookCall(config: Config, event: HookCallEvent): void {
       event.duration_ms,
       event.success,
     );
+  });
+}
+
+export function logStartupStats(
+  config: Config,
+  event: StartupStatsEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
   });
 }

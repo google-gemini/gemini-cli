@@ -11,8 +11,6 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
   ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
 import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
@@ -22,6 +20,7 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -43,6 +42,9 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
 
   const isAlternateBuffer = useAlternateBuffer();
+  const settings = useSettings();
+  const allowPermanentApproval =
+    settings.merged.security?.enablePermanentToolApproval ?? false;
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
@@ -104,16 +106,23 @@ export const ToolConfirmationMessage: React.FC<
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
         options.push({
-          label: 'Yes, allow once',
+          label: 'Allow once',
           value: ToolConfirmationOutcome.ProceedOnce,
-          key: 'Yes, allow once',
+          key: 'Allow once',
         });
         if (isTrustedFolder) {
           options.push({
-            label: 'Yes, allow always',
+            label: 'Allow for this session',
             value: ToolConfirmationOutcome.ProceedAlways,
-            key: 'Yes, allow always',
+            key: 'Allow for this session',
           });
+          if (allowPermanentApproval) {
+            options.push({
+              label: 'Allow for all future sessions',
+              value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+              key: 'Allow for all future sessions',
+            });
+          }
         }
         if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
@@ -130,21 +139,27 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
 
       question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, allow always ...`,
+          label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Yes, allow always ...`,
+          key: `Allow for this session`,
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: `Allow for all future sessions`,
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: `Allow for all future sessions`,
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -154,16 +169,23 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: 'Yes, allow always',
+          label: 'Allow for this session',
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: 'Yes, allow always',
+          key: 'Allow for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -172,24 +194,31 @@ export const ToolConfirmationMessage: React.FC<
       });
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-          value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
-          key: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+          label: 'Allow tool for this session',
+          value: ToolConfirmationOutcome.ProceedAlwaysTool,
+          key: 'Allow tool for this session',
         });
         options.push({
-          label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          label: 'Allow all server tools for this session',
           value: ToolConfirmationOutcome.ProceedAlwaysServer,
-          key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          key: 'Allow all server tools for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow tool for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow tool for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -238,8 +267,7 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
       let bodyContentHeight = availableBodyContentHeight();
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
@@ -292,7 +320,7 @@ export const ToolConfirmationMessage: React.FC<
       );
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
 
       bodyContent = (
         <Box flexDirection="column">
@@ -311,6 +339,7 @@ export const ToolConfirmationMessage: React.FC<
     availableTerminalHeight,
     terminalWidth,
     isAlternateBuffer,
+    allowPermanentApproval,
   ]);
 
   if (confirmationDetails.type === 'edit') {

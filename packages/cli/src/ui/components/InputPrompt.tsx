@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, type DOMElement } from 'ink';
+import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -24,10 +24,10 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
-  buildSegmentsForVisualSlice,
+  parseSegmentsFromTokens,
 } from '../utils/highlight.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
@@ -43,6 +43,7 @@ import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
@@ -129,10 +130,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const { stdout } = useStdout();
+  const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth } = useUIState();
+  const { mainAreaWidth, activePtyId } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -350,13 +353,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      const textToInsert = await clipboardy.read();
-      const offset = buffer.getOffset();
-      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      if (settings.experimental?.useOSC52Paste) {
+        stdout.write('\x1b]52;c;?\x07');
+      } else {
+        const textToInsert = await clipboardy.read();
+        const offset = buffer.getOffset();
+        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      }
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, stdout, settings]);
 
   useMouseClick(
     innerBoxRef,
@@ -589,7 +596,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
+      // We prioritize execution unless the user is explicitly selecting a different suggestion.
+      if (
+        completion.isPerfectMatch &&
+        keyMatchers[Command.RETURN](key) &&
+        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
+      ) {
         handleSubmit(buffer.text);
         return;
       }
@@ -621,15 +633,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const isEnterKey = key.name === 'return' && !key.ctrl;
 
               if (isEnterKey && buffer.text.startsWith('/')) {
-                const command = completion.getCommandFromSuggestion(suggestion);
+                const { isArgumentCompletion, leafCommand } =
+                  completion.slashCompletionRange;
 
-                if (command && isAutoExecutableCommand(command)) {
+                if (
+                  isArgumentCompletion &&
+                  isAutoExecutableCommand(leafCommand)
+                ) {
+                  // isArgumentCompletion guarantees leafCommand exists
                   const completedText = completion.getCompletedText(suggestion);
-
                   if (completedText) {
                     setExpandedSuggestionIndex(-1);
                     handleSubmit(completedText.trim());
                     return;
+                  }
+                } else if (!isArgumentCompletion) {
+                  // Existing logic for command name completion
+                  const command =
+                    completion.getCommandFromSuggestion(suggestion);
+
+                  // Only auto-execute if the command has no completion function
+                  // (i.e., it doesn't require an argument to be selected)
+                  if (
+                    command &&
+                    isAutoExecutableCommand(command) &&
+                    !command.completion
+                  ) {
+                    const completedText =
+                      completion.getCompletedText(suggestion);
+
+                    if (completedText) {
+                      setExpandedSuggestionIndex(-1);
+                      handleSubmit(completedText.trim());
+                      return;
+                    }
                   }
                 }
               }
@@ -792,6 +829,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_IN](key)) {
+        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
+        if (activePtyId) {
+          setEmbeddedShellFocused(true);
+        }
+        return;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
 
@@ -833,6 +878,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      activePtyId,
+      setEmbeddedShellFocused,
     ],
   );
 
@@ -1071,21 +1118,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 const renderedLine: React.ReactNode[] = [];
 
-                const [logicalLineIdx, logicalStartCol] = mapEntry;
+                const [logicalLineIdx] = mapEntry;
                 const logicalLine = buffer.lines[logicalLineIdx] || '';
+                const transformations =
+                  buffer.transformationsByLine[logicalLineIdx] ?? [];
                 const tokens = parseInputForHighlighting(
                   logicalLine,
                   logicalLineIdx,
+                  transformations,
+                  ...(focus && buffer.cursor[0] === logicalLineIdx
+                    ? [buffer.cursor[1]]
+                    : []),
                 );
-
-                const visualStart = logicalStartCol;
-                const visualEnd = logicalStartCol + cpLen(lineText);
-                const segments = buildSegmentsForVisualSlice(
+                const startColInTransformed =
+                  buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+                const visualStartCol = startColInTransformed;
+                const visualEndCol = visualStartCol + cpLen(lineText);
+                const segments = parseSegmentsFromTokens(
                   tokens,
-                  visualStart,
-                  visualEnd,
+                  visualStartCol,
+                  visualEndCol,
                 );
-
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
@@ -1101,7 +1154,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                       relativeVisualColForHighlight < segEnd
                     ) {
                       const charToHighlight = cpSlice(
-                        seg.text,
+                        display,
                         relativeVisualColForHighlight - segStart,
                         relativeVisualColForHighlight - segStart + 1,
                       );
@@ -1110,17 +1163,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         : charToHighlight;
                       display =
                         cpSlice(
-                          seg.text,
+                          display,
                           0,
                           relativeVisualColForHighlight - segStart,
                         ) +
                         highlighted +
                         cpSlice(
-                          seg.text,
+                          display,
                           relativeVisualColForHighlight - segStart + 1,
                         );
                     }
                     charCount = segEnd;
+                  } else {
+                    // Advance the running counter even when not on cursor line
+                    charCount += segLen;
                   }
 
                   const color =

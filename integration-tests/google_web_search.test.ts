@@ -5,19 +5,26 @@
  */
 
 import { WEB_SEARCH_TOOL_NAME } from '../packages/core/src/tools/tool-names.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe(WEB_SEARCH_TOOL_NAME, () => {
+describe('web search tool', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should be able to search the web', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to search the web', {
       settings: { tools: { core: [WEB_SEARCH_TOOL_NAME] } },
     });
 
     let result;
     try {
-      result = await rig.run(`what is the weather in London`);
+      result = await rig.run({ args: `what is the weather in London` });
     } catch (error) {
       // Network errors can occur in CI environments
       if (

@@ -17,11 +17,10 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
-  loadSettings,
-  migrateDeprecatedSettings,
-  SettingScope,
-} from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
+  loadTrustedFolders,
+  type TrustedFoldersError,
+} from './config/trustedFolders.js';
+import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -33,12 +32,12 @@ import {
   runExitCleanup,
   registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
   type Config,
   type ResumedSessionData,
   type OutputPayload,
   type ConsoleLogPayload,
+  type UserFeedbackPayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -61,8 +60,7 @@ import {
   ExitCodes,
   SessionStartSource,
   SessionEndReason,
-  fireSessionStartHook,
-  fireSessionEndHook,
+  getVersion,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -73,14 +71,14 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionSelector } from './utils/sessionUtils.js';
-import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
+import { StreamingState } from './ui/types.js';
+import { computeTerminalTitle } from './utils/windowTitle.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -92,12 +90,11 @@ import {
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
-import { ExtensionManager } from './config/extension-manager.js';
 import { createPolicyUpdater } from './config/policy.js';
-import { requestConsentNonInteractive } from './config/extensions/consent.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
+import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -196,7 +193,7 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getCliVersion();
+  const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -300,19 +297,19 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
-  const migrateHandle = startupProfiler.start('migrate_settings');
-  migrateDeprecatedSettings(
-    settings,
-    // Temporary extension manager only used during this non-interactive UI phase.
-    new ExtensionManager({
-      workspaceDir: process.cwd(),
-      settings: settings.merged,
-      enabledExtensionOverrides: [],
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: null,
-    }),
-  );
-  migrateHandle?.end();
+  // Report settings errors once during startup
+  settings.errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error.message);
+  });
+
+  const trustedFolders = loadTrustedFolders();
+  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+    coreEvents.emitFeedback(
+      'warning',
+      `Error in ${error.path}: ${error.message}`,
+    );
+  });
+
   await cleanupCheckpoints();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
@@ -360,17 +357,49 @@ export async function main() {
     }
   }
 
-  // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
+  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
+    projectHooks: settings.workspace.settings.hooks,
+  });
 
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
-      );
+  // Refresh auth to fetch remote admin settings from CCPA and before entering
+  // the sandbox because the sandbox will interfere with the Oauth2 web
+  // redirect.
+  if (
+    settings.merged.security?.auth?.selectedType &&
+    !settings.merged.security?.auth?.useExternal
+  ) {
+    try {
+      if (partialConfig.isInteractive()) {
+        const err = validateAuthMethod(
+          settings.merged.security.auth.selectedType,
+        );
+        if (err) {
+          throw new Error(err);
+        }
+
+        await partialConfig.refreshAuth(
+          settings.merged.security.auth.selectedType,
+        );
+      } else {
+        const authType = await validateNonInteractiveAuth(
+          settings.merged.security?.auth?.selectedType,
+          settings.merged.security?.auth?.useExternal,
+          partialConfig,
+          settings,
+        );
+        await partialConfig.refreshAuth(authType);
+      }
+    } catch (err) {
+      debugLogger.error('Error authenticating:', err);
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     }
+  }
+
+  const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
+  // Set remote admin settings if returned from CCPA.
+  if (remoteAdminSettings) {
+    settings.setRemoteAdminSettings(remoteAdminSettings);
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled
@@ -386,34 +415,6 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
-      const partialConfig = await loadCliConfig(
-        settings.merged,
-        sessionId,
-        argv,
-      );
-
-      if (
-        settings.merged.security?.auth?.selectedType &&
-        !settings.merged.security?.auth?.useExternal
-      ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
-        try {
-          const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
-          );
-          if (err) {
-            throw new Error(err);
-          }
-
-          await partialConfig.refreshAuth(
-            settings.merged.security.auth.selectedType,
-          );
-        } catch (err) {
-          debugLogger.error('Error authenticating:', err);
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-        }
-      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
@@ -461,8 +462,17 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv);
+    const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      projectHooks: settings.workspace.settings.hooks,
+    });
     loadConfigHandle?.end();
+
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
 
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
@@ -474,11 +484,9 @@ export async function main() {
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
-    if (config.getEnableHooks() && messageBus) {
-      registerCleanup(async () => {
-        await fireSessionEndHook(messageBus, SessionEndReason.Exit);
-      });
-    }
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    });
 
     // Cleanup sessions after config initialization
     try {
@@ -498,6 +506,20 @@ export async function main() {
 
     // Handle --list-sessions flag
     if (config.getListSessions()) {
+      // Attempt auth for summary generation (gracefully skips if not configured)
+      const authType = settings.merged.security?.auth?.selectedType;
+      if (authType) {
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          // Auth failed - continue without summary generation capability
+          debugLogger.debug(
+            'Auth failed for --list-sessions, summaries may not be generated:',
+            e,
+          );
+        }
+      }
+
       await listSessions(config);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
@@ -536,10 +558,9 @@ export async function main() {
       process.on('SIGINT', () => {
         process.stdin.setRawMode(wasRaw);
       });
-
-      // Detect and enable Kitty keyboard protocol once at startup.
-      await detectAndEnableKittyProtocol();
     }
+
+    await setupTerminalAndTheme(config, settings);
 
     setMaxSizedBoxDebugging(isDebugMode);
     const initAppHandle = startupProfiler.start('initialize_app');
@@ -562,7 +583,7 @@ export async function main() {
     let input = config.getQuestion();
     const startupWarnings = [
       ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings()),
+      ...(await getUserStartupWarnings(settings.merged)),
     ];
 
     // Handle --resume flag
@@ -578,7 +599,8 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        console.error(
+        coreEvents.emitFeedback(
+          'error',
           `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         await runExitCleanup();
@@ -603,30 +625,41 @@ export async function main() {
     await config.initialize();
     startupProfiler.flush(config);
 
-    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
-    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
-    const hooksEnabled = config.getEnableHooks();
-    const hookMessageBus = config.getMessageBus();
-    if (hooksEnabled && hookMessageBus) {
-      const sessionStartSource = resumedSessionData
-        ? SessionStartSource.Resume
-        : SessionStartSource.Startup;
-      await fireSessionStartHook(hookMessageBus, sessionStartSource);
-
-      // Register SessionEnd hook for graceful exit
-      registerCleanup(async () => {
-        await fireSessionEndHook(hookMessageBus, SessionEndReason.Exit);
-      });
-    }
-
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
+    let stdinData: string | undefined = undefined;
     if (!process.stdin.isTTY) {
-      const stdinData = await readStdin();
+      stdinData = await readStdin();
       if (stdinData) {
-        input = `${stdinData}\n\n${input}`;
+        input = input ? `${stdinData}\n\n${input}` : stdinData;
       }
     }
+
+    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+    const sessionStartSource = resumedSessionData
+      ? SessionStartSource.Resume
+      : SessionStartSource.Startup;
+    const result = await config
+      .getHookSystem()
+      ?.fireSessionStartEvent(sessionStartSource);
+
+    if (result?.finalOutput) {
+      if (result.finalOutput.systemMessage) {
+        writeToStderr(result.finalOutput.systemMessage + '\n');
+      }
+      const additionalContext = result.finalOutput.getAdditionalContext();
+      if (additionalContext) {
+        // Prepend context to input (System Context -> Stdin -> Question)
+        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+      }
+    }
+
+    // Register SessionEnd hook for graceful exit
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    });
+
     if (!input) {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
@@ -646,12 +679,13 @@ export async function main() {
       ),
     );
 
-    const nonInteractiveConfig = await validateNonInteractiveAuth(
+    const authType = await validateNonInteractiveAuth(
       settings.merged.security?.auth?.selectedType,
       settings.merged.security?.auth?.useExternal,
       config,
       settings,
     );
+    await config.refreshAuth(authType);
 
     if (config.getDebugMode()) {
       debugLogger.log('Session ID: %s', sessionId);
@@ -663,7 +697,7 @@ export async function main() {
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
-      config: nonInteractiveConfig,
+      config,
       settings,
       input,
       prompt_id,
@@ -678,11 +712,18 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
-    const windowTitle = computeWindowTitle(title);
-    writeToStdout(`\x1b]2;${windowTitle}\x07`);
+    // Initial state before React loop starts
+    const windowTitle = computeTerminalTitle({
+      streamingState: StreamingState.Idle,
+      isConfirming: false,
+      folderName: title,
+      showThoughts: !!settings.merged.ui?.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+    });
+    writeToStdout(`\x1b]0;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      writeToStdout(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]0;\x07`);
     });
   }
 }
@@ -700,13 +741,25 @@ export function initializeOutputListenersAndFlush() {
       }
     });
 
-    coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-      if (payload.type === 'error' || payload.type === 'warn') {
-        writeToStderr(payload.content);
-      } else {
-        writeToStdout(payload.content);
-      }
-    });
+    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
+      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
+        if (payload.type === 'error' || payload.type === 'warn') {
+          writeToStderr(payload.content);
+        } else {
+          writeToStdout(payload.content);
+        }
+      });
+    }
+
+    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
+      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
+        if (payload.severity === 'error' || payload.severity === 'warning') {
+          writeToStderr(payload.message);
+        } else {
+          writeToStdout(payload.message);
+        }
+      });
+    }
   }
   coreEvents.drainBacklogs();
 }

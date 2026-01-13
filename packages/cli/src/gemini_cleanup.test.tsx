@@ -60,6 +60,7 @@ vi.mock('./config/settings.js', async (importOriginal) => {
     ...actual,
     loadSettings: vi.fn().mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -171,6 +172,7 @@ describe('gemini.tsx main function cleanup', () => {
 
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
+      workspace: { settings: {} },
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
@@ -187,6 +189,7 @@ describe('gemini.tsx main function cleanup', () => {
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => false),
+      getHookSystem: () => undefined,
       initialize: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
       getMcpServers: () => ({}),
@@ -210,6 +213,9 @@ describe('gemini.tsx main function cleanup', () => {
       getFileFilteringRespectGitIgnore: vi.fn(() => true),
       getOutputFormat: vi.fn(() => 'text'),
       getUsageStatisticsEnabled: vi.fn(() => false),
+      setTerminalBackground: vi.fn(),
+      refreshAuth: vi.fn(),
+      getRemoteAdminSettings: vi.fn(() => undefined),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {
