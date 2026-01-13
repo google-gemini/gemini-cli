@@ -350,69 +350,43 @@ describe('Task', () => {
       );
     });
 
-    it('should handle Retry event without triggering error handling', async () => {
-      const mockConfig = createMockConfig();
-      const mockEventBus: ExecutionEventBus = {
-        publish: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-        once: vi.fn(),
-        removeAllListeners: vi.fn(),
-        finished: vi.fn(),
-      };
+    it.each([
+      { eventType: GeminiEventType.Retry, eventName: 'Retry' },
+      { eventType: GeminiEventType.InvalidStream, eventName: 'InvalidStream' },
+    ])(
+      'should handle $eventName event without triggering error handling',
+      async ({ eventType }) => {
+        const mockConfig = createMockConfig();
+        const mockEventBus: ExecutionEventBus = {
+          publish: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeAllListeners: vi.fn(),
+          finished: vi.fn(),
+        };
 
-      // @ts-expect-error - Calling private constructor
-      const task = new Task(
-        'task-id',
-        'context-id',
-        mockConfig as Config,
-        mockEventBus,
-      );
+        // @ts-expect-error - Calling private constructor
+        const task = new Task(
+          'task-id',
+          'context-id',
+          mockConfig as Config,
+          mockEventBus,
+        );
 
-      const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
-      const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
+        const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
+        const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
 
-      const event = {
-        type: GeminiEventType.Retry,
-      };
+        const event = {
+          type: eventType,
+        };
 
-      await task.acceptAgentMessage(event);
+        await task.acceptAgentMessage(event);
 
-      expect(cancelPendingToolsSpy).not.toHaveBeenCalled();
-      expect(setTaskStateSpy).not.toHaveBeenCalled();
-    });
-
-    it('should handle InvalidStream event without triggering error handling', async () => {
-      const mockConfig = createMockConfig();
-      const mockEventBus: ExecutionEventBus = {
-        publish: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-        once: vi.fn(),
-        removeAllListeners: vi.fn(),
-        finished: vi.fn(),
-      };
-
-      // @ts-expect-error - Calling private constructor
-      const task = new Task(
-        'task-id',
-        'context-id',
-        mockConfig as Config,
-        mockEventBus,
-      );
-
-      const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
-      const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
-
-      const event = {
-        type: GeminiEventType.InvalidStream,
-      };
-
-      await task.acceptAgentMessage(event);
-
-      expect(cancelPendingToolsSpy).not.toHaveBeenCalled();
-      expect(setTaskStateSpy).not.toHaveBeenCalled();
-    });
+        expect(cancelPendingToolsSpy).not.toHaveBeenCalled();
+        expect(setTaskStateSpy).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('_schedulerToolCallsUpdate', () => {
