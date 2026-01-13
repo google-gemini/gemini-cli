@@ -66,7 +66,8 @@ export function useHistory({
       const itemType = itemData.type as string;
       const currentVerbosity =
         VERBOSITY_MAPPING[verbosity ?? 'info'] ?? Verbosity.INFO;
-      const itemVerbosity = VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
+      const itemVerbosity =
+        itemData.verbosity ?? VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
 
       if (itemVerbosity > currentVerbosity) {
         // Skip adding the item to the UI history if it exceeds the current verbosity level

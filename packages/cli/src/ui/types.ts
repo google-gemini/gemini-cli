@@ -93,6 +93,7 @@ export const emptyIcon = '  ';
 
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
+  verbosity?: Verbosity;
 }
 
 export type HistoryItemUser = HistoryItemBase & {
@@ -360,7 +361,7 @@ export const VERBOSITY_MAPPING: Record<string, Verbosity> = {
   user: Verbosity.INFO,
   gemini: Verbosity.INFO,
   gemini_content: Verbosity.INFO,
-  tool_group: Verbosity.INFO,
+  tool_group: Verbosity.VERBOSE,
   user_shell: Verbosity.INFO,
   about: Verbosity.INFO,
   stats: Verbosity.INFO,
