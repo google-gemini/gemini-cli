@@ -5,8 +5,10 @@
  */
 
 import {
-  getErrorMessage,
-  refreshServerHierarchicalMemory,
+  addMemory,
+  listMemoryFiles,
+  refreshMemory,
+  showMemory,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
@@ -16,24 +18,22 @@ export const memoryCommand: SlashCommand = {
   name: 'memory',
   description: 'Commands for interacting with memory',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   subCommands: [
     {
       name: 'show',
       description: 'Show the current memory contents',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
-        const memoryContent = context.services.config?.getUserMemory() || '';
-        const fileCount = context.services.config?.getGeminiMdFileCount() || 0;
-
-        const messageContent =
-          memoryContent.length > 0
-            ? `Current memory content from ${fileCount} file(s):\n\n---\n${memoryContent}\n---`
-            : 'Memory is currently empty.';
+        const config = context.services.config;
+        if (!config) return;
+        const result = showMemory(config);
 
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: messageContent,
+            text: result.content,
           },
           Date.now(),
         );
@@ -43,13 +43,12 @@ export const memoryCommand: SlashCommand = {
       name: 'add',
       description: 'Add content to the memory',
       kind: CommandKind.BUILT_IN,
+      autoExecute: false,
       action: (context, args): SlashCommandActionReturn | void => {
-        if (!args || args.trim() === '') {
-          return {
-            type: 'message',
-            messageType: 'error',
-            content: 'Usage: /memory add <text to remember>',
-          };
+        const result = addMemory(args);
+
+        if (result.type === 'message') {
+          return result;
         }
 
         context.ui.addItem(
@@ -60,17 +59,14 @@ export const memoryCommand: SlashCommand = {
           Date.now(),
         );
 
-        return {
-          type: 'tool',
-          toolName: 'save_memory',
-          toolArgs: { fact: args.trim() },
-        };
+        return result;
       },
     },
     {
       name: 'refresh',
       description: 'Refresh the memory from the source',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
         context.ui.addItem(
           {
@@ -81,32 +77,23 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const config = await context.services.config;
+          const config = context.services.config;
           if (config) {
-            const { memoryContent, fileCount } =
-              await refreshServerHierarchicalMemory(config);
-
-            await config.updateSystemInstructionIfInitialized();
-
-            const successMessage =
-              memoryContent.length > 0
-                ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
-                : 'Memory refreshed successfully. No memory content found.';
+            const result = await refreshMemory(config);
 
             context.ui.addItem(
               {
                 type: MessageType.INFO,
-                text: successMessage,
+                text: result.content,
               },
               Date.now(),
             );
           }
         } catch (error) {
-          const errorMessage = getErrorMessage(error);
           context.ui.addItem(
             {
               type: MessageType.ERROR,
-              text: `Error refreshing memory: ${errorMessage}`,
+              text: `Error refreshing memory: ${(error as Error).message}`,
             },
             Date.now(),
           );
@@ -117,19 +104,16 @@ export const memoryCommand: SlashCommand = {
       name: 'list',
       description: 'Lists the paths of the GEMINI.md files in use',
       kind: CommandKind.BUILT_IN,
+      autoExecute: true,
       action: async (context) => {
-        const filePaths = context.services.config?.getGeminiMdFilePaths() || [];
-        const fileCount = filePaths.length;
-
-        const messageContent =
-          fileCount > 0
-            ? `There are ${fileCount} GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`
-            : 'No GEMINI.md files in use.';
+        const config = context.services.config;
+        if (!config) return;
+        const result = listMemoryFiles(config);
 
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: messageContent,
+            text: result.content,
           },
           Date.now(),
         );

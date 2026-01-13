@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { WritableStream, ReadableStream } from 'node:stream/web';
-
 import type {
   Config,
   GeminiChat,
@@ -29,9 +27,11 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
-  getEffectiveModel,
+  resolveModel,
+  createWorkingStdio,
+  startupProfiler,
 } from '@google/gemini-cli-core';
-import * as acp from './acp.js';
+import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
@@ -50,19 +50,14 @@ export async function runZedIntegration(
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
-  const stdout = Writable.toWeb(process.stdout) as WritableStream;
+  const { stdout: workingStdout } = createWorkingStdio();
+  const stdout = Writable.toWeb(workingStdout) as WritableStream;
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
-  // Stdout is used to send messages to the client, so console.log/console.info
-  // messages to stderr so that they don't interfere with ACP.
-  console.log = console.error;
-  console.info = console.error;
-  console.debug = console.error;
-
+  const stream = acp.ndJsonStream(stdout, stdin);
   new acp.AgentSideConnection(
-    (client: acp.Client) => new GeminiAgent(config, settings, argv, client),
-    stdout,
-    stdin,
+    (connection) => new GeminiAgent(config, settings, argv, connection),
+    stream,
   );
 }
 
@@ -74,7 +69,7 @@ export class GeminiAgent {
     private config: Config,
     private settings: LoadedSettings,
     private argv: CliArgs,
-    private client: acp.Client,
+    private connection: acp.AgentSideConnection,
   ) {}
 
   async initialize(
@@ -110,14 +105,26 @@ export class GeminiAgent {
           audio: true,
           embeddedContext: true,
         },
+        mcpCapabilities: {
+          http: true,
+          sse: true,
+        },
       },
     };
   }
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
+    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
 
-    await clearCachedCredentialFile();
+    // Only clear credentials when switching to a different auth method
+    if (selectedAuthType && selectedAuthType !== method) {
+      await clearCachedCredentialFile();
+    }
+
+    // Refresh auth with the requested method
+    // This will reuse existing credentials if they're valid,
+    // or perform new authentication if needed
     await this.config.refreshAuth(method);
     this.settings.setValue(
       SettingScope.User,
@@ -151,7 +158,7 @@ export class GeminiAgent {
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
-        this.client,
+        this.connection,
         sessionId,
         this.clientCapabilities.fs,
         config.getFileSystemService(),
@@ -161,7 +168,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
-    const session = new Session(sessionId, chat, config, this.client);
+    const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
     return {
@@ -176,19 +183,45 @@ export class GeminiAgent {
   ): Promise<Config> {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
-    for (const { command, args, env: rawEnv, name } of mcpServers) {
-      const env: Record<string, string> = {};
-      for (const { name: envName, value } of rawEnv) {
-        env[envName] = value;
+    for (const server of mcpServers) {
+      if (
+        'type' in server &&
+        (server.type === 'sse' || server.type === 'http')
+      ) {
+        // HTTP or SSE MCP server
+        const headers = Object.fromEntries(
+          server.headers.map(({ name, value }) => [name, value]),
+        );
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          undefined, // command
+          undefined, // args
+          undefined, // env
+          undefined, // cwd
+          server.type === 'sse' ? server.url : undefined, // url (sse)
+          server.type === 'http' ? server.url : undefined, // httpUrl
+          headers,
+        );
+      } else if ('command' in server) {
+        // Stdio MCP server
+        const env: Record<string, string> = {};
+        for (const { name: envName, value } of server.env) {
+          env[envName] = value;
+        }
+        mergedMcpServers[server.name] = new MCPServerConfig(
+          server.command,
+          server.args,
+          env,
+          cwd,
+        );
       }
-      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
     }
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
+    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
     await config.initialize();
+    startupProfiler.flush(config);
     return config;
   }
 
@@ -216,7 +249,7 @@ export class Session {
     private readonly id: string,
     private readonly chat: GeminiChat,
     private readonly config: Config,
-    private readonly client: acp.Client,
+    private readonly connection: acp.AgentSideConnection,
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -249,8 +282,7 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = getEffectiveModel(
-          this.config.isInFallbackMode(),
+        const model = resolveModel(
           this.config.getModel(),
           this.config.getPreviewFeatures(),
         );
@@ -283,6 +315,7 @@ export class Session {
                 text: part.text,
               };
 
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
               this.sendUpdate({
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'
@@ -333,13 +366,15 @@ export class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
+  private async sendUpdate(
+    update: acp.SessionNotification['update'],
+  ): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
     };
 
-    await this.client.sessionUpdate(params);
+    await this.connection.sessionUpdate(params);
   }
 
   private async runTool(
@@ -348,7 +383,7 @@ export class Session {
     fc: FunctionCall,
   ): Promise<Part[]> {
     const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-    const args = (fc.args ?? {}) as Record<string, unknown>;
+    const args = fc.args ?? {};
 
     const startTime = Date.now();
 
@@ -386,7 +421,7 @@ export class Session {
     }
 
     const toolRegistry = this.config.getToolRegistry();
-    const tool = toolRegistry.getTool(fc.name as string);
+    const tool = toolRegistry.getTool(fc.name);
 
     if (!tool) {
       return errorResponse(
@@ -425,7 +460,7 @@ export class Session {
           },
         };
 
-        const output = await this.client.requestPermission(params);
+        const output = await this.connection.requestPermission(params);
         const outcome =
           output.outcome.outcome === 'cancelled'
             ? ToolConfirmationOutcome.Cancel
@@ -442,6 +477,7 @@ export class Session {
             );
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysAndSave:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
           case ToolConfirmationOutcome.ProceedAlwaysTool:
           case ToolConfirmationOutcome.ModifyWithEditor:
@@ -489,7 +525,12 @@ export class Session {
         ),
       );
 
-      return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
+      return convertToFunctionResponse(
+        fc.name,
+        callId,
+        toolResult.llmContent,
+        this.config.getActiveModel(),
+      );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
 
@@ -568,7 +609,10 @@ export class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = new ReadManyFilesTool(this.config);
+    const readManyFilesTool = new ReadManyFilesTool(
+      this.config,
+      this.config.getMessageBus(),
+    );
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {

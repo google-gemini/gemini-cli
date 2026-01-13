@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { FileFilteringOptions } from '../config/constants.js';
@@ -37,13 +38,7 @@ export async function bfsFileSearch(
   rootDir: string,
   options: BfsFileSearchOptions,
 ): Promise<string[]> {
-  const {
-    fileName,
-    ignoreDirs = [],
-    maxDirs = Infinity,
-    debug = false,
-    fileService,
-  } = options;
+  const { ignoreDirs = [], maxDirs = Infinity, debug = false } = options;
   const foundFiles: string[] = [];
   const queue: string[] = [rootDir];
   const visited = new Set<string>();
@@ -99,36 +94,109 @@ export async function bfsFileSearch(
     const results = await Promise.all(readPromises);
 
     for (const { currentDir, entries } of results) {
-      for (const entry of entries) {
-        const fullPath = path.join(currentDir, entry.name);
-        const isDirectory = entry.isDirectory();
-        const isMatchingFile = entry.isFile() && entry.name === fileName;
+      processDirEntries(
+        currentDir,
+        entries,
+        options,
+        ignoreDirsSet,
+        queue,
+        foundFiles,
+      );
+    }
+  }
 
-        if (!isDirectory && !isMatchingFile) {
-          continue;
-        }
-        if (isDirectory && ignoreDirsSet.has(entry.name)) {
-          continue;
-        }
+  return foundFiles;
+}
 
-        if (
-          fileService?.shouldIgnoreFile(fullPath, {
-            respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
-            respectGeminiIgnore:
-              options.fileFilteringOptions?.respectGeminiIgnore,
-          })
-        ) {
-          continue;
-        }
+/**
+ * Performs a synchronous breadth-first search for a specific file within a directory structure.
+ *
+ * @param rootDir The directory to start the search from.
+ * @param options Configuration for the search.
+ * @returns An array of paths where the file was found.
+ */
+export function bfsFileSearchSync(
+  rootDir: string,
+  options: BfsFileSearchOptions,
+): string[] {
+  const { ignoreDirs = [], maxDirs = Infinity, debug = false } = options;
+  const foundFiles: string[] = [];
+  const queue: string[] = [rootDir];
+  const visited = new Set<string>();
+  let scannedDirCount = 0;
+  let queueHead = 0;
 
-        if (isDirectory) {
-          queue.push(fullPath);
-        } else {
-          foundFiles.push(fullPath);
-        }
+  const ignoreDirsSet = new Set(ignoreDirs);
+
+  while (queueHead < queue.length && scannedDirCount < maxDirs) {
+    const currentDir = queue[queueHead];
+    queueHead++;
+
+    if (!visited.has(currentDir)) {
+      visited.add(currentDir);
+      scannedDirCount++;
+
+      if (debug) {
+        logger.debug(
+          `Scanning Sync [${scannedDirCount}/${maxDirs}]: ${currentDir}`,
+        );
+      }
+
+      try {
+        const entries = fsSync.readdirSync(currentDir, { withFileTypes: true });
+        processDirEntries(
+          currentDir,
+          entries,
+          options,
+          ignoreDirsSet,
+          queue,
+          foundFiles,
+        );
+      } catch (error) {
+        const message = (error as Error)?.message ?? 'Unknown error';
+        debugLogger.warn(
+          `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
+        );
       }
     }
   }
 
   return foundFiles;
+}
+
+function processDirEntries(
+  currentDir: string,
+  entries: fsSync.Dirent[],
+  options: BfsFileSearchOptions,
+  ignoreDirsSet: Set<string>,
+  queue: string[],
+  foundFiles: string[],
+): void {
+  for (const entry of entries) {
+    const fullPath = path.join(currentDir, entry.name);
+    const isDirectory = entry.isDirectory();
+    const isMatchingFile = entry.isFile() && entry.name === options.fileName;
+
+    if (!isDirectory && !isMatchingFile) {
+      continue;
+    }
+    if (isDirectory && ignoreDirsSet.has(entry.name)) {
+      continue;
+    }
+
+    if (
+      options.fileService?.shouldIgnoreFile(fullPath, {
+        respectGitIgnore: options.fileFilteringOptions?.respectGitIgnore,
+        respectGeminiIgnore: options.fileFilteringOptions?.respectGeminiIgnore,
+      })
+    ) {
+      continue;
+    }
+
+    if (isDirectory) {
+      queue.push(fullPath);
+    } else {
+      foundFiles.push(fullPath);
+    }
+  }
 }

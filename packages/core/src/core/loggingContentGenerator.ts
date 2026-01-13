@@ -55,11 +55,22 @@ export class LoggingContentGenerator implements ContentGenerator {
     contents: Content[],
     model: string,
     promptId: string,
+    generationConfig?: GenerateContentConfig,
+    serverDetails?: ServerDetails,
   ): void {
     const requestText = JSON.stringify(contents);
     logApiRequest(
       this.config,
-      new ApiRequestEvent(model, promptId, requestText),
+      new ApiRequestEvent(
+        model,
+        {
+          prompt_id: promptId,
+          contents,
+          generate_content_config: generationConfig,
+          server: serverDetails,
+        },
+        requestText,
+      ),
     );
   }
 
@@ -176,8 +187,15 @@ export class LoggingContentGenerator implements ContentGenerator {
 
         const startTime = Date.now();
         const contents: Content[] = toContents(req.contents);
-        this.logApiRequest(toContents(req.contents), req.model, userPromptId);
         const serverDetails = this._getEndpointUrl(req, 'generateContent');
+        this.logApiRequest(
+          contents,
+          req.model,
+          userPromptId,
+          req.config,
+          serverDetails,
+        );
+
         try {
           const response = await this.wrapped.generateContent(
             req,
@@ -196,7 +214,13 @@ export class LoggingContentGenerator implements ContentGenerator {
             response.responseId,
             response.candidates,
             response.usageMetadata,
-            JSON.stringify(response),
+            JSON.stringify({
+              candidates: response.candidates,
+              usageMetadata: response.usageMetadata,
+              responseId: response.responseId,
+              modelVersion: response.modelVersion,
+              promptFeedback: response.promptFeedback,
+            }),
             req.config,
             serverDetails,
           );
@@ -230,10 +254,23 @@ export class LoggingContentGenerator implements ContentGenerator {
       async ({ metadata: spanMetadata, endSpan }) => {
         spanMetadata.input = { request: req, userPromptId, model: req.model };
         const startTime = Date.now();
-        this.logApiRequest(toContents(req.contents), req.model, userPromptId);
         const serverDetails = this._getEndpointUrl(
           req,
           'generateContentStream',
+        );
+
+        // For debugging: Capture the latest main agent request payload.
+        // Main agent prompt IDs end with exactly 8 hashes and a turn counter (e.g. "...########1")
+        if (/########\d+$/.test(userPromptId)) {
+          this.config.setLatestApiRequest(req);
+        }
+
+        this.logApiRequest(
+          toContents(req.contents),
+          req.model,
+          userPromptId,
+          req.config,
+          serverDetails,
         );
 
         let stream: AsyncGenerator<GenerateContentResponse>;
@@ -296,7 +333,15 @@ export class LoggingContentGenerator implements ContentGenerator {
         responses[0]?.responseId,
         responses.flatMap((response) => response.candidates || []),
         lastUsageMetadata,
-        JSON.stringify(responses),
+        JSON.stringify(
+          responses.map((r) => ({
+            candidates: r.candidates,
+            usageMetadata: r.usageMetadata,
+            responseId: r.responseId,
+            modelVersion: r.modelVersion,
+            promptFeedback: r.promptFeedback,
+          })),
+        ),
         req.config,
         serverDetails,
       );

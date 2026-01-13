@@ -58,17 +58,7 @@ describe('DetailedMessagesDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toContain('Debug Console');
-    expect(output).toContain('Log message');
-    expect(output).toContain('Warning message');
-    expect(output).toContain('Error message');
-    expect(output).toContain('Debug message');
-
-    // Check for icons
-    expect(output).toContain('ℹ');
-    expect(output).toContain('⚠');
-    expect(output).toContain('✖');
-    expect(output).toContain('🔍');
+    expect(output).toMatchSnapshot();
   });
 
   it('renders message counts', () => {
@@ -86,7 +76,6 @@ describe('DetailedMessagesDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toContain('Repeated message');
-    expect(output).toContain('(x5)');
+    expect(output).toMatchSnapshot();
   });
 });

@@ -10,9 +10,12 @@ import type {
   EmbedContentParameters,
   GenerateContentResponse,
   GenerateContentParameters,
+  GenerateContentConfig,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from './contentGenerator.js';
+import type { AuthType } from './contentGenerator.js';
+import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -20,6 +23,10 @@ import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import {
+  applyModelSelection,
+  createAvailabilityContextProvider,
+} from '../availability/policyHelpers.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -75,6 +82,19 @@ export interface GenerateContentOptions {
   maxAttempts?: number;
 }
 
+interface _CommonGenerateOptions {
+  modelConfigKey: ModelConfigKey;
+  contents: Content[];
+  systemInstruction?: string | Part | Part[] | Content;
+  abortSignal: AbortSignal;
+  promptId: string;
+  maxAttempts?: number;
+  additionalProperties?: {
+    responseJsonSchema: Record<string, unknown>;
+    responseMimeType: string;
+  };
+}
+
 /**
  * A client dedicated to stateless, utility-focused LLM calls.
  */
@@ -82,6 +102,7 @@ export class BaseLlmClient {
   constructor(
     private readonly contentGenerator: ContentGenerator,
     private readonly config: Config,
+    private readonly authType?: AuthType,
   ) {}
 
   async generateJson(
@@ -97,7 +118,7 @@ export class BaseLlmClient {
       maxAttempts,
     } = options;
 
-    const { model, generateContentConfig } =
+    const { model } =
       this.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
     const shouldRetryOnContent = (response: GenerateContentResponse) => {
@@ -116,18 +137,17 @@ export class BaseLlmClient {
 
     const result = await this._generateWithRetry(
       {
-        model,
+        modelConfigKey,
         contents,
-        config: {
-          ...generateContentConfig,
-          ...(systemInstruction && { systemInstruction }),
+        abortSignal,
+        promptId,
+        maxAttempts,
+        systemInstruction,
+        additionalProperties: {
           responseJsonSchema: schema,
           responseMimeType: 'application/json',
-          abortSignal,
         },
       },
-      promptId,
-      maxAttempts,
       shouldRetryOnContent,
       'generateJson',
     );
@@ -198,9 +218,6 @@ export class BaseLlmClient {
       maxAttempts,
     } = options;
 
-    const { model, generateContentConfig } =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
-
     const shouldRetryOnContent = (response: GenerateContentResponse) => {
       const text = getResponseText(response)?.trim();
       return !text; // Retry on empty response
@@ -208,37 +225,88 @@ export class BaseLlmClient {
 
     return this._generateWithRetry(
       {
-        model,
+        modelConfigKey,
         contents,
-        config: {
-          ...generateContentConfig,
-          ...(systemInstruction && { systemInstruction }),
-          abortSignal,
-        },
+        systemInstruction,
+        abortSignal,
+        promptId,
+        maxAttempts,
       },
-      promptId,
-      maxAttempts,
       shouldRetryOnContent,
       'generateContent',
     );
   }
 
   private async _generateWithRetry(
-    requestParams: GenerateContentParameters,
-    promptId: string,
-    maxAttempts: number | undefined,
+    options: _CommonGenerateOptions,
     shouldRetryOnContent: (response: GenerateContentResponse) => boolean,
     errorContext: 'generateJson' | 'generateContent',
   ): Promise<GenerateContentResponse> {
-    const abortSignal = requestParams.config?.abortSignal;
+    const {
+      modelConfigKey,
+      contents,
+      systemInstruction,
+      abortSignal,
+      promptId,
+      maxAttempts,
+      additionalProperties,
+    } = options;
+
+    const {
+      model,
+      config: generateContentConfig,
+      maxAttempts: availabilityMaxAttempts,
+    } = applyModelSelection(this.config, modelConfigKey);
+
+    let currentModel = model;
+    let currentGenerateContentConfig = generateContentConfig;
+
+    // Define callback to fetch context dynamically since active model may get updated during retry loop
+    const getAvailabilityContext = createAvailabilityContextProvider(
+      this.config,
+      () => currentModel,
+    );
 
     try {
-      const apiCall = () =>
-        this.contentGenerator.generateContent(requestParams, promptId);
+      const apiCall = () => {
+        // Ensure we use the current active model
+        // in case a fallback occurred in a previous attempt.
+        const activeModel = this.config.getActiveModel();
+        if (activeModel !== currentModel) {
+          currentModel = activeModel;
+          // Re-resolve config if model changed during retry
+          const { generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: activeModel,
+            });
+          currentGenerateContentConfig = generateContentConfig;
+        }
+        const finalConfig: GenerateContentConfig = {
+          ...currentGenerateContentConfig,
+          ...(systemInstruction && { systemInstruction }),
+          ...additionalProperties,
+          abortSignal,
+        };
+        const requestParams: GenerateContentParameters = {
+          model: currentModel,
+          config: finalConfig,
+          contents,
+        };
+        return this.contentGenerator.generateContent(requestParams, promptId);
+      };
 
       return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
-        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        maxAttempts:
+          availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+        getAvailabilityContext,
+        onPersistent429: this.config.isInteractive()
+          ? (authType, error) =>
+              handleFallback(this.config, currentModel, authType, error)
+          : undefined,
+        authType:
+          this.authType ?? this.config.getContentGeneratorConfig()?.authType,
       });
     } catch (error) {
       if (abortSignal?.aborted) {
@@ -253,14 +321,14 @@ export class BaseLlmClient {
         await reportError(
           error,
           `API returned invalid content after all retries.`,
-          requestParams.contents as Content[],
+          contents,
           `${errorContext}-invalid-content`,
         );
       } else {
         await reportError(
           error,
           `Error generating content via API.`,
-          requestParams.contents as Content[],
+          contents,
           `${errorContext}-api`,
         );
       }

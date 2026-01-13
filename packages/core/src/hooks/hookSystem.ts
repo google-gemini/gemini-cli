@@ -14,25 +14,31 @@ import type { HookRegistryEntry } from './hookRegistry.js';
 import { logs, type Logger } from '@opentelemetry/api-logs';
 import { SERVICE_NAME } from '../telemetry/constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
+import type {
+  SessionStartSource,
+  SessionEndReason,
+  PreCompressTrigger,
+} from './types.js';
+import type { AggregatedHookResult } from './hookAggregator.js';
 /**
  * Main hook system that coordinates all hook-related functionality
  */
 export class HookSystem {
+  private readonly config: Config;
   private readonly hookRegistry: HookRegistry;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
   private readonly hookPlanner: HookPlanner;
   private readonly hookEventHandler: HookEventHandler;
-  private initialized = false;
 
   constructor(config: Config) {
+    this.config = config;
     const logger: Logger = logs.getLogger(SERVICE_NAME);
     const messageBus = config.getMessageBus();
 
     // Initialize components
     this.hookRegistry = new HookRegistry(config);
-    this.hookRunner = new HookRunner();
+    this.hookRunner = new HookRunner(config);
     this.hookAggregator = new HookAggregator();
     this.hookPlanner = new HookPlanner(this.hookRegistry);
     this.hookEventHandler = new HookEventHandler(
@@ -49,12 +55,7 @@ export class HookSystem {
    * Initialize the hook system
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
     await this.hookRegistry.initialize();
-    this.initialized = true;
     debugLogger.debug('Hook system initialized successfully');
   }
 
@@ -62,9 +63,6 @@ export class HookSystem {
    * Get the hook event bus for firing events
    */
   getEventHandler(): HookEventHandler {
-    if (!this.initialized) {
-      throw new Error('Hook system not initialized');
-    }
     return this.hookEventHandler;
   }
 
@@ -90,17 +88,57 @@ export class HookSystem {
   }
 
   /**
-   * Get hook system status for debugging
+   * Fire hook events directly
+   * Returns undefined if hooks are disabled
    */
-  getStatus(): {
-    initialized: boolean;
-    totalHooks: number;
-  } {
-    const allHooks = this.initialized ? this.hookRegistry.getAllHooks() : [];
+  async fireSessionStartEvent(
+    source: SessionStartSource,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireSessionStartEvent(source);
+  }
 
-    return {
-      initialized: this.initialized,
-      totalHooks: allHooks.length,
-    };
+  async fireSessionEndEvent(
+    reason: SessionEndReason,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireSessionEndEvent(reason);
+  }
+
+  async firePreCompressEvent(
+    trigger: PreCompressTrigger,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.firePreCompressEvent(trigger);
+  }
+
+  async fireBeforeAgentEvent(
+    prompt: string,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireBeforeAgentEvent(prompt);
+  }
+
+  async fireAfterAgentEvent(
+    prompt: string,
+    response: string,
+    stopHookActive: boolean = false,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireAfterAgentEvent(
+      prompt,
+      response,
+      stopHookActive,
+    );
   }
 }

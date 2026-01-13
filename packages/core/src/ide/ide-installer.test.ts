@@ -7,16 +7,22 @@
 import { vi } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual =
-    (await importOriginal()) as typeof import('node:child_process');
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     execSync: vi.fn(),
     spawnSync: vi.fn(() => ({ status: 0 })),
   };
 });
-vi.mock('fs');
-vi.mock('os');
+vi.mock('node:fs');
+vi.mock('node:os');
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
@@ -25,12 +31,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+import { homedir as pathsHomedir } from '../utils/paths.js';
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
 
   beforeEach(() => {
     vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
+    vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
   });
 
   afterEach(() => {

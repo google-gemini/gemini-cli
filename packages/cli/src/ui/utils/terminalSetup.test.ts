@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   copyFile: vi.fn(),
   homedir: vi.fn(),
   platform: vi.fn(),
+  writeStream: {
+    write: vi.fn(),
+    on: vi.fn(),
+  },
 }));
 
 vi.mock('node:child_process', () => ({
@@ -24,6 +28,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs', () => ({
+  createWriteStream: () => mocks.writeStream,
   promises: {
     mkdir: mocks.mkdir,
     readFile: mocks.readFile,
@@ -37,8 +42,19 @@ vi.mock('node:os', () => ({
   platform: mocks.platform,
 }));
 
-vi.mock('./kittyProtocolDetector.js', () => ({
-  isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: mocks.homedir,
+  };
+});
+
+vi.mock('./terminalCapabilityManager.js', () => ({
+  terminalCapabilityManager: {
+    isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
+  },
 }));
 
 describe('terminalSetup', () => {

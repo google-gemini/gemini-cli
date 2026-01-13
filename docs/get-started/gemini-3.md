@@ -1,64 +1,22 @@
-# Gemini 3 Pro on Gemini CLI (Join the Waitlist)
+# Gemini 3 Pro and Gemini 3 Flash on Gemini CLI
 
-We’re excited to bring Gemini 3 Pro to Gemini CLI. For Google AI Ultra users
-(Google AI Ultra for Business is not currently supported) and paid Gemini and
-Vertex API key holders, Gemini 3 Pro is already available and ready to enable.
-For everyone else, we're gradually expanding access
-[through a waitlist](https://goo.gle/geminicli-waitlist-signup). Sign up for the
-waitlist now to access Gemini 3 Pro once approved.
+Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 
-**Note:** Please wait until you have been approved to use Gemini 3 Pro to enable
-**Preview Features**. If enabled early, the CLI will fallback to Gemini 2.5 Pro.
+## How to get started with Gemini 3 on Gemini CLI
 
-## Do I need to join the waitlist?
+Get started by upgrading Gemini CLI to the latest version:
 
-The following users will be **automatically granted access** to Gemini 3 Pro on
-Gemini CLI:
+```bash
+npm install -g @google/gemini-cli@latest
+```
 
-- Google AI Ultra subscribers (excluding Google AI Ultra for Business, which is
-  on the roadmap).
-- Gemini API key users
-  [with access to Gemini 3](https://ai.google.dev/gemini-api/docs/rate-limits).
-- Vertex API key users
-  [with access to Gemini 3](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/quotas).
+After you’ve confirmed your version is 0.21.1 or later:
 
-For **Gemini Code Assist Enterprise users**, access is coming soon.
+1. Use the `/settings` command in Gemini CLI.
+2. Toggle **Preview Features** to `true`.
+3. Run `/model` and select **Auto (Gemini 3)**.
 
-Users not automatically granted access through one of these account types will
-need to join the waitlist. This includes Google AI Pro, Gemini Code Assist
-standard, and free tier users.
-
-Note: Whether you’re automatically granted access or accepted from the waitlist,
-you’ll still need to enable Gemini 3 Pro
-[using the `/settings` command](../cli/settings.md).
-
-## How to join the waitlist
-
-Users not automatically granted access will need to join the waitlist. Follow
-these instructions to sign up:
-
-- Install Gemini CLI.
-- Authenticate using the **Login with Google** option. You’ll see a banner that
-  says “Gemini 3 is now available.” If you do not see this banner, update your
-  installation of Gemini CLI to the most recent version.
-- Fill out this Google form:
-  [Access Gemini 3 in Gemini CLI](https://goo.gle/geminicli-waitlist-signup).
-  Provide the email address of the account you used to authenticate with Gemini
-  CLI.
-
-Users will be onboarded in batches, subject to availability. When you’ve been
-granted access to Gemini 3 Pro, you’ll receive an acceptance email to your
-submitted email address.
-
-## How to use Gemini 3 Pro with Gemini CLI
-
-Once you receive your acceptance email–or if you are automatically granted
-access–you still need to enable Gemini 3 Pro within Gemini CLI.
-
-To enable Gemini 3 Pro, use the `/settings` command in Gemini CLI and set
-**Preview Features** to `true`.
-
-For more information, see [Gemini CLI Settings](../cli/settings.md).
+For more information, see [Gemini CLI model selection](../cli/model.md).
 
 ### Usage limits and fallback
 
@@ -76,12 +34,12 @@ There may be times when the Gemini 3 Pro model is overloaded. When that happens,
 Gemini CLI will ask you to decide whether you want to keep trying Gemini 3 Pro
 or fallback to Gemini 2.5 Pro.
 
-**Note:** The **Keep trying** option uses exponential backoff, in which Gemini
-CLI waits longer between each retry, when the system is busy. If the retry
-doesn't happen immediately, please wait a few minutes for the request to
-process.
+> **Note:** The **Keep trying** option uses exponential backoff, in which Gemini
+> CLI waits longer between each retry, when the system is busy. If the retry
+> doesn't happen immediately, please wait a few minutes for the request to
+> process.
 
-## Model selection & routing types
+### Model selection and routing types
 
 When using Gemini CLI, you may want to control how your requests are routed
 between models. By default, Gemini CLI uses **Auto** routing.
@@ -99,6 +57,39 @@ manage your usage limits:
 
 To learn more about selecting a model and routing, refer to
 [Gemini CLI Model Selection](../cli/model.md).
+
+## How to enable Gemini 3 with Gemini CLI on Gemini Code Assist
+
+If you're using Gemini Code Assist Standard or Gemini Code Assist Enterprise,
+enabling Gemini 3 Pro on Gemini CLI requires configuring your release channels.
+Using Gemini 3 Pro will require two steps: administrative enablement and user
+enablement.
+
+To learn more about these settings, refer to
+[Configure Gemini Code Assist release channels](https://developers.google.com/gemini-code-assist/docs/configure-release-channels).
+
+### Administrator instructions
+
+An administrator with **Google Cloud Settings Admin** permissions must follow
+these directions:
+
+- Navigate to the Google Cloud Project you're using with Gemini CLI for Code
+  Assist.
+- Go to **Admin for Gemini** > **Settings**.
+- Under **Release channels for Gemini Code Assist in local IDEs** select
+  **Preview**.
+- Click **Save changes**.
+
+### User instructions
+
+Wait for two to three minutes after your administrator has enabled **Preview**,
+then:
+
+- Open Gemini CLI.
+- Use the `/settings` command.
+- Set **Preview Features** to `true`.
+
+Restart Gemini CLI and you should have access to Gemini 3.
 
 ## Need help?
 

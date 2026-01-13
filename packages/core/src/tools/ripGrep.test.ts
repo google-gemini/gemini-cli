@@ -24,6 +24,7 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 // Mock dependencies for canUseRipgrep
 vi.mock('@joshua.litt/get-ripgrep', () => ({
   downloadRipGrep: vi.fn(),
@@ -252,6 +253,7 @@ describe('RipGrepTool', () => {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
+    getFileFilteringRespectGeminiIgnore: () => true,
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -266,7 +268,7 @@ describe('RipGrepTool', () => {
     await fs.writeFile(ripgrepBinaryPath, '');
     storageSpy.mockImplementation(() => binDir);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
-    grepTool = new RipGrepTool(mockConfig);
+    grepTool = new RipGrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
     await fs.writeFile(
@@ -735,6 +737,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
       // Setup specific mock for this test - multi-directory search for 'world'
@@ -831,7 +834,10 @@ describe('RipGrepTool', () => {
         return mockProcess as unknown as ChildProcess;
       });
 
-      const multiDirGrepTool = new RipGrepTool(multiDirConfig);
+      const multiDirGrepTool = new RipGrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -876,6 +882,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
@@ -924,7 +931,10 @@ describe('RipGrepTool', () => {
         return mockProcess as unknown as ChildProcess;
       });
 
-      const multiDirGrepTool = new RipGrepTool(multiDirConfig);
+      const multiDirGrepTool = new RipGrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
 
       // Search only in the 'sub' directory of the first workspace
       const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
@@ -1644,6 +1654,86 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: secret log entry');
     });
 
+    it('should add .geminiignore when enabled and patterns exist', async () => {
+      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      await fs.writeFile(geminiIgnorePath, 'ignored.log');
+      const configWithGeminiIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
+      } as unknown as Config;
+      const geminiIgnoreTool = new RipGrepTool(
+        configWithGeminiIgnore,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = geminiIgnoreTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--ignore-file', geminiIgnorePath]),
+        expect.anything(),
+      );
+    });
+
+    it('should skip .geminiignore when disabled', async () => {
+      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      await fs.writeFile(geminiIgnorePath, 'ignored.log');
+      const configWithoutGeminiIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGeminiIgnore: () => false,
+      } as unknown as Config;
+      const geminiIgnoreTool = new RipGrepTool(
+        configWithoutGeminiIgnore,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = geminiIgnoreTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.not.arrayContaining(['--ignore-file', geminiIgnorePath]),
+        expect.anything(),
+      );
+    });
+
     it('should handle context parameters', async () => {
       mockSpawn.mockImplementationOnce(
         createMockSpawn({
@@ -1739,7 +1829,10 @@ describe('RipGrepTool', () => {
         getDebugMode: () => false,
       } as unknown as Config;
 
-      const multiDirGrepTool = new RipGrepTool(multiDirConfig);
+      const multiDirGrepTool = new RipGrepTool(
+        multiDirConfig,
+        createMockMessageBus(),
+      );
       const params: RipGrepToolParams = { pattern: 'testPattern' };
       const invocation = multiDirGrepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");
@@ -1761,6 +1854,7 @@ describe('RipGrepTool', () => {
     });
   });
 });
+
 afterAll(() => {
   storageSpy.mockRestore();
 });
