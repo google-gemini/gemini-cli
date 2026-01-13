@@ -81,7 +81,8 @@ Respond *only* in JSON format according to the following schema.
   "required": ["reasoning", "complexity_score"]
 }
 # Output Examples
-*Prompt:* <user_request>read package.json</user_request>
+User: read package.json
+Model: {"complexity_reasoning": "Simple read operation.", "complexity_score": 10}
 *JSON:* {"reasoning": "Simple read operation.", "complexity_score": 10}
 
 *Prompt:* <user_request>Rename the 'data' variable to 'userData' in utils.ts</user_request>
