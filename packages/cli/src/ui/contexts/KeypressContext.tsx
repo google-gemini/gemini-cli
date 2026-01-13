@@ -278,7 +278,6 @@ function createDataListener(keypressHandler: KeypressHandler) {
   let timeoutId: NodeJS.Timeout;
   return (data: string) => {
     clearTimeout(timeoutId);
-    // Normal character-by-character processing
     for (const char of data) {
       parser.next(char);
     }
