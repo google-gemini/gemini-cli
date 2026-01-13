@@ -180,9 +180,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.showStatusInTitle`** (boolean):
-  - **Description:** Show Gemini CLI status and thoughts in the terminal window
-    title
+  - **Description:** Show Gemini CLI model thoughts in the terminal window title
+    during the working phase
   - **Default:** `false`
+
+- **`ui.dynamicWindowTitle`** (boolean):
+  - **Description:** Update the terminal window title with current status icons
+    (Ready: ◇, Action Required: ✋, Working: ✦)
+  - **Default:** `true`
 
 - **`ui.showHomeDirectoryWarning`** (boolean):
   - **Description:** Show a warning when running Gemini CLI in the home
