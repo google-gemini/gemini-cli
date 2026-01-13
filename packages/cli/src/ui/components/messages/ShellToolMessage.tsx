@@ -140,7 +140,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {shouldShowFocusHint && (
           <Box marginLeft={1} flexShrink={0}>
             <Text color={theme.text.accent}>
-              {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
+              {isThisShellFocused ? '(Focused)' : '(tab to focus)'}
             </Text>
           </Box>
         )}

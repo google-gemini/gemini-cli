@@ -126,6 +126,7 @@ import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
+import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -468,6 +469,16 @@ export const AppContainer = (props: AppContainerProps) => {
     apiKeyDefaultValue,
     reloadApiKey,
   } = useAuthCommand(settings, config);
+  const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
+    {},
+  );
+
+  useEffect(() => {
+    if (authState === AuthState.Authenticated && authContext.requiresRestart) {
+      setAuthState(AuthState.AwaitingGoogleLoginRestart);
+      setAuthContext({});
+    }
+  }, [authState, authContext, setAuthState]);
 
   const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
     config,
@@ -511,6 +522,11 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
+        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+          setAuthContext({ requiresRestart: true });
+        } else {
+          setAuthContext({});
+        }
         await clearCachedCredentialFile();
         settings.setValue(scope, 'security.auth.selectedType', authType);
 
@@ -539,7 +555,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
       setAuthState(AuthState.Authenticated);
     },
-    [settings, config, setAuthState, onAuthError],
+    [settings, config, setAuthState, onAuthError, setAuthContext],
   );
 
   const handleApiKeySubmit = useCallback(
@@ -807,11 +823,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     embeddedShellFocused,
   );
 
+  const lastOutputTimeRef = useRef(0);
+  useEffect(() => {
+    lastOutputTimeRef.current = lastOutputTime;
+  }, [lastOutputTime]);
+
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
     addItem: historyManager.addItem,
     onApprovalModeChange: handleApprovalModeChange,
+    isActive: !embeddedShellFocused,
   });
 
   const {
@@ -1037,19 +1059,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleWarning = useCallback((message: string) => {
+    setWarningMessage(message);
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningMessage(null);
+    }, WARNING_PROMPT_DURATION_MS);
+  }, []);
+
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    const handleWarning = (message: string) => {
-      setWarningMessage(message);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      timeoutId = setTimeout(() => {
-        setWarningMessage(null);
-      }, WARNING_PROMPT_DURATION_MS);
-    };
-
     const handleSelectionWarning = () => {
       handleWarning('Press Ctrl-S to enter selection mode to copy text.');
     };
@@ -1061,11 +1084,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+      if (tabFocusTimeoutRef.current) {
+        clearTimeout(tabFocusTimeoutRef.current);
       }
     };
-  }, []);
+  }, [handleWarning]);
 
   useEffect(() => {
     if (ideNeedsRestart) {
@@ -1253,10 +1279,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
-      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
-        if (activePtyId || embeddedShellFocused) {
-          setEmbeddedShellFocused((prev) => !prev);
+      } else if (
+        keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_OUT](key) &&
+        activePtyId &&
+        embeddedShellFocused
+      ) {
+        if (key.name === 'tab' && key.shift) {
+          // Always change focus
+          setEmbeddedShellFocused(false);
+          return;
         }
+
+        const now = Date.now();
+        // If the shell hasn't produced output in the last 100ms, it's considered idle.
+        const isIdle = now - lastOutputTimeRef.current >= 100;
+        if (isIdle) {
+          if (tabFocusTimeoutRef.current) {
+            clearTimeout(tabFocusTimeoutRef.current);
+          }
+          tabFocusTimeoutRef.current = setTimeout(() => {
+            tabFocusTimeoutRef.current = null;
+            // If the shell produced output since the tab press, we assume it handled the tab
+            // (e.g. autocomplete) so we should not toggle focus.
+            if (lastOutputTimeRef.current > now) {
+              handleWarning('Press Shift+Tab to focus out.');
+              return;
+            }
+            setEmbeddedShellFocused(false);
+          }, 100);
+          return;
+        }
+        handleWarning('Press Shift+Tab to focus out.');
       }
     },
     [
@@ -1277,6 +1330,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
+      handleWarning,
     ],
   );
 
@@ -1687,6 +1741,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setAuthContext,
     }),
     [
       handleThemeSelect,
@@ -1722,8 +1777,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      setAuthContext,
     ],
   );
+
+  if (authState === AuthState.AwaitingGoogleLoginRestart) {
+    return (
+      <LoginWithGoogleRestartDialog
+        onDismiss={() => {
+          setAuthContext({});
+          setAuthState(AuthState.Updating);
+        }}
+      />
+    );
+  }
 
   return (
     <UIStateContext.Provider value={uiState}>
