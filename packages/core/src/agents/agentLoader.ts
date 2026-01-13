@@ -281,12 +281,14 @@ export function markdownToAgentDefinition(
     },
     modelConfig: {
       model: modelName,
-      temp: markdown.temperature ?? 1,
-      top_p: 0.95,
+      generateContentConfig: {
+        temperature: markdown.temperature ?? 1,
+        topP: 0.95,
+      },
     },
     runConfig: {
-      max_turns: markdown.max_turns,
-      max_time_minutes: markdown.timeout_mins || 5,
+      maxTurns: markdown.max_turns,
+      maxTimeMinutes: markdown.timeout_mins || 5,
     },
     toolConfig: markdown.tools
       ? {

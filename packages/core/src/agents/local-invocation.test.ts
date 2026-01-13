@@ -33,8 +33,14 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
       priority: { type: 'number', required: false, description: 'prio' },
     },
   },
-  modelConfig: { model: 'test', temp: 0, top_p: 1 },
-  runConfig: { max_time_minutes: 1 },
+  modelConfig: {
+    model: 'test',
+    generateContentConfig: {
+      temperature: 0,
+      topP: 1,
+    },
+  },
+  runConfig: { maxTimeMinutes: 1 },
   promptConfig: { systemPrompt: 'test' },
 };
 

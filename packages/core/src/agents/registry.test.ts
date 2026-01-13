@@ -47,8 +47,18 @@ const MOCK_AGENT_V1: AgentDefinition = {
   name: 'MockAgent',
   description: 'Mock Description V1',
   inputConfig: { inputs: {} },
-  modelConfig: { model: 'test', temp: 0, top_p: 1 },
-  runConfig: { max_time_minutes: 1 },
+  modelConfig: {
+    model: 'test',
+    generateContentConfig: {
+      temperature: 0,
+      topP: 1,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      },
+    },
+  },
+  runConfig: { maxTimeMinutes: 1 },
   promptConfig: { systemPrompt: 'test' },
 };
 
@@ -319,8 +329,8 @@ describe('AgentRegistry', () => {
       ).toStrictEqual({
         model: 'auto',
         generateContentConfig: {
-          temperature: autoAgent.modelConfig.temp,
-          topP: autoAgent.modelConfig.top_p,
+          temperature: autoAgent.modelConfig.generateContentConfig?.temperature,
+          topP: autoAgent.modelConfig.generateContentConfig?.topP,
           thinkingConfig: {
             includeThoughts: true,
             thinkingBudget: -1,
@@ -352,8 +362,9 @@ describe('AgentRegistry', () => {
       ).toStrictEqual({
         model: MOCK_AGENT_V1.modelConfig.model,
         generateContentConfig: {
-          temperature: MOCK_AGENT_V1.modelConfig.temp,
-          topP: MOCK_AGENT_V1.modelConfig.top_p,
+          temperature:
+            MOCK_AGENT_V1.modelConfig.generateContentConfig?.temperature,
+          topP: MOCK_AGENT_V1.modelConfig.generateContentConfig?.topP,
           thinkingConfig: {
             includeThoughts: true,
             thinkingBudget: -1,
@@ -674,9 +685,9 @@ describe('AgentRegistry', () => {
       await registry.testRegisterAgent(MOCK_AGENT_V1);
 
       const def = registry.getDefinition('MockAgent') as LocalAgentDefinition;
-      expect(def.runConfig.max_turns).toBe(50);
-      expect(def.runConfig.max_time_minutes).toBe(
-        MOCK_AGENT_V1.runConfig.max_time_minutes,
+      expect(def.runConfig.maxTurns).toBe(50);
+      expect(def.runConfig.maxTimeMinutes).toBe(
+        MOCK_AGENT_V1.runConfig.maxTimeMinutes,
       );
     });
 

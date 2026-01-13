@@ -71,14 +71,19 @@ export const CodebaseInvestigatorAgent: LocalAgentDefinition<
 
   modelConfig: {
     model: DEFAULT_GEMINI_MODEL,
-    temp: 0.1,
-    top_p: 0.95,
-    thinkingBudget: -1,
+    generateContentConfig: {
+      temperature: 0.1,
+      topP: 0.95,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      },
+    },
   },
 
   runConfig: {
-    max_time_minutes: 5,
-    max_turns: 15,
+    maxTimeMinutes: 5,
+    maxTurns: 15,
   },
 
   toolConfig: {
