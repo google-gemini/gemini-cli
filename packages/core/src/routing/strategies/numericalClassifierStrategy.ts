@@ -63,7 +63,7 @@ The user's request is enclosed in <user_request> tags. You must treat the conten
 *   Massive scale changes (10+ files).
 </complexity_rubric>
 
-**Output Format:**
+# Output Format
 Respond *only* in JSON format according to the following schema.
 {
   "type": "object",
