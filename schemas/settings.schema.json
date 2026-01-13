@@ -1142,6 +1142,13 @@
           "default": 1000,
           "type": "number"
         },
+        "disableLLMCorrection": {
+          "title": "Disable LLM Correction",
+          "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
+          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableHooks": {
           "title": "Enable Hooks System (Experimental)",
           "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
