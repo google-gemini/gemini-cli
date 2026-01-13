@@ -595,13 +595,12 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
-
         const serverName =
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
             : undefined;
 
-        const { decision } = await this.config
+        const { decision, reason } = await this.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName);
 
@@ -633,8 +632,10 @@ export class CoreToolScheduler {
           // PolicyDecision.ASK_USER
 
           // We need confirmation details to show to the user
-          const confirmationDetails =
-            await invocation.shouldConfirmExecute(signal);
+          const confirmationDetails = await invocation.shouldConfirmExecute(
+            signal,
+            reason,
+          );
 
           if (!confirmationDetails) {
             this.setToolCallOutcome(

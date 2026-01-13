@@ -265,3 +265,9 @@ export interface PolicySettings {
   };
   mcpServers?: Record<string, { trust?: boolean }>;
 }
+
+export interface CheckResult {
+  decision: PolicyDecision;
+  rule?: PolicyRule;
+  reason?: string;
+}

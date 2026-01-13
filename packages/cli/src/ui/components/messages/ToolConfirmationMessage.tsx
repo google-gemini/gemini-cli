@@ -13,7 +13,11 @@ import type {
   ToolCallConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  ToolConfirmationOutcome,
+  hasRedirection,
+} from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -270,29 +274,58 @@ export const ToolConfirmationMessage: React.FC<
       }
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
+
+      const commandsToDisplay =
+        executionProps.commands && executionProps.commands.length > 1
+          ? executionProps.commands
+          : [executionProps.command];
+      const containsRedirection = commandsToDisplay.some((cmd) =>
+        hasRedirection(cmd),
+      );
+
       let bodyContentHeight = availableBodyContentHeight();
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
+        if (containsRedirection) {
+          bodyContentHeight -= 3; // Account for Spacer + Note/Tip lines
+        }
       }
+
+      const commandBoxChildren = (
+        <>
+          <Box flexDirection="column">
+            {commandsToDisplay.map((cmd, idx) => (
+              <Text key={idx} color={theme.text.link}>
+                {cmd}
+              </Text>
+            ))}
+          </Box>
+          {containsRedirection && (
+            <>
+              <Box />
+              <Box>
+                <Text color={theme.text.primary}>
+                  <Text bold>Note:</Text> Command contains redirection which can
+                  be undesirable.
+                </Text>
+              </Box>
+              <Box>
+                <Text color={theme.border.default}>
+                  Tip: Toggle auto-edit (Shift+Tab) to allow redirection in the
+                  future.
+                </Text>
+              </Box>
+            </>
+          )}
+        </>
+      );
 
       bodyContent = (
         <MaxSizedBox
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          <Box flexDirection="column">
-            {executionProps.commands && executionProps.commands.length > 1 ? (
-              executionProps.commands.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {cmd}
-                </Text>
-              ))
-            ) : (
-              <Box>
-                <Text color={theme.text.link}>{executionProps.command}</Text>
-              </Box>
-            )}
-          </Box>
+          {commandBoxChildren}
         </MaxSizedBox>
       );
     } else if (confirmationDetails.type === 'info') {

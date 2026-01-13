@@ -141,6 +141,7 @@ export async function initializeShellParsers(): Promise<void> {
 export interface ParsedCommandDetail {
   name: string;
   text: string;
+  startIndex: number;
 }
 
 interface CommandParseResult {
@@ -193,6 +194,12 @@ foreach ($commandAst in $commandAsts) {
 `,
   'utf16le',
 ).toString('base64');
+
+const REDIRECTION_NAMES = new Set([
+  'redirection (>)',
+  'heredoc (<<)',
+  'herestring (<<<)',
+]);
 
 function createParser(): Parser | null {
   if (!bashLanguage) {
@@ -278,6 +285,17 @@ function extractNameFromNode(node: Node): string | null {
       }
       return normalizeCommandName(firstChild.text);
     }
+    case 'file_redirect': {
+      const op = node.child(0)?.text;
+      if (op === '<') {
+        return 'redirection (<)';
+      }
+      return 'redirection (>)';
+    }
+    case 'heredoc_redirect':
+      return 'heredoc (<<)';
+    case 'herestring_redirect':
+      return 'herestring (<<<)';
     default:
       return null;
   }
@@ -293,43 +311,19 @@ function collectCommandDetails(
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    let name: string | null = null;
-    let ignoreChildId: number | undefined;
-
-    if (current.type === 'redirected_statement') {
-      const body = current.childForFieldName('body');
-      if (body) {
-        const bodyName = extractNameFromNode(body);
-        if (bodyName) {
-          name = bodyName;
-          ignoreChildId = body.id;
-
-          // If we ignore the body node (because we used it to name the redirected_statement),
-          // we must still traverse its children to find nested commands (e.g. command substitution).
-          for (let i = body.namedChildCount - 1; i >= 0; i -= 1) {
-            const grandChild = body.namedChild(i);
-            if (grandChild) {
-              stack.push(grandChild);
-            }
-          }
-        }
-      }
-    }
-
-    if (!name) {
-      name = extractNameFromNode(current);
-    }
-
+    const name = extractNameFromNode(current);
     if (name) {
       details.push({
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
+        startIndex: current.startIndex,
       });
     }
 
-    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
-      const child = current.namedChild(i);
-      if (child && child.id !== ignoreChildId) {
+    // Traverse all children to find all sub-components (commands, redirections, etc.)
+    for (let i = current.childCount - 1; i >= 0; i -= 1) {
+      const child = current.child(i);
+      if (child) {
         stack.push(child);
       }
     }
@@ -424,7 +418,7 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
     }
   }
   return {
-    details,
+    details: details.sort((a, b) => a.startIndex - b.startIndex),
     hasError,
   };
 }
@@ -499,6 +493,7 @@ function parsePowerShellCommandDetails(
         return {
           name,
           text,
+          startIndex: 0,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -610,6 +605,12 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  */
 export function hasRedirection(command: string): boolean {
   const fallbackCheck = () => /[><]/.test(command);
+
+  // If there are no redirection characters at all, we can skip parsing.
+  if (!fallbackCheck()) {
+    return false;
+  }
+
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
@@ -642,7 +643,9 @@ export function hasRedirection(command: string): boolean {
         if (child) stack.push(child);
       }
     }
-    return false;
+    // If tree traversal didn't find specific redirection nodes but we saw redirection chars,
+    // we use the fallback check. This is safer.
+    return fallbackCheck();
   }
 
   return fallbackCheck();
@@ -684,7 +687,10 @@ export function getCommandRoots(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.name).filter(Boolean);
+  return parsed.details
+    .map((detail) => detail.name)
+    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter(Boolean);
 }
 
 export function stripShellWrapper(command: string): string {
