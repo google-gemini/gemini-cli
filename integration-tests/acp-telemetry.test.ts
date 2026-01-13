@@ -46,7 +46,7 @@ describe('ACP telemetry', () => {
       fakeResponsesPath: join(import.meta.dirname, SIMPLE_RESPONSE_PATH),
     });
 
-    const telemetryPath = join(rig.testDir!, 'telemetry.log');
+    const telemetryPath = join(rig.homeDir!, 'telemetry.log');
     const bundlePath = join(import.meta.dirname, '..', 'bundle/gemini.js');
 
     child = spawn(
@@ -63,6 +63,7 @@ describe('ACP telemetry', () => {
         env: {
           ...process.env,
           GEMINI_API_KEY: 'fake-key',
+          GEMINI_CLI_HOME: rig.homeDir!,
           GEMINI_TELEMETRY_ENABLED: 'true',
           GEMINI_TELEMETRY_TARGET: 'local',
           GEMINI_TELEMETRY_OUTFILE: telemetryPath,
