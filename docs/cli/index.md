@@ -25,7 +25,7 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore
   snapshots of your session and files.
-- **[Enterprise configuration](./enterprise.md):** Deploying and manage Gemini
+- **[Enterprise configuration](./enterprise.md):** Deploying and managing Gemini
   CLI in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure,
   containerized environment.

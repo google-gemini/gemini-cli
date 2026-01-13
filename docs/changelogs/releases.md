@@ -849,7 +849,7 @@ https://github.com/google-gemini/gemini-cli/compare/v0.19.4...v0.20.0
   https://github.com/google-gemini/gemini-cli/pull/12863
 - feat(hooks): Hook Telemetry Infrastructure by @Edilmo in
   https://github.com/google-gemini/gemini-cli/pull/9082
-- fix: (some minor improvements to configs and getPackageJson return behaviour)
+- fix: (some minor improvements to configs and getPackageJson return behavior)
   by @grMLEqomlkkU5Eeinz4brIrOVCUCkJuN in
   https://github.com/google-gemini/gemini-cli/pull/12510
 - feat(hooks): Hook Event Handling by @Edilmo in
@@ -983,7 +983,7 @@ https://github.com/google-gemini/gemini-cli/compare/v0.18.4...v0.19.0
   https://github.com/google-gemini/gemini-cli/pull/12863
 - feat(hooks): Hook Telemetry Infrastructure by @Edilmo in
   https://github.com/google-gemini/gemini-cli/pull/9082
-- fix: (some minor improvements to configs and getPackageJson return behaviour)
+- fix: (some minor improvements to configs and getPackageJson return behavior)
   by @grMLEqomlkkU5Eeinz4brIrOVCUCkJuN in
   https://github.com/google-gemini/gemini-cli/pull/12510
 - feat(hooks): Hook Event Handling by @Edilmo in
