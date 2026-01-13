@@ -732,6 +732,7 @@ export async function loadCliConfig(
     },
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    generalSubagentSettings: settings.experimental?.generalSubagentSettings,
     cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,

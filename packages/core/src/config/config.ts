@@ -158,6 +158,15 @@ export interface CliHelpAgentSettings {
   enabled?: boolean;
 }
 
+export interface GeneralSubagentSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+  temp?: number;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -336,6 +345,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  generalSubagentSettings?: GeneralSubagentSettings;
   cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -467,6 +477,7 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly generalSubagentSettings: GeneralSubagentSettings;
   private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -633,6 +644,15 @@ export class Config {
     };
     this.cliHelpAgentSettings = {
       enabled: params.cliHelpAgentSettings?.enabled ?? true,
+    };
+    this.generalSubagentSettings = {
+      enabled: params.generalSubagentSettings?.enabled ?? true,
+      maxNumTurns: params.generalSubagentSettings?.maxNumTurns ?? 100,
+      maxTimeMinutes: params.generalSubagentSettings?.maxTimeMinutes ?? 30,
+      thinkingBudget:
+        params.generalSubagentSettings?.thinkingBudget ?? DEFAULT_THINKING_MODE,
+      model: params.generalSubagentSettings?.model,
+      temp: params.generalSubagentSettings?.temp ?? 0.7,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1706,6 +1726,10 @@ export class Config {
 
   getCliHelpAgentSettings(): CliHelpAgentSettings {
     return this.cliHelpAgentSettings;
+  }
+
+  getGeneralSubagentSettings(): GeneralSubagentSettings {
+    return this.generalSubagentSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

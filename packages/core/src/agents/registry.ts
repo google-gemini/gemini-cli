@@ -10,6 +10,7 @@ import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { createGeneralSubagent } from './general-subagent.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
@@ -129,6 +130,7 @@ export class AgentRegistry {
 
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+    const generalSubagentSettings = this.config.getGeneralSubagentSettings();
     const cliHelpSettings = this.config.getCliHelpAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
@@ -171,6 +173,59 @@ export class AgentRegistry {
     // Register the CLI help agent if it's explicitly enabled.
     if (cliHelpSettings.enabled) {
       this.registerLocalAgent(CliHelpAgent(this.config));
+    }
+
+    // Register the general subagent if it's explicitly enabled.
+    if (generalSubagentSettings?.enabled) {
+      try {
+        let model;
+        const settingsModel = generalSubagentSettings.model;
+        // Check if the user explicitly set a model in the settings.
+        if (settingsModel && settingsModel !== GEMINI_MODEL_ALIAS_AUTO) {
+          model = settingsModel;
+        } else {
+          // Use the same model as the main agent
+          model = this.config.getModel();
+        }
+
+        const generalAgent = createGeneralSubagent(this.config);
+        const agentDef = {
+          ...generalAgent,
+          modelConfig: {
+            ...generalAgent.modelConfig,
+            model,
+            temp: generalSubagentSettings.temp ?? generalAgent.modelConfig.temp,
+            thinkingBudget:
+              generalSubagentSettings.thinkingBudget ??
+              generalAgent.modelConfig.thinkingBudget,
+          },
+          runConfig: {
+            ...generalAgent.runConfig,
+            max_time_minutes:
+              generalSubagentSettings.maxTimeMinutes ??
+              generalAgent.runConfig.max_time_minutes,
+            max_turns:
+              generalSubagentSettings.maxNumTurns ??
+              generalAgent.runConfig.max_turns,
+          },
+        };
+        this.registerLocalAgent(agentDef);
+
+        if (this.config.getDebugMode()) {
+          debugLogger.log(
+            `[AgentRegistry] Registered general_subagent with ${agentDef.toolConfig?.tools?.length ?? 0} tools`,
+          );
+        }
+      } catch (error) {
+        debugLogger.error(
+          '[AgentRegistry] Failed to register general_subagent:',
+          error,
+        );
+        coreEvents.emitFeedback(
+          'error',
+          `Failed to register general_subagent: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 
