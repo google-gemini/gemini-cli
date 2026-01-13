@@ -42,7 +42,8 @@ they appear in the UI.
 | UI Label                       | Setting                                  | Description                                                                                                                                                       | Default |
 | ------------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Hide Window Title              | `ui.hideWindowTitle`                     | Hide the window title bar                                                                                                                                         | `false` |
-| Show Status in Title           | `ui.showStatusInTitle`                   | Show Gemini CLI status and thoughts in the terminal window title                                                                                                  | `false` |
+| Show Thoughts in Title         | `ui.showStatusInTitle`                   | Show Gemini CLI model thoughts in the terminal window title during the working phase                                                                              | `false` |
+| Dynamic Window Title           | `ui.dynamicWindowTitle`                  | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`  |
 | Show Home Directory Warning    | `ui.showHomeDirectoryWarning`            | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`  |
 | Hide Tips                      | `ui.hideTips`                            | Hide helpful tips in the UI                                                                                                                                       | `false` |
 | Hide Banner                    | `ui.hideBanner`                          | Hide the application banner                                                                                                                                       | `false` |
@@ -89,15 +90,16 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                     | Default   |
-| -------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- | --------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                      | `true`    |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                     | `false`   |
-| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).              | `false`   |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance. | `true`    |
-| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`    |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `4000000` |
-| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `1000`    |
+| UI Label                         | Setting                              | Description                                                                                                                                                                | Default   |
+| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`    |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false`   |
+| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).                                                                         | `false`   |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`    |
+| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                   | `true`    |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                                                                                      | `4000000` |
+| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                   | `1000`    |
+| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `false`   |
 
 ### Security
 

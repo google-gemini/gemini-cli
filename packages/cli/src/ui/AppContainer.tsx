@@ -81,7 +81,7 @@ import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
 import { basename } from 'node:path';
-import { computeWindowTitle } from '../utils/windowTitle.js';
+import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -126,8 +126,10 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
+  SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import { useInactivityTimer } from './hooks/useInactivityTimer.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -288,9 +290,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const mainControlsRef = useRef<DOMElement>(null);
   // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
-  const originalTitleRef = useRef(
-    computeWindowTitle(basename(config.getTargetDir())),
-  );
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
@@ -862,12 +861,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     backgroundShellsRef.current = backgroundShells;
   }, [backgroundShells]);
+  const lastOutputTimeRef = useRef(0);
+  useEffect(() => {
+    lastOutputTimeRef.current = lastOutputTime;
+  }, [lastOutputTime]);
+
+  const isShellAwaitingFocus =
+    !!activePtyId &&
+    !embeddedShellFocused &&
+    config.isInteractiveShellEnabled();
+  const showShellActionRequired = useInactivityTimer(
+    isShellAwaitingFocus,
+    lastOutputTime,
+    SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
+  );
 
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
     addItem: historyManager.addItem,
     onApprovalModeChange: handleApprovalModeChange,
+    isActive: !embeddedShellFocused,
   });
 
   useEffect(() => {
@@ -916,13 +930,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShellCount,
     isBackgroundShellListOpen,
   ]);
-
-  const visibleBackgroundShell =
-    isBackgroundShellVisible &&
-    activeBackgroundShellPid !== null &&
-    backgroundShells.has(activeBackgroundShellPid)
-      ? backgroundShells.get(activeBackgroundShellPid)
-      : undefined;
 
   useEffect(() => {
     if (embeddedShellFocused) {
@@ -1162,19 +1169,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleWarning = useCallback((message: string) => {
+    setWarningMessage(message);
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    warningTimeoutRef.current = setTimeout(() => {
+      setWarningMessage(null);
+    }, WARNING_PROMPT_DURATION_MS);
+  }, []);
+
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    const handleWarning = (message: string) => {
-      setWarningMessage(message);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      timeoutId = setTimeout(() => {
-        setWarningMessage(null);
-      }, WARNING_PROMPT_DURATION_MS);
-    };
-
     const handleSelectionWarning = () => {
       handleWarning('Press Ctrl-S to enter selection mode to copy text.');
     };
@@ -1186,11 +1194,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+      if (tabFocusTimeoutRef.current) {
+        clearTimeout(tabFocusTimeoutRef.current);
       }
     };
-  }, []);
+  }, [handleWarning]);
 
   useEffect(() => {
     if (ideNeedsRestart) {
@@ -1378,10 +1389,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
-      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
-        if (activePtyId || embeddedShellFocused || visibleBackgroundShell) {
-          setEmbeddedShellFocused((prev) => !prev);
+      } else if (
+        keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_OUT](key) &&
+        activePtyId &&
+        embeddedShellFocused
+      ) {
+        if (key.name === 'tab' && key.shift) {
+          // Always change focus
+          setEmbeddedShellFocused(false);
+          return;
         }
+
+        const now = Date.now();
+        // If the shell hasn't produced output in the last 100ms, it's considered idle.
+        const isIdle = now - lastOutputTimeRef.current >= 100;
+        if (isIdle) {
+          if (tabFocusTimeoutRef.current) {
+            clearTimeout(tabFocusTimeoutRef.current);
+          }
+          tabFocusTimeoutRef.current = setTimeout(() => {
+            tabFocusTimeoutRef.current = null;
+            // If the shell produced output since the tab press, we assume it handled the tab
+            // (e.g. autocomplete) so we should not toggle focus.
+            if (lastOutputTimeRef.current > now) {
+              handleWarning('Press Shift+Tab to focus out.');
+              return;
+            }
+            setEmbeddedShellFocused(false);
+          }, 100);
+          return;
+        }
+        handleWarning('Press Shift+Tab to focus out.');
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();
@@ -1426,8 +1464,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleBackgroundShell,
       backgroundShells,
       isBackgroundShellVisible,
-      visibleBackgroundShell,
       setIsBackgroundShellListOpen,
+      handleWarning,
     ],
   );
 
@@ -1435,37 +1473,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
-    // Respect both showStatusInTitle and hideWindowTitle settings
-    if (
-      !settings.merged.ui?.showStatusInTitle ||
-      settings.merged.ui?.hideWindowTitle
-    )
-      return;
+    // Respect hideWindowTitle settings
+    if (settings.merged.ui?.hideWindowTitle) return;
 
-    let title;
-    if (streamingState === StreamingState.Idle) {
-      title = originalTitleRef.current;
-    } else {
-      const statusText = thought?.subject
-        ?.replace(/[\r\n]+/g, ' ')
-        .substring(0, 80);
-      title = statusText || originalTitleRef.current;
-    }
-
-    // Pad the title to a fixed width to prevent taskbar icon resizing.
-    const paddedTitle = title.padEnd(80, ' ');
+    const paddedTitle = computeTerminalTitle({
+      streamingState,
+      thoughtSubject: thought?.subject,
+      isConfirming:
+        !!shellConfirmationRequest ||
+        !!confirmationRequest ||
+        showShellActionRequired,
+      folderName: basename(config.getTargetDir()),
+      showThoughts: !!settings.merged.ui?.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+    });
 
     // Only update the title if it's different from the last value we set
     if (lastTitleRef.current !== paddedTitle) {
       lastTitleRef.current = paddedTitle;
-      stdout.write(`\x1b]2;${paddedTitle}\x07`);
+      stdout.write(`\x1b]0;${paddedTitle}\x07`);
     }
     // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
   }, [
     streamingState,
     thought,
+    shellConfirmationRequest,
+    confirmationRequest,
+    showShellActionRequired,
     settings.merged.ui?.showStatusInTitle,
+    settings.merged.ui?.dynamicWindowTitle,
     settings.merged.ui?.hideWindowTitle,
+    config,
     stdout,
   ]);
 

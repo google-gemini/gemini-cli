@@ -62,6 +62,17 @@ export enum Command {
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
   TOGGLE_MARKDOWN = 'toggleMarkdown',
   TOGGLE_COPY_MODE = 'toggleCopyMode',
+  TOGGLE_YOLO = 'toggleYolo',
+  TOGGLE_AUTO_EDIT = 'toggleAutoEdit',
+  UNDO = 'undo',
+  REDO = 'redo',
+  MOVE_LEFT = 'moveLeft',
+  MOVE_RIGHT = 'moveRight',
+  MOVE_WORD_LEFT = 'moveWordLeft',
+  MOVE_WORD_RIGHT = 'moveWordRight',
+  DELETE_CHAR_LEFT = 'deleteCharLeft',
+  DELETE_CHAR_RIGHT = 'deleteCharRight',
+  DELETE_WORD_FORWARD = 'deleteWordForward',
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
@@ -70,9 +81,10 @@ export enum Command {
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
-  TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
   TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
   TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+  TOGGLE_SHELL_INPUT_FOCUS_IN = 'toggleShellInputFocus',
+  TOGGLE_SHELL_INPUT_FOCUS_OUT = 'toggleShellInputFocusOut',
 
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
@@ -125,6 +137,37 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
     { key: 'backspace', command: true },
+    { sequence: '\x7f', ctrl: true },
+    { sequence: '\x7f', command: true },
+    { key: 'w', ctrl: true },
+  ],
+  [Command.MOVE_LEFT]: [
+    { key: 'left', ctrl: false, command: false },
+    { key: 'b', ctrl: true },
+  ],
+  [Command.MOVE_RIGHT]: [
+    { key: 'right', ctrl: false, command: false },
+    { key: 'f', ctrl: true },
+  ],
+  [Command.MOVE_WORD_LEFT]: [
+    { key: 'left', ctrl: true },
+    { key: 'left', command: true },
+    { key: 'b', command: true },
+  ],
+  [Command.MOVE_WORD_RIGHT]: [
+    { key: 'right', ctrl: true },
+    { key: 'right', command: true },
+    { key: 'f', command: true },
+  ],
+  [Command.DELETE_CHAR_LEFT]: [
+    { key: 'backspace' },
+    { sequence: '\x7f' },
+    { key: 'h', ctrl: true },
+  ],
+  [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
+  [Command.DELETE_WORD_FORWARD]: [
+    { key: 'delete', ctrl: true },
+    { key: 'delete', command: true },
   ],
 
   // Screen control
@@ -205,6 +248,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
+  [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
+  [Command.TOGGLE_AUTO_EDIT]: [{ key: 'tab', shift: true }],
+  [Command.UNDO]: [{ key: 'z', ctrl: true, shift: false }],
+  [Command.REDO]: [{ key: 'z', ctrl: true, shift: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
@@ -214,10 +261,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
-  [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'o', ctrl: true }],
 
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]: [{ key: 'tab', shift: false }],
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]: [
+    { key: 'tab', shift: false },
+    { key: 'tab', shift: true },
+  ],
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
@@ -238,7 +289,14 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'Cursor Movement',
-    commands: [Command.HOME, Command.END],
+    commands: [
+      Command.HOME,
+      Command.END,
+      Command.MOVE_LEFT,
+      Command.MOVE_RIGHT,
+      Command.MOVE_WORD_LEFT,
+      Command.MOVE_WORD_RIGHT,
+    ],
   },
   {
     title: 'Editing',
@@ -247,6 +305,11 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.KILL_LINE_LEFT,
       Command.CLEAR_INPUT,
       Command.DELETE_WORD_BACKWARD,
+      Command.DELETE_WORD_FORWARD,
+      Command.DELETE_CHAR_LEFT,
+      Command.DELETE_CHAR_RIGHT,
+      Command.UNDO,
+      Command.REDO,
     ],
   },
   {
@@ -309,10 +372,13 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_IDE_CONTEXT_DETAIL,
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
+      Command.TOGGLE_YOLO,
+      Command.TOGGLE_AUTO_EDIT,
       Command.SHOW_MORE_LINES,
-      Command.TOGGLE_SHELL_INPUT_FOCUS,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
+      Command.TOGGLE_SHELL_INPUT_FOCUS_OUT,
     ],
   },
   {
@@ -329,10 +395,19 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
   [Command.HOME]: 'Move the cursor to the start of the line.',
   [Command.END]: 'Move the cursor to the end of the line.',
+  [Command.MOVE_LEFT]: 'Move the cursor one character to the left.',
+  [Command.MOVE_RIGHT]: 'Move the cursor one character to the right.',
+  [Command.MOVE_WORD_LEFT]: 'Move the cursor one word to the left.',
+  [Command.MOVE_WORD_RIGHT]: 'Move the cursor one word to the right.',
   [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',
   [Command.KILL_LINE_LEFT]: 'Delete from the cursor to the start of the line.',
   [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
   [Command.DELETE_WORD_BACKWARD]: 'Delete the previous word.',
+  [Command.DELETE_WORD_FORWARD]: 'Delete the next word.',
+  [Command.DELETE_CHAR_LEFT]: 'Delete the character to the left.',
+  [Command.DELETE_CHAR_RIGHT]: 'Delete the character to the right.',
+  [Command.UNDO]: 'Undo the most recent text edit.',
+  [Command.REDO]: 'Redo the most recent undone text edit.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.SCROLL_UP]: 'Scroll content up.',
   [Command.SCROLL_DOWN]: 'Scroll content down.',
@@ -360,6 +435,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]:
     'Toggle copy mode when the terminal is using the alternate buffer.',
+  [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
+  [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
   [Command.QUIT]: 'Cancel the current request or quit the CLI.',
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
   [Command.SHOW_MORE_LINES]:
@@ -368,12 +445,14 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT_REVERSE_SEARCH]: 'Insert the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
-  [Command.TOGGLE_SHELL_INPUT_FOCUS]:
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]:
     'Toggle focus between the shell and Gemini input.',
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Move current shell command to background or toggle background shell view.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
     'Toggle the list of background shell processes.',
+  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]:
+    'Toggle focus out of the interactive shell and into Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
 };

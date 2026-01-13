@@ -143,6 +143,8 @@ export const useGeminiStream = (
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+  const [lastGeminiActivityTime, setLastGeminiActivityTime] =
+    useState<number>(0);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
@@ -873,9 +875,11 @@ export const useGeminiStream = (
       for await (const event of stream) {
         switch (event.type) {
           case ServerGeminiEventType.Thought:
+            setLastGeminiActivityTime(Date.now());
             setThought(event.value);
             break;
           case ServerGeminiEventType.Content:
+            setLastGeminiActivityTime(Date.now());
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -1425,7 +1429,11 @@ export const useGeminiStream = (
     storage,
   ]);
 
-  const lastOutputTime = Math.max(lastToolOutputTime, lastShellOutputTime);
+  const lastOutputTime = Math.max(
+    lastToolOutputTime,
+    lastShellOutputTime,
+    lastGeminiActivityTime,
+  );
 
   return {
     streamingState,
