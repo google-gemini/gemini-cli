@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore from 'ignore';
+import { debugLogger } from './debugLogger.js';
 
 export interface IgnoreFileFilter {
   isIgnored(filePath: string): boolean;
@@ -37,9 +38,13 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
     } catch (_error) {
-      // ignore file not found
+      debugLogger.debug(
+        `Ignore file not found: ${patternsFilePath}, continue without it.`,
+      );
       return;
     }
+
+    debugLogger.debug(`Loading ignore patterns from: ${patternsFilePath}`);
 
     this.patterns = (content ?? '')
       .split('\n')
