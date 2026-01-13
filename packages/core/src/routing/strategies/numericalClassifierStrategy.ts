@@ -172,7 +172,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
 
       const sanitizedRequest = requestParts.map((part) => {
         if (typeof part === 'string') {
-          return { text: `<user_request>\n${part}\n</user_request>` };
+          return { text: part };
         }
         if (part.text) {
           return { text: `<user_request>\n${part.text}\n</user_request>` };
