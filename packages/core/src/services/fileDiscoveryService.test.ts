@@ -84,9 +84,7 @@ describe('FileDiscoveryService', () => {
 
       expect(defaults.respectGitIgnore).toBe(false);
       expect(defaults.respectGeminiIgnore).toBe(false);
-      expect(defaults.customIgnoreFilePath).toBe(
-        path.join(projectRoot, 'custom/.ignore'),
-      );
+      expect(defaults.customIgnoreFilePath).toBe('custom/.ignore');
     });
 
     it('should use defaults when options are not provided', () => {
@@ -375,6 +373,45 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual(
         ['file.txt', 'important.txt'].map((f) => path.join(projectRoot, f)),
       );
+    });
+  });
+
+  describe('custom ignore file', () => {
+    it('should respect patterns from a custom ignore file', async () => {
+      const customIgnoreName = '.customignore';
+      await createTestFile(customIgnoreName, '*.secret');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePath: customIgnoreName,
+      });
+
+      const files = ['file.txt', 'file.secret'].map((f) =>
+        path.join(projectRoot, f),
+      );
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'file.txt')]);
+    });
+
+    it('should prioritize custom ignore patterns over .geminiignore patterns in git repo', async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile('.gitignore', 'node_modules/');
+      await createTestFile('.geminiignore', '*.log');
+
+      const customIgnoreName = '.customignore';
+      // .geminiignore ignores *.log, custom un-ignores debug.log
+      await createTestFile(customIgnoreName, '!debug.log');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePath: customIgnoreName,
+      });
+
+      const files = ['debug.log', 'error.log'].map((f) =>
+        path.join(projectRoot, f),
+      );
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'debug.log')]);
     });
   });
 });

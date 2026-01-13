@@ -25,6 +25,7 @@ export interface FilterReport {
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: IgnoreFileFilter | null = null;
+  private customIgnoreFilter: IgnoreFileFilter | null = null;
   private combinedIgnoreFilter: GitIgnoreFilter | null = null;
   private defaultFilterFileOptions: FilterFilesOptions = {
     respectGitIgnore: true,
@@ -43,13 +44,23 @@ export class FileDiscoveryService {
       this.projectRoot,
       '.geminiignore',
     );
+    if (this.defaultFilterFileOptions.customIgnoreFilePath) {
+      this.customIgnoreFilter = new IgnoreFileParser(
+        this.projectRoot,
+        this.defaultFilterFileOptions.customIgnoreFilePath,
+      );
+    }
 
     if (this.gitIgnoreFilter) {
       const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
-      // Create combined parser: .gitignore + .geminiignore
+      const customPatterns = this.customIgnoreFilter
+        ? this.customIgnoreFilter.getPatterns()
+        : [];
+      // Create combined parser: .gitignore + .geminiignore + custom ignore
       this.combinedIgnoreFilter = new GitIgnoreParser(
         this.projectRoot,
-        geminiPatterns,
+        // customPatterns should go the last to ensure overwriting of geminiPatterns
+        [...geminiPatterns, ...customPatterns],
       );
     }
   }
@@ -65,15 +76,13 @@ export class FileDiscoveryService {
         options.respectGeminiIgnore;
     }
     if (options.customIgnoreFilePath) {
-      this.defaultFilterFileOptions.customIgnoreFilePath = path.join(
-        this.projectRoot,
-        options.customIgnoreFilePath,
-      );
+      this.defaultFilterFileOptions.customIgnoreFilePath =
+        options.customIgnoreFilePath;
     }
   }
 
   /**
-   * Filters a list of file paths based on git ignore rules
+   * Filters a list of file paths based on ignore rules
    */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
     const {
@@ -87,6 +96,11 @@ export class FileDiscoveryService {
         this.combinedIgnoreFilter
       ) {
         return !this.combinedIgnoreFilter.isIgnored(filePath);
+      }
+
+      // Always respect custom ignore filter if provided
+      if (this.customIgnoreFilter?.isIgnored(filePath)) {
+        return false;
       }
 
       if (respectGitIgnore && this.gitIgnoreFilter?.isIgnored(filePath)) {
