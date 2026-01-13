@@ -33,6 +33,8 @@ vi.mock('child_process');
 // fs (for /dev/tty)
 const mockFs = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
+  accessSync: vi.fn(),
+  constants: { W_OK: 2 },
 }));
 vi.mock('node:fs', () => ({
   default: mockFs,
@@ -237,6 +239,39 @@ describe('commandUtils', () => {
       expect(tty.write.mock.calls[0][0]).toBe(expected);
       expect(tty.end).toHaveBeenCalledTimes(1); // /dev/tty closed after write
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('checks access to /dev/tty before creating stream', async () => {
+      const testText = 'access-check';
+      process.env['SSH_CONNECTION'] = '1';
+
+      // Mock accessSync to throw
+      mockFs.accessSync.mockImplementationOnce(() => {
+        throw new Error('EACCES');
+      });
+      // Fallback to clipboard since /dev/tty is "inaccessible"
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard(testText);
+
+      expect(mockFs.accessSync).toHaveBeenCalledWith('/dev/tty', 2);
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+
+    it('proceeds if access check passes', async () => {
+      const testText = 'access-ok';
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.accessSync.mockReturnValue(undefined); // Success
+
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard(testText);
+
+      expect(mockFs.accessSync).toHaveBeenCalledWith('/dev/tty', 2);
+      expect(mockFs.createWriteStream).toHaveBeenCalledWith('/dev/tty');
+      expect(tty.write).toHaveBeenCalled();
     });
 
     it('wraps OSC-52 for tmux', async () => {

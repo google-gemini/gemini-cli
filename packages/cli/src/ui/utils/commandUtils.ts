@@ -70,6 +70,7 @@ const pickTty = (): TtyTarget => {
   if (process.platform !== 'win32') {
     // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
     try {
+      fs.accessSync('/dev/tty', fs.constants.W_OK);
       const devTty = fs.createWriteStream('/dev/tty');
       // Prevent unhandled 'error' events from crashing the process.
       devTty.on('error', () => {});
