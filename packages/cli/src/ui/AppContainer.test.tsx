@@ -1238,6 +1238,9 @@ describe('AppContainer State Management', () => {
       });
 
       it('should show Action Required in title after a delay when shell is awaiting focus', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
         // Arrange: Set up mock settings with showStatusInTitle enabled
         const mockSettingsWithTitleEnabled = {
           ...mockSettings,
@@ -1260,7 +1263,11 @@ describe('AppContainer State Management', () => {
           thought: { subject: 'Executing shell command' },
           cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
+          lastOutputTime: 0,
         });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
 
         // Act: Render the container (embeddedShellFocused is false by default in state)
         const { unmount } = renderAppContainer({
@@ -1275,19 +1282,109 @@ describe('AppContainer State Management', () => {
           '✦  Executing shell command',
         );
 
-        // Fast-forward time by 31 seconds
+        // Fast-forward time by 40 seconds
         await act(async () => {
-          vi.advanceTimersByTime(31000);
+          await vi.advanceTimersByTimeAsync(40000);
         });
 
         // Now it should show Action Required
-        await waitFor(() => {
-          const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-            call[0].includes('\x1b]0;'),
-          );
-          const lastTitle = titleWrites[titleWrites.length - 1][0];
-          expect(lastTitle).toContain('✋  Action Required');
+        const titleWritesDelayed = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWritesDelayed[titleWritesDelayed.length - 1][0];
+        expect(lastTitle).toContain('✋  Action Required');
+
+        unmount();
+      });
+
+      it('should NOT show Action Required in title if shell is streaming output', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty but not focused
+        let lastOutputTime = 1000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        // Act: Render the container
+        const { unmount, rerender } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
         });
+
+        // Fast-forward time by 20 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        // Update lastOutputTime to simulate new output
+        lastOutputTime = 21000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        // Rerender to propagate the new lastOutputTime
+        await act(async () => {
+          rerender(getAppContainer({ settings: mockSettingsWithTitleEnabled }));
+        });
+
+        // Fast-forward time by another 20 seconds
+        // Total time elapsed: 40s.
+        // Time since last output: 20s.
+        // It should NOT show Action Required yet.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        const titleWritesAfterOutput = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle =
+          titleWritesAfterOutput[titleWritesAfterOutput.length - 1][0];
+        expect(lastTitle).not.toContain('✋  Action Required');
+        expect(lastTitle).toContain('✦  Executing shell command');
+
+        // Fast-forward another 40 seconds (Total 60s since last output)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(40000);
+        });
+
+        // Now it SHOULD show Action Required
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitleFinal = titleWrites[titleWrites.length - 1][0];
+        expect(lastTitleFinal).toContain('✋  Action Required');
 
         unmount();
       });
@@ -1992,7 +2089,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Verify model is updated
-      expect(capturedUIState.currentModel).toBe('new-model');
+      await waitFor(() => {
+        expect(capturedUIState.currentModel).toBe('new-model');
+      });
       unmount!();
     });
 
@@ -2123,7 +2222,9 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(true);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('previous message');
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith('previous message');
+      });
 
       unmount!();
     });
