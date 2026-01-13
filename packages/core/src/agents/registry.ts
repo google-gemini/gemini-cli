@@ -120,6 +120,15 @@ export class AgentRegistry {
       );
     }
 
+    // Load agents from extensions
+    for (const extension of this.config.getExtensions()) {
+      if (extension.isActive && extension.agents) {
+        await Promise.allSettled(
+          extension.agents.map((agent) => this.registerAgent(agent)),
+        );
+      }
+    }
+
     if (this.config.getDebugMode()) {
       debugLogger.log(
         `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
