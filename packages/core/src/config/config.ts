@@ -101,6 +101,7 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
+import type { AgentDefinition } from '../agents/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -178,6 +179,7 @@ export interface GeminiCLIExtension {
   settings?: ExtensionSetting[];
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
+  agents?: AgentDefinition[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -358,6 +360,7 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
+  disableLLMCorrection?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -497,6 +500,7 @@ export class Config {
   private disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
+  private readonly disableLLMCorrection: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
@@ -566,6 +570,7 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -761,6 +766,7 @@ export class Config {
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
       if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
@@ -1425,6 +1431,10 @@ export class Config {
     return this.enableExtensionReloading;
   }
 
+  getDisableLLMCorrection(): boolean {
+    return this.disableLLMCorrection;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -1568,6 +1578,7 @@ export class Config {
 
     // Re-register ActivateSkillTool to update its schema with the newly discovered skills
     if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
       this.getToolRegistry().registerTool(
         new ActivateSkillTool(this, this.messageBus),
       );

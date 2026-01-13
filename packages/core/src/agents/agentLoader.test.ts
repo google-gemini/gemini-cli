@@ -83,7 +83,7 @@ System prompt content.`);
         AgentLoadError,
       );
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        'Invalid markdown format',
+        'Missing mandatory YAML frontmatter',
       );
     });
 
@@ -197,6 +197,32 @@ agent_card_url: https://example.com/card
         name: 'remote-2',
         agent_card_url: 'https://example.com/2',
       });
+    });
+
+    it('should parse frontmatter without a trailing newline', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: no-trailing-newline
+agent_card_url: https://example.com/card
+---`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        kind: 'remote',
+        name: 'no-trailing-newline',
+        agent_card_url: 'https://example.com/card',
+      });
+    });
+
+    it('should throw AgentLoadError if agent name is not a valid slug', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: Invalid Name With Spaces
+description: Test
+---
+Body`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
+        /Name must be a valid slug/,
+      );
     });
   });
 
