@@ -200,8 +200,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.bell`** (boolean):
-  - **Description:** Enable terminal bell sound when requesting user input.
+  - **Description:** Enable terminal bell sound when requesting user input. See
+    also `bellDurationThreshold`.
   - **Default:** `false`
+
+- **`ui.bellDurationThreshold`** (number):
+  - **Description:** Minimum duration in seconds the operation must take before
+    the bell rings. This helps reduce noise for short operations.
+  - **Default:** `10`
 
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner

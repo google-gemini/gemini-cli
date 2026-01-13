@@ -23,12 +23,23 @@ export const useBell = () => {
   // Track if it's the first render to avoid startup beep
   const isMounted = useRef(false);
 
+  // Track start time of the current operation
+  const startTime = useRef<number | null>(null);
+
   useEffect(() => {
     if (!isMounted.current) {
       isMounted.current = true;
       prevDialogsVisible.current = dialogsVisible;
       prevStreamingState.current = streamingState;
       return;
+    }
+
+    // Start timer when transitioning from Idle
+    if (
+      prevStreamingState.current === StreamingState.Idle &&
+      streamingState !== StreamingState.Idle
+    ) {
+      startTime.current = Date.now();
     }
 
     const dialogBecameVisible = dialogsVisible && !prevDialogsVisible.current;
@@ -50,15 +61,27 @@ export const useBell = () => {
         (actionCompleted && !isCancelled) ||
         waitingForConfirmation)
     ) {
-      try {
-        // Write bell character to stdout
-        stdout.write('\x07');
-      } catch (e) {
-        debugLogger.error('Failed to write bell character', e);
+      const duration = startTime.current
+        ? (Date.now() - startTime.current) / 1000
+        : 0;
+      const threshold = settings.ui?.bellDurationThreshold ?? 10;
+
+      if (duration >= threshold) {
+        try {
+          // Write bell character to stdout
+          stdout.write('\x07');
+        } catch (e) {
+          debugLogger.error('Failed to write bell character', e);
+        }
       }
+    }
+
+    // Reset timer if back to idle
+    if (streamingState === StreamingState.Idle) {
+      startTime.current = null;
     }
 
     prevDialogsVisible.current = dialogsVisible;
     prevStreamingState.current = streamingState;
-  }, [dialogsVisible, streamingState, settings.ui?.bell, stdout, history]);
+  }, [dialogsVisible, streamingState, settings.ui, stdout, history]);
 };

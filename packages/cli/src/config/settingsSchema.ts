@@ -419,8 +419,19 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Enable terminal bell sound when requesting user input.',
+        description:
+          'Enable terminal bell sound when requesting user input. See also `bellDurationThreshold`.',
         showInDialog: true,
+      },
+      bellDurationThreshold: {
+        type: 'number',
+        label: 'Bell Duration Threshold',
+        category: 'UI',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Minimum duration in seconds the operation must take before the bell rings. This helps reduce noise for short, quick operations.',
+        showInDialog: false,
       },
       hideBanner: {
         type: 'boolean',

@@ -217,10 +217,17 @@
         },
         "bell": {
           "title": "Bell",
-          "description": "Enable terminal bell sound when requesting user input.",
-          "markdownDescription": "Enable terminal bell sound when requesting user input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Enable terminal bell sound when requesting user input. See also `bellDurationThreshold`.",
+          "markdownDescription": "Enable terminal bell sound when requesting user input. See also `bellDurationThreshold`.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "bellDurationThreshold": {
+          "title": "Bell Duration Threshold",
+          "description": "Minimum duration in seconds the operation must take before the bell rings. This helps reduce noise for short, quick operations.",
+          "markdownDescription": "Minimum duration in seconds the operation must take before the bell rings. This helps reduce noise for short, quick operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `10`",
+          "default": 10,
+          "type": "number"
         },
         "hideBanner": {
           "title": "Hide Banner",

@@ -39,7 +39,9 @@ describe('useBell', () => {
   });
 
   it('should not ring bell on mount even if conditions are met', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     mockUseUIState.mockReturnValue({
       streamingState: StreamingState.Idle,
       dialogsVisible: false,
@@ -52,7 +54,9 @@ describe('useBell', () => {
   });
 
   it('should ring bell when streamingState becomes Idle (action completed)', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Responding,
       dialogsVisible: false,
@@ -74,7 +78,9 @@ describe('useBell', () => {
   });
 
   it('should ring bell when dialogsVisible becomes true', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Responding,
       dialogsVisible: false,
@@ -96,7 +102,9 @@ describe('useBell', () => {
   });
 
   it('should ring bell when streamingState becomes WaitingForConfirmation', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Responding,
       dialogsVisible: false,
@@ -118,7 +126,9 @@ describe('useBell', () => {
   });
 
   it('should not ring bell if action was cancelled', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Responding,
       dialogsVisible: false,
@@ -141,7 +151,9 @@ describe('useBell', () => {
   });
 
   it('should not ring bell if setting is disabled', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: false } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: false, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Responding,
       dialogsVisible: false,
@@ -163,7 +175,9 @@ describe('useBell', () => {
   });
 
   it('should not ring bell if streamingState changes to Responding', () => {
-    mockUseSettings.mockReturnValue({ merged: { ui: { bell: true } } });
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+    });
     let uiState = {
       streamingState: StreamingState.Idle,
       dialogsVisible: false,
@@ -181,5 +195,65 @@ describe('useBell', () => {
     rerender();
 
     expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  it('should not ring bell if duration is less than threshold', () => {
+    vi.useFakeTimers();
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 5 } },
+    });
+    let uiState = {
+      streamingState: StreamingState.Idle,
+      dialogsVisible: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      history: [] as any[],
+    };
+    mockUseUIState.mockImplementation(() => uiState);
+
+    const { rerender } = renderHook(() => useBell());
+
+    // Transition to Responding (start timer)
+    uiState = { ...uiState, streamingState: StreamingState.Responding };
+    rerender();
+
+    // Advance time by 4s
+    vi.advanceTimersByTime(4000);
+
+    // Transition to Idle (finish)
+    uiState = { ...uiState, streamingState: StreamingState.Idle };
+    rerender();
+
+    expect(mockWrite).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('should ring bell if duration is greater than threshold', () => {
+    vi.useFakeTimers();
+    mockUseSettings.mockReturnValue({
+      merged: { ui: { bell: true, bellDurationThreshold: 5 } },
+    });
+    let uiState = {
+      streamingState: StreamingState.Idle,
+      dialogsVisible: false,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      history: [] as any[],
+    };
+    mockUseUIState.mockImplementation(() => uiState);
+
+    const { rerender } = renderHook(() => useBell());
+
+    // Transition to Responding (start timer)
+    uiState = { ...uiState, streamingState: StreamingState.Responding };
+    rerender();
+
+    // Advance time by 6s
+    vi.advanceTimersByTime(6000);
+
+    // Transition to Idle (finish)
+    uiState = { ...uiState, streamingState: StreamingState.Idle };
+    rerender();
+
+    expect(mockWrite).toHaveBeenCalledWith('\x07');
+    vi.useRealTimers();
   });
 });
