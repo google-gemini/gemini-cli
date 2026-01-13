@@ -13,56 +13,89 @@ describe('computeTerminalTitle', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should return idle state title with folder name', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Idle,
-      isConfirming: false,
-      folderName: 'my-project',
-      showThoughts: false,
-      useDynamicTitle: true,
-    });
-
-    expect(title).toContain('◇  Ready (my-project)');
+  it.each([
+    {
+      description: 'idle state title with folder name',
+      args: {
+        streamingState: StreamingState.Idle,
+        isConfirming: false,
+        folderName: 'my-project',
+        showThoughts: false,
+        useDynamicTitle: true,
+      },
+      expected: '◇  Ready (my-project)',
+    },
+    {
+      description: 'legacy title when useDynamicTitle is false',
+      args: {
+        streamingState: StreamingState.Responding,
+        isConfirming: false,
+        folderName: 'my-project',
+        showThoughts: true,
+        useDynamicTitle: false,
+      },
+      expected: 'Gemini CLI (my-project)'.padEnd(80, ' '),
+      exact: true,
+    },
+    {
+      description:
+        'active state title with "Working..." when thoughts are disabled',
+      args: {
+        streamingState: StreamingState.Responding,
+        thoughtSubject: 'Reading files',
+        isConfirming: false,
+        folderName: 'my-project',
+        showThoughts: false,
+        useDynamicTitle: true,
+      },
+      expected: '✦  Working... (my-project)',
+    },
+    {
+      description:
+        'active state title with thought subject and suffix when thoughts are short enough',
+      args: {
+        streamingState: StreamingState.Responding,
+        thoughtSubject: 'Short thought',
+        isConfirming: false,
+        folderName: 'my-project',
+        showThoughts: true,
+        useDynamicTitle: true,
+      },
+      expected: '✦  Short thought (my-project)',
+    },
+    {
+      description:
+        'fallback active title with suffix if no thought subject is provided even when thoughts are enabled',
+      args: {
+        streamingState: StreamingState.Responding,
+        thoughtSubject: undefined,
+        isConfirming: false,
+        folderName: 'my-project',
+        showThoughts: true,
+        useDynamicTitle: true,
+      },
+      expected: '✦  Working... (my-project)'.padEnd(80, ' '),
+      exact: true,
+    },
+    {
+      description: 'action required state when confirming',
+      args: {
+        streamingState: StreamingState.Idle,
+        isConfirming: true,
+        folderName: 'my-project',
+        showThoughts: false,
+        useDynamicTitle: true,
+      },
+      expected: '✋  Action Required (my-project)',
+    },
+  ])('should return $description', ({ args, expected, exact }) => {
+    const title = computeTerminalTitle(args);
+    if (exact) {
+      expect(title).toBe(expected);
+    } else {
+      expect(title).toContain(expected);
+    }
     expect(title.length).toBe(80);
-  });
-
-  it('should return legacy title when useDynamicTitle is false', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Responding,
-      isConfirming: false,
-      folderName: 'my-project',
-      showThoughts: true, // Should be ignored
-      useDynamicTitle: false,
-    });
-
-    expect(title).toBe('Gemini CLI (my-project)'.padEnd(80, ' '));
-  });
-
-  it('should return active state title with "Working..." when thoughts are disabled', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Responding,
-      thoughtSubject: 'Reading files',
-      isConfirming: false,
-      folderName: 'my-project',
-      showThoughts: false,
-      useDynamicTitle: true,
-    });
-
-    expect(title).toContain('✦  Working... (my-project)');
-    expect(title.length).toBe(80);
-  });
-
-  it('should return active state title with thought subject and suffix when thoughts are short enough', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Responding,
-      thoughtSubject: 'Short thought',
-      isConfirming: false,
-      folderName: 'my-project',
-      showThoughts: true,
-      useDynamicTitle: true,
-    });
-
-    expect(title).toContain('✦  Short thought (my-project)');
   });
 
   it('should return active state title with thought subject and NO suffix when thoughts are very long', () => {
@@ -78,31 +111,7 @@ describe('computeTerminalTitle', () => {
 
     expect(title).not.toContain('(my-project)');
     expect(title).toContain('✦  AAAAAAAAAAAAAAAA');
-  });
-
-  it('should return fallback active title with suffix if no thought subject is provided even when thoughts are enabled', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Responding,
-      thoughtSubject: undefined,
-      isConfirming: false,
-      folderName: 'my-project',
-      showThoughts: true,
-      useDynamicTitle: true,
-    });
-
-    expect(title).toBe('✦  Working... (my-project)'.padEnd(80, ' '));
-  });
-
-  it('should return action required state when confirming', () => {
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Idle,
-      isConfirming: true,
-      folderName: 'my-project',
-      showThoughts: false,
-      useDynamicTitle: true,
-    });
-
-    expect(title).toContain('✋  Action Required (my-project)');
+    expect(title.length).toBe(80);
   });
 
   it('should truncate long thought subjects when thoughts are enabled', () => {
@@ -135,6 +144,7 @@ describe('computeTerminalTitle', () => {
     expect(title).not.toContain('\x00');
     expect(title).not.toContain('\x07');
     expect(title).not.toContain('\x1B');
+    expect(title.length).toBe(80);
   });
 
   it('should prioritize CLI_TITLE environment variable over folder name when thoughts are disabled', () => {
@@ -150,39 +160,41 @@ describe('computeTerminalTitle', () => {
 
     expect(title).toContain('◇  Ready (EnvOverride)');
     expect(title).not.toContain('my-project');
-  });
-
-  it('should truncate very long folder names to fit within 80 characters', () => {
-    const longFolderName = 'A'.repeat(100);
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Idle,
-      isConfirming: false,
-      folderName: longFolderName,
-      showThoughts: false,
-      useDynamicTitle: true,
-    });
-
     expect(title.length).toBe(80);
-    expect(title).toContain('◇  Ready (AAAAA');
-    expect(title).toContain('...)');
   });
 
-  it('should truncate very long CLI_TITLE to fit within 80 characters', () => {
-    const longTitle = 'B'.repeat(100);
-    vi.stubEnv('CLI_TITLE', longTitle);
-
-    const title = computeTerminalTitle({
-      streamingState: StreamingState.Idle,
-      isConfirming: false,
+  it.each([
+    {
+      name: 'folder name',
+      folderName: 'A'.repeat(100),
+      expected: '◇  Ready (AAAAA',
+    },
+    {
+      name: 'CLI_TITLE',
       folderName: 'my-project',
-      showThoughts: false,
-      useDynamicTitle: true,
-    });
+      envTitle: 'B'.repeat(100),
+      expected: '◇  Ready (BBBBB',
+    },
+  ])(
+    'should truncate very long $name to fit within 80 characters',
+    ({ folderName, envTitle, expected }) => {
+      if (envTitle) {
+        vi.stubEnv('CLI_TITLE', envTitle);
+      }
 
-    expect(title.length).toBe(80);
-    expect(title).toContain('◇  Ready (BBBBB');
-    expect(title).toContain('...)');
-  });
+      const title = computeTerminalTitle({
+        streamingState: StreamingState.Idle,
+        isConfirming: false,
+        folderName,
+        showThoughts: false,
+        useDynamicTitle: true,
+      });
+
+      expect(title.length).toBe(80);
+      expect(title).toContain(expected);
+      expect(title).toContain('...)');
+    },
+  );
 
   it('should truncate long folder name when useDynamicTitle is false', () => {
     const longFolderName = 'C'.repeat(100);

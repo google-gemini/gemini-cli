@@ -250,6 +250,8 @@ describe('AppContainer State Management', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
+
     // Initialize mock stdout for terminal title tests
 
     mocks.mockStdout.write.mockClear();
@@ -404,6 +406,7 @@ describe('AppContainer State Management', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   describe('Basic Rendering', () => {
@@ -1271,7 +1274,7 @@ describe('AppContainer State Management', () => {
       });
 
       // Now it should show Action Required
-      await vi.waitFor(() => {
+      await waitFor(() => {
         const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
           call[0].includes('\x1b]2;'),
         );
@@ -1419,6 +1422,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('should set and clear the queue error message after a timeout', async () => {
@@ -1587,6 +1591,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe('CTRL+C', () => {
@@ -1724,6 +1729,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe.each([
