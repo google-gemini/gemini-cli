@@ -56,7 +56,7 @@ export const aboutCommand: SlashCommand = {
       userEmail,
     };
 
-    context.ui.addItem(aboutItem, Date.now());
+    context.ui.addItem(aboutItem);
   },
 };
 

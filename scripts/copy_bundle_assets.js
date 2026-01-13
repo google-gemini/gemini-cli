@@ -62,4 +62,15 @@ if (existsSync(docsSrc)) {
   console.log('Copied docs to bundle/docs/');
 }
 
+// 4. Copy Built-in Skills (packages/core/src/skills/builtin)
+const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
+const builtinSkillsDest = join(bundleDir, 'builtin');
+if (existsSync(builtinSkillsSrc)) {
+  cpSync(builtinSkillsSrc, builtinSkillsDest, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log('Copied built-in skills to bundle/builtin/');
+}
+
 console.log('Assets copied to bundle/');
