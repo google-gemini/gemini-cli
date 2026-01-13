@@ -22,6 +22,10 @@ import {
   isPreviewModel,
   isAutoModel,
 } from '../config/models.js';
+import {
+  type ModelConfig,
+  ModelConfigService,
+} from '../services/modelConfigService.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -120,6 +124,15 @@ export class AgentRegistry {
       );
     }
 
+    // Load agents from extensions
+    for (const extension of this.config.getExtensions()) {
+      if (extension.isActive && extension.agents) {
+        await Promise.allSettled(
+          extension.agents.map((agent) => this.registerAgent(agent)),
+        );
+      }
+    }
+
     if (this.config.getDebugMode()) {
       debugLogger.log(
         `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
@@ -216,49 +229,83 @@ export class AgentRegistry {
       return;
     }
 
+    const overrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+    if (overrides?.disabled) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
     if (this.agents.has(definition.name) && this.config.getDebugMode()) {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
-    this.agents.set(definition.name, definition);
+    // TODO(16443): Refactor definition merging logic into a helper.
+    // To do this, we need to align the definition of the internal `Definition`
+    // type with the one exported in settings.json.
+    const mergedDefinition = {
+      ...definition,
+      runConfig: {
+        ...definition.runConfig,
+        max_time_minutes:
+          overrides?.runConfig?.maxTimeMinutes ??
+          definition.runConfig.max_time_minutes,
+        max_turns:
+          overrides?.runConfig?.maxTurns ?? definition.runConfig.max_turns,
+      },
+    };
+
+    this.agents.set(mergedDefinition.name, mergedDefinition);
 
     // Register model config. We always create a runtime alias. However,
     // if the user is using `auto` as a model string then we also create
     // runtime overrides to ensure the subagent generation settings are
     // respected regardless of the final model string from routing.
     // TODO(12916): Migrate sub-agents where possible to static configs.
-    const modelConfig = definition.modelConfig;
+    const modelConfig = mergedDefinition.modelConfig;
     let model = modelConfig.model;
     if (model === 'inherit') {
       model = this.config.getModel();
     }
 
-    const generateContentConfig = {
-      temperature: modelConfig.temp,
-      topP: modelConfig.top_p,
-      thinkingConfig: {
-        includeThoughts: true,
-        thinkingBudget: modelConfig.thinkingBudget ?? -1,
+    let agentModelConfig: ModelConfig = {
+      model,
+      generateContentConfig: {
+        temperature: modelConfig.temp,
+        topP: modelConfig.top_p,
+        thinkingConfig: {
+          includeThoughts: true,
+          thinkingBudget: modelConfig.thinkingBudget ?? -1,
+        },
       },
     };
 
+    // Apply standardized modelConfig overrides if present.
+    if (overrides?.modelConfig) {
+      agentModelConfig = ModelConfigService.merge(
+        agentModelConfig,
+        overrides.modelConfig,
+      );
+    }
+
     this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
+      getModelConfigAlias(mergedDefinition),
       {
-        modelConfig: {
-          model,
-          generateContentConfig,
-        },
+        modelConfig: agentModelConfig,
       },
     );
 
-    if (isAutoModel(model)) {
+    if (agentModelConfig.model && isAutoModel(agentModelConfig.model)) {
       this.config.modelConfigService.registerRuntimeModelOverride({
         match: {
-          overrideScope: definition.name,
+          overrideScope: mergedDefinition.name,
         },
         modelConfig: {
-          generateContentConfig,
+          generateContentConfig: agentModelConfig.generateContentConfig,
         },
       });
     }
@@ -279,6 +326,17 @@ export class AgentRegistry {
       debugLogger.warn(
         `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
       );
+      return;
+    }
+
+    const overrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+    if (overrides?.disabled) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
+        );
+      }
       return;
     }
 

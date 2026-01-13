@@ -37,7 +37,7 @@ async function panelAction(
     hooks: allHooks,
   };
 
-  context.ui.addItem(hooksListItem, Date.now());
+  context.ui.addItem(hooksListItem);
 }
 
 /**

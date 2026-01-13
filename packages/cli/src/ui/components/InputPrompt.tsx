@@ -829,7 +829,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_IN](key)) {
+      if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
         // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
         if (activePtyId) {
           setEmbeddedShellFocused(true);
