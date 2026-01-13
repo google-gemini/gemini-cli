@@ -109,6 +109,37 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match unqualified tool names with qualified rules when serverName is provided', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'my-server__tool',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Match with qualified name (standard)
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Match with unqualified name + serverName (the fix)
+      expect((await engine.check({ name: 'tool' }, 'my-server')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // Should NOT match with unqualified name but NO serverName
+      expect((await engine.check({ name: 'tool' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+
+      // Should NOT match with unqualified name but WRONG serverName
+      expect(
+        (await engine.check({ name: 'tool' }, 'wrong-server')).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should match by args pattern', async () => {
       const rules: PolicyRule[] = [
         {

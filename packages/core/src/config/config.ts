@@ -43,7 +43,7 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -73,6 +73,7 @@ import type { ModelConfigServiceConfig } from '../services/modelConfigService.js
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -149,6 +150,8 @@ export interface ResolvedExtensionSetting {
   envVar: string;
   value: string;
   sensitive: boolean;
+  scope?: 'user' | 'workspace';
+  source?: string;
 }
 
 export interface CliHelpAgentSettings {
@@ -355,8 +358,10 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
+  disableLLMCorrection?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
+  extensionsEnabled?: boolean;
   onReload?: () => Promise<{ disabledSkills?: string[] }>;
 }
 
@@ -391,6 +396,7 @@ export class Config {
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpEnabled: boolean;
+  private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
@@ -492,9 +498,11 @@ export class Config {
   private disabledSkills: string[];
 
   private readonly experimentalJitContext: boolean;
+  private readonly disableLLMCorrection: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
+  private latestApiRequest: GenerateContentParameters | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -517,6 +525,7 @@ export class Config {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.mcpEnabled = params.mcpEnabled ?? true;
+    this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
     this.blockedMcpServers = params.blockedMcpServers ?? [];
     this.allowedEnvironmentVariables = params.allowedEnvironmentVariables ?? [];
@@ -559,6 +568,7 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -728,6 +738,8 @@ export class Config {
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
 
+    coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
@@ -752,6 +764,7 @@ export class Config {
 
       // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
       if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
@@ -809,31 +822,26 @@ export class Config {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer) {
-      if (codeAssistServer.projectId) {
-        await this.refreshUserQuota();
-      }
-
-      this.experimentsPromise = getExperiments(codeAssistServer)
-        .then((experiments) => {
-          this.setExperiments(experiments);
-
-          // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-          if (this.getPreviewFeatures() === undefined) {
-            const remotePreviewFeatures =
-              experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
-            if (remotePreviewFeatures === true) {
-              this.setPreviewFeatures(remotePreviewFeatures);
-            }
-          }
-        })
-        .catch((e) => {
-          debugLogger.error('Failed to fetch experiments', e);
-        });
-    } else {
-      this.experiments = undefined;
-      this.experimentsPromise = undefined;
+    if (codeAssistServer?.projectId) {
+      await this.refreshUserQuota();
     }
+
+    this.experimentsPromise = getExperiments(codeAssistServer)
+      .then((experiments) => {
+        this.setExperiments(experiments);
+
+        // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
+        if (this.getPreviewFeatures() === undefined) {
+          const remotePreviewFeatures =
+            experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
+          if (remotePreviewFeatures === true) {
+            this.setPreviewFeatures(remotePreviewFeatures);
+          }
+        }
+      })
+      .catch((e) => {
+        debugLogger.error('Failed to fetch experiments', e);
+      });
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -854,10 +862,7 @@ export class Config {
       return this.experiments;
     }
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer) {
-      return getExperiments(codeAssistServer);
-    }
-    return undefined;
+    return getExperiments(codeAssistServer);
   }
 
   getUserTier(): UserTierId | undefined {
@@ -898,6 +903,14 @@ export class Config {
 
   getTerminalBackground(): string | undefined {
     return this.terminalBackground;
+  }
+
+  getLatestApiRequest(): GenerateContentParameters | undefined {
+    return this.latestApiRequest;
+  }
+
+  setLatestApiRequest(req: GenerateContentParameters): void {
+    this.latestApiRequest = req;
   }
 
   getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
@@ -1141,6 +1154,10 @@ export class Config {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getExtensionsEnabled(): boolean {
+    return this.extensionsEnabled;
   }
 
   getMcpClientManager(): McpClientManager | undefined {
@@ -1412,6 +1429,10 @@ export class Config {
     return this.enableExtensionReloading;
   }
 
+  getDisableLLMCorrection(): boolean {
+    return this.disableLLMCorrection;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -1555,6 +1576,7 @@ export class Config {
 
     // Re-register ActivateSkillTool to update its schema with the newly discovered skills
     if (this.getSkillManager().getSkills().length > 0) {
+      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
       this.getToolRegistry().registerTool(
         new ActivateSkillTool(this, this.messageBus),
       );
@@ -1752,6 +1774,17 @@ export class Config {
 
     // Register Subagents as Tools
     // Register DelegateToAgentTool if agents are enabled
+    this.registerDelegateToAgentTool(registry);
+
+    await registry.discoverAllTools();
+    registry.sortTools();
+    return registry;
+  }
+
+  /**
+   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   */
+  private registerDelegateToAgentTool(registry: ToolRegistry): void {
     if (
       this.isAgentsEnabled() ||
       this.getCodebaseInvestigatorSettings().enabled ||
@@ -1771,10 +1804,6 @@ export class Config {
         registry.registerTool(delegateTool);
       }
     }
-
-    await registry.discoverAllTools();
-    registry.sortTools();
-    return registry;
   }
 
   /**
@@ -1857,6 +1886,35 @@ export class Config {
       compact: false,
     });
     debugLogger.debug('Experiments loaded', summaryString);
+  }
+
+  private onAgentsRefreshed = async () => {
+    if (this.toolRegistry) {
+      this.registerDelegateToAgentTool(this.toolRegistry);
+    }
+    // Propagate updates to the active chat session
+    const client = this.getGeminiClient();
+    if (client?.isInitialized()) {
+      await client.setTools();
+      await client.updateSystemInstruction();
+    } else {
+      debugLogger.debug(
+        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
+      );
+    }
+  };
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  async dispose(): Promise<void> {
+    coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    if (this.agentRegistry) {
+      this.agentRegistry.dispose();
+    }
+    if (this.mcpClientManager) {
+      await this.mcpClientManager.stop();
+    }
   }
 }
 // Export model constants for use in CLI

@@ -78,6 +78,7 @@ export type ServerGeminiAgentExecutionStoppedEvent = {
   type: GeminiEventType.AgentExecutionStopped;
   value: {
     reason: string;
+    systemMessage?: string;
   };
 };
 
@@ -85,6 +86,7 @@ export type ServerGeminiAgentExecutionBlockedEvent = {
   type: GeminiEventType.AgentExecutionBlocked;
   value: {
     reason: string;
+    systemMessage?: string;
   };
 };
 
@@ -262,6 +264,22 @@ export class Turn {
         if (streamEvent.type === 'retry') {
           yield { type: GeminiEventType.Retry };
           continue; // Skip to the next event in the stream
+        }
+
+        if (streamEvent.type === 'agent_execution_stopped') {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: { reason: streamEvent.reason },
+          };
+          return;
+        }
+
+        if (streamEvent.type === 'agent_execution_blocked') {
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: { reason: streamEvent.reason },
+          };
+          continue;
         }
 
         // Assuming other events are chunks with a `value` property

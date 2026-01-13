@@ -520,7 +520,6 @@ export async function loadCliConfig(
         'Cannot start in YOLO mode since it is disabled by your admin',
       );
     }
-    approvalMode = ApprovalMode.DEFAULT;
   } else if (approvalMode === ApprovalMode.YOLO) {
     debugLogger.warn(
       'YOLO mode is enabled. All tool calls will be automatically approved.',
@@ -637,6 +636,7 @@ export async function loadCliConfig(
   const ptyInfo = await getPty();
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+  const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -659,6 +659,7 @@ export async function loadCliConfig(
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
     mcpServers: mcpEnabled ? settings.mcpServers : {},
     mcpEnabled,
+    extensionsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -736,6 +737,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
+    disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: getEnableHooks(settings),

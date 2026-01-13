@@ -129,6 +129,7 @@ export async function getCorrectedFileContent(
       config.getGeminiClient(),
       config.getBaseLlmClient(),
       abortSignal,
+      config.getDisableLLMCorrection(),
     );
     correctedContent = correctedParams.new_string;
   } else {
@@ -137,6 +138,7 @@ export async function getCorrectedFileContent(
       proposedContent,
       config.getBaseLlmClient(),
       abortSignal,
+      config.getDisableLLMCorrection(),
     );
   }
   return { originalContent, correctedContent, fileExists };

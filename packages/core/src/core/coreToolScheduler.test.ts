@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
+import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import type {
   ToolCall,
@@ -41,6 +42,7 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -283,7 +285,10 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   if (!overrides.getPolicyEngine) {
     finalConfig.getPolicyEngine = () =>
       ({
-        check: async (toolCall: { name: string; args: object }) => {
+        check: async (
+          toolCall: { name: string; args: object },
+          _serverName?: string,
+        ) => {
           // Mock simple policy logic for tests
           const mode = finalConfig.getApprovalMode();
           if (mode === ApprovalMode.YOLO) {
@@ -749,6 +754,17 @@ describe('CoreToolScheduler with payload', () => {
         payload,
       );
     }
+
+    // After internal update, the tool should be awaiting approval again with the NEW content.
+    const updatedAwaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
+
+    // Now confirm for real to execute.
+    await updatedAwaitingCall.confirmationDetails.onConfirm(
+      ToolConfirmationOutcome.ProceedOnce,
+    );
 
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
@@ -1822,5 +1838,70 @@ describe('CoreToolScheduler Sequential Execution', () => {
     });
 
     modifyWithEditorSpy.mockRestore();
+  });
+
+  it('should pass serverName to policy engine for DiscoveredMCPTool', async () => {
+    const mockMcpTool = {
+      tool: async () => ({ functionDeclarations: [] }),
+      callTool: async () => [],
+    };
+    const serverName = 'test-server';
+    const toolName = 'test-tool';
+    const mcpTool = new DiscoveredMCPTool(
+      mockMcpTool as unknown as CallableTool,
+      serverName,
+      toolName,
+      'description',
+      { type: 'object', properties: {} },
+      createMockMessageBus() as unknown as MessageBus,
+    );
+
+    const mockToolRegistry = {
+      getTool: () => mcpTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => mcpTool,
+      getToolByDisplayName: () => mcpTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const mockPolicyEngineCheck = vi.fn().mockResolvedValue({
+      decision: PolicyDecision.ALLOW,
+    });
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getPolicyEngine: () =>
+        ({
+          check: mockPolicyEngineCheck,
+        }) as unknown as PolicyEngine,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: toolName,
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-1',
+    };
+
+    await scheduler.schedule(request, abortController.signal);
+
+    expect(mockPolicyEngineCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ name: toolName }),
+      serverName,
+    );
   });
 });
