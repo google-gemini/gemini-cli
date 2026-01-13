@@ -109,6 +109,7 @@ If the hook exits with `0`, the CLI attempts to parse `stdout` as JSON.
 | Field               | Supported Events                           | Description                                                                       |
 | :------------------ | :----------------------------------------- | :-------------------------------------------------------------------------------- |
 | `additionalContext` | `SessionStart`, `BeforeAgent`, `AfterTool` | Appends text directly to the agent's context.                                     |
+| `clearContext`      | `AfterAgent`                               | If `true`, clears conversation history (LLM memory) while preserving UI display.  |
 | `llm_request`       | `BeforeModel`                              | A `Partial<LLMRequest>` to override parameters of the outgoing call.              |
 | `llm_response`      | `BeforeModel`                              | A **full** `LLMResponse` to bypass the model and provide a synthetic result.      |
 | `llm_response`      | `AfterModel`                               | A `Partial<LLMResponse>` to modify the model's response before the agent sees it. |
