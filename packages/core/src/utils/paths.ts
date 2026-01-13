@@ -9,15 +9,13 @@ import os from 'node:os';
 import process from 'node:process';
 import * as crypto from 'node:crypto';
 
+/**
+ * Utility functions for path manipulation and OS-specific directory resolution.
+ * Consolidated to ensure consistent behavior across the CLI.
+ */
+
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
-
-/**
- * Special characters that need to be escaped in file paths for shell compatibility.
- * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
- */
-export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Returns the home directory.
@@ -38,6 +36,13 @@ export function homedir(): string {
 export function tmpdir(): string {
   return os.tmpdir();
 }
+
+/**
+ * Special characters that need to be escaped in file paths for shell compatibility.
+ * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
+ * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ */
+export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Replaces the home directory with a tilde.
