@@ -310,16 +310,22 @@ export class PolicyEngine {
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
+    // For tools with a server name, we want to try matching both the
+    // original name and the fully qualified name (server__tool).
+    const toolCallsToTry: FunctionCall[] = [toolCall];
+    if (serverName && toolCall.name && !toolCall.name.includes('__')) {
+      toolCallsToTry.push({
+        ...toolCall,
+        name: `${serverName}__${toolCall.name}`,
+      });
+    }
+
     for (const rule of this.rules) {
-      if (
-        ruleMatches(
-          rule,
-          toolCall,
-          stringifiedArgs,
-          serverName,
-          this.approvalMode,
-        )
-      ) {
+      const match = toolCallsToTry.some((tc) =>
+        ruleMatches(rule, tc, stringifiedArgs, serverName, this.approvalMode),
+      );
+
+      if (match) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
