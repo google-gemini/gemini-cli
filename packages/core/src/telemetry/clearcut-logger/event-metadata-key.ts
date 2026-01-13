@@ -517,4 +517,16 @@ export enum EventMetadataKey {
 
   // Logs the exit code of the hook script (if applicable).
   GEMINI_CLI_HOOK_EXIT_CODE = 136,
+
+  // Logs CPU information of user machine.
+  GEMINI_CLI_CPU_INFO = 137,
+
+  // Logs number of CPU cores of user machine.
+  GEMINI_CLI_CPU_CORES = 138,
+
+  // Logs GPU information of user machine.
+  GEMINI_CLI_GPU_INFO = 139,
+
+  // Logs total RAM in GB of user machine.
+  GEMINI_CLI_RAM_TOTAL_GB = 140,
 }

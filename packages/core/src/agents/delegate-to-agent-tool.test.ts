@@ -187,24 +187,28 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should use correct tool name "delegate_to_agent" when requesting confirmation', async () => {
+  it('should execute local agents silently without requesting confirmation', async () => {
     const invocation = tool.build({
       agent_name: 'test_agent',
       arg1: 'valid',
     });
 
     // Trigger confirmation check
-    const p = invocation.shouldConfirmExecute(new AbortController().signal);
-    void p;
-
-    expect(messageBus.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall: expect.objectContaining({
-          name: DELEGATE_TO_AGENT_TOOL_NAME,
-        }),
-      }),
+    const result = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
     );
+
+    expect(result).toBe(false);
+
+    // Verify it did NOT call messageBus.publish with 'delegate_to_agent'
+    const delegateToAgentPublish = vi
+      .mocked(messageBus.publish)
+      .mock.calls.find(
+        (call) =>
+          call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+          call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+      );
+    expect(delegateToAgentPublish).toBeUndefined();
   });
 
   it('should delegate to remote agent correctly', async () => {
@@ -227,24 +231,27 @@ describe('DelegateToAgentTool', () => {
   });
 
   describe('Confirmation', () => {
-    it('should use default behavior for local agents (super call)', async () => {
+    it('should return false for local agents (silent execution)', async () => {
       const invocation = tool.build({
         agent_name: 'test_agent',
         arg1: 'valid',
       });
 
-      // We expect it to call messageBus.publish with 'delegate_to_agent'
-      // because super.shouldConfirmExecute checks the policy for the tool itself.
-      await invocation.shouldConfirmExecute(new AbortController().signal);
-
-      expect(messageBus.publish).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-          toolCall: expect.objectContaining({
-            name: DELEGATE_TO_AGENT_TOOL_NAME,
-          }),
-        }),
+      // Local agents should now return false directly, bypassing policy check
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
       );
+
+      expect(result).toBe(false);
+
+      const delegateToAgentPublish = vi
+        .mocked(messageBus.publish)
+        .mock.calls.find(
+          (call) =>
+            call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+            call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+        );
+      expect(delegateToAgentPublish).toBeUndefined();
     });
 
     it('should forward to remote agent confirmation logic', async () => {
