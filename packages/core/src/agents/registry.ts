@@ -14,6 +14,7 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
+import type { GenerateContentConfig } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -242,14 +243,18 @@ export class AgentRegistry {
       model = this.config.getModel();
     }
 
-    const generateContentConfig = {
+    const generateContentConfig: GenerateContentConfig = {
       temperature: modelConfig.temp,
       topP: modelConfig.top_p,
       thinkingConfig: {
         includeThoughts: true,
-        thinkingBudget: modelConfig.thinkingBudget ?? -1,
       },
     };
+
+    if (modelConfig.thinkingBudget !== undefined) {
+      generateContentConfig.thinkingConfig!.thinkingBudget =
+        modelConfig.thinkingBudget;
+    }
 
     this.config.modelConfigService.registerRuntimeModelConfig(
       getModelConfigAlias(definition),
