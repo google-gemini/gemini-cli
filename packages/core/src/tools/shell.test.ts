@@ -183,9 +183,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(
-        /Path must be within one of the workspace directories:/,
-      );
+      ).toThrow(/Path must be within one of the workspace directories:/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {
@@ -197,24 +195,46 @@ describe('ShellTool', () => {
     });
 
     it('should throw an error if command argument is a path outside the workspace', () => {
-        expect(() =>
-          shellTool.build({ command: 'ls /tmp' }),
-        ).toThrow(
-          /Path must be within one of the workspace directories:/,
-        );
+      expect(() => shellTool.build({ command: 'ls /tmp' })).toThrow(
+        /Path must be within one of the workspace directories:/,
+      );
     });
 
     it('should throw an error if command argument is a relative path outside the workspace', () => {
-        expect(() =>
-          shellTool.build({ command: 'ls ../outside' }),
-        ).toThrow(
-          /Path must be within one of the workspace directories:/,
-        );
+      expect(() => shellTool.build({ command: 'ls ../outside' })).toThrow(
+        /Path must be within one of the workspace directories:/,
+      );
     });
 
     it('should allow command arguments that are paths within the workspace', () => {
-        const invocation = shellTool.build({ command: 'ls subdir' });
-        expect(invocation).toBeDefined();
+      const invocation = shellTool.build({ command: 'ls subdir' });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if a flag value is an absolute path outside workspace', () => {
+      expect(() => shellTool.build({ command: 'ls --file=/tmp/foo' })).toThrow(
+        /Path must be within one of the workspace directories:/,
+      );
+    });
+
+    it('should throw an error if a flag value is a relative path with traversal outside workspace', () => {
+      expect(() =>
+        shellTool.build({ command: 'ls --file=../outside' }),
+      ).toThrow(/Path must be within one of the workspace directories:/);
+    });
+
+    it('should allow sed substitution pattern with slashes', () => {
+      const invocation = shellTool.build({
+        command: "sed 's/foo/bar/' file.txt",
+      });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should allow grep pattern with slashes', () => {
+      const invocation = shellTool.build({
+        command: 'grep "foo/bar" file.txt',
+      });
+      expect(invocation).toBeDefined();
     });
 
     it('should allow printf with long text containing slashes and newlines', () => {
@@ -226,8 +246,77 @@ describe('ShellTool', () => {
     });
 
     it('should allow non-path arguments', () => {
-        const invocation = shellTool.build({ command: 'echo "hello world"' });
-        expect(invocation).toBeDefined();
+      const invocation = shellTool.build({ command: 'echo "hello world"' });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if a variable expands to a path outside the workspace', () => {
+      process.env['OUTSIDE_VAR'] = path.resolve(tempRootDir, '../outside');
+      try {
+        expect(() => shellTool.build({ command: 'ls $OUTSIDE_VAR' })).toThrow(
+          /Path must be within one of the workspace directories:/,
+        );
+      } finally {
+        delete process.env['OUTSIDE_VAR'];
+      }
+    });
+
+    it('should allow absolute path for command executable even if outside workspace', () => {
+      const outsideCommand = path.resolve(tempRootDir, '../outside/bin/tool');
+      const invocation = shellTool.build({
+        command: `${outsideCommand} --flag`,
+      });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if an absolute path command has an argument that is an absolute path outside workspace', () => {
+      const outsideCommand = path.resolve(tempRootDir, '../outside/bin/tool');
+      const outsideArg = path.resolve(tempRootDir, '../outside/data');
+      expect(() =>
+        shellTool.build({ command: `${outsideCommand} ${outsideArg}` }),
+      ).toThrow(/Path must be within one of the workspace directories:/);
+    });
+
+    it('should allow an absolute path command if its arguments are paths inside the workspace', () => {
+      const outsideCommand = path.resolve(tempRootDir, '../outside/bin/tool');
+      const insideArg = path.join(tempRootDir, 'subdir');
+      const invocation = shellTool.build({
+        command: `${outsideCommand} ${insideArg}`,
+      });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should allow multiple commands if all their paths are within the workspace', () => {
+      const invocation = shellTool.build({
+        command: 'ls subdir; echo hello && cd subdir',
+      });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if any command in a multi-command string has a path outside the workspace', () => {
+      expect(() =>
+        shellTool.build({ command: 'ls subdir; cat /etc/passwd' }),
+      ).toThrow(/Path must be within one of the workspace directories:/);
+    });
+
+    it('should allow absolute path command executables in multi-command strings', () => {
+      const outsideCommand = path.resolve(tempRootDir, '../outside/bin/tool');
+      const invocation = shellTool.build({
+        command: `ls subdir; ${outsideCommand} --flag`,
+      });
+      expect(invocation).toBeDefined();
+    });
+
+    it('should throw an error if an assignment has a path outside the workspace', () => {
+      expect(() =>
+        shellTool.build({ command: 'VAR=/etc/passwd ls $VAR' }),
+      ).toThrow(/Path must be within one of the workspace directories:/);
+    });
+
+    it('should throw an error if a subshell contains a path outside the workspace', () => {
+      expect(() =>
+        shellTool.build({ command: 'ls $(cat /etc/passwd)' }),
+      ).toThrow(/Path must be within one of the workspace directories:/);
     });
   });
 

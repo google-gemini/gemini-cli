@@ -464,12 +464,13 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
+    const workspaceContext = this.config.getWorkspaceContext();
+
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
 
       if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
         const directories = workspaceContext.getDirectories();
@@ -481,65 +482,85 @@ export class ShellTool extends BaseDeclarativeTool<
 
     // Validate command arguments
     try {
-      const parsed = parse(params.command);
-      const workspaceContext = this.config.getWorkspaceContext();
+      const parsed = parse(params.command, process.env);
       const cwd = params.dir_path
         ? path.resolve(this.config.getTargetDir(), params.dir_path)
         : this.config.getTargetDir();
 
+      let commandExecutableFound = false;
+
       for (const arg of parsed) {
         if (typeof arg !== 'string') {
+          // If it's a control operator, the next string might be a new command executable
+          if (arg && typeof arg === 'object' && 'op' in arg) {
+            const op = arg.op as string;
+            if ([';', '&&', '||', '|'].includes(op)) {
+              commandExecutableFound = false;
+            }
+          }
           continue;
         }
 
-        // Basic heuristic: check if the argument looks like a path traversal or absolute path
-        // We resolve it against CWD and check if it's in the workspace.
-        // We only check arguments that actually look like paths to avoid false positives on flags or random text.
-        // Paths usually contain path separators or start with .. or . or ~
-        const isPathLike =
-          arg.includes(path.sep) ||
-          arg.includes('/') || // common separator
-          arg === '..' ||
-          arg.startsWith('../') ||
-          arg.startsWith('..\\') ||
-          arg.startsWith(path.sep) ||
-          arg.startsWith('~');
+        // Identify if this is the command executable or an assignment
+        let isCommandExecutable = false;
+        const isAssignment = /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(arg);
 
-        if (isPathLike) {
+        if (!commandExecutableFound && !isAssignment) {
+          isCommandExecutable = true;
+          commandExecutableFound = true;
+        }
+
+        // Extract value to check (handles both assignments and flags)
+        let valueToCheck = arg;
+        if (isAssignment || (arg.startsWith('-') && arg.includes('='))) {
+          const index = arg.indexOf('=');
+          valueToCheck = arg.slice(index + 1);
+        }
+
+        // Heuristic: Only treat as a path if it is absolute, explicitly relative, or relative to home.
+        // This avoids flagging random strings with slashes (e.g. sed 's/foo/bar/') as paths.
+        // We also check for '..' anywhere in the string to prevent traversal.
+        const isPath =
+          path.isAbsolute(valueToCheck) ||
+          valueToCheck.startsWith('~') ||
+          valueToCheck.startsWith(`.${path.sep}`) ||
+          valueToCheck.startsWith(`..${path.sep}`) ||
+          valueToCheck.startsWith('./') ||
+          valueToCheck.startsWith('../') ||
+          valueToCheck === '.' ||
+          valueToCheck === '..' ||
+          valueToCheck.split(/[/\\]/).includes('..');
+
+        if (isPath) {
           // If any component of the path is too long (typically > 255 bytes),
-          // it's likely not a valid path (or at least fs.realpathSync will throw ENAMETOOLONG).
-          // In this case, we can skip the check as the system call would likely fail anyway,
-          // and it's probably just a long text argument (like a git commit message).
-          // We use a safe upper bound of 255 characters per component.
-          const components = arg.split(/[/\\]/);
+          // it's likely not a valid path.
+          const components = valueToCheck.split(/[/\\]/);
           if (components.some((c) => c.length > 255)) {
             continue;
           }
 
           // Handle ~ expansion for validation
-          let argPath = arg;
+          let argPath = valueToCheck;
           if (argPath.startsWith('~')) {
             argPath = path.join(os.homedir(), argPath.slice(1));
           }
 
           const resolvedArg = path.resolve(cwd, argPath);
-          
-          // Check if it exists? No, we should restrict even if it doesn't exist yet (e.g. touch ../outside.txt)
-          // But 'grep -r pattern ../' is valid? No, that accesses outside.
-          
+
+          if (isCommandExecutable) {
+            continue;
+          }
+
           if (!workspaceContext.isPathWithinWorkspace(resolvedArg)) {
-             const directories = workspaceContext.getDirectories();
-             return `Path must be within one of the workspace directories: ${directories.join(
+            const directories = workspaceContext.getDirectories();
+            return `Path must be within one of the workspace directories: ${directories.join(
               ', ',
             )}`;
           }
         }
       }
-    } catch (e) {
-      // If parsing fails, we fallback to allowing it (or failing secure? failing secure is better but might break complex valid commands)
-      // For now, let's log debug and proceed, relying on the user to be smart, 
-      // OR we fail. Given the prompt "restrict execution", failing on parse error might be too aggressive if shell-quote is limited.
-      // Let's assume valid shell syntax.
+    } catch (_e) {
+      // If parsing fails, we assume valid shell syntax and rely on system permissions/sandboxing.
     }
     return null;
   }
