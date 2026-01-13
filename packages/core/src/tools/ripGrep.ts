@@ -22,7 +22,7 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
-import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
+import { IgnoreFileParser } from '../utils/ignoreFileParser.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
@@ -192,7 +192,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
-    private readonly geminiIgnoreParser: GeminiIgnoreParser,
+    private readonly geminiIgnoreParser: IgnoreFileParser,
     params: RipGrepToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -478,7 +478,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
-  private readonly geminiIgnoreParser: GeminiIgnoreParser;
+  private readonly geminiIgnoreParser: IgnoreFileParser;
 
   constructor(
     private readonly config: Config,
@@ -544,7 +544,10 @@ export class RipGrepTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-    this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
+    this.geminiIgnoreParser = new IgnoreFileParser(
+      config.getTargetDir(),
+      '.geminiignore',
+    );
   }
 
   /**

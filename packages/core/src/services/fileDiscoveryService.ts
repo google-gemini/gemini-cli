@@ -5,9 +5,9 @@
  */
 
 import type { GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
-import type { GeminiIgnoreFilter } from '../utils/geminiIgnoreParser.js';
+import type { IgnoreFileFilter } from '../utils/ignoreFileParser.js';
 import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
-import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
+import { IgnoreFileParser } from '../utils/ignoreFileParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'node:path';
 
@@ -24,7 +24,7 @@ export interface FilterReport {
 
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
-  private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
+  private geminiIgnoreFilter: IgnoreFileFilter | null = null;
   private combinedIgnoreFilter: GitIgnoreFilter | null = null;
   private defaultFilterFileOptions: FilterFilesOptions = {
     respectGitIgnore: true,
@@ -39,7 +39,10 @@ export class FileDiscoveryService {
     if (isGitRepository(this.projectRoot)) {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
-    this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
+    this.geminiIgnoreFilter = new IgnoreFileParser(
+      this.projectRoot,
+      '.geminiignore',
+    );
 
     if (this.gitIgnoreFilter) {
       const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
