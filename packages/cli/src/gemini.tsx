@@ -17,17 +17,10 @@ import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
-<<<<<<< HEAD
-  loadSettings,
-  migrateDeprecatedSettings,
-  SettingScope,
-} from './config/settings.js';
-=======
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
 import { loadSettings, SettingScope } from './config/settings.js';
->>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -304,21 +297,6 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
-<<<<<<< HEAD
-  const migrateHandle = startupProfiler.start('migrate_settings');
-  migrateDeprecatedSettings(
-    settings,
-    // Temporary extension manager only used during this non-interactive UI phase.
-    new ExtensionManager({
-      workspaceDir: process.cwd(),
-      settings: settings.merged,
-      enabledExtensionOverrides: [],
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: null,
-    }),
-  );
-  migrateHandle?.end();
-=======
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
     coreEvents.emitFeedback('warning', error.message);
@@ -332,7 +310,6 @@ export async function main() {
     );
   });
 
->>>>>>> 356f76e54 (refactor(config): remove legacy V1 settings migration logic (#16252))
   await cleanupCheckpoints();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
