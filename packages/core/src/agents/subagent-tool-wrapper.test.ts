@@ -43,8 +43,14 @@ const mockDefinition: LocalAgentDefinition = {
       },
     },
   },
-  modelConfig: { model: 'gemini-test-model', temp: 0, top_p: 1 },
-  runConfig: { max_time_minutes: 5 },
+  modelConfig: {
+    model: 'gemini-test-model',
+    generateContentConfig: {
+      temperature: 0,
+      topP: 1,
+    },
+  },
+  runConfig: { maxTimeMinutes: 5 },
   promptConfig: { systemPrompt: 'You are a test agent.' },
 };
 
