@@ -127,22 +127,19 @@ describe('chatCommand', () => {
 
       await listCommand?.action?.(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: 'chat_list',
-          chats: [
-            {
-              name: 'test1',
-              mtime: date1.toISOString(),
-            },
-            {
-              name: 'test2',
-              mtime: date2.toISOString(),
-            },
-          ],
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: 'chat_list',
+        chats: [
+          {
+            name: 'test1',
+            mtime: date1.toISOString(),
+          },
+          {
+            name: 'test2',
+            mtime: date2.toISOString(),
+          },
+        ],
+      });
     });
   });
   describe('save subcommand', () => {

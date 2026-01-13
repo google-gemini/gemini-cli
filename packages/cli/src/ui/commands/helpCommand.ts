@@ -20,6 +20,6 @@ export const helpCommand: SlashCommand = {
       timestamp: new Date(),
     };
 
-    context.ui.addItem(helpItem, Date.now());
+    context.ui.addItem(helpItem);
   },
 };
