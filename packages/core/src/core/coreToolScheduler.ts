@@ -49,6 +49,7 @@ import {
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { BeforeToolHookOutput } from '../hooks/types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 export type {
   ToolCall,
@@ -675,9 +676,14 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
+        const serverName =
+          toolCall.tool instanceof DiscoveredMCPTool
+            ? toolCall.tool.serverName
+            : undefined;
+
         const { decision: policyDecision } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, undefined); // Server name undefined for local tools
+          .check(toolCallForPolicy, serverName);
 
         let finalDecision = policyDecision;
         if (hookDecision === 'ask') {
