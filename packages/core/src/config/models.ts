@@ -161,16 +161,6 @@ export function isAutoModel(model: string): boolean {
 }
 
 /**
- * Checks if the model is a Gemini 3 model.
- *
- * @param model The model name to check.
- * @returns True if the model is a Gemini 3 model.
- */
-export function isGemini3Model(model: string): boolean {
-  return model.startsWith('gemini-3-');
-}
-
-/**
  * Checks if the model supports multimodal function responses (multimodal data nested within function response).
  * This is supported in Gemini 3.
  *
