@@ -248,13 +248,9 @@ export class AgentRegistry {
       topP: modelConfig.top_p,
       thinkingConfig: {
         includeThoughts: true,
+        thinkingBudget: modelConfig.thinkingBudget,
       },
     };
-
-    if (modelConfig.thinkingBudget !== undefined) {
-      generateContentConfig.thinkingConfig!.thinkingBudget =
-        modelConfig.thinkingBudget;
-    }
 
     this.config.modelConfigService.registerRuntimeModelConfig(
       getModelConfigAlias(definition),
