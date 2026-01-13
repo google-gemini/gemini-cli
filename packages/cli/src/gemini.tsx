@@ -720,10 +720,10 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
       showThoughts: !!settings.merged.ui?.showStatusInTitle,
       useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
     });
-    writeToStdout(`\x1b]2;${windowTitle}\x07`);
+    writeToStdout(`\x1b]0;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      writeToStdout(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]0;\x07`);
     });
   }
 }

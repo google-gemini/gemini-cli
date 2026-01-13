@@ -1020,12 +1020,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with "Working…"
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1061,12 +1061,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that legacy title was used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Gemini CLI (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'Gemini CLI (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1092,7 +1092,7 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that no title-related writes occurred
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(0);
@@ -1131,12 +1131,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with thought subject and suffix
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${`✦  ${thoughtSubject} (workspace)`.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${`✦  ${thoughtSubject} (workspace)`.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1172,12 +1172,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with default Idle text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'◇  Ready (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'◇  Ready (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1218,12 +1218,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with confirmation text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount!();
     });
@@ -1269,7 +1269,7 @@ describe('AppContainer State Management', () => {
 
         // Initially it should show the working status
         const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-          call[0].includes('\x1b]2;'),
+          call[0].includes('\x1b]0;'),
         );
         expect(titleWrites[titleWrites.length - 1][0]).toContain(
           '✦  Executing shell command',
@@ -1283,7 +1283,7 @@ describe('AppContainer State Management', () => {
         // Now it should show Action Required
         await waitFor(() => {
           const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-            call[0].includes('\x1b]2;'),
+            call[0].includes('\x1b]0;'),
           );
           const lastTitle = titleWrites[titleWrites.length - 1][0];
           expect(lastTitle).toContain('✋  Action Required');
@@ -1325,13 +1325,13 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title is padded to exactly 80 characters
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
       const expectedTitle = `✦  ${shortTitle} (workspace)`.padEnd(80, ' ');
-      const expectedEscapeSequence = `\x1b]2;${expectedTitle}\x07`;
+      const expectedEscapeSequence = `\x1b]0;${expectedTitle}\x07`;
       expect(calledWith).toBe(expectedEscapeSequence);
       unmount();
     });
@@ -1368,11 +1368,11 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that the correct ANSI escape sequence is used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
-      const expectedEscapeSequence = `\x1b]2;${`✦  ${title} (workspace)`.padEnd(80, ' ')}\x07`;
+      const expectedEscapeSequence = `\x1b]0;${`✦  ${title} (workspace)`.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
       unmount();
     });
@@ -1411,12 +1411,12 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with CLI_TITLE value
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
