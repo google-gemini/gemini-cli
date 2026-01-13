@@ -215,6 +215,13 @@
           "default": false,
           "type": "boolean"
         },
+        "bell": {
+          "title": "Bell",
+          "description": "Enable terminal bell sound when requesting user input.",
+          "markdownDescription": "Enable terminal bell sound when requesting user input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "hideBanner": {
           "title": "Hide Banner",
           "description": "Hide the application banner",

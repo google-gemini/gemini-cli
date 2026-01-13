@@ -199,6 +199,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.bell`** (boolean):
+  - **Description:** Enable terminal bell sound when requesting user input.
+  - **Default:** `false`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`

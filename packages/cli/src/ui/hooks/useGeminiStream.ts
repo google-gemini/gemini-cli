@@ -167,10 +167,14 @@ export const useGeminiStream = (
               completedToolCallsFromScheduler,
             );
 
-          await recordToolCallInteractions(
+          recordToolCallInteractions(
             config,
             completedToolCallsFromScheduler,
-          );
+          ).catch((error) => {
+            debugLogger.warn(
+              `Error recording completed tool call information: ${error}`,
+            );
+          });
         } catch (error) {
           debugLogger.warn(
             `Error recording completed tool call information: ${error}`,

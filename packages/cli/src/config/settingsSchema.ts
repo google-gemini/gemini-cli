@@ -413,6 +413,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      bell: {
+        type: 'boolean',
+        label: 'Bell',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable terminal bell sound when requesting user input.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
