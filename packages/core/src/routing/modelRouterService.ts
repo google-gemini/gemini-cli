@@ -22,6 +22,7 @@ import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 class DynamicClassifierStrategy implements RoutingStrategy {
   readonly name = 'dynamic_classifier';
@@ -97,6 +98,11 @@ export class ModelRouterService {
       );
       logModelRouting(this.config, event);
 
+      debugLogger.debug(
+        `[Routing] Selected model: ${decision.model} (Source: ${decision.metadata.source}, Latency: ${decision.metadata.latencyMs}ms)`,
+      );
+      debugLogger.debug(`[Routing] Reasoning: ${decision.metadata.reasoning}`);
+
       return decision;
     } catch (e) {
       const failed = true;
@@ -124,6 +130,11 @@ export class ModelRouterService {
       );
 
       logModelRouting(this.config, event);
+
+      debugLogger.error(`[Routing] Exception during routing: ${error_message}`);
+      debugLogger.debug(
+        `[Routing] Fallback model: ${decision.model} (Source: ${decision.metadata.source})`,
+      );
 
       throw e;
     }
