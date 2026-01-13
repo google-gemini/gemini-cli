@@ -120,6 +120,7 @@ describe('EditTool', () => {
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any,
       isInteractive: () => false,
+      getDisableLLMCorrection: vi.fn(() => false),
       getExperiments: () => {},
     } as unknown as Config;
 
@@ -856,6 +857,49 @@ describe('EditTool', () => {
         0,
       );
       expect(totalActualRemoved).toBe(totalExpectedRemoved);
+    });
+  });
+
+  describe('disableLLMCorrection', () => {
+    it('should NOT call FixLLMEditWithInstruction when disableLLMCorrection is true', async () => {
+      const filePath = path.join(rootDir, 'disable_llm_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Enable the setting
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(true);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace non-existent text',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('should call FixLLMEditWithInstruction when disableLLMCorrection is false (default)', async () => {
+      const filePath = path.join(rootDir, 'enable_llm_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Default is false, but being explicit
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace non-existent text',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
   });
 });
