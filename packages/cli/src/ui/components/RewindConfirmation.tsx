@@ -147,7 +147,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
       </Box>
 
       <RadioButtonSelect
-        items={REWIND_OPTIONS}
+        items={options}
         onSelect={handleSelect}
         isFocused={true}
       />
