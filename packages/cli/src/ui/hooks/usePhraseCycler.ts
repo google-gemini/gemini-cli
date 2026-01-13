@@ -38,7 +38,7 @@ export const usePhraseCycler = (
     loadingPhrases[0],
   );
   const showShellFocusHint = useInactivityTimer(
-    isInteractiveShellWaiting && lastOutputTime > 0,
+    isInteractiveShellWaiting,
     lastOutputTime,
     SHELL_FOCUS_HINT_DELAY_MS,
   );
