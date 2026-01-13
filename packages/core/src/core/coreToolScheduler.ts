@@ -44,6 +44,7 @@ import {
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 export type {
   ToolCall,
@@ -591,9 +592,15 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
+
+        const serverName =
+          toolCall.tool instanceof DiscoveredMCPTool
+            ? toolCall.tool.serverName
+            : undefined;
+
         const { decision } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, undefined); // Server name undefined for local tools
+          .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
           const errorMessage = `Tool execution denied by policy.`;

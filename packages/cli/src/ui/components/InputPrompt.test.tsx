@@ -38,6 +38,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { StreamingState } from '../types.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -124,6 +125,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isKittyProtocolEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
@@ -2403,6 +2408,84 @@ describe('InputPrompt', () => {
       });
       unmount();
     });
+  });
+
+  describe('Tab focus toggle', () => {
+    it.each([
+      {
+        name: 'should toggle focus in on Tab when no suggestions or ghost text',
+        showSuggestions: false,
+        ghostText: '',
+        suggestions: [],
+        expectedFocusToggle: true,
+      },
+      {
+        name: 'should accept ghost text and NOT toggle focus on Tab',
+        showSuggestions: false,
+        ghostText: 'ghost text',
+        suggestions: [],
+        expectedFocusToggle: false,
+        expectedAcceptCall: true,
+      },
+      {
+        name: 'should NOT toggle focus on Tab when suggestions are present',
+        showSuggestions: true,
+        ghostText: '',
+        suggestions: [{ label: 'test', value: 'test' }],
+        expectedFocusToggle: false,
+      },
+    ])(
+      '$name',
+      async ({
+        showSuggestions,
+        ghostText,
+        suggestions,
+        expectedFocusToggle,
+        expectedAcceptCall,
+      }) => {
+        const mockAccept = vi.fn();
+        mockedUseCommandCompletion.mockReturnValue({
+          ...mockCommandCompletion,
+          showSuggestions,
+          suggestions,
+          promptCompletion: {
+            text: ghostText,
+            accept: mockAccept,
+            clear: vi.fn(),
+            isLoading: false,
+            isActive: ghostText !== '',
+            markSelected: vi.fn(),
+          },
+        });
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiActions,
+            uiState: { activePtyId: 1 },
+          },
+        );
+
+        await act(async () => {
+          stdin.write('\t');
+        });
+
+        await waitFor(() => {
+          if (expectedFocusToggle) {
+            expect(uiActions.setEmbeddedShellFocused).toHaveBeenCalledWith(
+              true,
+            );
+          } else {
+            expect(uiActions.setEmbeddedShellFocused).not.toHaveBeenCalled();
+          }
+
+          if (expectedAcceptCall) {
+            expect(mockAccept).toHaveBeenCalled();
+          }
+        });
+        unmount();
+      },
+    );
   });
 
   describe('mouse interaction', () => {
