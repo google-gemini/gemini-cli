@@ -15,6 +15,7 @@ import type {
 import { resolveClassifierModel } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
+import { ExperimentFlags } from '../../code_assist/experiments/flagNames.js';
 import {
   isFunctionCall,
   isFunctionResponse,
@@ -175,22 +176,45 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return part;
       });
 
-      const jsonResponse = await baseLlmClient.generateJson({
-        modelConfigKey: { model: 'classifier' },
-        contents: [...finalHistory, createUserContent(sanitizedRequest)],
-        schema: RESPONSE_SCHEMA,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        abortSignal: context.signal,
-        promptId,
-      });
+      const [jsonResponse, experiments] = await Promise.all([
+        baseLlmClient.generateJson({
+          modelConfigKey: { model: 'classifier' },
+          contents: [...finalHistory, createUserContent(sanitizedRequest)],
+          schema: RESPONSE_SCHEMA,
+          systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+          abortSignal: context.signal,
+          promptId,
+        }),
+        config.getExperimentsAsync(),
+      ]);
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
-      // Deterministic A/B Test
-      const sessionId = config.getSessionId() || 'unknown-session';
-      const threshold = getComplexityThreshold(sessionId);
-      const groupLabel = threshold === 80 ? 'Strict' : 'Control';
+      // A/B Test or Remote Threshold
+      let threshold: number;
+      let groupLabel: string;
+
+      const remoteThresholdFlag =
+        experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+      const remoteThresholdValue = remoteThresholdFlag?.intValue
+        ? parseInt(remoteThresholdFlag.intValue, 10)
+        : remoteThresholdFlag?.floatValue;
+
+      if (
+        remoteThresholdValue !== undefined &&
+        !isNaN(remoteThresholdValue) &&
+        remoteThresholdValue >= 0 &&
+        remoteThresholdValue <= 100
+      ) {
+        threshold = remoteThresholdValue;
+        groupLabel = 'Remote';
+      } else {
+        // Fallback to deterministic A/B test
+        const sessionId = config.getSessionId() || 'unknown-session';
+        threshold = getComplexityThreshold(sessionId);
+        groupLabel = threshold === 80 ? 'Strict' : 'Control';
+      }
 
       // Select Model based on Score vs Threshold
       const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
