@@ -30,7 +30,7 @@ topics on:
 
 - **Error:
   `Failed to login. Message: Your current account is not eligible... because it is not currently available in your location.`**
-  - **Cause:** Gemini CLI doeds not currently support your location. For a full
+  - **Cause:** Gemini CLI does not currently support your location. For a full
     list of supported locations, see the following pages:
     - [Available locations for Gemini Code Assist for individuals](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
     - [Available locations for Google AI Pro and Ultra where Gemini Code Assist (and Gemini CLI) is also available](https://developers.google.com/gemini-code-assist/resources/locations-pro-ultra)
@@ -143,7 +143,8 @@ This is especially useful for scripting and automation.
 
 - **Core debugging:**
   - Check the server console output for error messages or stack traces.
-  - Increase log verbosity if configurable.
+  - Increase log verbosity if configurable. For example, set the `DEBUG_MODE`
+    environment variable to `true` or `1`.
   - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step
     through server-side code.
 
