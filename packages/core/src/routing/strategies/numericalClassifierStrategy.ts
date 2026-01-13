@@ -80,7 +80,7 @@ Respond *only* in JSON format according to the following schema.
   },
   "required": ["reasoning", "complexity_score"]
 }
---- EXAMPLES ---
+# Output Examples
 *Prompt:* <user_request>read package.json</user_request>
 *JSON:* {"reasoning": "Simple read operation.", "complexity_score": 10}
 
