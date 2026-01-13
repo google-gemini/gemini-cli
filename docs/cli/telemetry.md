@@ -8,8 +8,10 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Configuration](#configuration)
   - [Google Cloud telemetry](#google-cloud-telemetry)
     - [Prerequisites](#prerequisites)
+    - [Authenticating with CLI Credentials](#authenticating-with-cli-credentials)
     - [Direct export (recommended)](#direct-export-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced)
+    - [Monitoring Dashboards](#monitoring-dashboards)
   - [Local telemetry](#local-telemetry)
     - [File-based output (recommended)](#file-based-output-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced-1)
@@ -212,6 +214,24 @@ forward data to Google Cloud.
      - Traces: https://console.cloud.google.com/traces/list
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
+
+### Monitoring Dashboards
+
+Gemini CLI provides a pre-configured
+[Google Cloud Monitoring](https://cloud.google.com/monitoring) dashboard to
+visualize your telemetry.
+
+This dashboard can be found under **Google Cloud Monitoring Dashboard
+Templates** as "**Gemini CLI Monitoring**".
+
+![Gemini CLI Monitoring Dashboard Overview](../assets/monitoring-dashboard-overview.png)
+
+![Gemini CLI Monitoring Dashboard Metrics](../assets/monitoring-dashboard-metrics.png)
+
+![Gemini CLI Monitoring Dashboard Logs](../assets/monitoring-dashboard-logs.png)
+
+To learn more, check out this blog post:
+[Instant insights: Gemini CLI’s new pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
 
 ## Local telemetry
 
