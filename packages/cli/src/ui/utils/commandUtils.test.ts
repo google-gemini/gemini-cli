@@ -34,9 +34,17 @@ vi.mock('child_process');
 const mockFs = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
 }));
-vi.mock('node:fs', () => ({
-  default: mockFs,
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    createWriteStream: mockFs.createWriteStream,
+    default: {
+      ...actual,
+      createWriteStream: mockFs.createWriteStream,
+    },
+  };
+});
 
 // Mock process.platform for platform-specific tests
 const mockProcess = vi.hoisted(() => ({
