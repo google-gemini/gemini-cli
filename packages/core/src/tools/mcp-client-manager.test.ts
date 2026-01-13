@@ -73,6 +73,23 @@ describe('McpClientManager', () => {
     expect(mockConfig.refreshMcpContext).toHaveBeenCalledOnce();
   });
 
+  it('should batch context refresh when starting multiple servers', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'server-1': {},
+      'server-2': {},
+      'server-3': {},
+    });
+    const manager = new McpClientManager(toolRegistry, mockConfig);
+    await manager.startConfiguredMcpServers();
+
+    // Each client should be connected/discovered
+    expect(mockedMcpClient.connect).toHaveBeenCalledTimes(3);
+    expect(mockedMcpClient.discover).toHaveBeenCalledTimes(3);
+
+    // But context refresh should happen only once
+    expect(mockConfig.refreshMcpContext).toHaveBeenCalledOnce();
+  });
+
   it('should not discover tools if folder is not trusted', async () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': {},
@@ -229,14 +246,16 @@ describe('McpClientManager', () => {
       const instructions = manager.getMcpInstructions();
 
       expect(instructions).toContain(
-        "# Instructions for MCP Server 'server-with-instructions'",
+        "The following are instructions provided by the tool server 'server-with-instructions':",
       );
+      expect(instructions).toContain('---[start of server instructions]---');
       expect(instructions).toContain(
         'Instructions for server-with-instructions',
       );
+      expect(instructions).toContain('---[end of server instructions]---');
 
       expect(instructions).not.toContain(
-        "# Instructions for MCP Server 'server-without-instructions'",
+        "The following are instructions provided by the tool server 'server-without-instructions':",
       );
     });
   });
