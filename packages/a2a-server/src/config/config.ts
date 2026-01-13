@@ -147,12 +147,22 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
     return originalCWD;
   }
 
+  // VALIDATION: Prevent escape to sensitive system paths
+  const resolvedPath = path.resolve(targetDir);
+  const sensitivePaths = ['/', '/etc', '/root', '/var', '/home']; // Add sensitive system paths as needed
+
+  if (sensitivePaths.includes(resolvedPath) || resolvedPath === homedir()) {
+    logger.error(
+      `[CoderAgentExecutor] Blocked attempt to set workspace to sensitive path: ${resolvedPath}`,
+    );
+    return originalCWD;
+  }
+
   logger.info(
-    `[CoderAgentExecutor] Overriding workspace path to: ${targetDir}`,
+    `[CoderAgentExecutor] Overriding workspace path to: ${resolvedPath}`,
   );
 
   try {
-    const resolvedPath = path.resolve(targetDir);
     process.chdir(resolvedPath);
     return resolvedPath;
   } catch (e) {
