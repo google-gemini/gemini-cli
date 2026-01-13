@@ -17,12 +17,23 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 
 import { debugLogger } from '@google/gemini-cli-core';
-import { handleInstall } from './install.js';
+import { handleInstall, installCommand } from './install.js';
 
 describe('skill install command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  });
+
+  describe('installCommand', () => {
+    it('should have correct command and describe', () => {
+      expect(installCommand.command).toBe(
+        'install <source> [--scope] [--path]',
+      );
+      expect(installCommand.describe).toBe(
+        'Installs an agent skill from a git repository URL or a local path.',
+      );
+    });
   });
 
   it('should call installSkill with correct arguments for user scope', async () => {
