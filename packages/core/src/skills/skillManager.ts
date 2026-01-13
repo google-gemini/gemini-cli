@@ -97,9 +97,6 @@ export class SkillManager {
    * Returns the list of enabled discovered skills.
    */
   getSkills(): SkillDefinition[] {
-    if (!this.adminSkillsEnabled) {
-      return [];
-    }
     return this.skills.filter((s) => !s.disabled);
   }
 
@@ -108,9 +105,6 @@ export class SkillManager {
    * This excludes built-in skills.
    */
   getDisplayableSkills(): SkillDefinition[] {
-    if (!this.adminSkillsEnabled) {
-      return [];
-    }
     return this.skills.filter((s) => !s.disabled && !s.isBuiltin);
   }
 
@@ -118,12 +112,7 @@ export class SkillManager {
    * Returns all discovered skills, including disabled ones.
    */
   getAllSkills(): SkillDefinition[] {
-    if (!this.adminSkillsEnabled) {
-      return [];
-    }
-    return this.skills.map((s) => ({
-      ...s,
-    }));
+    return this.skills;
   }
 
   /**
@@ -149,9 +138,6 @@ export class SkillManager {
    * Reads the full content (metadata + body) of a skill by name.
    */
   getSkill(name: string): SkillDefinition | null {
-    if (!this.adminSkillsEnabled) {
-      return null;
-    }
     const lowercaseName = name.toLowerCase();
     return (
       this.skills.find((s) => s.name.toLowerCase() === lowercaseName) ?? null

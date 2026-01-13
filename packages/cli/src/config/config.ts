@@ -710,6 +710,7 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,
+
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -753,7 +754,7 @@ export async function loadCliConfig(
       return {
         disabledSkills: refreshedSettings.merged.skills?.disabled,
         adminSkillsEnabled:
-          refreshedSettings.merged.admin?.skills?.enabled ?? true,
+          refreshedSettings.merged.admin?.skills?.enabled ?? adminSkillsEnabled,
       };
     },
   });

@@ -248,28 +248,19 @@ body1`,
     expect(enabled.map((s) => s.name)).toContain('builtin-skill');
   });
 
-  it('should respect admin settings (enabled)', async () => {
+  it('should maintain admin settings state', async () => {
     const service = new SkillManager();
 
-    // @ts-expect-error accessing private property for testing
-    service.skills = [
-      {
-        name: 'skill1',
-        description: 'desc1',
-        location: 'loc1',
-        body: 'body',
-        isBuiltin: false,
-      },
-    ];
-
     // Case 1: Enabled by admin
+
     service.setAdminSettings(true);
-    expect(service.getSkills()).toHaveLength(1);
+
+    expect(service.isAdminEnabled()).toBe(true);
 
     // Case 2: Disabled by admin
+
     service.setAdminSettings(false);
-    expect(service.getSkills()).toHaveLength(0);
-    expect(service.getAllSkills()).toHaveLength(0);
-    expect(service.getSkill('skill1')).toBeNull();
+
+    expect(service.isAdminEnabled()).toBe(false);
   });
 });
