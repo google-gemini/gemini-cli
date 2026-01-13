@@ -118,21 +118,29 @@ const ClassifierResponseSchema = z.object({
  * Deterministically calculates the routing threshold based on the session ID.
  * This ensures a consistent experience for the user within a session.
  *
- * This implementation uses the Java String.hashCode() algorithm, which is a
- * variant of the djb2 hash.
- * @see https://en.wikipedia.org/wiki/Java_hashCode()
+ * This implementation uses the FNV-1a hash algorithm (32-bit).
+ * @see https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
  *
  * @param sessionId The unique session identifier.
  * @returns The threshold (50 or 80).
  */
 function getComplexityThreshold(sessionId: string): number {
-  let hash = 0;
+  const FNV_OFFSET_BASIS_32 = 0x811c9dc5;
+  const FNV_PRIME_32 = 0x01000193;
+
+  let hash = FNV_OFFSET_BASIS_32;
+
   for (let i = 0; i < sessionId.length; i++) {
-    hash = (hash << 5) - hash + sessionId.charCodeAt(i);
-    hash |= 0; // Convert to 32bit integer
+    hash ^= sessionId.charCodeAt(i);
+    // Multiply by prime (simulate 32-bit overflow with bitwise shift)
+    hash = Math.imul(hash, FNV_PRIME_32);
   }
+
+  // Ensure positive integer
+  hash = hash >>> 0;
+
   // Normalize to 0-99
-  const normalized = Math.abs(hash) % 100;
+  const normalized = hash % 100;
   // 50% split:
   // 0-49: Strict (80)
   // 50-99: Control (50)

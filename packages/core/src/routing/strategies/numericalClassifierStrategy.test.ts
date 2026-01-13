@@ -151,7 +151,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 60 -> FLASH', async () => {
-      vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // Hash 35 -> Strict
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // FNV Normalized 18 < 50 -> Strict
       const mockApiResponse = {
         reasoning: 'Complex task',
         complexity_score: 60,
