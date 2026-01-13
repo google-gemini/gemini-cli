@@ -100,18 +100,20 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys             |
-| ----------------------------------------------------------------- | ---------------- |
-| Toggle detailed error information.                                | `F12`            |
-| Toggle the full TODO list.                                        | `Ctrl + T`       |
-| Show IDE context details.                                         | `Ctrl + G`       |
-| Toggle Markdown rendering.                                        | `Cmd + M`        |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
-| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
-| Focus the Gemini input from the shell input.                      | `Tab`            |
+| Action                                                                    | Keys             |
+| ------------------------------------------------------------------------- | ---------------- |
+| Toggle detailed error information.                                        | `F12`            |
+| Toggle the full TODO list.                                                | `Ctrl + T`       |
+| Show IDE context details.                                                 | `Ctrl + G`       |
+| Toggle Markdown rendering.                                                | `Cmd + M`        |
+| Toggle copy mode when the terminal is using the alternate buffer.         | `Ctrl + S`       |
+| Toggle YOLO (auto-approval) mode for tool calls.                          | `Ctrl + Y`       |
+| Toggle Auto Edit (auto-accept edits) mode.                                | `Shift + Tab`    |
+| Expand a height-constrained response to show additional lines.            | `Ctrl + S`       |
+| Move current shell command to background or toggle background shell view. | `Ctrl + B`       |
+| Toggle the list of background shell processes.                            | `Ctrl + O`       |
+| Focus the shell input from the gemini input.                              | `Tab (no Shift)` |
+| Focus the Gemini input from the shell input.                              | `Tab`            |
 
 #### Session Control
 
