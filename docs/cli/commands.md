@@ -166,7 +166,7 @@ Slash commands provide meta-level control over the CLI itself.
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 - [**`/rewind`**](./rewind.md)
-  - **Description:** Browse and revert previous interactions. Allows you to
+  - **Description:** Browse and rewind previous interactions. Allows you to
     rewind the conversation, revert file changes, or both. Provides an
     interactive interface to select the exact point to rewind to.
   - **Keyboard shortcut:** Press **Esc** twice.

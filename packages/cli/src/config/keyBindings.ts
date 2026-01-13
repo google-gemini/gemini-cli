@@ -447,5 +447,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Toggle focus out of the interactive shell and into Gemini input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
-  [Command.REWIND]: 'Browse and revert previous interactions.',
+  [Command.REWIND]: 'Browse and rewind previous interactions.',
 };
