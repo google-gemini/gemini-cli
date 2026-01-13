@@ -248,7 +248,7 @@ export class AgentRegistry {
       topP: modelConfig.top_p,
       thinkingConfig: {
         includeThoughts: true,
-        thinkingBudget: modelConfig.thinkingBudget,
+        thinkingBudget: modelConfig.thinkingBudget ?? 1,
       },
     };
 
