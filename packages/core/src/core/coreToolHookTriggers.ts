@@ -312,112 +312,29 @@ export async function executeToolWithHooks(
   setPidCallback?: (pid: number) => void,
   config?: Config,
 ): Promise<ToolResult> {
-  let toolInput = (invocation.params || {}) as Record<string, unknown>;
-  let currentInvocation = invocation;
-  let modificationMessage: string | undefined;
-
-  // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const mcpContext = config
-      ? extractMcpContext(currentInvocation, config)
-      : undefined;
-    const beforeOutput = await fireBeforeToolHook(
-      messageBus,
-      toolName,
-      toolInput,
-      mcpContext,
-    );
-
-    if (beforeOutput) {
-      // Check if hook requested to stop entire agent execution
-      if (beforeOutput.shouldStopExecution()) {
-        const reason = beforeOutput.getEffectiveReason();
-        return {
-          llmContent: `Agent execution stopped by hook: ${reason}`,
-          returnDisplay: `Agent execution stopped by hook: ${reason}`,
-          error: {
-            type: ToolErrorType.STOP_EXECUTION,
-            message: reason,
-          },
-        };
-      }
-
-      // Check if hook blocked tool execution
-      const blockingError = beforeOutput.getBlockingError();
-      if (blockingError.blocked) {
-        return {
-          llmContent: `Tool execution blocked: ${blockingError.reason}`,
-          returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
-          error: {
-            type: ToolErrorType.EXECUTION_FAILED,
-            message: blockingError.reason,
-          },
-        };
-      }
-
-      // Check for modified tool input
-      const modifiedInput = beforeOutput.getModifiedToolInput();
-      if (modifiedInput) {
-        // Update toolInput with modified values
-        toolInput = { ...toolInput, ...modifiedInput };
-
-        // Attempt to update original invocation params in-place if possible
-        // to satisfy tests that check the original invocation object
-        try {
-          Object.assign(invocation.params, modifiedInput);
-        } catch (e) {
-          // If params is readonly or not extensible, we just continue with the new toolInput
-          debugLogger.debug('Could not modify invocation.params in-place:', e);
-        }
-
-        // Re-build invocation with modified input
-        currentInvocation = tool.build(toolInput) as typeof currentInvocation;
-
-        // Track that modification occurred to inform the model later
-        const modifiedKeys = Object.keys(modifiedInput).join(', ');
-        modificationMessage = `[System] Tool input parameters (${modifiedKeys}) were modified by a hook before execution.`;
-      }
-    }
-  }
+  const toolInput = (invocation.params || {}) as Record<string, unknown>;
 
   // Execute the actual tool
   let toolResult: ToolResult;
-  if (setPidCallback && currentInvocation instanceof ShellToolInvocation) {
-    toolResult = await currentInvocation.execute(
+  if (setPidCallback && invocation instanceof ShellToolInvocation) {
+    toolResult = await invocation.execute(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
       setPidCallback,
     );
   } else {
-    toolResult = await currentInvocation.execute(
+    toolResult = await invocation.execute(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
     );
   }
 
-  // Add modification message if input was changed
-  if (modificationMessage) {
-    if (typeof toolResult.llmContent === 'string') {
-      toolResult.llmContent += '\n\n' + modificationMessage;
-    } else if (Array.isArray(toolResult.llmContent)) {
-      toolResult.llmContent.push({ text: '\n\n' + modificationMessage });
-    } else if (toolResult.llmContent) {
-      // Handle single Part case by converting to an array
-      toolResult.llmContent = [
-        toolResult.llmContent,
-        { text: '\n\n' + modificationMessage },
-      ];
-    } else {
-      toolResult.llmContent = modificationMessage;
-    }
-  }
-
   // Fire AfterTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
     const mcpContext = config
-      ? extractMcpContext(currentInvocation, config)
+      ? extractMcpContext(invocation, config)
       : undefined;
     const afterOutput = await fireAfterToolHook(
       messageBus,
