@@ -619,6 +619,127 @@ describe('AgentRegistry', () => {
       );
     });
   });
+
+  describe('overrides', () => {
+    it('should skip registration if agent is disabled in settings', async () => {
+      const config = makeFakeConfig({
+        agents: {
+          overrides: {
+            MockAgent: { disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      expect(registry.getDefinition('MockAgent')).toBeUndefined();
+    });
+
+    it('should skip remote agent registration if disabled in settings', async () => {
+      const config = makeFakeConfig({
+        agents: {
+          overrides: {
+            RemoteAgent: { disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
+      };
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(registry.getDefinition('RemoteAgent')).toBeUndefined();
+    });
+
+    it('should merge runConfig overrides', async () => {
+      const config = makeFakeConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              runConfig: { maxTurns: 50 },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const def = registry.getDefinition('MockAgent') as LocalAgentDefinition;
+      expect(def.runConfig.max_turns).toBe(50);
+      expect(def.runConfig.max_time_minutes).toBe(
+        MOCK_AGENT_V1.runConfig.max_time_minutes,
+      );
+    });
+
+    it('should apply modelConfig overrides', async () => {
+      const config = makeFakeConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              modelConfig: {
+                model: 'overridden-model',
+                generateContentConfig: {
+                  temperature: 0.5,
+                },
+              },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(MOCK_AGENT_V1),
+      });
+
+      expect(resolved.model).toBe('overridden-model');
+      expect(resolved.generateContentConfig.temperature).toBe(0.5);
+      // topP should still be MOCK_AGENT_V1.modelConfig.top_p (1) because we merged
+      expect(resolved.generateContentConfig.topP).toBe(1);
+    });
+
+    it('should deep merge generateContentConfig (e.g. thinkingConfig)', async () => {
+      const config = makeFakeConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 16384,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(MOCK_AGENT_V1),
+      });
+
+      expect(resolved.generateContentConfig.thinkingConfig).toEqual({
+        includeThoughts: true, // Preserved from default
+        thinkingBudget: 16384, // Overridden
+      });
+    });
+  });
+
   describe('getToolDescription', () => {
     it('should return default message when no agents are registered', () => {
       expect(registry.getToolDescription()).toContain(
