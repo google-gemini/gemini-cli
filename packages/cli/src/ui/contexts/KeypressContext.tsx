@@ -25,7 +25,6 @@ export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
 export const PASTE_TIMEOUT = 30_000;
 export const FAST_RETURN_TIMEOUT = 30;
-export const UNBRACKETED_PASTE_MIN_LENGTH = 10;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -277,51 +276,8 @@ function createDataListener(keypressHandler: KeypressHandler) {
   parser.next(); // prime the generator so it starts listening.
 
   let timeoutId: NodeJS.Timeout;
-  let inBracketedPaste = false;
-
   return (data: string) => {
     clearTimeout(timeoutId);
-
-    // Track bracketed paste state across chunks
-    const hasPasteStart = data.includes('\x1B[200~');
-    const hasPasteEnd = data.includes('\x1B[201~');
-
-    // Enter bracketed paste mode when we see paste-start
-    if (hasPasteStart) {
-      inBracketedPaste = true;
-    }
-
-    // Detect unbracketed paste ONLY if:
-    // 1. NOT currently in a bracketed paste session
-    // 2. Data contains NO terminal control characters (excludes TAB, LF, CR
-    //    which appear in normal text)
-    // 3. Data meets minimum length threshold (avoids false positives from
-    //    key repeat, SSH latency batching, or IME composition)
-    // eslint-disable-next-line no-control-regex
-    const hasTerminalControlChars = /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(data);
-    const isLikelyUnbracketedPaste =
-      !inBracketedPaste &&
-      !hasTerminalControlChars &&
-      data.length >= UNBRACKETED_PASTE_MIN_LENGTH;
-
-    // Exit bracketed paste mode when we see paste-end
-    if (hasPasteEnd) {
-      inBracketedPaste = false;
-    }
-
-    if (isLikelyUnbracketedPaste) {
-      keypressHandler({
-        name: '',
-        ctrl: false,
-        meta: false,
-        shift: false,
-        paste: true,
-        insertable: true,
-        sequence: data,
-      });
-      return;
-    }
-
     // Normal character-by-character processing
     for (const char of data) {
       parser.next(char);
