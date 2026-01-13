@@ -76,17 +76,31 @@ export const formatTimeAgo = (date: string | number | Date): string => {
   return `${formatDuration(diffMs)} ago`;
 };
 
-function escapeRegExp(string: string): string {
+/**
+ * Escapes characters that have special meaning in regular expressions.
+ * Use this function when you want to insert a string into a regex pattern literally.
+ *
+ * @param string The string to escape.
+ * @returns The escaped string with special characters preceded by backslashes.
+ */
+export function escapeRegexSpecialCharacters(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
 const REFERENCE_CONTENT_END = '--- End of content ---';
 const REFERENCE_PATTERN = new RegExp(
-  `\\n?${escapeRegExp(REFERENCE_CONTENT_START)}[\\s\\S]*?${escapeRegExp(REFERENCE_CONTENT_END)}`,
+  `\\n?${escapeRegexSpecialCharacters(REFERENCE_CONTENT_START)}[\\s\\S]*?${escapeRegexSpecialCharacters(REFERENCE_CONTENT_END)}`,
   'g',
 );
 
+/**
+ * Removes content bounded by reference content markers from the given text.
+ * The markers are "--- Content from referenced files ---" and "--- End of content ---".
+ *
+ * @param text The input text containing potential reference blocks.
+ * @returns The text with reference blocks removed and trimmed.
+ */
 export function stripReferenceContent(text: string): string {
   return text.replace(REFERENCE_PATTERN, '').trim();
 }
