@@ -13,6 +13,7 @@ import {
 import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
+  Part,
 } from '@a2a-js/sdk';
 import type express from 'express';
 import type { Server } from 'node:http';
@@ -38,6 +39,7 @@ import {
 // Import MockTool from specific path to avoid vitest dependency in main core bundle
 import { MockTool } from '@google/gemini-cli-core/src/test-utils/mock-tool.js';
 import type { Command, CommandContext } from '../commands/types.js';
+import { type CoderAgentMessage } from '../types.js';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
@@ -474,17 +476,17 @@ describe('E2E Tests', () => {
     // --- Assert the sequential execution flow ---
     const eventStream = events.slice(2).map((e) => {
       const update = e.result as TaskStatusUpdateEvent;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const agentData = update.metadata?.['coderAgent'] as any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const toolData = update.status.message?.parts[0] as any;
-      if (!toolData) {
+      const agentData = update.metadata?.['coderAgent'] as CoderAgentMessage;
+      const toolData = update.status.message?.parts[0] as Part & {
+        data?: { status: string; request: { callId: string } };
+      };
+      if (!toolData || !toolData.data) {
         return { kind: agentData.kind };
       }
       return {
         kind: agentData.kind,
-        status: toolData.data?.status,
-        callId: toolData.data?.request.callId,
+        status: toolData.data.status,
+        callId: toolData.data.request.callId,
       };
     });
 

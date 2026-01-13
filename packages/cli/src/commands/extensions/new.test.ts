@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { newCommand } from './new.js';
 import yargs from 'yargs';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import type { Dirent } from 'node:fs';
 
 vi.mock('node:fs/promises');
 vi.mock('../utils.js', () => ({
@@ -25,9 +26,8 @@ describe('extensions new command', () => {
       { name: 'context', isDirectory: () => true },
       { name: 'custom-commands', isDirectory: () => true },
       { name: 'mcp-server', isDirectory: () => true },
-    ];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockedFs.readdir.mockResolvedValue(fakeFiles as any);
+    ] as Dirent[];
+    (mockedFs.readdir as Mock).mockResolvedValue(fakeFiles);
   });
 
   it('should fail if no path is provided', async () => {

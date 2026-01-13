@@ -369,13 +369,22 @@ describe('SettingsSchema', () => {
     it('should have name and description in hook definitions', () => {
       const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
       expect(hookDef).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hookItemProperties = (hookDef as any).items.properties.hooks.items
-        .properties;
-      expect(hookItemProperties.name).toBeDefined();
-      expect(hookItemProperties.name.type).toBe('string');
-      expect(hookItemProperties.description).toBeDefined();
-      expect(hookItemProperties.description.type).toBe('string');
+
+      const items = (hookDef as { items: Record<string, unknown> })['items'];
+      const properties = (items['properties'] as Record<string, unknown>)[
+        'hooks'
+      ] as Record<string, unknown>;
+      const hookItemProperties = (
+        properties['items'] as Record<string, unknown>
+      )['properties'] as Record<string, unknown> as Record<
+        string,
+        { type: string }
+      >;
+
+      expect(hookItemProperties['name']).toBeDefined();
+      expect(hookItemProperties['name']?.type).toBe('string');
+      expect(hookItemProperties['description']).toBeDefined();
+      expect(hookItemProperties['description']?.type).toBe('string');
     });
   });
 

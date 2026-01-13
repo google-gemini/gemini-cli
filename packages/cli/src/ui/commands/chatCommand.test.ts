@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -17,7 +25,7 @@ import {
   serializeHistoryToMarkdown,
   exportHistoryToFile,
 } from '../utils/historyExportUtils.js';
-import type { Stats } from 'node:fs';
+import type { Stats, PathLike } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
 
@@ -115,11 +123,9 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.readdir.mockResolvedValue(fakeFiles as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
+      (mockFs.readdir as Mock).mockResolvedValue(fakeFiles);
+      mockFs.stat.mockImplementation(async (path: PathLike): Promise<Stats> => {
+        if (path.toString().endsWith('test1.json')) {
           return { mtime: date1 } as Stats;
         }
         return { mtime: date2 } as Stats;

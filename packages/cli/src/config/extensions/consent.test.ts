@@ -64,8 +64,9 @@ describe('consent', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     if (originalReaddir.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockReaddir.mockImplementation(originalReaddir.current as any);
+      mockReaddir.mockImplementation(
+        originalReaddir.current as unknown as typeof fs.readdir,
+      );
     }
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
