@@ -323,6 +323,7 @@ describe('AgentRegistry', () => {
           topP: autoAgent.modelConfig.top_p,
           thinkingConfig: {
             includeThoughts: true,
+            thinkingBudget: -1,
           },
         },
       });
@@ -355,6 +356,7 @@ describe('AgentRegistry', () => {
           topP: MOCK_AGENT_V1.modelConfig.top_p,
           thinkingConfig: {
             includeThoughts: true,
+            thinkingBudget: -1,
           },
         },
       });
