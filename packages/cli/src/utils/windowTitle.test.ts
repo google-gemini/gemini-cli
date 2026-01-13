@@ -39,7 +39,7 @@ describe('computeTerminalTitle', () => {
     },
     {
       description:
-        'active state title with "Working..." when thoughts are disabled',
+        'active state title with "Working…" when thoughts are disabled',
       args: {
         streamingState: StreamingState.Responding,
         thoughtSubject: 'Reading files',
@@ -48,7 +48,7 @@ describe('computeTerminalTitle', () => {
         showThoughts: false,
         useDynamicTitle: true,
       },
-      expected: '✦  Working... (my-project)',
+      expected: '✦  Working… (my-project)',
     },
     {
       description:
@@ -74,7 +74,7 @@ describe('computeTerminalTitle', () => {
         showThoughts: true,
         useDynamicTitle: true,
       },
-      expected: '✦  Working... (my-project)'.padEnd(80, ' '),
+      expected: '✦  Working… (my-project)'.padEnd(80, ' '),
       exact: true,
     },
     {
@@ -126,7 +126,7 @@ describe('computeTerminalTitle', () => {
     });
 
     expect(title.length).toBe(80);
-    expect(title).toContain('...');
+    expect(title).toContain('…');
     expect(title.trimEnd().length).toBe(80);
   });
 
@@ -192,7 +192,7 @@ describe('computeTerminalTitle', () => {
 
       expect(title.length).toBe(80);
       expect(title).toContain(expected);
-      expect(title).toContain('...)');
+      expect(title).toContain('…)');
     },
   );
 
@@ -208,6 +208,6 @@ describe('computeTerminalTitle', () => {
 
     expect(title.length).toBe(80);
     expect(title).toContain('Gemini CLI (CCCCC');
-    expect(title).toContain('...)');
+    expect(title).toContain('…)');
   });
 });

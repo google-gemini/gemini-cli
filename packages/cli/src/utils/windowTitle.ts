@@ -15,6 +15,13 @@ export interface TerminalTitleOptions {
   useDynamicTitle: boolean;
 }
 
+function truncate(text: string, maxLen: number): string {
+  if (text.length <= maxLen) {
+    return text;
+  }
+  return text.substring(0, maxLen - 1) + '…';
+}
+
 /**
  * Computes the dynamic terminal window title based on the current CLI state.
  *
@@ -38,9 +45,7 @@ export function computeTerminalTitle({
     const base = 'Gemini CLI ';
     // Max context length is 80 - base.length - 2 (for brackets)
     const maxContextLen = MAX_LEN - base.length - 2;
-    if (displayContext.length > maxContextLen) {
-      displayContext = displayContext.substring(0, maxContextLen - 3) + '...';
-    }
+    displayContext = truncate(displayContext, maxContextLen);
     return `${base}(${displayContext})`.padEnd(MAX_LEN, ' ');
   }
 
@@ -55,19 +60,13 @@ export function computeTerminalTitle({
     const base = '✋  Action Required';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
     const maxContextLen = MAX_LEN - base.length - 3;
-    let context = displayContext;
-    if (context.length > maxContextLen) {
-      context = context.substring(0, maxContextLen - 3) + '...';
-    }
+    const context = truncate(displayContext, maxContextLen);
     title = `${base}${getSuffix(context)}`;
   } else if (streamingState === StreamingState.Idle) {
     const base = '◇  Ready';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
     const maxContextLen = MAX_LEN - base.length - 3;
-    let context = displayContext;
-    if (context.length > maxContextLen) {
-      context = context.substring(0, maxContextLen - 3) + '...';
-    }
+    const context = truncate(displayContext, maxContextLen);
     title = `${base}${getSuffix(context)}`;
   } else {
     // Active/Working state
@@ -92,10 +91,8 @@ export function computeTerminalTitle({
     }
 
     const displayStatus = cleanSubject
-      ? cleanSubject.length > maxStatusLen
-        ? cleanSubject.substring(0, maxStatusLen - 3) + '...'
-        : cleanSubject
-      : 'Working...';
+      ? truncate(cleanSubject, maxStatusLen)
+      : 'Working…';
 
     title = `✦  ${displayStatus}${activeSuffix}`;
   }

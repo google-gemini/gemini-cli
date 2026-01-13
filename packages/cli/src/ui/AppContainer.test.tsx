@@ -989,7 +989,7 @@ describe('AppContainer State Management', () => {
       expect(stdout).toBe(mocks.mockStdout);
     });
 
-    it('should update terminal title with Working... when showStatusInTitle is false', () => {
+    it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
       const mockSettingsWithShowStatusFalse = {
         ...mockSettings,
@@ -1018,14 +1018,14 @@ describe('AppContainer State Management', () => {
         settings: mockSettingsWithShowStatusFalse,
       });
 
-      // Assert: Check that title was updated with "Working..."
+      // Assert: Check that title was updated with "Working…"
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
         call[0].includes('\x1b]2;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'✦  Working... (workspace)'.padEnd(80, ' ')}\x07`,
+        `\x1b]2;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1228,62 +1228,69 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
-    it('should show Action Required in title after a delay when shell is awaiting focus', async () => {
-      vi.useFakeTimers();
+    describe('Shell Focus Action Required', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
 
-      // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = {
-        ...mockSettings,
-        merged: {
-          ...mockSettings.merged,
-          ui: {
-            ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should show Action Required in title after a delay when shell is awaiting focus', async () => {
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
           },
-        },
-      } as unknown as LoadedSettings;
+        } as unknown as LoadedSettings;
 
-      // Mock an active shell pty but not focused
-      mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: { subject: 'Executing shell command' },
-        cancelOngoingRequest: vi.fn(),
-        activePtyId: 'pty-1',
-      });
+        // Mock an active shell pty but not focused
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+        });
 
-      // Act: Render the container (embeddedShellFocused is false by default in state)
-      const { unmount } = renderAppContainer({
-        settings: mockSettingsWithTitleEnabled,
-      });
+        // Act: Render the container (embeddedShellFocused is false by default in state)
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
 
-      // Initially it should show the working status
-      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
-      );
-      expect(titleWrites[titleWrites.length - 1][0]).toContain(
-        '✦  Executing shell command',
-      );
-
-      // Fast-forward time by 31 seconds
-      await act(async () => {
-        vi.advanceTimersByTime(31000);
-      });
-
-      // Now it should show Action Required
-      await waitFor(() => {
+        // Initially it should show the working status
         const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
           call[0].includes('\x1b]2;'),
         );
-        const lastTitle = titleWrites[titleWrites.length - 1][0];
-        expect(lastTitle).toContain('✋  Action Required');
-      });
+        expect(titleWrites[titleWrites.length - 1][0]).toContain(
+          '✦  Executing shell command',
+        );
 
-      unmount();
-      vi.useRealTimers();
+        // Fast-forward time by 31 seconds
+        await act(async () => {
+          vi.advanceTimersByTime(31000);
+        });
+
+        // Now it should show Action Required
+        await waitFor(() => {
+          const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+            call[0].includes('\x1b]2;'),
+          );
+          const lastTitle = titleWrites[titleWrites.length - 1][0];
+          expect(lastTitle).toContain('✋  Action Required');
+        });
+
+        unmount();
+      });
     });
 
     it('should pad title to exactly 80 characters', () => {
@@ -1409,7 +1416,7 @@ describe('AppContainer State Management', () => {
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'✦  Working... (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
+        `\x1b]2;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
