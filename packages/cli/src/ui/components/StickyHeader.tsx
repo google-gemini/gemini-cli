@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box, type DOMElement } from 'ink';
 import { theme } from '../semantic-colors.js';
 
 export interface StickyHeaderProps {
@@ -14,6 +14,7 @@ export interface StickyHeaderProps {
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
+  containerRef?: React.RefObject<DOMElement | null>;
 }
 
 export const StickyHeader: React.FC<StickyHeaderProps> = ({
@@ -22,8 +23,10 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   isFirst,
   borderColor,
   borderDimColor,
+  containerRef,
 }) => (
   <Box
+    ref={containerRef}
     sticky
     minHeight={1}
     flexShrink={0}
