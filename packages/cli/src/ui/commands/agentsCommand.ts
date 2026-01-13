@@ -65,7 +65,16 @@ const agentsRefreshCommand: SlashCommand = {
       };
     }
 
-    await agentRegistry.reload();
+    context.ui.setPendingItem({
+      type: MessageType.INFO,
+      text: 'Refreshing agent registry...',
+    });
+
+    try {
+      await agentRegistry.reload();
+    } finally {
+      context.ui.setPendingItem(null);
+    }
 
     return {
       type: 'message',

@@ -96,7 +96,12 @@ describe('agentsCommand', () => {
 
     const result = await refreshCommand!.action!(mockContext, '');
 
+    expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
+      type: MessageType.INFO,
+      text: 'Refreshing agent registry...',
+    });
     expect(reloadSpy).toHaveBeenCalled();
+    expect(mockContext.ui.setPendingItem).toHaveBeenLastCalledWith(null);
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',

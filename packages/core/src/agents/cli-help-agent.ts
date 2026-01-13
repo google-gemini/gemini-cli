@@ -25,68 +25,75 @@ const CliHelpReportSchema = z.object({
  */
 export const CliHelpAgent = (
   config: Config,
-): AgentDefinition<typeof CliHelpReportSchema> => ({
-  name: 'cli_help',
-  kind: 'local',
-  displayName: 'CLI Help Agent',
-  description:
-    'Specialized in answering questions about how users use you, (Gemini CLI): features, documentation, and current runtime configuration.',
-  inputConfig: {
-    inputs: {
-      question: {
-        description: 'The specific question about Gemini CLI.',
-        type: 'string',
-        required: true,
+): AgentDefinition<typeof CliHelpReportSchema> => {
+  const subAgentsPrompt = config.isAgentsEnabled()
+    ? '### Sub-Agents (Local & Remote)\n' +
+      "User defined sub-agents are defined in `.gemini/agents/` or `~/.gemini/agents/` as .md files. These files contain YAML frontmatter for metadata, and the Markdown body becomes the agent's system prompt (`system_prompt`). Always reference the types and properties outlined here directly when answering questions about sub-agents.\n" +
+      '- **Local Agent:** `kind = "local"`, `name`, `description`, `system_prompt`, and optional `tools`, `model`, `temperate`, `max_turns`, `timeout_mins`.\n' +
+      '- **Remote Agent (A2A):** `kind = "remote"`, `name`, `agent_card_url`. Remote Agents do not use `system_prompt`. Multiple remote agents can be defined by using a YAML array at the top level of the frontmatter. **Note:** When users ask about "remote agents", they are referring to this Agent2Agent functionality, which is completely distinct from MCP servers.\n' +
+      '- **Agent Slug:** Agent names must match the pattern `^[a-z0-9-_]+$` (alphanumeric, hyphens, and underscores).\n' +
+      '- **Setup:** After creating the config files, the user must run `/agents refresh` to load the new agents. **Important:** If you generate agent config files or provide instructions to create them, you MUST suggest that the user run `/agents refresh` to load them.\n' +
+      '- **Invocation:** You can invoke active agents by typing `@` followed by the agent name (e.g., `@code-reviewer`). This will bring up a list of active agents to choose from.\n\n'
+    : '';
+
+  return {
+    name: 'cli_help',
+    kind: 'local',
+    displayName: 'CLI Help Agent',
+    description:
+      'Specialized in answering questions about how users use you, (Gemini CLI): features, documentation, and current runtime configuration.',
+    inputConfig: {
+      inputs: {
+        question: {
+          description: 'The specific question about Gemini CLI.',
+          type: 'string',
+          required: true,
+        },
       },
     },
-  },
-  outputConfig: {
-    outputName: 'report',
-    description: 'The final answer and sources as a JSON object.',
-    schema: CliHelpReportSchema,
-  },
+    outputConfig: {
+      outputName: 'report',
+      description: 'The final answer and sources as a JSON object.',
+      schema: CliHelpReportSchema,
+    },
 
-  processOutput: (output) => JSON.stringify(output, null, 2),
+    processOutput: (output) => JSON.stringify(output, null, 2),
 
-  modelConfig: {
-    model: GEMINI_MODEL_ALIAS_FLASH,
-    temp: 0.1,
-    top_p: 0.95,
-    thinkingBudget: -1,
-  },
+    modelConfig: {
+      model: GEMINI_MODEL_ALIAS_FLASH,
+      temp: 0.1,
+      top_p: 0.95,
+      thinkingBudget: -1,
+    },
 
-  runConfig: {
-    max_time_minutes: 3,
-    max_turns: 10,
-  },
+    runConfig: {
+      max_time_minutes: 3,
+      max_turns: 10,
+    },
 
-  toolConfig: {
-    tools: [new GetInternalDocsTool(config.getMessageBus())],
-  },
+    toolConfig: {
+      tools: [new GetInternalDocsTool(config.getMessageBus())],
+    },
 
-  promptConfig: {
-    query:
-      'Your task is to answer the following question about Gemini CLI:\n' +
-      '<question>\n' +
-      '${question}\n' +
-      '</question>',
-    systemPrompt:
-      "You are **CLI Help Agent**, an expert on Gemini CLI. Your purpose is to provide accurate information about Gemini CLI's features, configuration, and current state.\n\n" +
-      '### Runtime Context\n' +
-      '- **CLI Version:** ${cliVersion}\n' +
-      '- **Active Model:** ${activeModel}\n' +
-      "- **Today's Date:** ${today}\n\n" +
-      (config.isAgentsEnabled()
-        ? '### Sub-Agents (Local & Remote)\n' +
-          "User defined sub-agents are defined in `.gemini/agents/` or `~/.gemini/agents/` as .md files. These files contain YAML frontmatter for metadata, and the Markdown body becomes the agent's system prompt (`system_prompt`). Always reference the types and properties outlined here directly when answering questions about sub-agents.\n" +
-          '- **Local Agent:** `kind = "local"`, `name`, `description`, `system_prompt`, and optional `tools`, `model`, `temperate`, `max_turns`, `timeout_mins`.\n' +
-          '- **Remote Agent (A2A):** `kind = "remote"`, `name`, `agent_card_url`. Remote Agents do not use `system_prompt`. Multiple remote agents can be defined by using a YAML array at the top level of the frontmatter. **Note:** When users ask about "remote agents", they are referring to this Agent2Agent functionality, which is completely distinct from MCP servers.\n\n'
-        : '') +
-      '### Instructions\n' +
-      "1. **Explore Documentation**: Use the `get_internal_docs` tool to find answers. If you don't know where to start, call `get_internal_docs()` without arguments to see the full list of available documentation files.\n" +
-      '2. **Be Precise**: Use the provided runtime context and documentation to give exact answers.\n' +
-      '3. **Cite Sources**: Always include the specific documentation files you used in your final report.\n' +
-      '4. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
-      'You MUST call `complete_task` with a JSON report containing your `answer` and the `sources` you used.',
-  },
-});
+    promptConfig: {
+      query:
+        'Your task is to answer the following question about Gemini CLI:\n' +
+        '<question>\n' +
+        '${question}\n' +
+        '</question>',
+      systemPrompt:
+        "You are **CLI Help Agent**, an expert on Gemini CLI. Your purpose is to provide accurate information about Gemini CLI's features, configuration, and current state.\n\n" +
+        '### Runtime Context\n' +
+        '- **CLI Version:** ${cliVersion}\n' +
+        '- **Active Model:** ${activeModel}\n' +
+        "- **Today's Date:** ${today}\n\n" +
+        subAgentsPrompt +
+        '### Instructions\n' +
+        "1. **Explore Documentation**: Use the `get_internal_docs` tool to find answers. If you don't know where to start, call `get_internal_docs()` without arguments to see the full list of available documentation files.\n" +
+        '2. **Be Precise**: Use the provided runtime context and documentation to give exact answers.\n' +
+        '3. **Cite Sources**: Always include the specific documentation files you used in your final report.\n' +
+        '4. **Non-Interactive**: You operate in a loop and cannot ask the user for more info. If the question is ambiguous, answer as best as you can with the information available.\n\n' +
+        'You MUST call `complete_task` with a JSON report containing your `answer` and the `sources` you used.',
+    },
+  };
+};
