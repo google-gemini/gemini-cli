@@ -286,7 +286,10 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
-        if (this.requestSetting) {
+        if (
+          this.requestSetting &&
+          (this.settings.experimental?.extensionConfig ?? true)
+        ) {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
@@ -304,11 +307,14 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         }
 
-        const missingSettings = await getMissingSettings(
-          newExtensionConfig,
-          extensionId,
-          this.workspaceDir,
-        );
+        const missingSettings =
+          (this.settings.experimental?.extensionConfig ?? true)
+            ? await getMissingSettings(
+                newExtensionConfig,
+                extensionId,
+                this.workspaceDir,
+              )
+            : [];
         if (missingSettings.length > 0) {
           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
             .map((s) => s.name)
@@ -525,23 +531,31 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const extensionId = getExtensionId(config, installMetadata);
 
-      const userSettings = await getScopedEnvContents(
-        config,
-        extensionId,
-        ExtensionSettingScope.USER,
-      );
-      const workspaceSettings = await getScopedEnvContents(
-        config,
-        extensionId,
-        ExtensionSettingScope.WORKSPACE,
-        this.workspaceDir,
-      );
+      let userSettings: Record<string, string> = {};
+      let workspaceSettings: Record<string, string> = {};
+
+      if (this.settings.experimental?.extensionConfig ?? true) {
+        userSettings = await getScopedEnvContents(
+          config,
+          extensionId,
+          ExtensionSettingScope.USER,
+        );
+        workspaceSettings = await getScopedEnvContents(
+          config,
+          extensionId,
+          ExtensionSettingScope.WORKSPACE,
+          this.workspaceDir,
+        );
+      }
 
       const customEnv = { ...userSettings, ...workspaceSettings };
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
-      if (config.settings) {
+      if (
+        config.settings &&
+        (this.settings.experimental?.extensionConfig ?? true)
+      ) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
           let scope: 'user' | 'workspace' | undefined;
