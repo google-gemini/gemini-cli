@@ -50,7 +50,7 @@ Your command definition files must be written in the TOML format and use the
 ## Handling arguments
 
 Custom commands support two powerful methods for handling arguments. The CLI
-automatically chooses the correct method based on the content of your command\'s
+automatically chooses the correct method based on the content of your command's
 `prompt`.
 
 ### 1. Context-aware injection with `{{args}}`
@@ -96,13 +96,13 @@ Search Results:
 """
 ```
 
-When you run `/grep-code It\'s complicated`:
+When you run `/grep-code It's complicated`:
 
 1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
-2. Outside: The first `{{args}}` is replaced raw with `It\'s complicated`.
+2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
 3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on
-   Linux: `"It\'s complicated"`).
-4. The command executed is `grep -r "It\'s complicated" .`.
+   Linux: `"It's complicated"`).
+4. The command executed is `grep -r "It's complicated" .`.
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
 
@@ -241,7 +241,7 @@ operate on specific files.
 **Example (`review.toml`):**
 
 This command injects the content of a _fixed_ best practices file
-(`docs/best-practices.md`) and uses the user\'s arguments to provide context for
+(`docs/best-practices.md`) and uses the user's arguments to provide context for
 the review.
 
 ```toml
