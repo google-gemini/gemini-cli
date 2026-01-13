@@ -179,7 +179,7 @@ description: project-desc
     expect(skills[0].isBuiltin).toBe(true);
   });
 
-  it('should filter disabled skills in getSkills and hide admin-disabled skills in getAllSkills', async () => {
+  it('should filter disabled skills in getSkills but not in getAllSkills', async () => {
     const skillDir = path.join(testRootDir, 'skill1');
     await fs.mkdir(skillDir, { recursive: true });
 
@@ -189,7 +189,7 @@ description: project-desc
 name: skill1
 description: desc1
 ---
-`,
+body1`,
     );
 
     const storage = new Storage('/dummy');
@@ -200,16 +200,11 @@ description: desc1
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage);
-
-    // User disable: still in getAllSkills
     service.setDisabledSkills(['skill1']);
+
     expect(service.getSkills()).toHaveLength(0);
     expect(service.getAllSkills()).toHaveLength(1);
     expect(service.getAllSkills()[0].disabled).toBe(true);
-
-    // Admin disable: hidden from getAllSkills
-    service.setAdminSettings(true, ['skill1']);
-    expect(service.getAllSkills()).toHaveLength(0);
   });
 
   it('should filter built-in skills in getDisplayableSkills', async () => {
@@ -253,7 +248,7 @@ description: desc1
     expect(enabled.map((s) => s.name)).toContain('builtin-skill');
   });
 
-  it('should respect admin settings (enabled/disabled)', async () => {
+  it('should respect admin settings (enabled)', async () => {
     const service = new SkillManager();
 
     // @ts-expect-error accessing private property for testing
@@ -265,30 +260,16 @@ description: desc1
         body: 'body',
         isBuiltin: false,
       },
-      {
-        name: 'skill2',
-        description: 'desc2',
-        location: 'loc2',
-        body: 'body',
-        isBuiltin: false,
-      },
     ];
 
-    // Case 1: All enabled by admin
-    service.setAdminSettings(true, []);
-    expect(service.getSkills()).toHaveLength(2);
-
-    // Case 2: One disabled by admin - hidden from everything
-    service.setAdminSettings(true, ['skill1']);
+    // Case 1: Enabled by admin
+    service.setAdminSettings(true);
     expect(service.getSkills()).toHaveLength(1);
-    expect(service.getSkills()[0].name).toBe('skill2');
-    expect(service.getAllSkills()).toHaveLength(1);
-    expect(service.getAllSkills()[0].name).toBe('skill2');
 
-    // Case 3: All disabled by admin
-    service.setAdminSettings(false, []);
+    // Case 2: Disabled by admin
+    service.setAdminSettings(false);
     expect(service.getSkills()).toHaveLength(0);
     expect(service.getAllSkills()).toHaveLength(0);
-    expect(service.getSkill('skill2')).toBeNull();
+    expect(service.getSkill('skill1')).toBeNull();
   });
 });

@@ -46,11 +46,8 @@ vi.mock('../utils.js', () => ({
 describe('skills enable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadSettings.mockReturnValue({
-      merged: { admin: { skills: { enabled: true, disabled: [] } } },
-    } as unknown as LoadedSettings);
   });
 
   afterEach(() => {
@@ -60,7 +57,6 @@ describe('skills enable command', () => {
   describe('handleEnable', () => {
     it('should enable a disabled skill in user scope', async () => {
       const mockSettings = {
-        merged: { admin: { skills: { enabled: true, disabled: [] } } },
         forScope: vi.fn().mockImplementation((scope) => {
           if (scope === SettingScope.User) {
             return {
@@ -91,7 +87,6 @@ describe('skills enable command', () => {
 
     it('should enable a skill across multiple scopes', async () => {
       const mockSettings = {
-        merged: { admin: { skills: { enabled: true, disabled: [] } } },
         forScope: vi.fn().mockImplementation((scope) => {
           if (scope === SettingScope.User) {
             return {
@@ -133,7 +128,6 @@ describe('skills enable command', () => {
 
     it('should log a message if the skill is already enabled', async () => {
       const mockSettings = {
-        merged: { admin: { skills: { enabled: true, disabled: [] } } },
         forScope: vi.fn().mockReturnValue({
           settings: { skills: { disabled: [] } },
           path: '/user/settings.json',

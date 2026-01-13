@@ -978,10 +978,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
-
-- **`admin.skills.disabled`** (array):
-  - **Description:** List of skills disabled by the administrator.
-  - **Default:** `[]`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`

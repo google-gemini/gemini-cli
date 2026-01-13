@@ -28,11 +28,6 @@ export async function handleList(args: { all?: boolean }) {
   await config.initialize();
 
   const skillManager = config.getSkillManager();
-  if (skillManager.isAdminEnabled() === false) {
-    debugLogger.log(chalk.red('Agent skills are disabled by your admin.'));
-    return;
-  }
-
   const skills = args.all
     ? skillManager.getAllSkills()
     : skillManager.getAllSkills().filter((s) => !s.isBuiltin);

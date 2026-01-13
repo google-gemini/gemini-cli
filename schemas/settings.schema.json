@@ -1711,16 +1711,6 @@
               "markdownDescription": "If false, disallows agent skills from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
-            },
-            "disabled": {
-              "title": "Disabled Skills",
-              "description": "List of skills disabled by the administrator.",
-              "markdownDescription": "List of skills disabled by the administrator.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `[]`",
-              "default": [],
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             }
           },
           "additionalProperties": false

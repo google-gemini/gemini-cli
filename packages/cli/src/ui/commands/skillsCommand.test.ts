@@ -47,7 +47,6 @@ describe('skillsCommand', () => {
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
             isAdminEnabled: vi.fn().mockReturnValue(true),
-            getAdminDisabledSkills: vi.fn().mockReturnValue([]),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -309,6 +308,42 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Skill "non-existent" not found.',
         }),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during disable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      await disableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during enable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
+      await enableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
+        }),
+        expect.any(Number),
       );
     });
   });

@@ -2095,7 +2095,6 @@ describe('Config JIT Initialization', () => {
     it('should update admin settings from onReload', async () => {
       const mockOnReload = vi.fn().mockResolvedValue({
         adminSkillsEnabled: false,
-        adminDisabledSkills: ['skill-admin'],
       });
       const params: ConfigParameters = {
         sessionId: 'test-session',
@@ -2115,9 +2114,7 @@ describe('Config JIT Initialization', () => {
 
       await config.reloadSkills();
 
-      expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false, [
-        'skill-admin',
-      ]);
+      expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
     });
   });
 });

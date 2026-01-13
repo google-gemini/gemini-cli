@@ -21,20 +21,6 @@ export async function handleEnable(args: EnableArgs) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
-  if (settings.merged.admin?.skills?.enabled === false) {
-    debugLogger.log(chalk.red('Agent skills are disabled by your admin.'));
-    return;
-  }
-
-  const adminDisabledSkills =
-    settings.merged.admin?.skills?.disabled?.map((n) => n.toLowerCase()) ?? [];
-  if (adminDisabledSkills.includes(name.toLowerCase())) {
-    debugLogger.log(
-      chalk.red(`Skill "${chalk.bold(name)}" is disabled by your admin.`),
-    );
-    return;
-  }
-
   const result = enableSkill(settings, name);
   const feedback = renderSkillActionFeedback(
     result,

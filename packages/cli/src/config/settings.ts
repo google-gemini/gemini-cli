@@ -342,13 +342,10 @@ export class LoadedSettings {
     }
 
     const skillsSetting = remoteSettings.cliFeatureSetting?.skillsSetting;
-    if (skillsSetting !== undefined) {
+    if (skillsSetting) {
       admin.skills = {};
       if (skillsSetting.skillsEnabled !== undefined) {
         admin.skills.enabled = skillsSetting.skillsEnabled;
-      }
-      if (skillsSetting.disabledSkills !== undefined) {
-        admin.skills.disabled = skillsSetting.disabledSkills;
       }
     }
 

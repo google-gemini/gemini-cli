@@ -61,7 +61,6 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue([]),
-          isAdminEnabled: vi.fn().mockReturnValue(true),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -93,7 +92,6 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
-          isAdminEnabled: vi.fn().mockReturnValue(true),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
@@ -142,7 +140,6 @@ describe('skills list command', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         getSkillManager: vi.fn().mockReturnValue({
           getAllSkills: vi.fn().mockReturnValue(skills),
-          isAdminEnabled: vi.fn().mockReturnValue(true),
         }),
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
