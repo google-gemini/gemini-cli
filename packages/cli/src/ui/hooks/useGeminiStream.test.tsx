@@ -252,6 +252,11 @@ describe('useGeminiStream', () => {
       .mockClear()
       .mockReturnValue((async function* () {})());
     handleAtCommandSpy = vi.spyOn(atCommandProcessor, 'handleAtCommand');
+    // Default mock: pass through the query unchanged (simulates no @-command processing)
+    handleAtCommandSpy.mockImplementation(async ({ query }) => ({
+      processedQuery: [{ text: query }],
+      shouldProceed: true,
+    }));
   });
 
   const mockLoadedSettings: LoadedSettings = {
@@ -1451,8 +1456,9 @@ describe('useGeminiStream', () => {
 
       await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        // After PR #14919, all queries go through handleAtCommand which returns Part[]
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
-          '// This is a line comment',
+          [{ text: '// This is a line comment' }],
           expect.any(AbortSignal),
           expect.any(String),
         );
@@ -1469,8 +1475,9 @@ describe('useGeminiStream', () => {
 
       await waitFor(() => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        // After PR #14919, all queries go through handleAtCommand which returns Part[]
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
-          '/* This is a block comment */',
+          [{ text: '/* This is a block comment */' }],
           expect.any(AbortSignal),
           expect.any(String),
         );
@@ -2631,8 +2638,10 @@ describe('useGeminiStream', () => {
         1,
       );
 
-      // Verify confirmation request was cleared
-      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      // Verify confirmation request was cleared (use waitFor for async state updates)
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      });
 
       // Verify appropriate message was added
       expect(mockAddItem).toHaveBeenCalledWith({
@@ -2641,11 +2650,12 @@ describe('useGeminiStream', () => {
       });
 
       // Verify that the request was retried
+      // After PR #14919, all queries go through handleAtCommand which returns Part[]
       await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           2,
-          'test query',
+          [{ text: 'test query' }],
           expect.any(AbortSignal),
           expect.any(String),
         );
@@ -2691,8 +2701,10 @@ describe('useGeminiStream', () => {
       // Verify loop detection was NOT disabled
       expect(mockLoopDetectionService.disableForSession).not.toHaveBeenCalled();
 
-      // Verify confirmation request was cleared
-      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      // Verify confirmation request was cleared (use waitFor for async state updates)
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      });
 
       // Verify appropriate message was added
       expect(mockAddItem).toHaveBeenCalledWith({
@@ -2732,7 +2744,10 @@ describe('useGeminiStream', () => {
         });
       });
 
-      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      // Use waitFor for async state update
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      });
 
       // Verify first message was added
       expect(mockAddItem).toHaveBeenCalledWith({
@@ -2779,7 +2794,10 @@ describe('useGeminiStream', () => {
         });
       });
 
-      expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      // Use waitFor for async state update
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).toBeNull();
+      });
 
       // Verify second message was added
       expect(mockAddItem).toHaveBeenCalledWith({
@@ -2788,11 +2806,12 @@ describe('useGeminiStream', () => {
       });
 
       // Verify that the request was retried
+      // After PR #14919, all queries go through handleAtCommand which returns Part[]
       await waitFor(() => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
         expect(mockSendMessageStream).toHaveBeenNthCalledWith(
           3,
-          'second query',
+          [{ text: 'second query' }],
           expect.any(AbortSignal),
           expect.any(String),
         );
