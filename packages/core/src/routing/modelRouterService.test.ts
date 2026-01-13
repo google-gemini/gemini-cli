@@ -121,6 +121,8 @@ describe('ModelRouterService', () => {
         'Strategy reasoning',
         false,
         undefined,
+        undefined,
+        undefined,
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,
@@ -142,6 +144,8 @@ describe('ModelRouterService', () => {
         'An exception occurred during routing.',
         true,
         'Strategy failed',
+        undefined,
+        undefined,
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,

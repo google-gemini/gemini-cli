@@ -81,6 +81,20 @@ export class ModelRouterService {
     const startTime = Date.now();
     let decision: RoutingDecision;
 
+    const experiments = this.config.getExperiments();
+    const enableNumericalRouting =
+      experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]?.boolValue;
+    const thresholdFlag =
+      experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    let classifierThreshold: string | undefined;
+    if (thresholdFlag) {
+      classifierThreshold =
+        thresholdFlag.intValue ??
+        (thresholdFlag.floatValue !== undefined
+          ? String(thresholdFlag.floatValue)
+          : undefined);
+    }
+
     try {
       decision = await this.strategy.route(
         context,
@@ -95,6 +109,8 @@ export class ModelRouterService {
         decision.metadata.reasoning,
         false, // failed
         undefined, // error_message
+        enableNumericalRouting,
+        classifierThreshold,
       );
       logModelRouting(this.config, event);
 
@@ -127,6 +143,8 @@ export class ModelRouterService {
         decision.metadata.reasoning,
         failed,
         error_message,
+        enableNumericalRouting,
+        classifierThreshold,
       );
 
       logModelRouting(this.config, event);
