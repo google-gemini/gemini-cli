@@ -827,10 +827,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     lastOutputTimeRef.current = lastOutputTime;
   }, [lastOutputTime]);
 
-  const isShellAwaitingFocus = !!activePtyId && !embeddedShellFocused;
+  const isShellAwaitingFocus =
+    !!activePtyId &&
+    !embeddedShellFocused &&
+    config.isInteractiveShellEnabled();
   const showShellActionRequired = useInactivityTimer(
     isShellAwaitingFocus,
-    isShellAwaitingFocus,
+    lastOutputTime,
     SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
   );
 
