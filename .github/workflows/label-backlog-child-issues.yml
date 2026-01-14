@@ -3,38 +3,55 @@ name: 'Label Child Issues for Project Rollup'
 on:
   issues:
     types: ['opened', 'edited', 'reopened']
+  schedule:
+    - cron: '0 * * * *' # Run every hour
+  workflow_dispatch:
+
+permissions:
+  issues: 'write'
+  contents: 'read'
 
 jobs:
+  # Event-based: Quick reaction to new/edited issues in THIS repo
   labeler:
+    if: "github.event_name == 'issues'"
     runs-on: 'ubuntu-latest'
-    permissions:
-      issues: 'write'
     steps:
-      - name: 'Check for Parent Workstream and Apply Label'
-        uses: 'actions/github-script@v7'
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
         with:
-          script: |
-            const issue = context.payload.issue;
-            const labelToAdd = 'workstream-rollup';
+          node-version: '20'
+          cache: 'npm'
 
-            // --- Define the FULL URLs of the allowed parent workstreams ---
-            const allowedParentUrls = [
-              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15374',
-              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15456',
-              'https://api.github.com/repos/google-gemini/gemini-cli/issues/15324'
-            ];
+      - name: 'Install Dependencies'
+        run: 'npm ci'
 
-            // Check if the issue has a parent_issue_url and if it's in our allowed list.
-            if (issue && issue.parent_issue_url && allowedParentUrls.includes(issue.parent_issue_url)) {
-              console.log(`SUCCESS: Issue #${issue.number} is a child of a target workstream (${issue.parent_issue_url}). Adding label.`);
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                labels: [labelToAdd]
-              });
-            } else if (issue && issue.parent_issue_url) {
-              console.log(`FAILURE: Issue #${issue.number} has a parent, but it's not a target workstream. Parent URL: ${issue.parent_issue_url}`);
-            } else {
-              console.log(`FAILURE: Issue #${issue.number} is not a child of any issue. No action taken.`);
-            }
+      - name: 'Run Multi-Repo Sync Script'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'node .github/scripts/sync-maintainer-labels.cjs'
+
+  # Scheduled/Manual: Recursive sync across multiple repos
+  sync-maintainer-labels:
+    if: "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: 'npm ci'
+
+      - name: 'Run Multi-Repo Sync Script'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'node .github/scripts/sync-maintainer-labels.cjs'
