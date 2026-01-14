@@ -203,7 +203,7 @@ jobs:
               - No straightforward workaround exists, or the workaround is difficult and non-obvious.
               Qualifier: Is a key feature unusable or giving very wrong results?
               Example: Gemini CLI enters a loop when making read-many-files tool call. I am unable to break out of the loop and gemini doesn't follow instructions subsequently.
-P2: Medium
+            P2: Medium
               - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
               Impact:
               - Affects a non-critical feature or a smaller, specific subset of users.
@@ -211,7 +211,7 @@ P2: Medium
               - Noticeable UI/UX problems that don't break functionality but look unprofessional (e.g., elements are misaligned or overlapping).
               Qualifier: Is it an annoying but non-blocking problem?
               Example: An error message is unclear or contains a typo, causing user confusion but not halting their workflow.
-P3: Low
+            P3: Low
               - A P3 bug is a minor, low-impact issue that is trivial or cosmetic. It has little to no effect on the overall functionality of the application.
               Impact:
               - Minor cosmetic issues like color inconsistencies, typos in documentation, or slight alignment problems on a non-critical page.
