@@ -80,6 +80,7 @@ const mockConfigInternal = {
   setUserMemory: vi.fn(),
   getGeminiMdFileCount: () => 0,
   setGeminiMdFileCount: vi.fn(),
+  getDisableLLMCorrection: vi.fn(() => false),
   getToolRegistry: () =>
     ({
       registerTool: vi.fn(),
@@ -138,7 +139,7 @@ describe('Line Ending Preservation', () => {
     if (fs.existsSync(rootDir)) {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('detectLineEnding', () => {
@@ -273,13 +274,6 @@ describe('Line Ending Preservation', () => {
       await invocation.execute(abortSignal);
 
       const writtenContent = fs.readFileSync(filePath, 'utf8');
-      // Expect 'line2' to be replaced by 'modified', and all endings to be CRLF
-      // Logic:
-      // 1. Read: line1\r\nline2\r\nline3\r\n
-      // 2. Detect: CRLF
-      // 3. Normalize: line1\nline2\nline3\n
-      // 4. Replace: line1\nmodified\nline3\n (assuming safeLiteralReplace works on normalized strings)
-      // 5. Restore: line1\r\nmodified\r\nline3\r\n
 
       expect(writtenContent).toBe('line1\r\nmodified\r\nline3\r\n');
     });
