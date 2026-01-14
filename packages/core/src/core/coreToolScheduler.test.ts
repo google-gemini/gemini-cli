@@ -1978,9 +1978,101 @@ describe('CoreToolScheduler Sequential Execution', () => {
     await schedulePromise;
 
     // Assert
-    // Even though cancelAll was called while the first completion was in
-    // progress, it should not have triggered a SECOND completion call because
-    // the first one was still 'finalizing' and will drain any new tools.
+    // Even though cancelAll was called while the first completion was in progress,
+    // it should not have triggered a SECOND completion call because the first one
+    // was still 'finalizing' and will drain any new tools.
+    expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('should complete reporting all tools even mid-callback during abort', async () => {
+    // Arrange
+    const onAllToolCallsComplete = vi.fn().mockImplementation(async () => {
+      // Simulate slow reporting
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const mockTool = new MockTool({ name: 'mockTool' });
+    const mockToolRegistry = {
+      getTool: () => mockTool,
+      getToolByName: () => mockTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => mockTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      isInteractive: () => false,
+    });
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
+    // Act
+    // 1. Start execution of two tools
+    const schedulePromise = scheduler.schedule(
+      [
+        {
+          callId: '1',
+          name: 'mockTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        {
+          callId: '2',
+          name: 'mockTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+      ],
+      signal,
+    );
+
+    // 2. Wait for reporting to start
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    // 3. Abort the signal while reporting is in progress
+    abortController.abort();
+
+    await schedulePromise;
+
+    // Assert
+    // Verify that onAllToolCallsComplete was called and processed the tools,
+    // and that the scheduler didn't just drop them because of the abort.
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+
+    const reportedTools = onAllToolCallsComplete.mock.calls.flatMap((call) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call[0].map((t: any) => t.request.callId),
+    );
+
+    // Both tools should have been reported exactly once with success status
+    expect(reportedTools).toContain('1');
+    expect(reportedTools).toContain('2');
+
+    const allStatuses = onAllToolCallsComplete.mock.calls.flatMap((call) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      call[0].map((t: any) => t.status),
+    );
+    expect(allStatuses).toEqual(['success', 'success']);
+
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
   });
 });
