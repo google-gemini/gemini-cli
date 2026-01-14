@@ -1319,7 +1319,8 @@ for that specific session.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--debug`** (**`-d`**):
-  - Enables debug mode for this session, providing more verbose output.
+  - Enables debug mode for this session, providing more verbose output. Open the
+    debug console with F12 to see the additional logging.
 
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
