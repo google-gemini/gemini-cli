@@ -66,16 +66,7 @@ function fetchHistoricalData() {
 
   try {
     // Determine branch
-    let branch = process.env.GITHUB_REF_NAME;
-    if (!branch) {
-      try {
-        branch = execSync('git rev-parse --abbrev-ref HEAD', {
-          encoding: 'utf-8',
-        }).trim();
-      } catch (_) {
-        branch = 'main';
-      }
-    }
+    const branch = 'main';
 
     // Get recent runs
     const cmd = `gh run list --workflow evals-nightly.yml --branch "${branch}" --limit ${
