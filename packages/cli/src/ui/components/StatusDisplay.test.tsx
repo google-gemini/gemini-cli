@@ -30,6 +30,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     warningMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    showClearTextToast: false,
     queueErrorMessage: null,
     activeHooks: [],
     ideContextState: null,
@@ -150,6 +151,17 @@ describe('StatusDisplay', () => {
   it('renders Escape prompt', () => {
     const uiState = createMockUIState({
       showEscapePrompt: true,
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders Clear Text Toast', () => {
+    const uiState = createMockUIState({
+      showClearTextToast: true,
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },

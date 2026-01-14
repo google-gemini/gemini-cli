@@ -1904,7 +1904,7 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         stdin.write('\x1B\x1B');
-        vi.advanceTimersByTime(100);
+        vi.advanceTimersByTime(2000);
 
         expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
