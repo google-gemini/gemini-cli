@@ -11,8 +11,8 @@ npm install -g @google/gemini-cli
 
 ## Highlights
 
-- **Gemini CLI wrapped:** Run `npx gemini-wrapped` to see your usage stats, top
-  models and languages and more visualized!
+- **Gemini CLI wrapped:** Run `npx gemini-wrapped` to visualize your usage
+  stats, top models, languages, and more!
 - **Windows clipboard image support:** Windows users can now paste images
   directly from their clipboard into the CLI using `Alt`+`V`.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/13997) by

@@ -18,7 +18,7 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
-## Announcements: v0.23.0 - 2025-01-07
+## Announcements: v0.23.0 - 2026-01-07
 
 - 🎉 **Experimental Agent Skills Support in Preview:** Gemini CLI now supports
   [Agent Skills](https://agentskills.io/home) in our preview builds. This is an
@@ -27,8 +27,8 @@ on GitHub.
   - Enable in `/settings`
   - Docs:
     [https://geminicli.com/docs/cli/skills/](https://geminicli.com/docs/cli/skills/)
-- **Gemini CLI wrapped:** Run `npx gemini-wrapped` to see your usage stats, top
-  models and languages and more visualized!
+- **Gemini CLI wrapped:** Run `npx gemini-wrapped` to visualize your usage
+  stats, top models, languages, and more!
 - **Windows clipboard image support:** Windows users can now paste images
   directly from their clipboard into the CLI using `Alt`+`V`.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/13997) by
