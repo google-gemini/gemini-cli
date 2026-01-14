@@ -113,13 +113,16 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                            | Setting                                                 | Description                                                                         | Default |
-| ----------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                                                 | `false` |
-| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                             | `true`  |
-| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                        | `10`    |
-| Use OSC 52 Paste                    | `experimental.useOSC52Paste`                            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                          | `true`  |
+| UI Label                            | Setting                                                 | Description                                                                                    | Default              |
+| ----------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------- |
+| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                                                            | `false`              |
+| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                                        | `true`               |
+| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                                   | `10`                 |
+| Enable Model Router                 | `experimental.modelRouter.enabled`                      | Enable model routing to route requests to the best model based on complexity.                  | `true`               |
+| Simple Task Model                   | `experimental.modelRouter.simpleTaskModel`              | The model to use for simple, well-defined tasks when the model router is enabled.              | `"gemini-2.5-flash"` |
+| Complex Task Model                  | `experimental.modelRouter.complexTaskModel`             | The model to use for complex, multi-step, or ambiguous tasks when the model router is enabled. | `"gemini-2.5-pro"`   |
+| Use OSC 52 Paste                    | `experimental.useOSC52Paste`                            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).            | `false`              |
+| Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                                     | `true`               |
 
 ### Hooks
 

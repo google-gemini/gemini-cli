@@ -48,6 +48,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_THINKING_MODE,
   isPreviewModel,
@@ -379,6 +380,9 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  useModelRouter?: boolean;
+  simpleTaskModel?: string;
+  complexTaskModel?: string;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -521,6 +525,9 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly useModelRouter: boolean;
+  private readonly simpleTaskModel: string;
+  private readonly complexTaskModel: string;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
@@ -592,6 +599,9 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.useModelRouter = params.useModelRouter ?? true;
+    this.simpleTaskModel = params.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel = params.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -1454,6 +1464,18 @@ export class Config {
 
   getDisableLLMCorrection(): boolean {
     return this.disableLLMCorrection;
+  }
+
+  isModelRouterEnabled(): boolean {
+    return this.useModelRouter;
+  }
+
+  getSimpleTaskModel(): string {
+    return this.simpleTaskModel;
+  }
+
+  getComplexTaskModel(): string {
+    return this.complexTaskModel;
   }
 
   isAgentsEnabled(): boolean {

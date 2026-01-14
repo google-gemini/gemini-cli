@@ -739,6 +739,9 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    useModelRouter: settings.experimental?.modelRouter?.enabled,
+    simpleTaskModel: settings.experimental?.modelRouter?.simpleTaskModel,
+    complexTaskModel: settings.experimental?.modelRouter?.complexTaskModel,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: getEnableHooks(settings),

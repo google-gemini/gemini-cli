@@ -872,6 +872,24 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.modelRouter.enabled`** (boolean):
+  - **Description:** Enable model routing to route requests to the best model
+    based on complexity.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.modelRouter.simpleTaskModel`** (string):
+  - **Description:** The model to use for simple, well-defined tasks when the
+    model router is enabled.
+  - **Default:** `"gemini-2.5-flash"`
+  - **Requires restart:** Yes
+
+- **`experimental.modelRouter.complexTaskModel`** (string):
+  - **Description:** The model to use for complex, multi-step, or ambiguous
+    tasks when the model router is enabled.
+  - **Default:** `"gemini-2.5-pro"`
+  - **Requires restart:** Yes
+
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
     (useful for remote sessions).
