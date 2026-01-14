@@ -55,7 +55,20 @@ for (const reportPath of reports) {
   }
 }
 
+const totalStats = Object.values(testStats).reduce(
+  (acc, stats) => {
+    acc.passed += stats.passed;
+    acc.total += stats.total;
+    return acc;
+  },
+  { passed: 0, total: 0 },
+);
+
+const totalPassRate =
+  ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%';
+
 console.log('### Evals Nightly Summary');
+console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
 console.log('| Test Name | Pass Rate | Passes | Fails | Total Runs |');
 console.log('| :--- | :---: | :---: | :---: | :---: |');
 
