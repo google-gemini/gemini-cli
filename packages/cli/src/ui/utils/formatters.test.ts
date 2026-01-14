@@ -5,20 +5,20 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatMemoryUsage } from './formatters.js';
+import { formatDuration, formatBytes } from './formatters.js';
 
 describe('formatters', () => {
-  describe('formatMemoryUsage', () => {
+  describe('formatBytes', () => {
     it('should format bytes into KB', () => {
-      expect(formatMemoryUsage(12345)).toBe('12.1 KB');
+      expect(formatBytes(12345)).toBe('12.1 KB');
     });
 
     it('should format bytes into MB', () => {
-      expect(formatMemoryUsage(12345678)).toBe('11.8 MB');
+      expect(formatBytes(12345678)).toBe('11.8 MB');
     });
 
     it('should format bytes into GB', () => {
-      expect(formatMemoryUsage(12345678901)).toBe('11.50 GB');
+      expect(formatBytes(12345678901)).toBe('11.50 GB');
     });
   });
 
