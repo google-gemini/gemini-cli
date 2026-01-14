@@ -54,8 +54,8 @@ function getStats(reports) {
           }
         }
       }
-    } catch (_) {
-      // Ignore malformed or missing files
+    } catch (error) {
+      console.error(`Error processing report at ${reportPath}:`, error);
     }
   }
   return testStats;
@@ -106,15 +106,17 @@ function fetchHistoricalData() {
             stats: getStats(runReports),
           });
         }
-      } catch (_) {
-        // Failed to download or process, skip
+      } catch (error) {
+        console.error(
+          `Failed to download or process artifacts for run ${run.databaseId}:`,
+          error,
+        );
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     }
-  } catch (_) {
-    // gh cli might fail or not be installed, ignore history
-    // console.error('Failed to fetch history:', e);
+  } catch (error) {
+    console.error('Failed to fetch historical data:', error);
   }
 
   return history;
