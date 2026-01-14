@@ -1,0 +1,41 @@
+name: 'Evals: Nightly'
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # Runs at 1 AM every day
+  workflow_dispatch:
+    inputs:
+      run_all:
+        description: 'Run all evaluations (including usually passing)'
+        type: 'boolean'
+        default: true
+
+permissions:
+  contents: 'read'
+  checks: 'write'
+
+jobs:
+  evals:
+    name: 'Evals (USUALLY_PASSING) nightly run'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Run Evals'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
+        run: 'npm run test:all_evals'
