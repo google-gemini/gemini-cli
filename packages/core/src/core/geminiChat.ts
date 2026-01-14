@@ -503,62 +503,54 @@ export class GeminiChat {
         ? contentsForPreviewModel
         : requestContents;
 
-      // Fire BeforeModelHookEvent and BeforeToolSelection hooks if enabled
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus) {
-        // Fire BeforeModel hook
-        const beforeModelResult = (await this.config
-          .getHookSystem()
-          ?.fireBeforeModelEvent({
-            model: modelToUse,
-            config,
-            contents: contentsToUse,
-          })) ?? { blocked: false };
+      const beforeModelResult = (await this.config
+        .getHookSystem()
+        ?.fireBeforeModelEvent({
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        })) ?? { blocked: false };
 
-        // Check if hook requested to stop execution
-        if (beforeModelResult.stopped) {
-          throw new AgentExecutionStoppedError(
-            beforeModelResult.reason || 'Agent execution stopped by hook',
-          );
-        }
+      if (beforeModelResult.stopped) {
+        throw new AgentExecutionStoppedError(
+          beforeModelResult.reason || 'Agent execution stopped by hook',
+        );
+      }
 
-        // Check if hook blocked the model call
-        if (beforeModelResult.blocked) {
-          // Return a synthetic response generator
-          const syntheticResponse = beforeModelResult.syntheticResponse;
-          if (syntheticResponse) {
-            // Ensure synthetic response has a finish reason to prevent InvalidStreamError
-            if (
-              syntheticResponse.candidates &&
-              syntheticResponse.candidates.length > 0
-            ) {
-              for (const candidate of syntheticResponse.candidates) {
-                if (!candidate.finishReason) {
-                  candidate.finishReason = FinishReason.STOP;
-                }
+      if (beforeModelResult.blocked) {
+        const syntheticResponse = beforeModelResult.syntheticResponse;
+        if (syntheticResponse) {
+          if (
+            syntheticResponse.candidates &&
+            syntheticResponse.candidates.length > 0
+          ) {
+            for (const candidate of syntheticResponse.candidates) {
+              if (!candidate.finishReason) {
+                candidate.finishReason = FinishReason.STOP;
               }
             }
           }
-
-          throw new AgentExecutionBlockedError(
-            beforeModelResult.reason || 'Model call blocked by hook',
-            syntheticResponse,
-          );
         }
 
-        // Apply modifications from BeforeModel hook
-        if (beforeModelResult.modifiedConfig) {
-          Object.assign(config, beforeModelResult.modifiedConfig);
-        }
-        if (
-          beforeModelResult.modifiedContents &&
-          Array.isArray(beforeModelResult.modifiedContents)
-        ) {
-          contentsToUse = beforeModelResult.modifiedContents as Content[];
-        }
+        throw new AgentExecutionBlockedError(
+          beforeModelResult.reason || 'Model call blocked by hook',
+          syntheticResponse,
+        );
+      }
 
-        // Fire BeforeToolSelection hook
+      if (beforeModelResult.modifiedConfig) {
+        Object.assign(config, beforeModelResult.modifiedConfig);
+      }
+      if (
+        beforeModelResult.modifiedContents &&
+        Array.isArray(beforeModelResult.modifiedContents)
+      ) {
+        contentsToUse = beforeModelResult.modifiedContents as Content[];
+      }
+
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus) {
         const toolSelectionResult = await fireBeforeToolSelectionHook(
           messageBus,
           {
@@ -823,7 +815,6 @@ export class GeminiChat {
         }
       }
 
-      // Fire AfterModel hookEvent
       if (originalRequest && chunk) {
         const hookResult = (await this.config
           .getHookSystem()
@@ -844,7 +835,7 @@ export class GeminiChat {
 
         yield hookResult.response;
       } else {
-        yield chunk; // Yield every chunk to the UI immediately.
+        yield chunk;
       }
     }
 
