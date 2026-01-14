@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* global require, console, process */
+
 /**
  * Script to backfill the 'status/need-triage' label to all open issues
  * that are NOT currently labeled with '🔒 maintainer only'.
@@ -17,11 +20,16 @@ function runGh(command) {
 }
 
 async function main() {
-  console.log('🔍 Fetching open issues without the "🔒 maintainer only" label...');
+  console.log(
+    '🔍 Fetching open issues without the "🔒 maintainer only" label...',
+  );
 
   // Search for open issues that do NOT have the maintainer label
-  const query = 'is:open is:issue -label:"🔒 maintainer only" -label:"status/need-triage"';
-  const issuesJson = runGh(`issue list --search '${query}' --limit 1000 --json number,title`);
+  const query =
+    'is:open is:issue -label:"🔒 maintainer only" -label:"status/need-triage"';
+  const issuesJson = runGh(
+    `issue list --search '${query}' --limit 1000 --json number,title`,
+  );
 
   if (!issuesJson) {
     console.error('❌ Failed to fetch issues.');
@@ -44,7 +52,7 @@ async function main() {
   console.log('\n🎉 Backfill complete!');
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
