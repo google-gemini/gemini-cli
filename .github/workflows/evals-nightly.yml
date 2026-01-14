@@ -7,7 +7,7 @@ on:
     inputs:
       run_all:
         description: 'Run all evaluations (including usually passing)'
-        type: boolean
+        type: 'boolean'
         default: true
 
 permissions:
