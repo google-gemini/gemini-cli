@@ -23,6 +23,23 @@ interface RenderInlineProps {
   defaultColor?: string;
 }
 
+/**
+ * Removes trailing punctuation from URLs.
+ * This prevents trailing punctuation marks (especially Chinese punctuation)
+ * from being included in the URL match.
+ *
+ * Examples:
+ * - "https://example.com." → "https://example.com"
+ * - "https://example.com。" → "https://example.com"
+ * - "https://example.com)." → "https://example.com"
+ */
+function stripTrailingPunctuation(url: string): string {
+  // Remove trailing punctuation marks (both ASCII and non-ASCII)
+  // ASCII: . , ; : ! ? ) ] > ` ' "
+  // Chinese: 。，；！？）」』》 （及其他中文标点）
+  return url.replace(/[.,;:!?)\]>`'"、。，；！？）」』》）‖‧…]+$/, '');
+}
+
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   text,
   defaultColor,
@@ -138,9 +155,10 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        const cleanUrl = stripTrailingPunctuation(fullMatch);
         renderedNode = (
           <Text key={key} color={theme.text.link}>
-            {fullMatch}
+            {cleanUrl}
           </Text>
         );
       }
