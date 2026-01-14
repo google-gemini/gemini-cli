@@ -764,25 +764,41 @@ export class CoreToolScheduler {
         isModifying: true,
       } as ToolCallConfirmationDetails);
 
-      const result = await this.toolModifier.handleModifyWithEditor(
-        waitingToolCall,
-        editorType,
-        signal,
-      );
+      try {
+        const result = await this.toolModifier.handleModifyWithEditor(
+          waitingToolCall,
+          editorType,
+          signal,
+        );
 
-      // Restore status (isModifying: false) and update diff if result exists
-      if (result) {
-        this.setArgsInternal(callId, result.updatedParams);
-        this.setStatusInternal(callId, 'awaiting_approval', signal, {
-          ...waitingToolCall.confirmationDetails,
-          fileDiff: result.updatedDiff,
-          isModifying: false,
-        } as ToolCallConfirmationDetails);
-      } else {
-        this.setStatusInternal(callId, 'awaiting_approval', signal, {
-          ...waitingToolCall.confirmationDetails,
-          isModifying: false,
-        } as ToolCallConfirmationDetails);
+        // Restore status (isModifying: false) and update diff if result exists
+        if (result) {
+          this.setArgsInternal(callId, result.updatedParams);
+          this.setStatusInternal(callId, 'awaiting_approval', signal, {
+            ...waitingToolCall.confirmationDetails,
+            fileDiff: result.updatedDiff,
+            isModifying: false,
+          } as ToolCallConfirmationDetails);
+        } else {
+          this.setStatusInternal(callId, 'awaiting_approval', signal, {
+            ...waitingToolCall.confirmationDetails,
+            isModifying: false,
+          } as ToolCallConfirmationDetails);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.setStatusInternal(
+          callId,
+          'error',
+          signal,
+          createErrorResponse(
+            waitingToolCall.request,
+            err,
+            ToolErrorType.EXECUTION_FAILED,
+          ),
+        );
+        await this.checkAndNotifyCompletion(signal);
+        return;
       }
     } else {
       // If the client provided new content, apply it and wait for

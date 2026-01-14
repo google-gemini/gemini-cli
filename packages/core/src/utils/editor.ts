@@ -226,13 +226,23 @@ export async function openDiff(
     return;
   }
 
+  const formatEditorLaunchError = (command: string, error: Error): Error => {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return new Error(
+        `Failed to launch ${command}. Ensure it is installed and available on PATH.`,
+      );
+    }
+    return error;
+  };
+
   if (isTerminalEditor(editor)) {
     try {
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });
       if (result.error) {
-        throw result.error;
+        throw formatEditorLaunchError(diffCommand.command, result.error);
       }
       if (result.status !== 0) {
         throw new Error(`${editor} exited with code ${result.status}`);
@@ -258,7 +268,7 @@ export async function openDiff(
     });
 
     childProcess.on('error', (error) => {
-      reject(error);
+      reject(formatEditorLaunchError(diffCommand.command, error));
     });
   });
 }
