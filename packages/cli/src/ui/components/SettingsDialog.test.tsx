@@ -35,7 +35,6 @@ import {
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
-import { terminalCapabilityManager } from '../../ui/utils/terminalCapabilityManager.js';
 
 // Mock the VimModeContext
 const mockToggleVimEnabled = vi.fn();
@@ -105,7 +104,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -254,10 +253,6 @@ const renderDialog = (
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
-    vi.spyOn(
-      terminalCapabilityManager,
-      'isBracketedPasteEnabled',
-    ).mockReturnValue(true);
     mockToggleVimEnabled.mockResolvedValue(true);
   });
 
