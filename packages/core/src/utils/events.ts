@@ -108,6 +108,7 @@ export enum CoreEvent {
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
   AgentsRefreshed = 'agents-refreshed',
+  AdminSettingsChanged = 'admin-settings-changed',
 }
 
 export interface CoreEvents {
@@ -120,7 +121,9 @@ export interface CoreEvents {
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.HookEnd]: [HookEndPayload];
   [CoreEvent.AgentsRefreshed]: never[];
+  [CoreEvent.AdminSettingsChanged]: never[];
 }
 
 type EventBacklogItem = {
@@ -227,6 +230,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitAgentsRefreshed(): void {
     this.emit(CoreEvent.AgentsRefreshed);
+  }
+
+  /**
+   * Notifies subscribers that admin settings have changed.
+   */
+  emitAdminSettingsChanged(): void {
+    this.emit(CoreEvent.AdminSettingsChanged);
   }
 
   /**

@@ -61,6 +61,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -302,6 +303,18 @@ export async function main() {
     coreEvents.emitFeedback('warning', error.message);
   });
 
+  // Listen for admin settings from parent process (IPC)
+  // Listen for admin settings from parent process (IPC)
+  process.on('message', (msg: unknown) => {
+    const message = msg as {
+      type?: string;
+      settings?: FetchAdminControlsResponse;
+    };
+    if (message?.type === 'admin-settings' && message.settings) {
+      settings.setRemoteAdminSettings(message.settings);
+    }
+  });
+
   const trustedFolders = loadTrustedFolders();
   trustedFolders.errors.forEach((error: TrustedFoldersError) => {
     coreEvents.emitFeedback(
@@ -453,7 +466,7 @@ export async function main() {
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, []);
+      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 

@@ -286,10 +286,48 @@ export interface ConversationInteraction {
   isAgentic?: boolean;
 }
 
-export interface GeminiCodeAssistSetting {
+// Request for FetchAdminControls RPC
+export interface FetchAdminControlsRequest {
+  metadata: ClientMetadata;
+}
+
+export interface FetchAdminControlsResponse {
   secureModeEnabled?: boolean;
   mcpSetting?: McpSetting;
   cliFeatureSetting?: CliFeatureSetting;
+  // Add other fields as they become relevant
+  recitationPolicy?: RecitationPolicy;
+  groundingType?: GroundingType;
+  turboModeSetting?: TurboModeSetting;
+  browserSetting?: BrowserSetting;
+  previewFeatureSetting?: PreviewFeatureSetting;
+  agentSetting?: AgentSetting;
+}
+
+export interface RecitationPolicy {
+  recitationEnabled?: boolean;
+}
+
+export enum GroundingType {
+  GROUNDING_TYPE_UNSPECIFIED = 0,
+  GROUNDING_TYPE_DISABLED = 1,
+  GROUNDING_TYPE_ENABLED = 2,
+}
+
+export interface TurboModeSetting {
+  turboModeEnabled?: boolean;
+}
+
+export interface BrowserSetting {
+  browserEnabled?: boolean;
+}
+
+export interface PreviewFeatureSetting {
+  previewFeatureEnabled?: boolean;
+}
+
+export interface AgentSetting {
+  agentEnabled?: boolean;
 }
 
 export interface McpSetting {

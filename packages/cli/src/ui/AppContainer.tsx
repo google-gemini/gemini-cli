@@ -129,6 +129,7 @@ import {
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
+import { AdminSettingsChangedDialog } from './components/AdminSettingsChangedDialog.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -186,6 +187,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
+  const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -364,9 +366,18 @@ export const AppContainer = (props: AppContainerProps) => {
       setSettingsNonce((prev) => prev + 1);
     };
 
+    const handleAdminSettingsChanged = () => {
+      setAdminSettingsChanged(true);
+    };
+
     coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
+    coreEvents.on(CoreEvent.AdminSettingsChanged, handleAdminSettingsChanged);
     return () => {
       coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
+      coreEvents.off(
+        CoreEvent.AdminSettingsChanged,
+        handleAdminSettingsChanged,
+      );
     };
   }, []);
 
@@ -1796,6 +1807,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
         onDismiss={() => {
           setAuthContext({});
           setAuthState(AuthState.Updating);
+        }}
+      />
+    );
+  }
+
+  if (adminSettingsChanged) {
+    return (
+      <AdminSettingsChangedDialog
+        onDismiss={() => {
+          setAdminSettingsChanged(false);
         }}
       />
     );

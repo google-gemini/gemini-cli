@@ -92,7 +92,7 @@ import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
+import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -105,6 +105,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+
+import { getClientMetadata } from '../code_assist/experiments/client_metadata.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -523,8 +525,9 @@ export class Config {
   private readonly disableLLMCorrection: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
-  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
+  private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
+  private adminControlsPollingInterval: NodeJS.Timeout | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -878,6 +881,65 @@ export class Config {
     if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
+
+    // Fetch admin controls
+    if (codeAssistServer) {
+      try {
+        const metadata = await getClientMetadata();
+        const adminControls = await codeAssistServer.fetchAdminControls({
+          metadata,
+        });
+        this.setRemoteAdminSettings(adminControls);
+        this.startAdminControlsPolling();
+      } catch (e) {
+        debugLogger.error('Failed to fetch admin controls', e);
+      }
+    } else {
+      this.stopAdminControlsPolling();
+    }
+  }
+
+  private stopAdminControlsPolling() {
+    if (this.adminControlsPollingInterval) {
+      clearInterval(this.adminControlsPollingInterval);
+      this.adminControlsPollingInterval = undefined;
+    }
+  }
+
+  private startAdminControlsPolling() {
+    this.stopAdminControlsPolling();
+
+    this.adminControlsPollingInterval = setInterval(
+      async () => {
+        const codeAssistServer = getCodeAssistServer(this);
+        if (!codeAssistServer) return;
+
+        try {
+          const metadata = await getClientMetadata();
+          const newSettings = await codeAssistServer.fetchAdminControls({
+            metadata,
+          });
+          const currentSettings = this.getRemoteAdminSettings();
+
+          // Compare relevant fields
+          const hasChanged =
+            newSettings.secureModeEnabled !==
+              currentSettings?.secureModeEnabled ||
+            JSON.stringify(newSettings.mcpSetting) !==
+              JSON.stringify(currentSettings?.mcpSetting) ||
+            JSON.stringify(newSettings.cliFeatureSetting) !==
+              JSON.stringify(currentSettings?.cliFeatureSetting);
+
+          if (hasChanged) {
+            this.setRemoteAdminSettings(newSettings);
+            coreEvents.emitAdminSettingsChanged();
+          }
+        } catch (e) {
+          debugLogger.error('Failed to poll admin controls', e);
+        }
+      },
+      5 * 60 * 1000,
+    ); // 5 minutes
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -936,11 +998,11 @@ export class Config {
     this.latestApiRequest = req;
   }
 
-  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+  getRemoteAdminSettings(): FetchAdminControlsResponse | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+  setRemoteAdminSettings(settings: FetchAdminControlsResponse): void {
     this.remoteAdminSettings = settings;
   }
 
