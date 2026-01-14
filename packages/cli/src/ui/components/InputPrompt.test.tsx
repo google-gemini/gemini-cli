@@ -1371,7 +1371,7 @@ describe('InputPrompt', () => {
 
         const isWhite =
           color === 'white' || color === '#ffffff' || color === '#fff';
-        const expectedBgColor = isWhite ? '#e4e4e4' : '#262626';
+        const expectedBgColor = isWhite ? '#eeeeee' : '#121212';
 
         await waitFor(() => {
           const frame = stdout.lastFrame();
