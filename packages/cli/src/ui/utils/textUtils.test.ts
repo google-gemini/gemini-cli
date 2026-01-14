@@ -63,6 +63,7 @@ describe('textUtils', () => {
             type: 'exec',
             command: '\u001b[31mmls -l\u001b[0m',
             rootCommand: '\u001b[32msudo apt-get update\u001b[0m',
+            rootCommands: ['sudo'],
             onConfirm: async () => {},
           };
 
