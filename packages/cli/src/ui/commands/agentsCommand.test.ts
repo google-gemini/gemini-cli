@@ -9,11 +9,13 @@ import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Config } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
+import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 
 describe('agentsCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
   let mockConfig: {
     getAgentRegistry: ReturnType<typeof vi.fn>;
+    isAgentsEnabled: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -22,7 +24,10 @@ describe('agentsCommand', () => {
     mockConfig = {
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
+        reload: vi.fn(),
+        getDefinition: vi.fn(),
       }),
+      isAgentsEnabled: vi.fn().mockReturnValue(true),
     };
 
     mockContext = createMockCommandContext({
@@ -115,6 +120,94 @@ describe('agentsCommand', () => {
       type: 'message',
       messageType: 'error',
       content: 'Agent registry not found.',
+    });
+  });
+
+  describe('debug subcommand', () => {
+    let debugCommand: SlashCommand;
+
+    beforeEach(() => {
+      const found = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'debug',
+      );
+      if (!found) {
+        throw new Error('Debug command not found');
+      }
+      debugCommand = found;
+    });
+
+    it('should show an error if agents are disabled', async () => {
+      mockConfig.isAgentsEnabled.mockReturnValue(false);
+
+      const result = await debugCommand.action!(mockContext, 'agent1 problem');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Agents are disabled.',
+      });
+    });
+
+    it('should show error if no arguments provided', async () => {
+      const result = await debugCommand.action!(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: /agent debug <agent-name> <problem-description>',
+      });
+    });
+
+    it('should show error if no problem description provided', async () => {
+      const result = await debugCommand.action!(mockContext, 'agent1');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Please provide a description of the problem or the failed prompt. Usage: /agent debug <agent-name> <problem-description>',
+      });
+    });
+
+    it('should show error if agent not found', async () => {
+      mockConfig.getAgentRegistry().getDefinition.mockReturnValue(undefined);
+
+      const result = await debugCommand.action!(
+        mockContext,
+        'unknownAgent some problem',
+      );
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: "Agent 'unknownAgent' not found.",
+      });
+    });
+
+    it('should return submit_prompt action with debug prompt for local agent', async () => {
+      const mockAgent = {
+        name: 'test-agent',
+        description: 'A test agent',
+        kind: 'local',
+        promptConfig: {
+          systemPrompt: 'You are a helper.',
+          query: 'Task: ${input}',
+        },
+      };
+      mockConfig.getAgentRegistry().getDefinition.mockReturnValue(mockAgent);
+
+      const result = (await debugCommand.action!(
+        mockContext,
+        'test-agent prompt failure',
+      )) as SlashCommandActionReturn;
+
+      expect(result.type).toBe('submit_prompt');
+      if (result.type === 'submit_prompt') {
+        expect(result.content).toContain('I am debugging a custom agent named');
+        expect(result.content).toContain('test-agent');
+        expect(result.content).toContain('prompt failure');
+        expect(result.content).toContain('You are a helper.');
+      }
     });
   });
 });
