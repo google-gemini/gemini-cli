@@ -98,6 +98,7 @@ import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { clearCommand } from './commands/clearCommand.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
@@ -808,6 +809,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
+  // Function to execute the clear command directly, bypassing the slash command processor.
+  // This is used by the RenewSessionDialog to avoid potential infinite loops caused
+  // by state updates within the processor.
+  const executeClearCommand = useCallback(async () => {
+    if (clearCommand.action) {
+      await clearCommand.action(commandContext, '');
+    }
+  }, [commandContext]);
+
   const {
     streamingState,
     submitQuery,
@@ -841,6 +851,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    executeClearCommand,
   );
 
   const lastOutputTimeRef = useRef(0);

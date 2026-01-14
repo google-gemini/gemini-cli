@@ -105,6 +105,9 @@ export const useGeminiStream = (
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
+    oneTimeShellAllowlist?: Set<string>,
+    overwriteConfirmed?: boolean,
+    addToHistory?: boolean,
   ) => Promise<SlashCommandProcessorResult | false>,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
@@ -117,6 +120,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  executeClearCommand?: () => Promise<void>,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -239,6 +243,19 @@ export const useGeminiStream = (
         userSelection: 'compress_session' | 'new_session';
       }) => void;
     } | null>(null);
+
+  const renewSessionConfirmationRequestRef = useRef(
+    RenewSessionConfirmationRequest,
+  );
+
+  useEffect(() => {
+    renewSessionConfirmationRequestRef.current =
+      RenewSessionConfirmationRequest;
+  }, [RenewSessionConfirmationRequest]);
+
+  // Flag to prevent showing the dialog multiple times if
+  // the RenewSession event is triggered repeatedly
+  const hasShownRenewDialogRef = useRef(false);
 
   const handleSlashCommandRef = useRef(handleSlashCommand);
   useEffect(() => {
@@ -767,7 +784,11 @@ export const useGeminiStream = (
   );
 
   const handleRenewSessionEvent = useCallback((): void => {
-    if (RenewSessionConfirmationRequest) {
+    // Prevent showing the dialog multiple times
+    if (
+      renewSessionConfirmationRequestRef.current ||
+      hasShownRenewDialogRef.current
+    ) {
       return;
     }
 
@@ -777,23 +798,51 @@ export const useGeminiStream = (
     }
     geminiClient.resetSessionTurnCount();
 
+    // Mark that we've shown the dialog
+    hasShownRenewDialogRef.current = true;
+
     setRenewSessionConfirmationRequest({
       onComplete: (result: {
         userSelection: 'compress_session' | 'new_session';
       }) => {
-        setRenewSessionConfirmationRequest(null);
+        queueMicrotask(async () => {
+          cancelOngoingRequest();
 
-        if (result.userSelection === 'compress_session') {
-          void handleSlashCommandRef.current('/compress');
-        } else if (result.userSelection === 'new_session') {
-          void handleSlashCommandRef.current('/clear');
-        }
+          if (result.userSelection === 'compress_session') {
+            // For compress, close dialog first as it's a long running operation
+            // and not destructive to the DOM structure immediately.
+            setRenewSessionConfirmationRequest(null);
+            hasShownRenewDialogRef.current = false;
+
+            await handleSlashCommandRef.current(
+              '/compress',
+              undefined,
+              undefined,
+              false,
+            );
+          } else if (result.userSelection === 'new_session') {
+            // For clear, execute the command FIRST while the dialog is still open.
+            // This ensures the heavy DOM destruction (clearing history) happens
+            // in a separate render cycle from the Dialog unmounting.
+            if (executeClearCommand) {
+              await executeClearCommand();
+            }
+
+            // Close the dialog AFTER the clear is done and processed.
+            // A short delay ensures React processes the history clearing first.
+            setTimeout(() => {
+              setRenewSessionConfirmationRequest(null);
+              hasShownRenewDialogRef.current = false;
+            }, 50);
+          }
+        });
       },
     });
   }, [
     addItem,
+    cancelOngoingRequest,
+    executeClearCommand,
     geminiClient,
-    RenewSessionConfirmationRequest,
     pendingHistoryItemRef,
     setPendingHistoryItem,
   ]);
