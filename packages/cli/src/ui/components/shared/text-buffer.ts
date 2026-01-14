@@ -775,6 +775,88 @@ export function getTransformUnderCursor(
   return null;
 }
 
+/**
+ * Represents an atomic placeholder that should be deleted as a unit.
+ * Extensible to support future placeholder types.
+ */
+interface AtomicPlaceholder {
+  start: number; // Start position in logical text
+  end: number; // End position in logical text
+  type: 'paste' | 'image'; // Type for cleanup logic
+  id?: string; // For paste placeholders: the pastedContent key
+}
+
+/**
+ * Find atomic placeholder at cursor for backspace (cursor at end).
+ * Checks all placeholder types in priority order.
+ */
+function findAtomicPlaceholderForBackspace(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders (text-based)
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (cursorCol === end) {
+      return { start, end, type: 'paste', id: match[0] };
+    }
+  }
+
+  // 2. Check image transformations (logical bounds)
+  for (const transform of transformations) {
+    if (cursorCol === transform.logEnd) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find atomic placeholder at cursor for delete (cursor at start).
+ */
+function findAtomicPlaceholderForDelete(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    if (cursorCol === start) {
+      return {
+        start,
+        end: start + match[0].length,
+        type: 'paste',
+        id: match[0],
+      };
+    }
+  }
+
+  // 2. Check image transformations
+  for (const transform of transformations) {
+    if (cursorCol === transform.logStart) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
+  return null;
+}
+
 export function calculateTransformedLine(
   logLine: string,
   logIndex: number,
@@ -1318,14 +1400,56 @@ function textBufferReducerLogic(
     }
 
     case 'backspace': {
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Early return if at start of buffer
+      if (cursorCol === 0 && cursorRow === 0) return state;
+
+      // Check if cursor is at end of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForBackspace(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorCol: placeholder.start,
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard backspace logic
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
 
       const currentLine = (r: number) => newLines[r] ?? '';
-
-      if (newCursorCol === 0 && newCursorRow === 0) return state;
 
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
@@ -1536,7 +1660,47 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const { cursorRow, cursorCol, lines } = state;
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Check if cursor is at start of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForDelete(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          // cursorCol stays the same
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard delete logic
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
         const nextState = pushUndoLocal(state);

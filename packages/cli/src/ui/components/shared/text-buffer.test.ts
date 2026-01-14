@@ -191,6 +191,155 @@ describe('textBufferReducer', () => {
     });
   });
 
+  describe('atomic placeholder deletion', () => {
+    describe('paste placeholders', () => {
+      it('backspace at end of paste placeholder removes entire placeholder', () => {
+        const placeholder = '[Pasted Text: 6 lines]';
+        const stateWithPlaceholder: TextBufferState = {
+          ...initialState,
+          lines: [placeholder],
+          cursorRow: 0,
+          cursorCol: placeholder.length, // cursor at end
+          pastedContent: {
+            [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
+          },
+        };
+        const action: TextBufferAction = { type: 'backspace' };
+        const state = textBufferReducer(stateWithPlaceholder, action);
+        expect(state).toHaveOnlyValidCharacters();
+        expect(state.lines).toEqual(['']);
+        expect(state.cursorCol).toBe(0);
+        // pastedContent should be cleaned up
+        expect(state.pastedContent[placeholder]).toBeUndefined();
+      });
+
+      it('delete at start of paste placeholder removes entire placeholder', () => {
+        const placeholder = '[Pasted Text: 6 lines]';
+        const stateWithPlaceholder: TextBufferState = {
+          ...initialState,
+          lines: [placeholder],
+          cursorRow: 0,
+          cursorCol: 0, // cursor at start
+          pastedContent: {
+            [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
+          },
+        };
+        const action: TextBufferAction = { type: 'delete' };
+        const state = textBufferReducer(stateWithPlaceholder, action);
+        expect(state).toHaveOnlyValidCharacters();
+        expect(state.lines).toEqual(['']);
+        expect(state.cursorCol).toBe(0);
+        // pastedContent should be cleaned up
+        expect(state.pastedContent[placeholder]).toBeUndefined();
+      });
+
+      it('backspace inside paste placeholder does normal deletion', () => {
+        const placeholder = '[Pasted Text: 6 lines]';
+        const stateWithPlaceholder: TextBufferState = {
+          ...initialState,
+          lines: [placeholder],
+          cursorRow: 0,
+          cursorCol: 10, // cursor in middle
+          pastedContent: {
+            [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
+          },
+        };
+        const action: TextBufferAction = { type: 'backspace' };
+        const state = textBufferReducer(stateWithPlaceholder, action);
+        expect(state).toHaveOnlyValidCharacters();
+        // Should only delete one character
+        expect(state.lines[0].length).toBe(placeholder.length - 1);
+        expect(state.cursorCol).toBe(9);
+        // pastedContent should NOT be cleaned up (placeholder is broken)
+        expect(state.pastedContent[placeholder]).toBeDefined();
+      });
+    });
+
+    describe('image placeholders', () => {
+      it('backspace at end of image path removes entire path', () => {
+        const imagePath = '@test.png';
+        const transformations = calculateTransformationsForLine(imagePath);
+        const stateWithImage: TextBufferState = {
+          ...initialState,
+          lines: [imagePath],
+          cursorRow: 0,
+          cursorCol: imagePath.length, // cursor at end
+          transformationsByLine: [transformations],
+        };
+        const action: TextBufferAction = { type: 'backspace' };
+        const state = textBufferReducer(stateWithImage, action);
+        expect(state).toHaveOnlyValidCharacters();
+        expect(state.lines).toEqual(['']);
+        expect(state.cursorCol).toBe(0);
+      });
+
+      it('delete at start of image path removes entire path', () => {
+        const imagePath = '@test.png';
+        const transformations = calculateTransformationsForLine(imagePath);
+        const stateWithImage: TextBufferState = {
+          ...initialState,
+          lines: [imagePath],
+          cursorRow: 0,
+          cursorCol: 0, // cursor at start
+          transformationsByLine: [transformations],
+        };
+        const action: TextBufferAction = { type: 'delete' };
+        const state = textBufferReducer(stateWithImage, action);
+        expect(state).toHaveOnlyValidCharacters();
+        expect(state.lines).toEqual(['']);
+        expect(state.cursorCol).toBe(0);
+      });
+
+      it('backspace inside image path does normal deletion', () => {
+        const imagePath = '@test.png';
+        const transformations = calculateTransformationsForLine(imagePath);
+        const stateWithImage: TextBufferState = {
+          ...initialState,
+          lines: [imagePath],
+          cursorRow: 0,
+          cursorCol: 5, // cursor in middle
+          transformationsByLine: [transformations],
+        };
+        const action: TextBufferAction = { type: 'backspace' };
+        const state = textBufferReducer(stateWithImage, action);
+        expect(state).toHaveOnlyValidCharacters();
+        // Should only delete one character
+        expect(state.lines[0].length).toBe(imagePath.length - 1);
+        expect(state.cursorCol).toBe(4);
+      });
+    });
+
+    describe('undo behavior', () => {
+      it('undo after placeholder deletion restores everything', () => {
+        const placeholder = '[Pasted Text: 6 lines]';
+        const pasteContent = 'line1\nline2\nline3\nline4\nline5\nline6';
+        const stateWithPlaceholder: TextBufferState = {
+          ...initialState,
+          lines: [placeholder],
+          cursorRow: 0,
+          cursorCol: placeholder.length,
+          pastedContent: { [placeholder]: pasteContent },
+        };
+
+        // Delete the placeholder
+        const deleteAction: TextBufferAction = { type: 'backspace' };
+        const stateAfterDelete = textBufferReducer(
+          stateWithPlaceholder,
+          deleteAction,
+        );
+        expect(stateAfterDelete.lines).toEqual(['']);
+        expect(stateAfterDelete.pastedContent[placeholder]).toBeUndefined();
+
+        // Undo should restore
+        const undoAction: TextBufferAction = { type: 'undo' };
+        const stateAfterUndo = textBufferReducer(stateAfterDelete, undoAction);
+        expect(stateAfterUndo).toHaveOnlyValidCharacters();
+        expect(stateAfterUndo.lines).toEqual([placeholder]);
+        expect(stateAfterUndo.pastedContent[placeholder]).toBe(pasteContent);
+      });
+    });
+  });
+
   describe('undo/redo actions', () => {
     it('should undo and redo a change', () => {
       // 1. Insert text
@@ -589,7 +738,7 @@ describe('useTextBuffer', () => {
       expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
     });
 
-    it('insert: should retain pastedContent when placeholder is removed via backspace', () => {
+    it('insert: should clean up pastedContent when placeholder is removed via atomic backspace', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
@@ -599,18 +748,14 @@ describe('useTextBuffer', () => {
         largeText,
       );
 
-      // Delete the placeholder character by character using backspace
-      const placeholderLength = '[Pasted Text: 6 lines]'.length;
+      // Single backspace at end of placeholder removes entire placeholder
       act(() => {
-        for (let i = 0; i < placeholderLength; i++) {
-          result.current.backspace();
-        }
+        result.current.backspace();
       });
 
       expect(getBufferState(result).text).toBe('');
-      // pastedContent intentionally retains the entry to avoid race conditions
-      // and complexity from cleanup logic on every text mutation
-      expect(Object.keys(result.current.pastedContent)).toHaveLength(1);
+      // pastedContent is cleaned up when placeholder is deleted atomically
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
     });
 
     it('newline: should create a new line and move cursor', () => {
