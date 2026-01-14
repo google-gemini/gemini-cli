@@ -19,8 +19,18 @@ import type {
   SessionEndReason,
   PreCompressTrigger,
   DefaultHookOutput,
+  BeforeModelHookOutput,
+  AfterModelHookOutput,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from '@google/genai';
+import type {
+  AfterModelHookResult,
+  BeforeModelHookResult,
+} from '../core/geminiChatHookTriggers.js';
 /**
  * Main hook system that coordinates all hook-related functionality
  */
@@ -143,5 +153,98 @@ export class HookSystem {
       stopHookActive,
     );
     return result.finalOutput;
+  }
+
+  async fireBeforeModelEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<BeforeModelHookResult> {
+    if (!this.config.getEnableHooks()) {
+      return { blocked: false };
+    }
+    try {
+      const result =
+        await this.hookEventHandler.fireBeforeModelEvent(llmRequest);
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput?.shouldStopExecution()) {
+        return {
+          blocked: true,
+          stopped: true,
+          reason: hookOutput.getEffectiveReason(),
+        };
+      }
+
+      const blockingError = hookOutput?.getBlockingError();
+      if (blockingError?.blocked) {
+        const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+        const syntheticResponse = beforeModelOutput.getSyntheticResponse();
+        return {
+          blocked: true,
+          reason:
+            hookOutput?.getEffectiveReason() || 'Model call blocked by hook',
+          syntheticResponse,
+        };
+      }
+
+      if (hookOutput) {
+        const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+        const modifiedRequest =
+          beforeModelOutput.applyLLMRequestModifications(llmRequest);
+        return {
+          blocked: false,
+          modifiedConfig: modifiedRequest?.config,
+          modifiedContents: modifiedRequest?.contents,
+        };
+      }
+
+      return { blocked: false };
+    } catch {
+      return { blocked: false };
+    }
+  }
+
+  async fireAfterModelEvent(
+    originalRequest: GenerateContentParameters,
+    chunk: GenerateContentResponse,
+  ): Promise<AfterModelHookResult> {
+    if (!this.config.getEnableHooks()) {
+      return { response: chunk };
+    }
+    try {
+      const result = await this.hookEventHandler.fireAfterModelEvent(
+        originalRequest,
+        chunk,
+      );
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput?.shouldStopExecution()) {
+        return {
+          response: chunk,
+          stopped: true,
+          reason: hookOutput.getEffectiveReason(),
+        };
+      }
+
+      const blockingError = hookOutput?.getBlockingError();
+      if (blockingError?.blocked) {
+        return {
+          response: chunk,
+          blocked: true,
+          reason: hookOutput?.getEffectiveReason(),
+        };
+      }
+
+      if (hookOutput) {
+        const afterModelOutput = hookOutput as AfterModelHookOutput;
+        const modifiedResponse = afterModelOutput.getModifiedResponse();
+        if (modifiedResponse) {
+          return { response: modifiedResponse };
+        }
+      }
+
+      return { response: chunk };
+    } catch {
+      return { response: chunk };
+    }
   }
 }

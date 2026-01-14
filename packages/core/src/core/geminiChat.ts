@@ -49,11 +49,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  fireAfterModelHook,
-  fireBeforeModelHook,
-  fireBeforeToolSelectionHook,
-} from './geminiChatHookTriggers.js';
+import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
 import { coreEvents } from '../utils/events.js';
 
 export enum StreamEventType {
@@ -507,16 +503,18 @@ export class GeminiChat {
         ? contentsForPreviewModel
         : requestContents;
 
-      // Fire BeforeModel and BeforeToolSelection hooks if enabled
+      // Fire BeforeModelHookEvent and BeforeToolSelection hooks if enabled
       const hooksEnabled = this.config.getEnableHooks();
       const messageBus = this.config.getMessageBus();
       if (hooksEnabled && messageBus) {
         // Fire BeforeModel hook
-        const beforeModelResult = await fireBeforeModelHook(messageBus, {
-          model: modelToUse,
-          config,
-          contents: contentsToUse,
-        });
+        const beforeModelResult = (await this.config
+          .getHookSystem()
+          ?.fireBeforeModelEvent({
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          })) ?? { blocked: false };
 
         // Check if hook requested to stop execution
         if (beforeModelResult.stopped) {
@@ -825,15 +823,11 @@ export class GeminiChat {
         }
       }
 
-      // Fire AfterModel hook through MessageBus (only if hooks are enabled)
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus && originalRequest && chunk) {
-        const hookResult = await fireAfterModelHook(
-          messageBus,
-          originalRequest,
-          chunk,
-        );
+      // Fire AfterModel hookEvent
+      if (originalRequest && chunk) {
+        const hookResult = (await this.config
+          .getHookSystem()
+          ?.fireAfterModelEvent(originalRequest, chunk)) ?? { response: chunk };
 
         if (hookResult.stopped) {
           throw new AgentExecutionStoppedError(
