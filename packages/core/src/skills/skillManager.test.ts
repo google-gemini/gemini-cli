@@ -35,9 +35,9 @@ describe('SkillManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('should discover skills from extensions, user, and project with precedence', async () => {
+  it('should discover skills from extensions, user, and workspace with precedence', async () => {
     const userDir = path.join(testRootDir, 'user');
-    const projectDir = path.join(testRootDir, 'project');
+    const projectDir = path.join(testRootDir, 'workspace');
     await fs.mkdir(path.join(userDir, 'skill-a'), { recursive: true });
     await fs.mkdir(path.join(projectDir, 'skill-b'), { recursive: true });
 
@@ -92,9 +92,9 @@ description: project-desc
     expect(names).toContain('skill-project');
   });
 
-  it('should respect precedence: Project > User > Extension', async () => {
+  it('should respect precedence: Workspace > User > Extension', async () => {
     const userDir = path.join(testRootDir, 'user');
-    const projectDir = path.join(testRootDir, 'project');
+    const projectDir = path.join(testRootDir, 'workspace');
     await fs.mkdir(path.join(userDir, 'skill'), { recursive: true });
     await fs.mkdir(path.join(projectDir, 'skill'), { recursive: true });
 
