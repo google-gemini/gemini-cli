@@ -166,10 +166,7 @@ let header = '| Test Name |';
 let separator = '| :--- |';
 
 for (const item of history) {
-  // Format date: MM-DD
-  const date = new Date(item.run.createdAt);
-  const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-  header += ` [${dateStr}](${item.run.url}) |`;
+  header += ` [${item.run.databaseId}](${item.run.url}) |`;
   separator += ' :---: |';
 }
 
