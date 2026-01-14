@@ -1393,6 +1393,13 @@
           "default": true,
           "type": "boolean"
         },
+        "extensionConfig": {
+          "title": "Extension Configuration",
+          "description": "Enable requesting and fetching of extension settings.",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1692,6 +1699,23 @@
               "title": "MCP Enabled",
               "description": "If false, disallows MCP servers from being used.",
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "skills": {
+          "title": "Skills Settings",
+          "description": "Agent Skills-specific admin settings.",
+          "markdownDescription": "Agent Skills-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Skills Enabled",
+              "description": "If false, disallows agent skills from being used.",
+              "markdownDescription": "If false, disallows agent skills from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
