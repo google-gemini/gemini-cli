@@ -431,6 +431,24 @@ describe('commandUtils', () => {
       expect(tty.end).not.toHaveBeenCalled();
     });
 
+    it('falls back if /dev/tty hangs (timeout)', async () => {
+      const testText = 'timeout-fallback';
+      process.env['SSH_CONNECTION'] = '1';
+
+      mockFs.createWriteStream.mockImplementation(() => 
+        // Stream that never emits open or error
+         makeWritable({ isTTY: true })
+      );
+
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      // Should complete even though stream hangs
+      await copyToClipboard(testText);
+
+      expect(mockFs.createWriteStream).toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+
     it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
       mockProcess.platform = 'win32';
       const stderrStream = makeWritable({ isTTY: true });
