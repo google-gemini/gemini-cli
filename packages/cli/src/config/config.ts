@@ -235,11 +235,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
-        })
-        .deprecateOption(
-          'prompt',
-          'Use the positional prompt instead. This flag will be removed in a future version.',
-        ),
+        }),
     )
     // Register MCP subcommands
     .command(mcpCommand)
