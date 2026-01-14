@@ -91,10 +91,6 @@ User: Design a microservices backend for this app.
 *JSON:* {"complexity_reasoning": "High-level architecture and strategic planning.", "complexity_score": 95}
 `;
 
-debugLogger.warn(
-  `[Routing] Test Numerical strategy prompt:\n${CLASSIFIER_SYSTEM_PROMPT}`,
-);
-
 const ClassifierResponseSchema = z.object({
   complexity_reasoning: z.string(),
   complexity_score: z.number().min(1).max(100),

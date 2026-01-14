@@ -146,10 +146,33 @@ describe('<ModelDialog />', () => {
     stdin.write('\r');
     await waitForUpdate();
 
-    expect(mockSetModel).toHaveBeenCalledWith(
-      DEFAULT_GEMINI_MODEL_AUTO,
-      true, // Session only by default
-    );
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL_AUTO, true);
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('selects the "Auto" option when the model is the generic "auto" alias', async () => {
+    mockGetModel.mockReturnValue('auto');
+    const { stdin } = renderComponent();
+
+    // If it's correctly highlighting index 0 (Auto), pressing Enter should select Auto
+    stdin.write('\r');
+    await waitForUpdate();
+
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL_AUTO, true);
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('selects the "Auto (Preview)" option when the model is "auto" and preview features are enabled', async () => {
+    mockGetPreviewFeatures.mockReturnValue(true);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    mockGetModel.mockReturnValue('auto');
+    const { stdin } = renderComponent();
+
+    // With preview enabled, "auto" should resolve to index 0 (Auto Gemini 3)
+    stdin.write('\r');
+    await waitForUpdate();
+
+    expect(mockSetModel).toHaveBeenCalledWith(PREVIEW_GEMINI_MODEL_AUTO, true);
     expect(mockOnClose).toHaveBeenCalled();
   });
 
