@@ -133,81 +133,33 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.jetbrains);
   });
 
-  it('should detect IntelliJ IDEA via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const intellijProcessInfo = {
-      pid: 123,
-      command: '/Applications/IntelliJ IDEA.app',
-    };
-    expect(detectIde(intellijProcessInfo)).toBe(IDE_DEFINITIONS.intellijidea);
-  });
+  describe('JetBrains IDE detection via command', () => {
+    beforeEach(() => {
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    });
 
-  it('should detect WebStorm via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const webstormProcessInfo = {
-      pid: 123,
-      command: '/Applications/WebStorm.app',
-    };
-    expect(detectIde(webstormProcessInfo)).toBe(IDE_DEFINITIONS.webstorm);
-  });
-
-  it('should detect PyCharm via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const pycharmProcessInfo = {
-      pid: 123,
-      command: '/Applications/PyCharm.app',
-    };
-    expect(detectIde(pycharmProcessInfo)).toBe(IDE_DEFINITIONS.pycharm);
-  });
-
-  it('should detect GoLand via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const golandProcessInfo = { pid: 123, command: '/Applications/GoLand.app' };
-    expect(detectIde(golandProcessInfo)).toBe(IDE_DEFINITIONS.goland);
-  });
-
-  it('should detect Android Studio via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const androidStudioProcessInfo = {
-      pid: 123,
-      command: '/Applications/Android Studio.app',
-    };
-    expect(detectIde(androidStudioProcessInfo)).toBe(
-      IDE_DEFINITIONS.androidstudio,
-    );
-  });
-
-  it('should detect CLion via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const clionProcessInfo = { pid: 123, command: '/Applications/CLion.app' };
-    expect(detectIde(clionProcessInfo)).toBe(IDE_DEFINITIONS.clion);
-  });
-
-  it('should detect RustRover via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const rustroverProcessInfo = {
-      pid: 123,
-      command: '/Applications/RustRover.app',
-    };
-    expect(detectIde(rustroverProcessInfo)).toBe(IDE_DEFINITIONS.rustrover);
-  });
-
-  it('should detect DataGrip via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const datagripProcessInfo = {
-      pid: 123,
-      command: '/Applications/DataGrip.app',
-    };
-    expect(detectIde(datagripProcessInfo)).toBe(IDE_DEFINITIONS.datagrip);
-  });
-
-  it('should detect PhpStorm via command', () => {
-    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-    const phpstormProcessInfo = {
-      pid: 123,
-      command: '/Applications/PhpStorm.app',
-    };
-    expect(detectIde(phpstormProcessInfo)).toBe(IDE_DEFINITIONS.phpstorm);
+    it.each([
+      [
+        'IntelliJ IDEA',
+        '/Applications/IntelliJ IDEA.app',
+        IDE_DEFINITIONS.intellijidea,
+      ],
+      ['WebStorm', '/Applications/WebStorm.app', IDE_DEFINITIONS.webstorm],
+      ['PyCharm', '/Applications/PyCharm.app', IDE_DEFINITIONS.pycharm],
+      ['GoLand', '/Applications/GoLand.app', IDE_DEFINITIONS.goland],
+      [
+        'Android Studio',
+        '/Applications/Android Studio.app',
+        IDE_DEFINITIONS.androidstudio,
+      ],
+      ['CLion', '/Applications/CLion.app', IDE_DEFINITIONS.clion],
+      ['RustRover', '/Applications/RustRover.app', IDE_DEFINITIONS.rustrover],
+      ['DataGrip', '/Applications/DataGrip.app', IDE_DEFINITIONS.datagrip],
+      ['PhpStorm', '/Applications/PhpStorm.app', IDE_DEFINITIONS.phpstorm],
+    ])('should detect %s via command', (_name, command, expectedIde) => {
+      const processInfo = { pid: 123, command };
+      expect(detectIde(processInfo)).toBe(expectedIde);
+    });
   });
 
   it('should return generic JetBrains when command does not match specific IDE', () => {
