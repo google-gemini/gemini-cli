@@ -61,6 +61,7 @@ they appear in the UI.
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                  | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
 | Incremental Rendering          | `ui.incrementalRendering`                | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
 | Disable Loading Phrases        | `ui.accessibility.disableLoadingPhrases` | Disable loading phrases for accessibility                                                                                                                         | `false` |
+| Disable Spinner                | `ui.accessibility.disableSpinner`        | Disable the loading spinner to reduce UI updates.                                                                                                                 | `false` |
 | Screen Reader Mode             | `ui.accessibility.screenReader`          | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
 
 ### IDE

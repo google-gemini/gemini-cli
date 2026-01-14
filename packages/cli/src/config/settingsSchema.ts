@@ -585,6 +585,15 @@ const SETTINGS_SCHEMA = {
             description: 'Disable loading phrases for accessibility',
             showInDialog: true,
           },
+          disableSpinner: {
+            type: 'boolean',
+            label: 'Disable Spinner',
+            category: 'UI',
+            requiresRestart: true,
+            default: false,
+            description: 'Disable the loading spinner to reduce UI updates.',
+            showInDialog: true,
+          },
           screenReader: {
             type: 'boolean',
             label: 'Screen Reader Mode',

@@ -347,6 +347,13 @@
               "default": false,
               "type": "boolean"
             },
+            "disableSpinner": {
+              "title": "Disable Spinner",
+              "description": "Disable the loading spinner to reduce UI updates.",
+              "markdownDescription": "Disable the loading spinner to reduce UI updates.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
             "screenReader": {
               "title": "Screen Reader Mode",
               "description": "Render output in plain-text to be more screen reader accessible",
