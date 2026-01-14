@@ -1489,6 +1489,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "plan": {
+          "title": "Plan",
+          "description": "Enable planning features (Plan Mode and tools).",
+          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
