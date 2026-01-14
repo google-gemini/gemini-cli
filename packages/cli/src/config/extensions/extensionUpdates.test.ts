@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from './storage.js';
+import type { Settings } from '../settings.js';
 import {
   KeychainTokenStorage,
   debugLogger,
@@ -245,8 +246,13 @@ describe('extensionUpdates', () => {
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        settings: { telemetry: {} } as any,
+
+        settings: {
+          telemetry: {
+            enabled: false,
+          },
+          experimental: { extensionConfig: true },
+        } as unknown as Settings,
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });
