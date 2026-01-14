@@ -96,6 +96,27 @@ describe('RenderInline - URL handling with trailing punctuation', () => {
     expect(lastFrame()).toContain('https://example.com');
   });
 
+  it('should preserve balanced parentheses in URLs (Wikipedia style)', () => {
+    const { lastFrame } = renderWithProviders(
+      <RenderInline text="See https://en.wikipedia.org/wiki/State_(computer_science)" />,
+    );
+    expect(lastFrame()).toContain(
+      'https://en.wikipedia.org/wiki/State_(computer_science)',
+    );
+  });
+
+  it('should strip extra punctuation but preserve balanced parentheses', () => {
+    const { lastFrame } = renderWithProviders(
+      <RenderInline text="Check https://en.wikipedia.org/wiki/State_(computer_science))." />,
+    );
+    expect(lastFrame()).toContain(
+      'https://en.wikipedia.org/wiki/State_(computer_science)',
+    );
+    expect(lastFrame()).not.toContain(
+      'https://en.wikipedia.org/wiki/State_(computer_science)).',
+    );
+  });
+
   it('should render URLs in mixed content', () => {
     const { lastFrame } = renderWithProviders(
       <RenderInline text="Check out https://github.com/google-gemini/gemini-cli。 This is great!" />,
