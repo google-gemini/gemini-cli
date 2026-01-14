@@ -145,7 +145,7 @@ export const BackgroundShellDisplay = ({
       if (!activeShell) return;
 
       // Handle Shift+Tab to focus out
-      if (key.name === 'tab' && key.shift) {
+      if (key.name === 'tab' && (key.shift || isListOpenProp)) {
         setEmbeddedShellFocused(false);
         return;
       }
@@ -272,7 +272,6 @@ export const BackgroundShellDisplay = ({
         <Text
           key={shell.pid}
           color={isActive ? theme.text.primary : theme.text.secondary}
-          backgroundColor={isActive ? theme.border.focused : undefined}
           bold={isActive}
         >
           {label}
@@ -299,25 +298,25 @@ export const BackgroundShellDisplay = ({
       width - BORDER_WIDTH - CONTENT_PADDING_X * 2 - 10,
     );
 
-    const items: Array<RadioSelectItem<number>> = Array.from(shells.values()).map(
-      (shell, index) => {
-        const truncatedCommand = formatShellCommandForDisplay(
-          shell.command,
-          maxCommandLength,
-        );
+    const items: Array<RadioSelectItem<number>> = Array.from(
+      shells.values(),
+    ).map((shell, index) => {
+      const truncatedCommand = formatShellCommandForDisplay(
+        shell.command,
+        maxCommandLength,
+      );
 
-        let label = `${index + 1}: ${truncatedCommand} (PID: ${shell.pid})`;
-        if (shell.status === 'exited') {
-          label += ` (Exit Code: ${shell.exitCode})`;
-        }
+      let label = `${index + 1}: ${truncatedCommand} (PID: ${shell.pid})`;
+      if (shell.status === 'exited') {
+        label += ` (Exit Code: ${shell.exitCode})`;
+      }
 
-        return {
-          key: shell.pid.toString(),
-          value: shell.pid,
-          label,
-        };
-      },
-    );
+      return {
+        key: shell.pid.toString(),
+        value: shell.pid,
+        label,
+      };
+    });
 
     const initialIndex = items.findIndex((item) => item.value === activePid);
 
