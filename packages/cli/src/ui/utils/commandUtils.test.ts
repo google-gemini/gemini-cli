@@ -247,11 +247,12 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
 
-    it('wraps OSC-52 for tmux', async () => {
+    it('wraps OSC-52 for tmux when in SSH', async () => {
       const testText = 'tmux-copy';
       const tty = makeWritable({ isTTY: true });
       mockFs.createWriteStream.mockReturnValue(tty);
 
+      process.env['SSH_CONNECTION'] = '1';
       process.env['TMUX'] = '1';
 
       await copyToClipboard(testText);
@@ -265,12 +266,13 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
 
-    it('wraps OSC-52 for GNU screen with chunked DCS', async () => {
+    it('wraps OSC-52 for GNU screen with chunked DCS when in SSH', async () => {
       // ensure payload > chunk size (240) so there are multiple chunks
       const testText = 'x'.repeat(1200);
       const tty = makeWritable({ isTTY: true });
       mockFs.createWriteStream.mockReturnValue(tty);
 
+      process.env['SSH_CONNECTION'] = '1';
       process.env['STY'] = 'screen-session';
 
       await copyToClipboard(testText);
@@ -358,6 +360,21 @@ describe('commandUtils', () => {
       mockFs.createWriteStream.mockReturnValue(tty);
       const text = 'local-terminal';
       mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard(text);
+
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
+      expect(tty.write).not.toHaveBeenCalled();
+      expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy in tmux when not in SSH/WSL', async () => {
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockReturnValue(tty);
+      const text = 'tmux-local';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      process.env['TMUX'] = '1';
 
       await copyToClipboard(text);
 

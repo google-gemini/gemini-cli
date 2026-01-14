@@ -35,6 +35,8 @@ export default tseslint.config(
       'package/bundle/**',
       '.integration-tests/**',
       'dist/**',
+      'evals/**',
+      'packages/test-utils/**',
     ],
   },
   eslint.configs.recommended,
