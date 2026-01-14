@@ -49,8 +49,8 @@ two arguments:
 - `ALWAYS_PASSES`: Tests expected to pass 100% of the time. These are typically
   trivial and test basic functionality. These run in every CI.
 - `USUALLY_PASSES`: Tests expected to pass most of the time but may have some
-  flakiness due to non-deterministic behaviors. These are skipped unless
-  explicitly requested.
+  flakiness due to non-deterministic behaviors. These are run nightly and used
+  to track the health of the product from build to build.
 
 #### `EvalCase` Properties
 
