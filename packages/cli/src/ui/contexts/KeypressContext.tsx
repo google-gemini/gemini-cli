@@ -85,6 +85,7 @@ const KEY_INFO_MAP: Record<
   '[9u': { name: 'tab' },
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
+  '[32u': { name: 'space' },
   '[127u': { name: 'backspace' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
@@ -144,6 +145,30 @@ function nonKeyboardEventFilter(
 }
 
 /**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accommodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: '',
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
+  };
+}
+
+/**
  * Buffers "/" keys to see if they are followed return.
  * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
  * or when a null key is received.
@@ -187,30 +212,6 @@ function bufferBackslashEnter(
   bufferer.next(); // prime the generator so it starts listening.
 
   return (key: Key) => bufferer.next(key);
-}
-
-/**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
- *
- * This is to accomodate older terminals that paste text without bracketing.
- */
-function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
-  let lastKeyTime = 0;
-  return (key: Key) => {
-    const now = Date.now();
-    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: '',
-        sequence: '\r',
-        insertable: true,
-      });
-    } else {
-      keypressHandler(key);
-    }
-    lastKeyTime = now;
-  };
 }
 
 /**
@@ -504,6 +505,10 @@ function* emitKeys(
         if (keyInfo.ctrl) {
           ctrl = true;
         }
+        if (name === 'space' && !ctrl && !meta) {
+          sequence = ' ';
+          insertable = true;
+        }
       } else {
         name = 'undefined';
         if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
@@ -661,7 +666,7 @@ export function KeypressProvider({
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
-    if (!terminalCapabilityManager.isBracketedPasteEnabled()) {
+    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
       processor = bufferFastReturn(processor);
     }
     processor = bufferBackslashEnter(processor);
