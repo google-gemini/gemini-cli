@@ -16,9 +16,10 @@ the main agent's context or toolset.
 > }
 > ```
 >
-> **Warning:** Sub-agents currently operate in "YOLO mode" (You Only Look Once),
-> meaning they may execute tools without individual user confirmation for each
-> step. Proceed with caution when defining agents with powerful tools like
+> **Warning:** Sub-agents currently operate in
+> ["YOLO mode"](../get-started/configuration.md#command-line-arguments), meaning
+> they may execute tools without individual user confirmation for each step.
+> Proceed with caution when defining agents with powerful tools like
 > `run_shell_command` or `write_file`.
 
 ## What are Sub-Agents?
