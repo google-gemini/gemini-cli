@@ -20,4 +20,6 @@ export interface PrepareLabelProps {
   isExpanded?: boolean;
 }
 
-export const PrepareLabel: React.FC<PrepareLabelProps> = (props) => <ExpandablePrompt {...props} />;
+export const PrepareLabel: React.FC<PrepareLabelProps> = (props) => (
+  <ExpandablePrompt {...props} />
+);
