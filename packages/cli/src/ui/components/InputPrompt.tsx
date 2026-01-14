@@ -506,9 +506,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-          // Second ESC triggers rewind
           resetEscapeState();
-          onSubmit('/rewind');
         }
         return;
       }
@@ -877,7 +875,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
-      onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
     ],

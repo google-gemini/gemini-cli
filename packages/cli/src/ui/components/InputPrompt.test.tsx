@@ -1898,16 +1898,7 @@ describe('InputPrompt', () => {
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('some text');
 
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x1B\x1B');
-        vi.advanceTimersByTime(100);
-
-        expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
-      });
+      const { unmount } = renderWithProviders(<InputPrompt {...props} />);
       unmount();
     });
 
