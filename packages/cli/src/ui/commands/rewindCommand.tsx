@@ -57,12 +57,16 @@ export const rewindCommand: SlashCommand = {
       component: (
         <RewindViewer
           conversation={conversation}
-          onExit={() => context.ui.removeComponent()}
+          onExit={() => {
+            context.ui.removeComponent();
+            context.ui.clearTextToast();
+          }}
           onRewind={async (messageId, newText, outcome) => {
             try {
               switch (outcome) {
                 case RewindOutcome.Cancel:
                   context.ui.removeComponent();
+                  context.ui.clearTextToast();
                   return;
 
                 case RewindOutcome.RevertOnly:

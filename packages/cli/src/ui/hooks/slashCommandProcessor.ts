@@ -72,6 +72,7 @@ interface SlashCommandProcessorActions {
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   setText: (text: string) => void;
+  clearTextToast: () => void;
 }
 
 /**
@@ -232,6 +233,7 @@ export const useSlashCommandProcessor = (
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
+        clearTextToast: actions.clearTextToast,
       },
       session: {
         stats: session.stats,

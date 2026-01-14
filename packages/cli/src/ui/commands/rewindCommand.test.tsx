@@ -31,6 +31,7 @@ const mockResetContext = vi.fn();
 const mockSetInput = vi.fn();
 const mockRevertFileChanges = vi.fn();
 const mockGetProjectRoot = vi.fn().mockReturnValue('/mock/root');
+const mockClearTextToast = vi.fn();
 
 vi.mock('@google/gemini-cli-core', () => ({
   uiTelemetryService: {
@@ -111,6 +112,7 @@ describe('rewindCommand', () => {
         loadHistory: mockLoadHistory,
         addItem: mockAddItem,
         setPendingItem: mockSetPendingItem,
+        clearTextToast: mockClearTextToast,
       },
     }) as unknown as CommandContext;
   });
@@ -216,8 +218,23 @@ describe('rewindCommand', () => {
       expect(mockRevertFileChanges).not.toHaveBeenCalled();
       expect(mockRewindTo).not.toHaveBeenCalled();
       expect(mockRemoveComponent).toHaveBeenCalled();
+      expect(mockClearTextToast).toHaveBeenCalled();
     });
     expect(mockSetInput).not.toHaveBeenCalled();
+  });
+
+  it('should handle onExit correctly', async () => {
+    const result = (await rewindCommand.action!(
+      mockContext,
+      '',
+    )) as OpenCustomDialogActionReturn;
+    const component = result.component as ReactElement<RewindViewerProps>;
+    const onExit = component.props.onExit;
+
+    onExit();
+
+    expect(mockRemoveComponent).toHaveBeenCalled();
+    expect(mockClearTextToast).toHaveBeenCalled();
   });
 
   it('should handle rewind error correctly', async () => {

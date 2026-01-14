@@ -201,6 +201,7 @@ describe('useSlashCommandProcessor', () => {
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
             setText: vi.fn(),
+            clearTextToast: vi.fn(),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized

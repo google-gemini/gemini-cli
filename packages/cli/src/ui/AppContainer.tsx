@@ -644,6 +644,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
     exitEditorDialog,
   } = useEditorSettings(settings, setEditorError, historyManager.addItem);
 
+  const [showClearTextToast, setShowClearTextToast] = useState(false);
+  const clearTextToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleClearTextToastChange = useCallback((show: boolean) => {
+    setShowClearTextToast(show);
+    if (clearTextToastTimeoutRef.current) {
+      clearTimeout(clearTextToastTimeoutRef.current);
+      clearTextToastTimeoutRef.current = null;
+    }
+    if (show) {
+      clearTextToastTimeoutRef.current = setTimeout(() => {
+        setShowClearTextToast(false);
+        clearTextToastTimeoutRef.current = null;
+      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
+    }
+  }, []);
+
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
@@ -675,6 +692,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
       setText: (text: string) => buffer.setText(text),
+      clearTextToast: () => handleClearTextToastChange(false),
     }),
     [
       setAuthState,
@@ -692,6 +710,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       buffer,
+      handleClearTextToastChange,
     ],
   );
 
@@ -1059,7 +1078,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     IdeContext | undefined
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
-  const [showClearTextToast, setShowClearTextToast] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
@@ -1075,7 +1093,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const clearTextToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleWarning = useCallback((message: string) => {
     setWarningMessage(message);
@@ -1085,20 +1102,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     warningTimeoutRef.current = setTimeout(() => {
       setWarningMessage(null);
     }, WARNING_PROMPT_DURATION_MS);
-  }, []);
-
-  const handleClearTextToastChange = useCallback((show: boolean) => {
-    setShowClearTextToast(show);
-    if (clearTextToastTimeoutRef.current) {
-      clearTimeout(clearTextToastTimeoutRef.current);
-      clearTextToastTimeoutRef.current = null;
-    }
-    if (show) {
-      clearTextToastTimeoutRef.current = setTimeout(() => {
-        setShowClearTextToast(false);
-        clearTextToastTimeoutRef.current = null;
-      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
-    }
   }, []);
 
   useEffect(() => {
