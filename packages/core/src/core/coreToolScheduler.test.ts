@@ -1245,6 +1245,7 @@ describe('CoreToolScheduler request queueing', () => {
           title: 'Confirm Shell Command',
           command: String(params['command'] ?? ''),
           rootCommand: 'git',
+          rootCommands: ['git'],
           onConfirm: async () => {},
         }),
       execute: () => executeFn({}),
