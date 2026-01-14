@@ -5,6 +5,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import * as os from 'node:os';
+import si from 'systeminformation';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type {
   StartSessionEvent,
@@ -57,6 +59,7 @@ import {
   isCloudShell,
 } from '../../ide/detect-ide.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -190,6 +193,35 @@ const MAX_EVENTS = 1000;
  */
 const MAX_RETRY_EVENTS = 100;
 
+const NO_GPU = 'NA';
+
+let cachedGpuInfo: string | undefined;
+
+async function refreshGpuInfo(): Promise<void> {
+  try {
+    const graphics = await si.graphics();
+    if (graphics.controllers && graphics.controllers.length > 0) {
+      cachedGpuInfo = graphics.controllers.map((c) => c.model).join(', ');
+    } else {
+      cachedGpuInfo = NO_GPU;
+    }
+  } catch (error) {
+    cachedGpuInfo = 'FAILED';
+    debugLogger.error(
+      'Failed to get GPU information for telemetry',
+      getErrorMessage(error),
+    );
+  }
+}
+
+async function getGpuInfo(): Promise<string> {
+  if (!cachedGpuInfo) {
+    await refreshGpuInfo();
+  }
+
+  return cachedGpuInfo ?? NO_GPU;
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -321,7 +353,6 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
-
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -475,7 +506,7 @@ export class ClearcutLogger {
     return result;
   }
 
-  logStartSessionEvent(event: StartSessionEvent): void {
+  async logStartSessionEvent(event: StartSessionEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -564,6 +595,29 @@ export class ClearcutLogger {
         value: event.extension_ids.toString(),
       },
     ];
+
+    // Add hardware information only to the start session event
+    const cpus = os.cpus();
+    data.push(
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        value: cpus[0].model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        value: cpus.length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+        value: (os.totalmem() / 1024 ** 3).toFixed(2).toString(),
+      },
+    );
+
+    const gpuInfo = await getGpuInfo();
+    data.push({
+      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+      value: gpuInfo,
+    });
     this.sessionData = data;
 
     // Flush after experiments finish loading from CCPA server
@@ -1533,4 +1587,8 @@ export class ClearcutLogger {
 export const TEST_ONLY = {
   MAX_RETRY_EVENTS,
   MAX_EVENTS,
+  refreshGpuInfo,
+  resetCachedGpuInfoForTesting: () => {
+    cachedGpuInfo = undefined;
+  },
 };
