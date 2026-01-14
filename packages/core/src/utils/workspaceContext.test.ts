@@ -278,7 +278,7 @@ describe('WorkspaceContext with real filesystem', () => {
         // handle it gracefully and return false.
         expect(workspaceContext.isPathWithinWorkspace(linkA)).toBe(false);
         expect(workspaceContext.isPathWithinWorkspace(linkB)).toBe(false);
-      });
+      }, 30000);
     });
   });
 

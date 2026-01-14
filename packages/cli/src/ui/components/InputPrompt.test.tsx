@@ -26,7 +26,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from '../hooks/useCommandCompletion.js';
 import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
@@ -214,6 +217,7 @@ describe('InputPrompt', () => {
         leafCommand: null,
       },
       getCompletedText: vi.fn().mockReturnValue(null),
+      completionMode: CompletionMode.IDLE,
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 

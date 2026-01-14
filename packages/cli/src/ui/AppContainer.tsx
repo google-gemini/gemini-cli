@@ -391,6 +391,11 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, []);
 
+  const getPreferredEditor = useCallback(
+    () => settings.merged.general?.preferredEditor as EditorType,
+    [settings.merged.general?.preferredEditor],
+  );
+
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height: 10, width: inputWidth },
@@ -398,6 +403,7 @@ export const AppContainer = (props: AppContainerProps) => {
     setRawMode,
     isValidPath,
     shellModeActive,
+    getPreferredEditor,
   });
 
   // Initialize input history from logger (past sessions)
@@ -758,11 +764,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => {},
   );
 
-  const getPreferredEditor = useCallback(
-    () => settings.merged.general?.preferredEditor as EditorType,
-    [settings.merged.general?.preferredEditor],
-  );
-
   const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
     if (shouldRestorePrompt) {
       setPendingRestorePrompt(true);
@@ -801,6 +802,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    retryStatus,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1222,6 +1224,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     settings.merged.ui?.customWittyPhrases,
     !!activePtyId && !embeddedShellFocused,
     lastOutputTime,
+    retryStatus,
   );
 
   const handleGlobalKeypress = useCallback(
@@ -1277,7 +1280,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           return newValue;
         });
       } else if (
-        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
+        keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
         ideContextState
       ) {
@@ -1289,7 +1292,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
       } else if (
-        keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_OUT](key) &&
+        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) &&
         activePtyId &&
         embeddedShellFocused
       ) {
