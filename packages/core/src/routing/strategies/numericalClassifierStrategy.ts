@@ -68,7 +68,7 @@ Respond *only* in JSON format according to the following schema.
 {
   "type": "object",
   "properties": {
-    "reasoning": {
+    "complexity_reasoning": {
       "type": "string",
       "description": "Brief explanation of the requests complexity."
     },
