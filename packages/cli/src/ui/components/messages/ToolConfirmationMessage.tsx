@@ -19,7 +19,6 @@ import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 
 export interface ToolConfirmationMessageProps {
@@ -41,7 +40,6 @@ export const ToolConfirmationMessage: React.FC<
 }) => {
   const { onConfirm } = confirmationDetails;
 
-  const isAlternateBuffer = useAlternateBuffer();
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security?.enablePermanentToolApproval ?? false;
@@ -273,20 +271,14 @@ export const ToolConfirmationMessage: React.FC<
         bodyContentHeight -= 2; // Account for padding;
       }
 
-      const commandBox = (
-        <Box>
-          <Text color={theme.text.link}>{executionProps.command}</Text>
-        </Box>
-      );
-
-      bodyContent = isAlternateBuffer ? (
-        commandBox
-      ) : (
+      bodyContent = (
         <MaxSizedBox
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          {commandBox}
+          <Box>
+            <Text color={theme.text.link}>{executionProps.command}</Text>
+          </Box>
         </MaxSizedBox>
       );
     } else if (confirmationDetails.type === 'info') {
@@ -338,7 +330,6 @@ export const ToolConfirmationMessage: React.FC<
     isDiffingEnabled,
     availableTerminalHeight,
     terminalWidth,
-    isAlternateBuffer,
     allowPermanentApproval,
   ]);
 
