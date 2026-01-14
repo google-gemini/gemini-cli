@@ -203,7 +203,7 @@ jobs:
               - No straightforward workaround exists, or the workaround is difficult and non-obvious.
               Qualifier: Is a key feature unusable or giving very wrong results?
               Example: Gemini CLI enters a loop when making read-many-files tool call. I am unable to break out of the loop and gemini doesn't follow instructions subsequently.
-            P2: Medium
+P2: Medium
               - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
               Impact:
               - Affects a non-critical feature or a smaller, specific subset of users.
@@ -211,7 +211,7 @@ jobs:
               - Noticeable UI/UX problems that don't break functionality but look unprofessional (e.g., elements are misaligned or overlapping).
               Qualifier: Is it an annoying but non-blocking problem?
               Example: An error message is unclear or contains a typo, causing user confusion but not halting their workflow.
-            P3: Low
+P3: Low
               - A P3 bug is a minor, low-impact issue that is trivial or cosmetic. It has little to no effect on the overall functionality of the application.
               Impact:
               - Minor cosmetic issues like color inconsistencies, typos in documentation, or slight alignment problems on a non-critical page.
@@ -238,23 +238,16 @@ jobs:
             core.info(`Raw labels JSON: ${rawLabels}`);
             let parsedLabels;
             try {
-              // First, try to parse the raw output as JSON.
-              parsedLabels = JSON.parse(rawLabels.trim());
-            } catch (jsonError) {
-              // If that fails, check for a markdown code block.
-              core.info(`Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`);
               const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-              if (jsonMatch && jsonMatch[1]) {
-                try {
-                  parsedLabels = JSON.parse(jsonMatch[1].trim());
-                } catch (markdownError) {
-                  core.setFailed(`Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`);
-                  return;
-                }
-              } else {
-                core.setFailed(`Output is not valid JSON and does not contain a JSON markdown block.\nRaw output: ${rawLabels}`);
-                return;
+              if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("Could not find a ```json ... ``` block in the output.");
               }
+              const jsonString = jsonMatch[1].trim();
+              parsedLabels = JSON.parse(jsonString);
+              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+            } catch (err) {
+              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              return;
             }
 
             for (const entry of parsedLabels) {

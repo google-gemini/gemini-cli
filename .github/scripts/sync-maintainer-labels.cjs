@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* global process, console, require */
 const { Octokit } = require('@octokit/rest');
 
 /**
@@ -18,11 +20,12 @@ const ALLOWED_REPOS = [PUBLIC_REPO, PRIVATE_REPO];
 const ROOT_ISSUES = [
   { owner: REPO_OWNER, repo: PUBLIC_REPO, number: 15374 },
   { owner: REPO_OWNER, repo: PUBLIC_REPO, number: 15456 },
-  { owner: REPO_OWNER, repo: PUBLIC_REPO, number: 15324 }
+  { owner: REPO_OWNER, repo: PUBLIC_REPO, number: 15324 },
 ];
 
 const TARGET_LABEL = '🔒 maintainer only';
-const isDryRun = process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
+const isDryRun =
+  process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
@@ -44,14 +47,16 @@ function extractTaskListLinks(text, contextOwner, contextRepo) {
   };
 
   // 1. Full URLs in task lists
-  const urlRegex = /-\s+\[[ x]\].*https:\/\/github\.com\/([a-zA-Z0-9._-]+)\/([a-zA-Z0-9._-]+)\/issues\/(\d+)\b/g;
+  const urlRegex =
+    /-\s+\[[ x]\].*https:\/\/github\.com\/([a-zA-Z0-9._-]+)\/([a-zA-Z0-9._-]+)\/issues\/(\d+)\b/g;
   let match;
   while ((match = urlRegex.exec(text)) !== null) {
     add(match[1], match[2], match[3]);
   }
 
   // 2. Cross-repo refs in task lists: owner/repo#123
-  const crossRepoRegex = /-\s+\[[ x]\].*([a-zA-Z0-9._-]+)\/([a-zA-Z0-9._-]+)#(\d+)\b/g;
+  const crossRepoRegex =
+    /-\s+\[[ x]\].*([a-zA-Z0-9._-]+)\/([a-zA-Z0-9._-]+)#(\d+)\b/g;
   while ((match = crossRepoRegex.exec(text)) !== null) {
     add(match[1], match[2], match[3]);
   }
@@ -109,9 +114,9 @@ async function fetchIssueData(owner, repo, number) {
       state: data.state,
       title: data.title,
       body: data.body || '',
-      labels: data.labels.nodes.map(n => n.name),
+      labels: data.labels.nodes.map((n) => n.name),
       subIssues: [...data.subIssues.nodes],
-      comments: data.comments.nodes.map(n => n.body)
+      comments: data.comments.nodes.map((n) => n.body),
     };
 
     // Paginate subIssues if there are more than 100
@@ -122,7 +127,7 @@ async function fetchIssueData(owner, repo, number) {
         number,
         'subIssues',
         'number repository { name owner { login } }',
-        data.subIssues.pageInfo.endCursor
+        data.subIssues.pageInfo.endCursor,
       );
       issue.subIssues.push(...moreSubIssues);
     }
@@ -136,20 +141,20 @@ async function fetchIssueData(owner, repo, number) {
         'labels',
         'name',
         data.labels.pageInfo.endCursor,
-        (n) => n.name
+        (n) => n.name,
       );
       issue.labels.push(...moreLabels);
     }
 
     // Note: Comments are handled via Task Lists in body + first 100 comments.
     // If an issue has > 100 comments with task lists, we'd need to paginate those too.
-    // Given the 1,100+ issue discovery count, 100 comments is usually sufficient, 
+    // Given the 1,100+ issue discovery count, 100 comments is usually sufficient,
     // but we can add it for absolute completeness.
     // (Skipping for now to avoid excessive API churn unless clearly needed).
 
     return issue;
   } catch (error) {
-    if (error.errors && error.errors.some(e => e.type === 'NOT_FOUND')) {
+    if (error.errors && error.errors.some((e) => e.type === 'NOT_FOUND')) {
       return null;
     }
     throw error;
@@ -159,7 +164,15 @@ async function fetchIssueData(owner, repo, number) {
 /**
  * Helper to paginate any GraphQL connection.
  */
-async function paginateConnection(owner, repo, number, connectionName, nodeFields, initialCursor, transformNode = (n) => n) {
+async function paginateConnection(
+  owner,
+  repo,
+  number,
+  connectionName,
+  nodeFields,
+  initialCursor,
+  transformNode = (n) => n,
+) {
   let additionalNodes = [];
   let hasNext = true;
   let cursor = initialCursor;
@@ -177,7 +190,12 @@ async function paginateConnection(owner, repo, number, connectionName, nodeField
         }
       }
     `;
-    const response = await octokit.graphql(query, { owner, repo, number, cursor });
+    const response = await octokit.graphql(query, {
+      owner,
+      repo,
+      number,
+      cursor,
+    });
     const connection = response.repository.issue[connectionName];
     additionalNodes.push(...connection.nodes.map(transformNode));
     hasNext = connection.pageInfo.hasNextPage;
@@ -191,10 +209,10 @@ async function paginateConnection(owner, repo, number, connectionName, nodeField
  */
 function shouldProcess(issueData) {
   if (!issueData) return false;
-  
+
   if (issueData.state !== 'OPEN') return false;
 
-  const labels = issueData.labels.map(l => l.toLowerCase());
+  const labels = issueData.labels.map((l) => l.toLowerCase());
   if (labels.includes('duplicate') || labels.includes('kind/duplicate')) {
     return false;
   }
@@ -218,8 +236,12 @@ async function getAllDescendants(roots) {
     const currentKey = `${current.owner}/${current.repo}#${current.number}`;
 
     try {
-      const issueData = await fetchIssueData(current.owner, current.repo, current.number);
-      
+      const issueData = await fetchIssueData(
+        current.owner,
+        current.repo,
+        current.number,
+      );
+
       if (!shouldProcess(issueData)) {
         continue;
       }
@@ -227,11 +249,15 @@ async function getAllDescendants(roots) {
       // ONLY add to labeling list if it's in the PUBLIC repository
       if (current.repo === PUBLIC_REPO) {
         // Don't label the roots themselves
-        if (!ROOT_ISSUES.some(r => r.number === current.number && r.repo === current.repo)) {
+        if (
+          !ROOT_ISSUES.some(
+            (r) => r.number === current.number && r.repo === current.repo,
+          )
+        ) {
           allDescendants.set(currentKey, {
             ...current,
             title: issueData.title,
-            labels: issueData.labels
+            labels: issueData.labels,
           });
         }
       }
@@ -245,7 +271,11 @@ async function getAllDescendants(roots) {
           const childRepo = node.repository.name;
           const childNumber = node.number;
           const key = `${childOwner}/${childRepo}#${childNumber}`;
-          children.set(key, { owner: childOwner, repo: childRepo, number: childNumber });
+          children.set(key, {
+            owner: childOwner,
+            repo: childRepo,
+            number: childNumber,
+          });
         }
       }
 
@@ -256,8 +286,12 @@ async function getAllDescendants(roots) {
           combinedText += '\n' + (commentBody || '');
         }
       }
-      
-      const taskListLinks = extractTaskListLinks(combinedText, current.owner, current.repo);
+
+      const taskListLinks = extractTaskListLinks(
+        combinedText,
+        current.owner,
+        current.repo,
+      );
       for (const link of taskListLinks) {
         const key = `${link.owner}/${link.repo}#${link.number}`;
         children.set(key, link);
@@ -284,17 +318,21 @@ async function run() {
   }
 
   const descendants = await getAllDescendants(ROOT_ISSUES);
-  console.log(`\nFound ${descendants.length} total unique open descendant issues in ${PUBLIC_REPO}.`);
+  console.log(
+    `\nFound ${descendants.length} total unique open descendant issues in ${PUBLIC_REPO}.`,
+  );
 
   for (const issueInfo of descendants) {
     const issueKey = `${issueInfo.owner}/${issueInfo.repo}#${issueInfo.number}`;
     try {
       // Data is already available from the discovery phase
-      const hasLabel = issueInfo.labels.some(l => l === TARGET_LABEL);
+      const hasLabel = issueInfo.labels.some((l) => l === TARGET_LABEL);
 
       if (!hasLabel) {
         if (isDryRun) {
-          console.log(`[DRY RUN] Would label ${issueKey}: "${issueInfo.title}"`);
+          console.log(
+            `[DRY RUN] Would label ${issueKey}: "${issueInfo.title}"`,
+          );
         } else {
           console.log(`Labeling ${issueKey}: "${issueInfo.title}"...`);
           await octokit.rest.issues.addLabels({
@@ -311,7 +349,7 @@ async function run() {
   }
 }
 
-run().catch(error => {
+run().catch((error) => {
   console.error(error);
   process.exit(1);
 });
