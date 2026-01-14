@@ -32,10 +32,11 @@ export interface RetryOptions {
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
+  onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 3,
+  maxAttempts: 10,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -149,6 +150,7 @@ export async function retryWithBackoff<T>(
     retryFetchErrors,
     signal,
     getAvailabilityContext,
+    onRetry,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -172,6 +174,9 @@ export async function retryWithBackoff<T>(
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
+        if (onRetry) {
+          onRetry(attempt, new Error('Invalid content'), delayWithJitter);
+        }
         await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
@@ -252,6 +257,9 @@ export async function retryWithBackoff<T>(
           debugLogger.warn(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
+          if (onRetry) {
+            onRetry(attempt, error, classifiedError.retryDelayMs);
+          }
           await delay(classifiedError.retryDelayMs, signal);
           continue;
         } else {
@@ -261,6 +269,9 @@ export async function retryWithBackoff<T>(
           // Exponential backoff with jitter for non-quota errors
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
           const delayWithJitter = Math.max(0, currentDelay + jitter);
+          if (onRetry) {
+            onRetry(attempt, error, delayWithJitter);
+          }
           await delay(delayWithJitter, signal);
           currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
@@ -281,6 +292,9 @@ export async function retryWithBackoff<T>(
       // Exponential backoff with jitter for non-quota errors
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
       const delayWithJitter = Math.max(0, currentDelay + jitter);
+      if (onRetry) {
+        onRetry(attempt, error, delayWithJitter);
+      }
       await delay(delayWithJitter, signal);
       currentDelay = Math.min(maxDelayMs, currentDelay * 2);
     }
