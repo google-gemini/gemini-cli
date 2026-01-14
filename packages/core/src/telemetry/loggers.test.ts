@@ -111,6 +111,14 @@ import { UserAccountManager } from '../utils/userAccountManager.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { AgentTerminateMode } from '../agents/types.js';
 
+vi.mock('systeminformation', () => ({
+  default: {
+    graphics: vi.fn().mockResolvedValue({
+      controllers: [{ model: 'Mock GPU' }],
+    }),
+  },
+}));
+
 describe('loggers', () => {
   const mockLogger = {
     emit: vi.fn(),
@@ -1053,6 +1061,7 @@ describe('loggers', () => {
           resultDisplay: {
             fileDiff: 'diff',
             fileName: 'file.txt',
+            filePath: 'file.txt',
             originalContent: 'old content',
             newContent: 'new content',
             diffStat: {
