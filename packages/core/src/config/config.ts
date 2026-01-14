@@ -683,6 +683,7 @@ export class Config {
       ...params.policyEngineConfig,
       approvalMode:
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      allowedTools: params.allowedTools,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.skillManager = new SkillManager();

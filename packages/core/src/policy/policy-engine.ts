@@ -26,6 +26,8 @@ import {
   splitCommands,
   hasRedirection,
 } from '../utils/shell-utils.js';
+import { buildArgsPatterns } from './utils.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -80,6 +82,53 @@ function ruleMatches(
   return true;
 }
 
+function buildAllowedToolRules(
+  allowedTools: string[] | undefined,
+): PolicyRule[] {
+  if (!allowedTools || allowedTools.length === 0) {
+    return [];
+  }
+
+  const rules: PolicyRule[] = [];
+  for (const tool of allowedTools) {
+    const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
+    if (match) {
+      const [, rawToolName, args] = match;
+      const toolName = SHELL_TOOL_NAMES.includes(rawToolName)
+        ? SHELL_TOOL_NAME
+        : rawToolName;
+      if (toolName === SHELL_TOOL_NAME) {
+        const patterns = buildArgsPatterns(undefined, args);
+        for (const pattern of patterns) {
+          if (pattern) {
+            rules.push({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              priority: 2.3,
+              argsPattern: new RegExp(pattern),
+            });
+          }
+        }
+      } else {
+        rules.push({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+        });
+      }
+    } else {
+      const toolName = SHELL_TOOL_NAMES.includes(tool) ? SHELL_TOOL_NAME : tool;
+      rules.push({
+        toolName,
+        decision: PolicyDecision.ALLOW,
+        priority: 2.3,
+      });
+    }
+  }
+
+  return rules;
+}
+
 /**
  * Check if a hook checker rule matches a hook execution context.
  */
@@ -111,7 +160,8 @@ export class PolicyEngine {
   private approvalMode: ApprovalMode;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
-    this.rules = (config.rules ?? []).sort(
+    const allowedToolRules = buildAllowedToolRules(config.allowedTools);
+    this.rules = [...(config.rules ?? []), ...allowedToolRules].sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
     this.checkers = (config.checkers ?? []).sort(

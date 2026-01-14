@@ -210,6 +210,10 @@ export interface PolicyEngineConfig {
    * List of policy rules to apply.
    */
   rules?: PolicyRule[];
+  /**
+   * List of tools that should be auto-approved.
+   */
+  allowedTools?: string[];
 
   /**
    * List of safety checkers to apply to tool calls.
