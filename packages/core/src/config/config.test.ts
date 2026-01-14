@@ -13,6 +13,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -137,6 +138,8 @@ vi.mock('../services/gitService.js', () => {
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
+
+vi.mock('../services/fileDiscoveryService.js');
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
@@ -719,6 +722,29 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  it('should pass file filtering options to FileDiscoveryService', () => {
+    const configParams = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePath: '.myignore',
+      },
+    };
+
+    const config = new Config(configParams);
+    config.getFileService();
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(
+      path.resolve(TARGET_DIR),
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePath: '.myignore',
+      },
+    );
   });
 
   describe('Usage Statistics', () => {

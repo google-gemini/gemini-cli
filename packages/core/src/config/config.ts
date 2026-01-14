@@ -1570,7 +1570,11 @@ export class Config {
 
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
-      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
+      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
+        respectGitIgnore: this.fileFiltering.respectGitIgnore,
+        respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+        customIgnoreFilePath: this.fileFiltering.customIgnoreFilePath,
+      });
     }
     return this.fileDiscoveryService;
   }
