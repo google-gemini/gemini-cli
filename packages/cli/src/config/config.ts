@@ -637,6 +637,7 @@ export async function loadCliConfig(
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
+  const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -661,6 +662,7 @@ export async function loadCliConfig(
     mcpEnabled,
     extensionsEnabled,
     agents: settings.agents,
+    adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -708,6 +710,7 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,
+
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -750,6 +753,8 @@ export async function loadCliConfig(
       const refreshedSettings = loadSettings(cwd);
       return {
         disabledSkills: refreshedSettings.merged.skills?.disabled,
+        adminSkillsEnabled:
+          refreshedSettings.merged.admin?.skills?.enabled ?? adminSkillsEnabled,
       };
     },
   });

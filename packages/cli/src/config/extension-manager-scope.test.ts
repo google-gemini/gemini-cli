@@ -10,6 +10,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import type { Settings } from './settings.js';
+import {
+  loadAgentsFromDirectory,
+  loadSkillsFromDir,
+} from '@google/gemini-cli-core';
 
 let currentTempHome = '';
 
@@ -24,6 +28,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       error: vi.fn(),
       warn: vi.fn(),
     },
+    loadAgentsFromDirectory: vi.fn().mockImplementation(async () => ({
+      agents: [],
+      errors: [],
+    })),
+    loadSkillsFromDir: vi.fn().mockImplementation(async () => []),
   };
 });
 
@@ -34,6 +43,11 @@ describe('ExtensionManager Settings Scope', () => {
   let extensionDir: string;
 
   beforeEach(async () => {
+    vi.mocked(loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
+    vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
     currentTempHome = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );

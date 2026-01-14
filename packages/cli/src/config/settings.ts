@@ -324,23 +324,19 @@ export class LoadedSettings {
 
   setRemoteAdminSettings(remoteSettings: GeminiCodeAssistSetting): void {
     const admin: Settings['admin'] = {};
+    const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
-    if (remoteSettings.secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = remoteSettings.secureModeEnabled;
+    if (secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = secureModeEnabled;
     }
 
-    if (remoteSettings.mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: remoteSettings.mcpSetting.mcpEnabled };
+    if (mcpSetting?.mcpEnabled !== undefined) {
+      admin.mcp = { enabled: mcpSetting.mcpEnabled };
     }
 
-    if (
-      remoteSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
-      undefined
-    ) {
-      admin.extensions = {
-        enabled:
-          remoteSettings.cliFeatureSetting.extensionsSetting.extensionsEnabled,
-      };
+    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
+    if (extensionsSetting?.extensionsEnabled !== undefined) {
+      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
     }
 
     this._remoteAdminSettings = { admin };

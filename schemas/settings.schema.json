@@ -1697,6 +1697,23 @@
             }
           },
           "additionalProperties": false
+        },
+        "skills": {
+          "title": "Skills Settings",
+          "description": "Agent Skills-specific admin settings.",
+          "markdownDescription": "Agent Skills-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Skills Enabled",
+              "description": "If false, disallows agent skills from being used.",
+              "markdownDescription": "If false, disallows agent skills from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
