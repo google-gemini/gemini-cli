@@ -2240,8 +2240,8 @@ export function useTextBuffer({
         newline();
       else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
       else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
-      else if (key.name === 'up') move('up');
-      else if (key.name === 'down') move('down');
+      else if (keyMatchers[Command.MOVE_UP](key)) move('up');
+      else if (keyMatchers[Command.MOVE_DOWN](key)) move('down');
       else if (keyMatchers[Command.MOVE_WORD_LEFT](key)) move('wordLeft');
       else if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) move('wordRight');
       else if (keyMatchers[Command.HOME](key)) move('home');
