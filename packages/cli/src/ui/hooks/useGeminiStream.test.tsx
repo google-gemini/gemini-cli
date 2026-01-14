@@ -34,6 +34,8 @@ import {
   ToolConfirmationOutcome,
   tokenLimit,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -1333,6 +1335,64 @@ describe('useGeminiStream', () => {
 
       // The final state should be idle
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+  });
+
+  describe('Retry Handling', () => {
+    it('should update retryStatus when CoreEvent.RetryAttempt is emitted', async () => {
+      const { result } = renderHookWithDefaults();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+      };
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+    });
+
+    it('should reset retryStatus when isResponding becomes false', async () => {
+      const { result } = renderTestHook();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+      };
+
+      // Start a query to make isResponding true
+      const mockStream = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Emit retry event
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+
+      // Cancel to make isResponding false
+      await act(async () => {
+        result.current.cancelOngoingRequest();
+      });
+
+      expect(result.current.retryStatus).toBeNull();
     });
   });
 
