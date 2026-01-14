@@ -1,7 +1,34 @@
 # Behavioral Evals
 
-This document describes how to create and run behavioral evaluations for Gemini
-CLI.
+Behavioral evaluations (evals) are tests designed to validate the agent's
+behavior in response to specific prompts. They serve as a critical feedback loop
+for changes to system prompts, tool definitions, and other model-steering
+mechanisms.
+
+## Why Behavioral Evals?
+
+Unlike traditional **integration tests** which verify that the system functions
+correctly (e.g., "does the file writer actually write to disk?"), behavioral
+evals verify that the model _chooses_ to take the correct action (e.g., "does
+the model decide to write to disk when asked to save code?").
+
+They are also distinct from broad **industry benchmarks** (like SWE-bench).
+While benchmarks measure general capabilities across complex challenges, our
+behavioral evals focus on specific, granular behaviors relevant to the Gemini
+CLI's features.
+
+### Key Characteristics
+
+- **Feedback Loop**: They help us understand how changes to prompts or tools
+  affect the model's decision-making.
+  - _Did a change to the system prompt make the model less likely to use tool
+    X?_
+  - _Did a new tool definition confuse the model?_
+- **Regression Testing**: They prevent regressions in model steering.
+- **Non-Determinism**: Unlike unit tests, LLM behavior can be non-deterministic.
+  We distinguish between behaviors that should be robust (`ALWAYS_PASSES`) and
+  those that are generally reliable but might occasionally vary
+  (`USUALLY_PASSES`).
 
 ## Creating an Evaluation
 
