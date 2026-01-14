@@ -401,6 +401,7 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
+  model?: string;
 }
 
 /**
