@@ -149,12 +149,12 @@ export class ModelRouterService {
 
       logModelRouting(this.config, event);
 
-      debugLogger.error(`[Routing] Exception during routing: ${error_message}`);
+      debugLogger.debug(`[Routing] Exception during routing: ${error_message}`);
       debugLogger.debug(
         `[Routing] Fallback model: ${decision.model} (Source: ${decision.metadata.source})`,
       );
 
-      throw e;
+      return decision;
     }
   }
 }

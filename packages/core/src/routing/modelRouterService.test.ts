@@ -130,12 +130,15 @@ describe('ModelRouterService', () => {
       );
     });
 
-    it('should log a telemetry event and re-throw on a failed decision', async () => {
+    it('should log a telemetry event and return fallback on a failed decision', async () => {
       const testError = new Error('Strategy failed');
       vi.spyOn(mockCompositeStrategy, 'route').mockRejectedValue(testError);
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('default-model');
 
-      await expect(service.route(mockContext)).rejects.toThrow(testError);
+      const decision = await service.route(mockContext);
+
+      expect(decision.model).toBe('default-model');
+      expect(decision.metadata.source).toBe('router-exception');
 
       expect(ModelRoutingEvent).toHaveBeenCalledWith(
         'default-model',

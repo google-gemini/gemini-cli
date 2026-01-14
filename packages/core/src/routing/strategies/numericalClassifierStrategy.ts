@@ -169,37 +169,10 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
-      // A/B Test or Remote Threshold
-      let threshold: number;
-      let groupLabel: string;
-
-      const remoteThresholdFlag =
-        experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-      const remoteThresholdValue = remoteThresholdFlag?.intValue
-        ? parseInt(remoteThresholdFlag.intValue, 10)
-        : remoteThresholdFlag?.floatValue;
-
-      if (
-        remoteThresholdValue !== undefined &&
-        !isNaN(remoteThresholdValue) &&
-        remoteThresholdValue >= 0 &&
-        remoteThresholdValue <= 100
-      ) {
-        threshold = remoteThresholdValue;
-        groupLabel = 'Remote';
-      } else {
-        // Fallback to deterministic A/B test
-        const sessionId = config.getSessionId() || 'unknown-session';
-        threshold = getComplexityThreshold(sessionId);
-        groupLabel = threshold === 80 ? 'Strict' : 'Control';
-      }
-
-      // Select Model based on Score vs Threshold
-      const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
-
-      // temp TO REMOVE
-      debugLogger.debug(
-        `Numerical Classifier Model: ${modelAlias}. PRO_MODEL: ${PRO_MODEL}, FLASH_MODEL: ${FLASH_MODEL}, Threshold: ${threshold}, Score: ${score}`,
+      const { threshold, groupLabel, modelAlias } = this.getRoutingDecision(
+        score,
+        experiments,
+        config.getSessionId() || 'unknown-session',
       );
 
       const selectedModel = resolveClassifierModel(
@@ -222,5 +195,42 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       debugLogger.warn(`[Routing] NumericalClassifierStrategy failed:`, error);
       return null;
     }
+  }
+
+  private getRoutingDecision(
+    score: number,
+    experiments: Awaited<ReturnType<Config['getExperimentsAsync']>> | undefined,
+    sessionId: string,
+  ): {
+    threshold: number;
+    groupLabel: string;
+    modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
+  } {
+    let threshold: number;
+    let groupLabel: string;
+
+    const remoteThresholdFlag =
+      experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    const remoteThresholdValue = remoteThresholdFlag?.intValue
+      ? parseInt(remoteThresholdFlag.intValue, 10)
+      : remoteThresholdFlag?.floatValue;
+
+    if (
+      remoteThresholdValue !== undefined &&
+      !isNaN(remoteThresholdValue) &&
+      remoteThresholdValue >= 0 &&
+      remoteThresholdValue <= 100
+    ) {
+      threshold = remoteThresholdValue;
+      groupLabel = 'Remote';
+    } else {
+      // Fallback to deterministic A/B test
+      threshold = getComplexityThreshold(sessionId);
+      groupLabel = threshold === 80 ? 'Strict' : 'Control';
+    }
+
+    const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
+
+    return { threshold, groupLabel, modelAlias };
   }
 }

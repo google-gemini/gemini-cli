@@ -10,10 +10,6 @@ import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../../utils/messageInspectors.js';
-import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -88,13 +84,11 @@ describe('NumericalClassifierStrategy', () => {
       promptId: 'test-prompt-id',
     });
 
-    // Verify user content wrapping for security
+    // Verify user content parts
     const userContent =
       generateJsonCall.contents[generateJsonCall.contents.length - 1];
     const textPart = userContent.parts?.[0];
-    expect(textPart?.text).toContain('');
-    expect(textPart?.text).toContain('simple task');
-    expect(textPart?.text).toContain('');
+    expect(textPart?.text).toBe('simple task');
   });
 
   describe('A/B Testing Logic (Deterministic)', () => {
@@ -482,7 +476,7 @@ describe('NumericalClassifierStrategy', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-  it('should filter out tool-related history before sending to classifier', async () => {
+  it('should include tool-related history when sending to classifier', async () => {
     mockContext.history = [
       { role: 'user', parts: [{ text: 'call a tool' }] },
       { role: 'model', parts: [{ functionCall: { name: 'test_tool' } }] },
@@ -509,9 +503,8 @@ describe('NumericalClassifierStrategy', () => {
     const contents = generateJsonCall.contents;
 
     const expectedContents = [
-      { role: 'user', parts: [{ text: 'call a tool' }] },
-      { role: 'user', parts: [{ text: 'another user turn' }] },
-      // The last user turn is wrapped
+      ...mockContext.history,
+      // The last user turn is the request part
       {
         role: 'user',
         parts: [{ text: 'simple task' }],
@@ -521,17 +514,10 @@ describe('NumericalClassifierStrategy', () => {
     expect(contents).toEqual(expectedContents);
   });
 
-  it('should respect HISTORY_SEARCH_WINDOW and HISTORY_TURNS_FOR_CONTEXT', async () => {
+  it('should respect HISTORY_TURNS_FOR_CONTEXT', async () => {
     const longHistory: Content[] = [];
     for (let i = 0; i < 30; i++) {
       longHistory.push({ role: 'user', parts: [{ text: `Message ${i}` }] });
-      // Add noise that should be filtered
-      if (i % 2 === 0) {
-        longHistory.push({
-          role: 'model',
-          parts: [{ functionCall: { name: 'noise', args: {} } }],
-        });
-      }
     }
     mockContext.history = longHistory;
     const mockApiResponse = {
@@ -549,22 +535,17 @@ describe('NumericalClassifierStrategy', () => {
     const contents = generateJsonCall.contents;
 
     // Manually calculate what the history should be
-    const HISTORY_SEARCH_WINDOW = 20;
-    const HISTORY_TURNS_FOR_CONTEXT = 4;
-    const historySlice = longHistory.slice(-HISTORY_SEARCH_WINDOW);
-    const cleanHistory = historySlice.filter(
-      (content) => !isFunctionCall(content) && !isFunctionResponse(content),
-    );
-    const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+    const HISTORY_TURNS_FOR_CONTEXT = 8;
+    const finalHistory = longHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-    // Last part is the wrapped request
+    // Last part is the request
     const requestPart = {
       role: 'user',
       parts: [{ text: 'simple task' }],
     };
 
     expect(contents).toEqual([...finalHistory, requestPart]);
-    expect(contents).toHaveLength(5);
+    expect(contents).toHaveLength(9);
   });
 
   it('should use a fallback promptId if not found in context', async () => {
