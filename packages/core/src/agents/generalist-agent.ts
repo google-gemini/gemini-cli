@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -25,6 +26,7 @@ export const GeneralistAgent = (
   displayName: 'Generalist Agent',
   description:
     "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
+  experimental: true,
   inputConfig: {
     inputs: {
       request: {
@@ -43,14 +45,22 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = config.getToolRegistry().getAllToolNames();
+    // TODO(15179): Support recursive agent invocation.
+    const tools = config
+      .getToolRegistry()
+      .getAllToolNames()
+      .filter((name) => name !== DELEGATE_TO_AGENT_TOOL_NAME);
     return {
       tools,
     };
   },
   get promptConfig() {
     return {
-      systemPrompt: getCoreSystemPrompt(config, undefined, false),
+      systemPrompt: getCoreSystemPrompt(
+        config,
+        /*useMemory=*/ undefined,
+        /*interactiveOverride=*/ false,
+      ),
       query: '${request}',
     };
   },

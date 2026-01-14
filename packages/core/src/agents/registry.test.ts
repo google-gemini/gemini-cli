@@ -234,7 +234,6 @@ describe('AgentRegistry', () => {
         enableAgents: false,
         codebaseInvestigatorSettings: { enabled: false },
         cliHelpAgentSettings: { enabled: false },
-        generalistAgentSettings: { enabled: false },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
 
@@ -266,7 +265,7 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeUndefined();
     });
 
-    it('should NOT register generalist agent by default', async () => {
+    it('should NOT register generalist agent by default (because it is experimental)', async () => {
       const config = makeMockedConfig();
       const registry = new TestableAgentRegistry(config);
 
@@ -275,15 +274,50 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('generalist')).toBeUndefined();
     });
 
-    it('should register generalist agent if enabled', async () => {
+    it('should register generalist agent if explicitly enabled via override', async () => {
       const config = makeMockedConfig({
-        generalistAgentSettings: { enabled: true },
+        agents: {
+          overrides: {
+            generalist: { enabled: true },
+          },
+        },
       });
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
 
       expect(registry.getDefinition('generalist')).toBeDefined();
+    });
+
+    it('should NOT register a non-experimental agent if enabled is false', async () => {
+      // CLI help is NOT experimental, but we explicitly disable it via enabled: false
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            cli_help: { enabled: false },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('cli_help')).toBeUndefined();
+    });
+
+    it('should respect disabled override over enabled override', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            generalist: { enabled: true, disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('generalist')).toBeUndefined();
     });
 
     it('should load agents from active extensions', async () => {

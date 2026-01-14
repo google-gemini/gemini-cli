@@ -144,7 +144,6 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const cliHelpSettings = this.config.getCliHelpAgentSettings();
-    const generalistSettings = this.config.getGeneralistAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -196,10 +195,8 @@ export class AgentRegistry {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
 
-    // Register the generalist agent if it's explicitly enabled.
-    if (generalistSettings.enabled) {
-      this.registerLocalAgent(GeneralistAgent(this.config));
-    }
+    // Register the generalist agent.
+    this.registerLocalAgent(GeneralistAgent(this.config));
   }
 
   private async refreshAgents(): Promise<void> {
@@ -246,7 +243,8 @@ export class AgentRegistry {
 
     const settingsOverrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
-    if (settingsOverrides?.disabled) {
+
+    if (!this.isAgentEnabled(definition, settingsOverrides)) {
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
@@ -263,6 +261,24 @@ export class AgentRegistry {
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
+  }
+
+  private isAgentEnabled<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): boolean {
+    const isExperimental = definition.experimental === true;
+    let isEnabled = !isExperimental;
+
+    if (overrides) {
+      if (overrides.disabled !== undefined) {
+        isEnabled = !overrides.disabled;
+      } else if (overrides.enabled !== undefined) {
+        isEnabled = overrides.enabled;
+      }
+    }
+
+    return isEnabled;
   }
 
   /**
@@ -285,7 +301,8 @@ export class AgentRegistry {
 
     const overrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
-    if (overrides?.disabled) {
+
+    if (!this.isAgentEnabled(definition, overrides)) {
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
@@ -339,7 +356,7 @@ export class AgentRegistry {
     }
 
     // Use Object.create to preserve lazy getters on the definition object
-    const merged = Object.create(definition) as LocalAgentDefinition<TOutput>;
+    const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
 
     if (overrides.runConfig) {
       merged.runConfig = {

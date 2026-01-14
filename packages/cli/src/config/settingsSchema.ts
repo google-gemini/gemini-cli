@@ -1540,26 +1540,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      generalistAgentSettings: {
-        type: 'object',
-        label: 'Generalist Agent Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for Generalist Agent.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Generalist Agent',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: false,
-            description: 'Enable the Generalist Agent.',
-            showInDialog: true,
-          },
-        },
-      },
     },
   },
 
@@ -2102,6 +2082,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             description: 'The maximum number of conversational turns.',
           },
         },
+      },
+      enabled: {
+        type: 'boolean',
+        description: 'Whether to enable the agent.',
       },
       disabled: {
         type: 'boolean',
