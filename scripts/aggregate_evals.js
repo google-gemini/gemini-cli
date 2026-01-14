@@ -167,7 +167,8 @@ function generateMarkdown(currentStats, history) {
   }
 
   for (const name of Array.from(allTestNames).sort()) {
-    let row = `| ${name} |`;
+    const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20${encodeURIComponent(name)}&type=code`;
+    let row = `| [${name}](${searchUrl}) |`;
 
     // History
     for (const item of reversedHistory) {
