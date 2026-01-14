@@ -65,21 +65,37 @@ const SCREEN_DCS_CHUNK_SIZE = 240;
 
 type TtyTarget = { stream: Writable; closeAfter: boolean } | null;
 
-const pickTty = (): TtyTarget => {
-  // /dev/tty is only available on Unix-like systems (Linux, macOS, BSD, etc.)
-  if (process.platform !== 'win32') {
-    // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
-    try {
-      fs.accessSync('/dev/tty', fs.constants.W_OK);
-      const devTty = fs.createWriteStream('/dev/tty');
-      // Prevent unhandled 'error' events from crashing the process.
-      devTty.on('error', () => {});
-      return { stream: devTty, closeAfter: true };
-    } catch {
-      // fall through - /dev/tty not accessible
-    }
-  }
+const pickTty = (): Promise<TtyTarget> => new Promise((resolve) => {
+    // /dev/tty is only available on Unix-like systems (Linux, macOS, BSD, etc.)
+    if (process.platform !== 'win32') {
+      // Prefer the controlling TTY to avoid interleaving escape sequences with piped stdout.
+      try {
+        const devTty = fs.createWriteStream('/dev/tty');
 
+        // If we can't open it (e.g. sandbox), we'll get an error.
+        // We wait for 'open' to confirm it's usable, or 'error' to fallback.
+        // If it opens, we resolve with the stream.
+        devTty.once('open', () => {
+          devTty.removeAllListeners('error');
+          // Prevent future unhandled 'error' events from crashing the process
+          devTty.on('error', () => {});
+          resolve({ stream: devTty, closeAfter: true });
+        });
+
+        // If it errors immediately (or quickly), we fallback.
+        devTty.once('error', () => {
+          resolve(getStdioTty());
+        });
+        return;
+      } catch {
+        // fall through - synchronous failure
+      }
+    }
+
+    resolve(getStdioTty());
+  });
+
+const getStdioTty = (): TtyTarget => {
   if (process.stderr?.isTTY)
     return { stream: process.stderr, closeAfter: false };
   if (process.stdout?.isTTY)
@@ -175,7 +191,7 @@ const writeAll = (stream: Writable, data: string): Promise<void> =>
 export const copyToClipboard = async (text: string): Promise<void> => {
   if (!text) return;
 
-  const tty = pickTty();
+  const tty = await pickTty();
 
   if (shouldUseOsc52(tty)) {
     const osc = buildOsc52(text);
