@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface UseInputHistoryProps {
   userMessages: readonly string[];
@@ -27,8 +27,13 @@ export function useInputHistory({
   currentQuery,
   onChange,
 }: UseInputHistoryProps): UseInputHistoryReturn {
+  const currentQueryRef = useRef(currentQuery);
   const historyIndexRef = useRef<number>(-1);
   const originalQueryBeforeNavRef = useRef<string>('');
+
+  useEffect(() => {
+    currentQueryRef.current = currentQuery;
+  }, [currentQuery]);
 
   const resetHistoryNav = useCallback(() => {
     historyIndexRef.current = -1;
@@ -53,7 +58,7 @@ export function useInputHistory({
     let nextIndex = historyIndexRef.current;
     if (historyIndexRef.current === -1) {
       // Store the current query from the parent before navigating
-      originalQueryBeforeNavRef.current = currentQuery;
+      originalQueryBeforeNavRef.current = currentQueryRef.current;
       nextIndex = 0;
     } else if (historyIndexRef.current < userMessages.length - 1) {
       nextIndex = historyIndexRef.current + 1;
@@ -68,12 +73,7 @@ export function useInputHistory({
       return true;
     }
     return false;
-  }, [
-    onChange,
-    userMessages,
-    isActive,
-    currentQuery, // Use currentQuery from props
-  ]);
+  }, [onChange, userMessages, isActive]);
 
   const navigateDown = useCallback(() => {
     if (!isActive) return false;
