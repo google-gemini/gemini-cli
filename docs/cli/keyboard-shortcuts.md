@@ -26,17 +26,17 @@ available combinations.
 
 #### Editing
 
-| Action                                           | Keys                                                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                                                   |
-| Delete from the cursor to the start of the line. | `Ctrl + U`                                                                                   |
-| Clear all text in the input field.               | `Ctrl + C`                                                                                   |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + ""`<br />`Cmd + ""`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                                                          |
-| Delete the character to the left.                | `Backspace`<br />`""`<br />`Ctrl + H`                                                       |
-| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                                                     |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                                                        |
-| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                                                           |
+| Action                                           | Keys                                                      |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
+| Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
+| Clear all text in the input field.               | `Ctrl + C`                                                |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
+| Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
+| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
+| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
+| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
 
 #### Screen Control
 
@@ -64,6 +64,7 @@ available combinations.
 | Start reverse search through history.        | `Ctrl + R`            |
 | Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
 | Accept a suggestion while reverse searching. | `Tab`                 |
+| Browse and rewind previous interactions.     | `Esc (×2)`            |
 
 #### Navigation
 
@@ -129,7 +130,7 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
-- `Esc` pressed twice quickly: Clear the current input buffer.
+- `Esc` pressed twice quickly: Browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to

@@ -76,6 +76,7 @@ export enum Command {
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
+  REWIND = 'rewind',
 
   // Shell commands
   REVERSE_SEARCH = 'reverseSearch',
@@ -135,8 +136,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
     { key: 'backspace', command: true },
-    { sequence: '\x7f', ctrl: true },
-    { sequence: '\x7f', command: true },
     { key: 'w', ctrl: true },
   ],
   [Command.MOVE_LEFT]: [
@@ -157,11 +156,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', command: true },
     { key: 'f', command: true },
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    { key: 'backspace' },
-    { sequence: '\x7f' },
-    { key: 'h', ctrl: true },
-  ],
+  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
@@ -264,6 +259,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
+  [Command.REWIND]: [{ key: 'Esc (×2)' }],
 };
 
 interface CommandCategory {
@@ -327,6 +323,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+      Command.REWIND,
     ],
   },
   {
@@ -439,4 +436,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.REWIND]: 'Browse and rewind previous interactions.',
 };

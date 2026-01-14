@@ -97,6 +97,17 @@ export interface HookEndPayload extends HookPayload {
   success: boolean;
 }
 
+/**
+ * Payload for the 'retry-attempt' event.
+ */
+export interface RetryAttemptPayload {
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error?: string;
+  model: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -109,6 +120,7 @@ export enum CoreEvent {
   HookEnd = 'hook-end',
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
+  RetryAttempt = 'retry-attempt',
 }
 
 export interface CoreEvents {
@@ -123,6 +135,7 @@ export interface CoreEvents {
   [CoreEvent.HookEnd]: [HookEndPayload];
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
+  [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
 }
 
 type EventBacklogItem = {
@@ -236,6 +249,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitAdminSettingsChanged(): void {
     this.emit(CoreEvent.AdminSettingsChanged);
+  }
+  
+  /**
+   * Notifies subscribers that a retry attempt is happening.
+   */
+  emitRetryAttempt(payload: RetryAttemptPayload): void {
+    this.emit(CoreEvent.RetryAttempt, payload);
   }
 
   /**

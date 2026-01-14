@@ -238,23 +238,16 @@ jobs:
             core.info(`Raw labels JSON: ${rawLabels}`);
             let parsedLabels;
             try {
-              // First, try to parse the raw output as JSON.
-              parsedLabels = JSON.parse(rawLabels.trim());
-            } catch (jsonError) {
-              // If that fails, check for a markdown code block.
-              core.info(`Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`);
               const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-              if (jsonMatch && jsonMatch[1]) {
-                try {
-                  parsedLabels = JSON.parse(jsonMatch[1].trim());
-                } catch (markdownError) {
-                  core.setFailed(`Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`);
-                  return;
-                }
-              } else {
-                core.setFailed(`Output is not valid JSON and does not contain a JSON markdown block.\nRaw output: ${rawLabels}`);
-                return;
+              if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("Could not find a ```json ... ``` block in the output.");
               }
+              const jsonString = jsonMatch[1].trim();
+              parsedLabels = JSON.parse(jsonString);
+              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+            } catch (err) {
+              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              return;
             }
 
             for (const entry of parsedLabels) {
