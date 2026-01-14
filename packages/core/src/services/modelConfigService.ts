@@ -119,14 +119,10 @@ export class ModelConfigService {
       ...this.runtimeAliases,
     };
 
-    const {
-      aliasChain,
-      baseModel: initialBaseModel,
-      resolvedConfig: initialResolvedConfig,
-    } = this.resolveAliasChain(context.model, allAliases);
-
-    let baseModel = initialBaseModel;
-    let resolvedConfig = initialResolvedConfig;
+    const { aliasChain, baseModel, resolvedConfig } = this.resolveAliasChain(
+      context.model,
+      allAliases,
+    );
 
     const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
     const allOverrides = [
@@ -142,19 +138,22 @@ export class ModelConfigService {
 
     this.sortOverrides(matches);
 
+    let currentConfig: ModelConfig = {
+      model: baseModel,
+      generateContentConfig: resolvedConfig,
+    };
+
     for (const match of matches) {
-      if (match.modelConfig.model) {
-        baseModel = match.modelConfig.model;
-      }
-      if (match.modelConfig.generateContentConfig) {
-        resolvedConfig = this.deepMerge(
-          resolvedConfig,
-          match.modelConfig.generateContentConfig,
-        );
-      }
+      currentConfig = ModelConfigService.merge(
+        currentConfig,
+        match.modelConfig,
+      );
     }
 
-    return { model: baseModel, generateContentConfig: resolvedConfig };
+    return {
+      model: currentConfig.model,
+      generateContentConfig: currentConfig.generateContentConfig ?? {},
+    };
   }
 
   private resolveAliasChain(
@@ -165,8 +164,6 @@ export class ModelConfigService {
     baseModel: string | undefined;
     resolvedConfig: GenerateContentConfig;
   } {
-    let baseModel: string | undefined = undefined;
-    let resolvedConfig: GenerateContentConfig = {};
     const aliasChain: string[] = [];
 
     if (allAliases[requestedModel]) {
@@ -194,17 +191,19 @@ export class ModelConfigService {
 
       // Root-to-Leaf chain for merging and level assignment.
       const reversedChain = [...aliasChain].reverse();
+      let resolvedConfig: ModelConfig = {};
       for (const aliasName of reversedChain) {
         const alias = allAliases[aliasName];
-        if (alias.modelConfig.model) {
-          baseModel = alias.modelConfig.model;
-        }
-        resolvedConfig = this.deepMerge(
+        resolvedConfig = ModelConfigService.merge(
           resolvedConfig,
-          alias.modelConfig.generateContentConfig,
+          alias.modelConfig,
         );
       }
-      return { aliasChain: reversedChain, baseModel, resolvedConfig };
+      return {
+        aliasChain: reversedChain,
+        baseModel: resolvedConfig.model,
+        resolvedConfig: resolvedConfig.generateContentConfig ?? {},
+      };
     }
 
     return {
@@ -298,21 +297,36 @@ export class ModelConfigService {
     } as ResolvedModelConfig;
   }
 
-  private isObject(item: unknown): item is Record<string, unknown> {
+  static isObject(item: unknown): item is Record<string, unknown> {
     return !!item && typeof item === 'object' && !Array.isArray(item);
   }
 
-  private deepMerge(
-    config1: GenerateContentConfig | undefined,
-    config2: GenerateContentConfig | undefined,
-  ): Record<string, unknown> {
-    return this.genericDeepMerge(
-      config1 as Record<string, unknown> | undefined,
-      config2 as Record<string, unknown> | undefined,
-    );
+  /**
+   * Merges an override `ModelConfig` into a base `ModelConfig`.
+   * The override's model name takes precedence if provided.
+   * The `generateContentConfig` properties are deeply merged.
+   */
+  static merge(base: ModelConfig, override: ModelConfig): ModelConfig {
+    return {
+      model: override.model ?? base.model,
+      generateContentConfig: ModelConfigService.deepMerge(
+        base.generateContentConfig,
+        override.generateContentConfig,
+      ),
+    };
   }
 
-  private genericDeepMerge(
+  static deepMerge(
+    config1: GenerateContentConfig | undefined,
+    config2: GenerateContentConfig | undefined,
+  ): GenerateContentConfig {
+    return ModelConfigService.genericDeepMerge(
+      config1 as Record<string, unknown> | undefined,
+      config2 as Record<string, unknown> | undefined,
+    ) as GenerateContentConfig;
+  }
+
+  private static genericDeepMerge(
     ...objects: Array<Record<string, unknown> | undefined>
   ): Record<string, unknown> {
     return objects.reduce((acc: Record<string, unknown>, obj) => {
@@ -329,8 +343,11 @@ export class ModelConfigService {
         // override the base array.
         // TODO(joshualitt): Consider knobs here, i.e. opt-in to deep merging
         // arrays on a case-by-case basis.
-        if (this.isObject(accValue) && this.isObject(objValue)) {
-          acc[key] = this.deepMerge(accValue, objValue);
+        if (
+          ModelConfigService.isObject(accValue) &&
+          ModelConfigService.isObject(objValue)
+        ) {
+          acc[key] = ModelConfigService.genericDeepMerge(accValue, objValue);
         } else {
           acc[key] = objValue;
         }

@@ -59,3 +59,4 @@ patch_output.log
 .genkit
 .gemini-clipboard/
 .eslintcache
+evals/logs/

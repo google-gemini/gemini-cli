@@ -27,13 +27,10 @@ export const toolsCommand: SlashCommand = {
 
     const toolRegistry = context.services.config?.getToolRegistry();
     if (!toolRegistry) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Could not retrieve tool registry.',
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: 'Could not retrieve tool registry.',
+      });
       return;
     }
 
@@ -51,6 +48,6 @@ export const toolsCommand: SlashCommand = {
       showDescriptions: useShowDescriptions,
     };
 
-    context.ui.addItem(toolsListItem, Date.now());
+    context.ui.addItem(toolsListItem);
   },
 };

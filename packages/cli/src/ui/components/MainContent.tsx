@@ -65,7 +65,9 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={i}
               availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
+                uiState.constrainHeight && !isAlternateBuffer
+                  ? availableTerminalHeight
+                  : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: 0 }}
@@ -82,6 +84,7 @@ export const MainContent = () => {
     [
       pendingHistoryItems,
       uiState.constrainHeight,
+      isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
       uiState.isEditorDialogOpen,
@@ -107,7 +110,7 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
-            availableTerminalHeight={staticAreaMaxItemHeight}
+            availableTerminalHeight={undefined}
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
             item={item.item}
@@ -119,13 +122,7 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [
-      version,
-      mainAreaWidth,
-      staticAreaMaxItemHeight,
-      uiState.slashCommands,
-      pendingItems,
-    ],
+    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
   );
 
   if (isAlternateBuffer) {

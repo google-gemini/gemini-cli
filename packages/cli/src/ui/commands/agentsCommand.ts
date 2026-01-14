@@ -44,7 +44,7 @@ const agentsListCommand: SlashCommand = {
       agents,
     };
 
-    context.ui.addItem(agentsListItem, Date.now());
+    context.ui.addItem(agentsListItem);
 
     return;
   },
@@ -65,13 +65,10 @@ const agentsRefreshCommand: SlashCommand = {
       };
     }
 
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'Refreshing agent registry...',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: 'Refreshing agent registry...',
+    });
 
     await agentRegistry.reload();
 

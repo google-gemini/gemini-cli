@@ -94,7 +94,6 @@ describe('directoryCommand', () => {
             '/home/user/project1',
           )}\n- ${path.normalize('/home/user/project2')}`,
         }),
-        expect.any(Number),
       );
     });
   });
@@ -121,7 +120,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: 'Please provide at least one path to add.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -135,7 +133,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -151,7 +148,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath1}\n- ${newPath2}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -168,7 +164,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${newPath}': ${error.message}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -191,7 +186,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `The following directories are already in the workspace:\n- ${existingPath}`,
         }),
-        expect.any(Number),
       );
       expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalledWith(
         existingPath,
@@ -218,7 +212,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${validPath}`,
         }),
-        expect.any(Number),
       );
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -226,7 +219,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${invalidPath}': ${error.message}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -317,7 +309,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: expect.stringContaining('explicitly untrusted'),
         }),
-        expect.any(Number),
       );
     });
 

@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RewindConfirmation > renders correctly with stats 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ Confirm Rewind                                                               │
+│                                                                              │
+│ ┌──────────────────────────────────────────────────────────────────────────┐ │
+│ │ File: test.ts                                                            │ │
+│ │ Lines added: 10 Lines removed: 5                                         │ │
+│ │                                                                          │ │
+│ │ ℹ Rewinding does not affect files edited manually or by the shell tool.  │ │
+│ └──────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│ Select an action:                                                            │
+│                                                                              │
+│ ● 1. Rewind conversation and revert code changes                             │
+│   2. Rewind conversation                                                     │
+│   3. Revert code changes                                                     │
+│   4. Do nothing (esc)                                                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`RewindConfirmation > renders correctly without stats 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ Confirm Rewind                                                               │
+│                                                                              │
+│ No code changes to revert.                                                   │
+│                                                                              │
+│ Select an action:                                                            │
+│                                                                              │
+│ ● 1. Rewind conversation                                                     │
+│   2. Do nothing (esc)                                                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`RewindConfirmation > renders timestamp when provided 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ Confirm Rewind                                                               │
+│                                                                              │
+│ No code changes to revert. (just now)                                        │
+│                                                                              │
+│ Select an action:                                                            │
+│                                                                              │
+│ ● 1. Rewind conversation                                                     │
+│   2. Do nothing (esc)                                                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;

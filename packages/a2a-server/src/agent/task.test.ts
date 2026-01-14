@@ -349,6 +349,44 @@ describe('Task', () => {
         }),
       );
     });
+
+    it.each([
+      { eventType: GeminiEventType.Retry, eventName: 'Retry' },
+      { eventType: GeminiEventType.InvalidStream, eventName: 'InvalidStream' },
+    ])(
+      'should handle $eventName event without triggering error handling',
+      async ({ eventType }) => {
+        const mockConfig = createMockConfig();
+        const mockEventBus: ExecutionEventBus = {
+          publish: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeAllListeners: vi.fn(),
+          finished: vi.fn(),
+        };
+
+        // @ts-expect-error - Calling private constructor
+        const task = new Task(
+          'task-id',
+          'context-id',
+          mockConfig as Config,
+          mockEventBus,
+        );
+
+        const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
+        const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
+
+        const event = {
+          type: eventType,
+        };
+
+        await task.acceptAgentMessage(event);
+
+        expect(cancelPendingToolsSpy).not.toHaveBeenCalled();
+        expect(setTaskStateSpy).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('_schedulerToolCallsUpdate', () => {

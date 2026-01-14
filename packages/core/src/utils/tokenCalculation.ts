@@ -16,6 +16,9 @@ const ASCII_TOKENS_PER_CHAR = 0.25;
 const NON_ASCII_TOKENS_PER_CHAR = 1.3;
 // Fixed token estimate for images
 const IMAGE_TOKEN_ESTIMATE = 3000;
+// Fixed token estimate for PDFs (~100 pages at 258 tokens/page)
+// See: https://ai.google.dev/gemini-api/docs/document-processing
+const PDF_TOKEN_ESTIMATE = 25800;
 
 /**
  * Estimates token count for parts synchronously using a heuristic.
@@ -34,15 +37,19 @@ export function estimateTokenCountSync(parts: Part[]): number {
         }
       }
     } else {
-      // For images, we use a fixed safe estimate (3,000 tokens) covering
-      // up to 4K resolution on Gemini 3.
+      // For images and PDFs, we use fixed safe estimates:
+      // - Images: 3,000 tokens (covers up to 4K resolution on Gemini 3)
+      // - PDFs: 25,800 tokens (~100 pages at 258 tokens/page)
       // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
+      // See: https://ai.google.dev/gemini-api/docs/document-processing
       const inlineData = 'inlineData' in part ? part.inlineData : undefined;
       const fileData = 'fileData' in part ? part.fileData : undefined;
       const mimeType = inlineData?.mimeType || fileData?.mimeType;
 
       if (mimeType?.startsWith('image/')) {
         totalTokens += IMAGE_TOKEN_ESTIMATE;
+      } else if (mimeType?.startsWith('application/pdf')) {
+        totalTokens += PDF_TOKEN_ESTIMATE;
       } else {
         // For other non-text parts (functionCall, functionResponse, etc.),
         // we fallback to the JSON string length heuristic.

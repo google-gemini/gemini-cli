@@ -55,6 +55,7 @@ export interface UseCommandCompletionReturn {
     leafCommand: SlashCommand | null;
   };
   getCompletedText: (suggestion: Suggestion) => string | null;
+  completionMode: CompletionMode;
 }
 
 export function useCommandCompletion(
@@ -341,5 +342,6 @@ export function useCommandCompletion(
     getCommandFromSuggestion: slashCompletionRange.getCommandFromSuggestion,
     slashCompletionRange,
     getCompletedText,
+    completionMode,
   };
 }

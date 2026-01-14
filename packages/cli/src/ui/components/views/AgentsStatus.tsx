@@ -24,7 +24,7 @@ export const AgentsStatus: React.FC<AgentsStatusProps> = ({
 
   if (agents.length === 0) {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginBottom={1}>
         <Text>No agents available.</Text>
       </Box>
     );
@@ -34,7 +34,7 @@ export const AgentsStatus: React.FC<AgentsStatusProps> = ({
     if (agentList.length === 0) return null;
 
     return (
-      <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column">
         <Text bold color={theme.text.primary}>
           {title}
         </Text>
@@ -66,6 +66,7 @@ export const AgentsStatus: React.FC<AgentsStatusProps> = ({
   return (
     <Box flexDirection="column" marginBottom={1}>
       {renderAgentList('Local Agents', localAgents)}
+      {localAgents.length > 0 && remoteAgents.length > 0 && <Box height={1} />}
       {renderAgentList('Remote Agents', remoteAgents)}
     </Box>
   );

@@ -50,14 +50,20 @@ describe('DelegateToAgentTool', () => {
     name: 'test_agent',
     description: 'A test agent',
     promptConfig: {},
-    modelConfig: { model: 'test-model', temp: 0, top_p: 0 },
+    modelConfig: {
+      model: 'test-model',
+      generateContentConfig: {
+        temperature: 0,
+        topP: 0,
+      },
+    },
     inputConfig: {
       inputs: {
         arg1: { type: 'string', description: 'Argument 1', required: true },
         arg2: { type: 'number', description: 'Argument 2', required: false },
       },
     },
-    runConfig: { max_turns: 1, max_time_minutes: 1 },
+    runConfig: { maxTurns: 1, maxTimeMinutes: 1 },
     toolConfig: { tools: [] },
   };
 

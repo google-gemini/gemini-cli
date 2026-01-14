@@ -136,6 +136,7 @@ export const MOCK_TOOL_SHOULD_CONFIRM_EXECUTE = () =>
     title: 'Confirm mockTool',
     command: 'mockTool',
     rootCommand: 'mockTool',
+    rootCommands: ['mockTool'],
     onConfirm: async () => {},
   });
 

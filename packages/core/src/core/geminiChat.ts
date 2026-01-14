@@ -54,6 +54,7 @@ import {
   fireBeforeModelHook,
   fireBeforeToolSelectionHook,
 } from './geminiChatHookTriggers.js';
+import { coreEvents } from '../utils/events.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -401,6 +402,13 @@ export class GeminiChat {
                   this.config,
                   new ContentRetryEvent(attempt, retryType, delayMs, model),
                 );
+                coreEvents.emitRetryAttempt({
+                  attempt: attempt + 1,
+                  maxAttempts,
+                  delayMs: delayMs * (attempt + 1),
+                  error: error instanceof Error ? error.message : String(error),
+                  model,
+                });
                 await new Promise((res) =>
                   setTimeout(res, delayMs * (attempt + 1)),
                 );
@@ -601,6 +609,15 @@ export class GeminiChat {
       signal: abortSignal,
       maxAttempts: availabilityMaxAttempts,
       getAvailabilityContext,
+      onRetry: (attempt, error, delayMs) => {
+        coreEvents.emitRetryAttempt({
+          attempt,
+          maxAttempts: availabilityMaxAttempts ?? 10,
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+          model: lastModelToUse,
+        });
+      },
     });
 
     // Store the original request for AfterModel hooks

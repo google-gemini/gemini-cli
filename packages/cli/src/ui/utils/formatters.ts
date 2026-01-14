@@ -61,3 +61,37 @@ export const formatDuration = (milliseconds: number): string => {
 
   return parts.join(' ');
 };
+
+export const formatTimeAgo = (date: string | number | Date): string => {
+  const past = new Date(date);
+  if (isNaN(past.getTime())) {
+    return 'invalid date';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - past.getTime();
+  if (diffMs < 60000) {
+    return 'just now';
+  }
+  return `${formatDuration(diffMs)} ago`;
+};
+
+const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
+const REFERENCE_CONTENT_END = '--- End of content ---';
+
+/**
+ * Removes content bounded by reference content markers from the given text.
+ * The markers are "--- Content from referenced files ---" and "--- End of content ---".
+ *
+ * @param text The input text containing potential reference blocks.
+ * @returns The text with reference blocks removed and trimmed.
+ */
+export function stripReferenceContent(text: string): string {
+  // Match optional newline, the start marker, content (non-greedy), and the end marker
+  const pattern = new RegExp(
+    `\\n?${REFERENCE_CONTENT_START}[\\s\\S]*?${REFERENCE_CONTENT_END}`,
+    'g',
+  );
+
+  return text.replace(pattern, '').trim();
+}

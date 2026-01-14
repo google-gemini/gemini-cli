@@ -385,7 +385,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Esc again to clear');
+      expect(lastFrame()).toContain('Press Esc again to rewind');
     });
   });
 

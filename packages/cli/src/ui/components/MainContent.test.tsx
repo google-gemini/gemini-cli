@@ -5,6 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
@@ -41,9 +42,21 @@ vi.mock('../hooks/useAlternateBuffer.js', () => ({
 }));
 
 vi.mock('./HistoryItemDisplay.js', () => ({
-  HistoryItemDisplay: ({ item }: { item: { content: string } }) => (
+  HistoryItemDisplay: ({
+    item,
+    availableTerminalHeight,
+  }: {
+    item: { content: string };
+    availableTerminalHeight?: number;
+  }) => (
     <Box>
-      <Text>HistoryItem: {item.content}</Text>
+      <Text>
+        HistoryItem: {item.content} (height:{' '}
+        {availableTerminalHeight === undefined
+          ? 'undefined'
+          : availableTerminalHeight}
+        )
+      </Text>
     </Box>
   ),
 }));
@@ -81,23 +94,32 @@ describe('MainContent', () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
   });
 
-  it('renders in normal buffer mode', () => {
+  it('renders in normal buffer mode', async () => {
     const { lastFrame } = render(<MainContent />);
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
     const output = lastFrame();
 
-    expect(output).toContain('AppHeader');
-    expect(output).toContain('HistoryItem: Hello');
-    expect(output).toContain('HistoryItem: Hi there');
+    expect(output).toContain('HistoryItem: Hello (height: 20)');
+    expect(output).toContain('HistoryItem: Hi there (height: 20)');
   });
 
-  it('renders in alternate buffer mode', () => {
+  it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
     const { lastFrame } = render(<MainContent />);
+    await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
     const output = lastFrame();
 
-    expect(output).toContain('ScrollableList');
     expect(output).toContain('AppHeader');
-    expect(output).toContain('HistoryItem: Hello');
-    expect(output).toContain('HistoryItem: Hi there');
+    expect(output).toContain('HistoryItem: Hello (height: undefined)');
+    expect(output).toContain('HistoryItem: Hi there (height: undefined)');
+  });
+
+  it('does not constrain height in alternate buffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const { lastFrame } = render(<MainContent />);
+    await waitFor(() => expect(lastFrame()).toContain('HistoryItem: Hello'));
+    const output = lastFrame();
+
+    expect(output).toMatchSnapshot();
   });
 });

@@ -361,11 +361,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
-    const { max_time_minutes } = this.definition.runConfig;
+    const { maxTimeMinutes } = this.definition.runConfig;
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(new Error('Agent timed out.')),
-      max_time_minutes * 60 * 1000,
+      maxTimeMinutes * 60 * 1000,
     );
 
     // Combine the external signal with the internal timeout signal.
@@ -454,13 +454,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+            finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${this.definition.runConfig.max_turns}).`;
+            finalResult = `Agent reached max turns limit (${this.definition.runConfig.maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -524,7 +524,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
@@ -556,7 +556,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     chat: GeminiChat,
     prompt_id: string,
   ): Promise<void> {
-    const model = this.definition.modelConfig.model;
+    const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
     const { newHistory, info } = await this.compressionService.compress(
       chat,
@@ -1109,7 +1109,7 @@ Important Rules:
   ): AgentTerminateMode | null {
     const { runConfig } = this.definition;
 
-    if (runConfig.max_turns && turnCounter >= runConfig.max_turns) {
+    if (runConfig.maxTurns && turnCounter >= runConfig.maxTurns) {
       return AgentTerminateMode.MAX_TURNS;
     }
 

@@ -13,7 +13,6 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -102,7 +101,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   theme,
 }) => {
   const settings = useSettings();
-  const isAlternateBuffer = useAlternateBuffer();
 
   const screenReaderEnabled = useIsScreenReaderEnabled();
 
@@ -179,7 +177,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
-        !isAlternateBuffer,
       );
     }
   }, [
@@ -192,7 +189,6 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     terminalWidth,
     theme,
     settings,
-    isAlternateBuffer,
     tabWidth,
   ]);
 
@@ -205,7 +201,6 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
-  useMaxSizedBox: boolean,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -283,22 +278,14 @@ const renderDiffContent = (
       ) {
         acc.push(
           <Box key={`gap-${index}`}>
-            {useMaxSizedBox ? (
-              <Text wrap="truncate" color={semanticTheme.text.secondary}>
-                {'═'.repeat(terminalWidth)}
-              </Text>
-            ) : (
-              // We can use a proper separator when not using max sized box.
-              <Box
-                borderStyle="double"
-                borderLeft={false}
-                borderRight={false}
-                borderBottom={false}
-                width={terminalWidth}
-                borderColor={semanticTheme.text.secondary}
-                marginRight={1}
-              ></Box>
-            )}
+            <Box
+              borderStyle="double"
+              borderLeft={false}
+              borderRight={false}
+              borderBottom={false}
+              width={terminalWidth}
+              borderColor={semanticTheme.text.secondary}
+            ></Box>
           </Box>,
         );
       }
@@ -342,24 +329,15 @@ const renderDiffContent = (
             : undefined;
       acc.push(
         <Box key={lineKey} flexDirection="row">
-          {useMaxSizedBox ? (
-            <Text
-              color={semanticTheme.text.secondary}
-              backgroundColor={backgroundColor}
-            >
-              {gutterNumStr.padStart(gutterWidth)}{' '}
-            </Text>
-          ) : (
-            <Box
-              width={gutterWidth + 1}
-              paddingRight={1}
-              flexShrink={0}
-              backgroundColor={backgroundColor}
-              justifyContent="flex-end"
-            >
-              <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
-            </Box>
-          )}
+          <Box
+            width={gutterWidth + 1}
+            paddingRight={1}
+            flexShrink={0}
+            backgroundColor={backgroundColor}
+            justifyContent="flex-end"
+          >
+            <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
+          </Box>
           {line.type === 'context' ? (
             <>
               <Text>{prefixSymbol} </Text>
@@ -393,22 +371,14 @@ const renderDiffContent = (
     [],
   );
 
-  if (useMaxSizedBox) {
-    return (
-      <MaxSizedBox
-        maxHeight={availableTerminalHeight}
-        maxWidth={terminalWidth}
-        key={key}
-      >
-        {content}
-      </MaxSizedBox>
-    );
-  }
-
   return (
-    <Box key={key} flexDirection="column" width={terminalWidth} flexShrink={0}>
+    <MaxSizedBox
+      maxHeight={availableTerminalHeight}
+      maxWidth={terminalWidth}
+      key={key}
+    >
       {content}
-    </Box>
+    </MaxSizedBox>
   );
 };
 

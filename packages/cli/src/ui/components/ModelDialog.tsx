@@ -221,7 +221,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           <Text color={theme.text.primary}>
             Remember model for future sessions:{' '}
           </Text>
-          <Text color={theme.text.secondary}>
+          <Text color={theme.status.success}>
             {persistMode ? 'true' : 'false'}
           </Text>
         </Box>

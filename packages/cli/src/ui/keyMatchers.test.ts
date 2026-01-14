@@ -102,11 +102,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.DELETE_CHAR_LEFT,
-      positive: [
-        createKey('backspace'),
-        { ...createKey('\x7f'), sequence: '\x7f' },
-        createKey('h', { ctrl: true }),
-      ],
+      positive: [createKey('backspace'), createKey('h', { ctrl: true })],
       negative: [createKey('h'), createKey('x', { ctrl: true })],
     },
     {
@@ -119,8 +115,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
-        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
-        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
         createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
@@ -289,7 +283,7 @@ describe('keyMatchers', () => {
       negative: [createKey('t'), createKey('e', { ctrl: true })],
     },
     {
-      command: Command.TOGGLE_IDE_CONTEXT_DETAIL,
+      command: Command.SHOW_IDE_CONTEXT_DETAIL,
       positive: [createKey('g', { ctrl: true })],
       negative: [createKey('g'), createKey('t', { ctrl: true })],
     },
@@ -336,7 +330,7 @@ describe('keyMatchers', () => {
       negative: [createKey('return'), createKey('space')],
     },
     {
-      command: Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
+      command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
       negative: [createKey('f', { ctrl: true }), createKey('f')],
     },

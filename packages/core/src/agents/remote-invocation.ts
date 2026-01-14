@@ -166,16 +166,16 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       });
 
       // Extract the output text
-      const resultData = response;
-      let outputText = '';
+      const outputText =
+        response.kind === 'task'
+          ? extractTaskText(response)
+          : response.kind === 'message'
+            ? extractMessageText(response)
+            : JSON.stringify(response);
 
-      if (resultData.kind === 'message') {
-        outputText = extractMessageText(resultData);
-      } else if (resultData.kind === 'task') {
-        outputText = extractTaskText(resultData);
-      } else {
-        outputText = JSON.stringify(resultData);
-      }
+      debugLogger.debug(
+        `[RemoteAgent] Response from ${this.definition.name}:\n${JSON.stringify(response, null, 2)}`,
+      );
 
       return {
         llmContent: [{ text: outputText }],

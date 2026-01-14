@@ -108,7 +108,7 @@ describe('skills disable command', () => {
 
   describe('disableCommand', () => {
     it('should have correct command and describe', () => {
-      expect(disableCommand.command).toBe('disable <name>');
+      expect(disableCommand.command).toBe('disable <name> [--scope]');
       expect(disableCommand.describe).toBe('Disables an agent skill.');
     });
   });
