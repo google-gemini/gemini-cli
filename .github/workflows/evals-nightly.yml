@@ -73,4 +73,4 @@ jobs:
       - name: 'Generate Summary'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: "node scripts/aggregate_evals.js artifacts >> $GITHUB_STEP_SUMMARY"
+        run: 'node scripts/aggregate_evals.js artifacts >> "$GITHUB_STEP_SUMMARY"'
