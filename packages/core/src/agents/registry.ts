@@ -11,6 +11,7 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { GeneralistAgent } from './generalist-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
@@ -143,6 +144,7 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const cliHelpSettings = this.config.getCliHelpAgentSettings();
+    const generalistSettings = this.config.getGeneralistAgentSettings();
 
     // Only register the agent if it's enabled in the settings.
     if (investigatorSettings?.enabled) {
@@ -192,6 +194,11 @@ export class AgentRegistry {
     // Register the CLI help agent if it's explicitly enabled.
     if (cliHelpSettings.enabled) {
       this.registerLocalAgent(CliHelpAgent(this.config));
+    }
+
+    // Register the generalist agent if it's explicitly enabled.
+    if (generalistSettings.enabled) {
+      this.registerLocalAgent(GeneralistAgent(this.config));
     }
   }
 
@@ -331,17 +338,24 @@ export class AgentRegistry {
       return definition;
     }
 
-    return {
-      ...definition,
-      runConfig: {
+    // Use Object.create to preserve lazy getters on the definition object
+    const merged = Object.create(definition) as LocalAgentDefinition<TOutput>;
+
+    if (overrides.runConfig) {
+      merged.runConfig = {
         ...definition.runConfig,
         ...overrides.runConfig,
-      },
-      modelConfig: ModelConfigService.merge(
+      };
+    }
+
+    if (overrides.modelConfig) {
+      merged.modelConfig = ModelConfigService.merge(
         definition.modelConfig,
-        overrides.modelConfig ?? {},
-      ),
-    };
+        overrides.modelConfig,
+      );
+    }
+
+    return merged;
   }
 
   private registerModelConfigs<TOutput extends z.ZodTypeAny>(

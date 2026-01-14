@@ -1489,6 +1489,23 @@
             }
           },
           "additionalProperties": false
+        },
+        "generalistAgentSettings": {
+          "title": "Generalist Agent Settings",
+          "description": "Configuration for Generalist Agent.",
+          "markdownDescription": "Configuration for Generalist Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Generalist Agent",
+              "description": "Enable the Generalist Agent.",
+              "markdownDescription": "Enable the Generalist Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

@@ -162,6 +162,10 @@ export interface CliHelpAgentSettings {
   enabled?: boolean;
 }
 
+export interface GeneralistAgentSettings {
+  enabled?: boolean;
+}
+
 export interface AgentRunConfig {
   maxTimeMinutes?: number;
   maxTurns?: number;
@@ -357,6 +361,7 @@ export interface ConfigParameters {
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   cliHelpAgentSettings?: CliHelpAgentSettings;
+  generalistAgentSettings?: GeneralistAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -493,6 +498,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly cliHelpAgentSettings: CliHelpAgentSettings;
+  private readonly generalistAgentSettings: GeneralistAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -665,6 +671,9 @@ export class Config {
     };
     this.cliHelpAgentSettings = {
       enabled: params.cliHelpAgentSettings?.enabled ?? true,
+    };
+    this.generalistAgentSettings = {
+      enabled: params.generalistAgentSettings?.enabled ?? false,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
@@ -1754,6 +1763,10 @@ export class Config {
     return this.cliHelpAgentSettings;
   }
 
+  getGeneralistAgentSettings(): GeneralistAgentSettings {
+    return this.generalistAgentSettings;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 
@@ -1834,7 +1847,8 @@ export class Config {
     if (
       this.isAgentsEnabled() ||
       this.getCodebaseInvestigatorSettings().enabled ||
-      this.getCliHelpAgentSettings().enabled
+      this.getCliHelpAgentSettings().enabled ||
+      this.getGeneralistAgentSettings().enabled
     ) {
       // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();

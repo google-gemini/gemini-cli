@@ -887,6 +887,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.generalistAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the Generalist Agent.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.disabled`** (array):
