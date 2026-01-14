@@ -285,6 +285,11 @@ export async function startInteractiveUI(
 
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
+
+  // Listen for admin controls from parent process (IPC)
+  const adminControlsListner = setupAdminControlsListener();
+  registerCleanup(adminControlsListner.cleanup);
+
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -300,17 +305,6 @@ export async function main() {
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
     coreEvents.emitFeedback('warning', error.message);
-  });
-
-  // Listen for admin settings from parent process (IPC)
-  process.on('message', (msg: unknown) => {
-    const message = msg as {
-      type?: string;
-      settings?: FetchAdminControlsResponse;
-    };
-    if (message?.type === 'admin-settings' && message.settings) {
-      settings.setRemoteAdminSettings(message.settings);
-    }
   });
 
   const trustedFolders = loadTrustedFolders();
@@ -371,6 +365,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+  adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
@@ -772,4 +767,38 @@ export function initializeOutputListenersAndFlush() {
     }
   }
   coreEvents.drainBacklogs();
+}
+
+function setupAdminControlsListener() {
+  let pendingSettings: FetchAdminControlsResponse | undefined;
+  let config: Config | undefined;
+
+  const messageHandler = (msg: unknown) => {
+    const message = msg as {
+      type?: string;
+      settings?: FetchAdminControlsResponse;
+    };
+    if (message?.type === 'admin-settings' && message.settings) {
+      if (config) {
+        config.setRemoteAdminSettings(message.settings);
+      } else {
+        pendingSettings = message.settings;
+      }
+    }
+  };
+
+  process.on('message', messageHandler);
+
+  return {
+    setConfig: (newConfig: Config) => {
+      config = newConfig;
+      if (pendingSettings) {
+        config.setRemoteAdminSettings(pendingSettings);
+        pendingSettings = undefined;
+      }
+    },
+    cleanup: () => {
+      process.off('message', messageHandler);
+    },
+  };
 }
