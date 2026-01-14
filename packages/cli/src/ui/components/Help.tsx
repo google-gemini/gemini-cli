@@ -144,7 +144,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+        Ctrl+X
       </Text>{' '}
       - Open input in external editor
     </Text>

@@ -200,4 +200,23 @@ describe('useHistoryManager', () => {
     expect(result.current.history[1].text).toBe('Gemini response');
     expect(result.current.history[2].text).toBe('Message 1');
   });
+
+  it('should use Date.now() as default baseTimestamp if not provided', () => {
+    const { result } = renderHook(() => useHistory());
+    const before = Date.now();
+    const itemData: Omit<HistoryItem, 'id'> = {
+      type: 'user',
+      text: 'Default timestamp test',
+    };
+
+    act(() => {
+      result.current.addItem(itemData);
+    });
+    const after = Date.now();
+
+    expect(result.current.history).toHaveLength(1);
+    // ID should be >= before + 1 (since counter starts at 0 and increments to 1)
+    expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
+    expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
+  });
 });

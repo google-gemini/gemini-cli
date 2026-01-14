@@ -707,6 +707,10 @@ export class Task {
       case GeminiEventType.ModelInfo:
         this.modelInfo = event.value;
         break;
+      case GeminiEventType.Retry:
+      case GeminiEventType.InvalidStream:
+        // An invalid stream should trigger a retry, which requires no action from the user.
+        break;
       case GeminiEventType.Error:
       default: {
         // Block scope for lexical declaration
