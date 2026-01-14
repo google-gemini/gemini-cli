@@ -8,7 +8,19 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
+import { enableAgent, disableAgent } from '../../utils/agentSettings.js';
+import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
+
+vi.mock('../../utils/agentSettings.js', () => ({
+  enableAgent: vi.fn(),
+  disableAgent: vi.fn(),
+}));
+
+vi.mock('../../utils/agentUtils.js', () => ({
+  renderAgentActionFeedback: vi.fn(),
+}));
 
 describe('agentsCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -28,6 +40,10 @@ describe('agentsCommand', () => {
     mockContext = createMockCommandContext({
       services: {
         config: mockConfig as unknown as Config,
+        settings: {
+          workspace: { path: '/mock/path' },
+          merged: { agents: { overrides: {} } },
+        } as unknown as LoadedSettings,
       },
     });
   });
@@ -68,7 +84,12 @@ describe('agentsCommand', () => {
         description: 'desc1',
         kind: 'local',
       },
-      { name: 'agent2', description: 'desc2', kind: 'remote' },
+      {
+        name: 'agent2',
+        displayName: undefined,
+        description: 'desc2',
+        kind: 'remote',
+      },
     ];
     mockConfig.getAgentRegistry().getAllDefinitions.mockReturnValue(mockAgents);
 
@@ -116,6 +137,165 @@ describe('agentsCommand', () => {
       type: 'message',
       messageType: 'error',
       content: 'Agent registry not found.',
+    });
+  });
+
+  it('should enable an agent successfully', async () => {
+    const reloadSpy = vi.fn().mockResolvedValue(undefined);
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      reload: reloadSpy,
+    });
+    vi.mocked(enableAgent).mockReturnValue({
+      status: 'success',
+      agentName: 'test-agent',
+      action: 'enable',
+      modifiedScopes: [],
+      alreadyInStateScopes: [],
+    });
+    vi.mocked(renderAgentActionFeedback).mockReturnValue('Enabled test-agent.');
+
+    const enableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'enable',
+    );
+    expect(enableCommand).toBeDefined();
+
+    const result = await enableCommand!.action!(mockContext, 'test-agent');
+
+    expect(enableAgent).toHaveBeenCalledWith(
+      mockContext.services.settings,
+      'test-agent',
+    );
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.INFO,
+        text: 'Enabling test-agent...',
+      }),
+    );
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Enabled test-agent.',
+    });
+  });
+
+  it('should handle no-op when enabling an agent', async () => {
+    vi.mocked(enableAgent).mockReturnValue({
+      status: 'no-op',
+      agentName: 'test-agent',
+      action: 'enable',
+      modifiedScopes: [],
+      alreadyInStateScopes: [],
+    });
+    vi.mocked(renderAgentActionFeedback).mockReturnValue(
+      'Agent test-agent is already enabled.',
+    );
+
+    const enableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'enable',
+    );
+    const result = await enableCommand!.action!(mockContext, 'test-agent');
+
+    expect(enableAgent).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Agent test-agent is already enabled.',
+    });
+  });
+
+  it('should show usage error if no agent name provided for enable', async () => {
+    const enableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'enable',
+    );
+    const result = await enableCommand!.action!(mockContext, '   ');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /agents enable <agent-name>',
+    });
+  });
+
+  it('should disable an agent successfully', async () => {
+    const reloadSpy = vi.fn().mockResolvedValue(undefined);
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      reload: reloadSpy,
+    });
+    vi.mocked(disableAgent).mockReturnValue({
+      status: 'success',
+      agentName: 'test-agent',
+      action: 'disable',
+      modifiedScopes: [],
+      alreadyInStateScopes: [],
+    });
+    vi.mocked(renderAgentActionFeedback).mockReturnValue(
+      'Disabled test-agent.',
+    );
+
+    const disableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'disable',
+    );
+    expect(disableCommand).toBeDefined();
+
+    const result = await disableCommand!.action!(mockContext, 'test-agent');
+
+    expect(disableAgent).toHaveBeenCalledWith(
+      mockContext.services.settings,
+      'test-agent',
+      expect.anything(), // Scope is derived in the command
+    );
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.INFO,
+        text: 'Disabling test-agent...',
+      }),
+    );
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Disabled test-agent.',
+    });
+  });
+
+  it('should handle no-op when disabling an agent', async () => {
+    vi.mocked(disableAgent).mockReturnValue({
+      status: 'no-op',
+      agentName: 'test-agent',
+      action: 'disable',
+      modifiedScopes: [],
+      alreadyInStateScopes: [],
+    });
+    vi.mocked(renderAgentActionFeedback).mockReturnValue(
+      'Agent test-agent is already disabled.',
+    );
+
+    const disableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'disable',
+    );
+    const result = await disableCommand!.action!(mockContext, 'test-agent');
+
+    expect(disableAgent).toHaveBeenCalled();
+    expect(mockContext.ui.addItem).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Agent test-agent is already disabled.',
+    });
+  });
+
+  it('should show usage error if no agent name provided for disable', async () => {
+    const disableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'disable',
+    );
+    const result = await disableCommand!.action!(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /agents disable <agent-name>',
     });
   });
 });

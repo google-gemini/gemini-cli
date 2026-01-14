@@ -80,7 +80,7 @@ describe('skills disable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" disabled by adding it to the disabled list in user (/user/settings.json) settings. Restart required to take effect.',
+        'Skill "skill1" disabled by adding it to the disabled list in user (/user/settings.json) settings.',
       );
     });
 
@@ -108,7 +108,7 @@ describe('skills disable command', () => {
 
   describe('disableCommand', () => {
     it('should have correct command and describe', () => {
-      expect(disableCommand.command).toBe('disable <name>');
+      expect(disableCommand.command).toBe('disable <name> [--scope]');
       expect(disableCommand.describe).toBe('Disables an agent skill.');
     });
   });

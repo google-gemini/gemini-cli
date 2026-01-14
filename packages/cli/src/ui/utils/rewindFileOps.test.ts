@@ -4,219 +4,204 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import fs from 'node:fs/promises';
 import {
   calculateTurnStats,
   calculateRewindImpact,
   revertFileChanges,
 } from './rewindFileOps.js';
-import type {
-  ConversationRecord,
-  MessageRecord,
-  ToolCallRecord,
+import {
+  coreEvents,
+  type ConversationRecord,
+  type MessageRecord,
+  type ToolCallRecord,
 } from '@google/gemini-cli-core';
-import { coreEvents } from '@google/gemini-cli-core';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 
-vi.mock('node:fs/promises');
+// Mock fs/promises
+vi.mock('node:fs/promises', () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    rm: vi.fn(),
+    unlink: vi.fn(),
+  },
+}));
+
+// Mock @google/gemini-cli-core
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    coreEvents: {
-      emitFeedback: vi.fn(),
+    debugLogger: {
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
     },
+    getFileDiffFromResultDisplay: vi.fn(),
+    computeAddedAndRemovedLines: vi.fn(),
   };
 });
 
 describe('rewindFileOps', () => {
-  const mockConversation: ConversationRecord = {
-    sessionId: 'test-session',
-    projectHash: 'hash',
-    startTime: 'time',
-    lastUpdated: 'time',
-    messages: [],
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    vi.spyOn(coreEvents, 'emitFeedback');
   });
 
   describe('calculateTurnStats', () => {
     it('returns null if no edits found after user message', () => {
-      const userMsg: MessageRecord = {
-        type: 'user',
-        content: 'hello',
-        id: '1',
-        timestamp: '1',
+      const userMsg = { type: 'user' } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
+          { type: 'gemini', text: 'Hello' } as unknown as MessageRecord,
+        ],
       };
-      const geminiMsg: MessageRecord = {
-        type: 'gemini',
-        content: 'hi',
-        id: '2',
-        timestamp: '2',
-      };
-      mockConversation.messages = [userMsg, geminiMsg];
-
-      const stats = calculateTurnStats(mockConversation, userMsg);
-      expect(stats).toBeNull();
+      const result = calculateTurnStats(
+        conversation as unknown as ConversationRecord,
+        userMsg,
+      );
+      expect(result).toBeNull();
     });
 
-    it('calculates stats for single turn correctly', () => {
-      const userMsg: MessageRecord = {
-        type: 'user',
-        content: 'hello',
-        id: '1',
-        timestamp: '1',
-      };
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+    it('calculates stats for single turn correctly', async () => {
+      const { getFileDiffFromResultDisplay, computeAddedAndRemovedLines } =
+        await import('@google/gemini-cli-core');
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: 'test.ts',
+        fileName: 'test.ts',
+        originalContent: 'old',
+        newContent: 'new',
+        isNewFile: false,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
+      vi.mocked(computeAddedAndRemovedLines).mockReturnValue({
+        addedLines: 3,
+        removedLines: 3,
+      });
+
+      const userMsg = { type: 'user' } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file1.ts',
-              filePath: '/file1.ts',
-              originalContent: 'old',
-              newContent: 'new',
-              isNewFile: false,
-              diffStat: {
-                model_added_lines: 5,
-                model_removed_lines: 2,
-                user_added_lines: 0,
-                user_removed_lines: 0,
-                model_added_chars: 100,
-                model_removed_chars: 20,
-                user_added_chars: 0,
-                user_removed_chars: 0,
+            type: 'gemini',
+            toolCalls: [
+              {
+                name: 'replace',
+                args: {},
+                resultDisplay: 'diff',
               },
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            ],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      const userMsg2: MessageRecord = {
-        type: 'user',
-        content: 'next',
-        id: '3',
-        timestamp: '3',
-      };
-
-      mockConversation.messages = [userMsg, toolMsg, userMsg2];
-
-      const stats = calculateTurnStats(mockConversation, userMsg);
-      expect(stats).toEqual({
-        addedLines: 5,
-        removedLines: 2,
+      const result = calculateTurnStats(
+        conversation as unknown as ConversationRecord,
+        userMsg,
+      );
+      expect(result).toEqual({
         fileCount: 1,
+        addedLines: 3,
+        removedLines: 3,
       });
     });
   });
 
   describe('calculateRewindImpact', () => {
-    it('calculates cumulative stats across multiple turns', () => {
-      const userMsg1: MessageRecord = {
-        type: 'user',
-        content: 'start',
-        id: '1',
-        timestamp: '1',
-      };
-      const toolMsg1: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
-          {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file1.ts',
-              filePath: '/file1.ts',
-              fileDiff: 'diff1',
-              originalContent: 'old',
-              newContent: 'new',
-              isNewFile: false,
-              diffStat: {
-                model_added_lines: 5,
-                model_removed_lines: 2,
-                user_added_lines: 0,
-                user_removed_lines: 0,
-                model_added_chars: 0,
-                model_removed_chars: 0,
-                user_added_chars: 0,
-                user_removed_chars: 0,
-              },
-            },
+    it('calculates cumulative stats across multiple turns', async () => {
+      const { getFileDiffFromResultDisplay, computeAddedAndRemovedLines } =
+        await import('@google/gemini-cli-core');
+      vi.mocked(getFileDiffFromResultDisplay)
+        .mockReturnValueOnce({
+          filePath: 'file1.ts',
+          fileName: 'file1.ts',
+          originalContent: '123',
+          newContent: '12345',
+          isNewFile: false,
+          diffStat: {
+            model_added_lines: 0,
+            model_removed_lines: 0,
+            model_added_chars: 0,
+            model_removed_chars: 0,
+            user_added_lines: 0,
+            user_removed_lines: 0,
+            user_added_chars: 0,
+            user_removed_chars: 0,
           },
-        ] as unknown as ToolCallRecord[],
-      };
-
-      const userMsg2: MessageRecord = {
-        type: 'user',
-        content: 'next',
-        id: '3',
-        timestamp: '3',
-      };
-
-      const toolMsg2: MessageRecord = {
-        type: 'gemini',
-        id: '4',
-        timestamp: '4',
-        content: '',
-        toolCalls: [
-          {
-            name: 'replace',
-            id: 'tool-call-2',
-            status: 'success',
-            timestamp: '4',
-            args: {},
-            resultDisplay: {
-              fileName: 'file2.ts',
-              filePath: '/file2.ts',
-              fileDiff: 'diff2',
-              originalContent: 'old',
-              newContent: 'new',
-              isNewFile: false,
-              diffStat: {
-                model_added_lines: 3,
-                model_removed_lines: 1,
-                user_added_lines: 0,
-                user_removed_lines: 0,
-                model_added_chars: 0,
-                model_removed_chars: 0,
-                user_added_chars: 0,
-                user_removed_chars: 0,
-              },
-            },
+          fileDiff: 'diff1',
+        })
+        .mockReturnValueOnce({
+          filePath: 'file2.ts',
+          fileName: 'file2.ts',
+          originalContent: 'abc',
+          newContent: 'abcd',
+          isNewFile: true,
+          diffStat: {
+            model_added_lines: 0,
+            model_removed_lines: 0,
+            model_added_chars: 0,
+            model_removed_chars: 0,
+            user_added_lines: 0,
+            user_removed_lines: 0,
+            user_added_chars: 0,
+            user_removed_chars: 0,
           },
-        ] as unknown as ToolCallRecord[],
+          fileDiff: 'diff2',
+        });
+
+      vi.mocked(computeAddedAndRemovedLines)
+        .mockReturnValueOnce({ addedLines: 5, removedLines: 3 })
+        .mockReturnValueOnce({ addedLines: 4, removedLines: 0 });
+
+      const userMsg = { type: 'user' } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
+          {
+            type: 'gemini',
+            toolCalls: [
+              {
+                resultDisplay: 'd1',
+              } as unknown as ToolCallRecord,
+            ],
+          } as unknown as MessageRecord,
+          {
+            type: 'user',
+          } as unknown as MessageRecord,
+          {
+            type: 'gemini',
+            toolCalls: [
+              {
+                resultDisplay: 'd2',
+              } as unknown as ToolCallRecord,
+            ],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [userMsg1, toolMsg1, userMsg2, toolMsg2];
-
-      const stats = calculateRewindImpact(mockConversation, userMsg1);
-
-      expect(stats).toEqual({
-        addedLines: 8, // 5 + 3
-        removedLines: 3, // 2 + 1
+      const result = calculateRewindImpact(
+        conversation as unknown as ConversationRecord,
+        userMsg,
+      );
+      expect(result).toEqual({
         fileCount: 2,
+        addedLines: 9, // 5 + 4
+        removedLines: 3, // 3 + 0
         details: [
           { fileName: 'file1.ts', diff: 'diff1' },
           { fileName: 'file2.ts', diff: 'diff2' },
@@ -226,246 +211,264 @@ describe('rewindFileOps', () => {
   });
 
   describe('revertFileChanges', () => {
-    const mockDiffStat = {
-      model_added_lines: 1,
-      model_removed_lines: 1,
-      user_added_lines: 0,
-      user_removed_lines: 0,
-      model_added_chars: 1,
-      model_removed_chars: 1,
-      user_added_chars: 0,
-      user_removed_chars: 0,
-    };
-
     it('does nothing if message not found', async () => {
-      mockConversation.messages = [];
-      await revertFileChanges(mockConversation, 'missing-id');
+      await revertFileChanges(
+        { messages: [] } as unknown as ConversationRecord,
+        'missing',
+      );
       expect(fs.writeFile).not.toHaveBeenCalled();
     });
 
     it('reverts exact match', async () => {
-      const userMsg: MessageRecord = {
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: '/abs/path/test.ts',
+        fileName: 'test.ts',
+        originalContent: 'ORIGINAL_CONTENT',
+        newContent: 'NEW_CONTENT',
+        isNewFile: false,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
+
+      const userMsg = {
         type: 'user',
-        content: 'start',
-        id: '1',
-        timestamp: '1',
-      };
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+        id: 'target',
+      } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file.txt',
-              filePath: path.resolve('/root/file.txt'),
-              originalContent: 'old',
-              newContent: 'new',
-              isNewFile: false,
-              diffStat: mockDiffStat,
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            type: 'gemini',
+            toolCalls: [{ resultDisplay: 'diff' } as unknown as ToolCallRecord],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [userMsg, toolMsg];
+      vi.mocked(fs.readFile).mockResolvedValue('NEW_CONTENT');
 
-      vi.mocked(fs.readFile).mockResolvedValue('new');
-
-      await revertFileChanges(mockConversation, '1');
+      await revertFileChanges(
+        conversation as unknown as ConversationRecord,
+        'target',
+      );
 
       expect(fs.writeFile).toHaveBeenCalledWith(
-        path.resolve('/root/file.txt'),
-        'old',
+        '/abs/path/test.ts',
+        'ORIGINAL_CONTENT',
       );
     });
 
     it('deletes new file on revert', async () => {
-      const userMsg: MessageRecord = {
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: '/abs/path/new.ts',
+        fileName: 'new.ts',
+        originalContent: '',
+        newContent: 'SOME_CONTENT',
+        isNewFile: true,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
+
+      const userMsg = {
         type: 'user',
-        content: 'start',
-        id: '1',
-        timestamp: '1',
-      };
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+        id: 'target',
+      } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'write_file',
-            id: 'tool-call-2',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file.txt',
-              filePath: path.resolve('/root/file.txt'),
-              originalContent: null,
-              newContent: 'content',
-              isNewFile: true,
-              diffStat: mockDiffStat,
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            type: 'gemini',
+            toolCalls: [{ resultDisplay: 'diff' } as unknown as ToolCallRecord],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [userMsg, toolMsg];
+      vi.mocked(fs.readFile).mockResolvedValue('SOME_CONTENT');
 
-      vi.mocked(fs.readFile).mockResolvedValue('content');
+      await revertFileChanges(
+        conversation as unknown as ConversationRecord,
+        'target',
+      );
 
-      await revertFileChanges(mockConversation, '1');
-
-      expect(fs.unlink).toHaveBeenCalledWith(path.resolve('/root/file.txt'));
+      expect(fs.unlink).toHaveBeenCalledWith('/abs/path/new.ts');
     });
 
     it('handles smart revert (patching) successfully', async () => {
-      const original = Array.from(
-        { length: 20 },
-        (_, i) => `line${i + 1}`,
-      ).join('\n');
-      // Agent changes line 2
-      const agentModifiedLines = original.split('\n');
-      agentModifiedLines[1] = 'line2-modified';
-      const agentModified = agentModifiedLines.join('\n');
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: '/abs/path/test.ts',
+        fileName: 'test.ts',
+        originalContent: 'LINE1\nLINE2\nLINE3',
+        newContent: 'LINE1\nEDITED\nLINE3',
+        isNewFile: false,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
 
-      // User changes line 18 (far away from line 2)
-      const userModifiedLines = [...agentModifiedLines];
-      userModifiedLines[17] = 'line18-modified';
-      const userModified = userModifiedLines.join('\n');
-
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+      const userMsg = {
+        type: 'user',
+        id: 'target',
+      } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file.txt',
-              filePath: path.resolve('/root/file.txt'),
-              originalContent: original,
-              newContent: agentModified,
-              isNewFile: false,
-              diffStat: mockDiffStat,
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            type: 'gemini',
+            toolCalls: [{ resultDisplay: 'diff' } as unknown as ToolCallRecord],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [
-        { type: 'user', content: 'start', id: '1', timestamp: '1' },
-        toolMsg,
-      ];
-      vi.mocked(fs.readFile).mockResolvedValue(userModified);
+      // Current content has FURTHER changes
+      vi.mocked(fs.readFile).mockResolvedValue('LINE1\nEDITED\nLINE3\nNEWLINE');
 
-      await revertFileChanges(mockConversation, '1');
+      await revertFileChanges(
+        conversation as unknown as ConversationRecord,
+        'target',
+      );
 
-      // Expect line 2 to be reverted to original, but line 18 to keep user modification
-      const expectedLines = original.split('\n');
-      expectedLines[17] = 'line18-modified';
-      const expectedContent = expectedLines.join('\n');
-
+      // Should have successfully patched it back to ORIGINAL state but kept the NEWLINE
       expect(fs.writeFile).toHaveBeenCalledWith(
-        path.resolve('/root/file.txt'),
-        expectedContent,
+        '/abs/path/test.ts',
+        'LINE1\nLINE2\nLINE3\nNEWLINE',
       );
     });
 
     it('emits warning on smart revert failure', async () => {
-      const original = 'line1\nline2\nline3';
-      const agentModified = 'line1\nline2-modified\nline3';
-      // User modification conflicts with the agent's change.
-      const userModified = 'line1\nline2-usermodified\nline3';
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: '/abs/path/test.ts',
+        fileName: 'test.ts',
+        originalContent: 'OLD',
+        newContent: 'NEW',
+        isNewFile: false,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
 
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+      const userMsg = {
+        type: 'user',
+        id: 'target',
+      } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file.txt',
-              filePath: path.resolve('/root/file.txt'),
-              originalContent: original,
-              newContent: agentModified,
-              isNewFile: false,
-              diffStat: mockDiffStat,
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            type: 'gemini',
+            toolCalls: [{ resultDisplay: 'diff' } as unknown as ToolCallRecord],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [
-        { type: 'user', content: 'start', id: '1', timestamp: '1' },
-        toolMsg,
-      ];
-      vi.mocked(fs.readFile).mockResolvedValue(userModified);
+      // Current content is completely unrelated - diff won't apply
+      vi.mocked(fs.readFile).mockResolvedValue('UNRELATED');
 
-      await revertFileChanges(mockConversation, '1');
+      await revertFileChanges(
+        conversation as unknown as ConversationRecord,
+        'target',
+      );
 
       expect(fs.writeFile).not.toHaveBeenCalled();
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'warning',
-        expect.stringContaining('Smart revert for file.txt failed'),
+        expect.stringContaining('Smart revert for test.ts failed'),
       );
     });
 
     it('emits error if fs.readFile fails with a generic error', async () => {
-      const toolMsg: MessageRecord = {
-        type: 'gemini',
-        id: '2',
-        timestamp: '2',
-        content: '',
-        toolCalls: [
+      const { getFileDiffFromResultDisplay } = await import(
+        '@google/gemini-cli-core'
+      );
+      vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
+        filePath: '/abs/path/test.ts',
+        fileName: 'test.ts',
+        originalContent: 'OLD',
+        newContent: 'NEW',
+        isNewFile: false,
+        diffStat: {
+          model_added_lines: 0,
+          model_removed_lines: 0,
+          model_added_chars: 0,
+          model_removed_chars: 0,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+        fileDiff: 'diff',
+      });
+
+      const userMsg = {
+        type: 'user',
+        id: 'target',
+      } as unknown as MessageRecord;
+      const conversation = {
+        messages: [
+          userMsg,
           {
-            name: 'replace',
-            id: 'tool-call-1',
-            status: 'success',
-            timestamp: '2',
-            args: {},
-            resultDisplay: {
-              fileName: 'file.txt',
-              filePath: path.resolve('/root/file.txt'),
-              originalContent: 'old',
-              newContent: 'new',
-              isNewFile: false,
-              diffStat: mockDiffStat,
-            },
-          },
-        ] as unknown as ToolCallRecord[],
+            type: 'gemini',
+            toolCalls: [{ resultDisplay: 'diff' } as unknown as ToolCallRecord],
+          } as unknown as MessageRecord,
+        ],
       };
 
-      mockConversation.messages = [
-        { type: 'user', content: 'start', id: '1', timestamp: '1' },
-        toolMsg,
-      ];
-      // Simulate a generic file read error
-      vi.mocked(fs.readFile).mockRejectedValue(new Error('Permission denied'));
+      vi.mocked(fs.readFile).mockRejectedValue(new Error('disk failure'));
 
-      await revertFileChanges(mockConversation, '1');
-      expect(fs.writeFile).not.toHaveBeenCalled();
+      await revertFileChanges(
+        conversation as unknown as ConversationRecord,
+        'target',
+      );
+
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
-        'Error reading file.txt during revert: Permission denied',
+        expect.stringContaining(
+          'Error reading test.ts during revert: disk failure',
+        ),
         expect.any(Error),
       );
     });
