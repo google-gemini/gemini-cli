@@ -192,8 +192,8 @@ describe('consent', () => {
         const expectedConsentString = [
           'Installing extension "test-ext".',
           'This extension will run the following MCP servers:',
-          '  - server1 (local): npm start',
-          '  - server2 (remote): https://remote.com',
+          '  * server1 (local): npm start',
+          '  * server2 (remote): https://remote.com',
           'This extension will append info to your gemini.md context using my-context.md',
           'This extension will exclude the following core tools: tool1,tool2',
           '',
@@ -326,17 +326,17 @@ describe('consent', () => {
         const expectedConsentString = [
           'Installing extension "test-ext".',
           'This extension will run the following MCP servers:',
-          '  - server1 (local): npm start',
-          '  - server2 (remote): https://remote.com',
+          '  * server1 (local): npm start',
+          '  * server2 (remote): https://remote.com',
           'This extension will append info to your gemini.md context using my-context.md',
           'This extension will exclude the following core tools: tool1,tool2',
           '',
           chalk.bold('Agent Skills:'),
           '\nThis extension will install the following agent skills:\n',
-          `  - ${chalk.bold('skill1')}: desc1`,
+          `  * ${chalk.bold('skill1')}: desc1`,
           chalk.dim(`    (Source: ${skill1.location}) (2 items in directory)`),
           '',
-          `  - ${chalk.bold('skill2')}: desc2`,
+          `  * ${chalk.bold('skill2')}: desc2`,
           chalk.dim(`    (Source: ${skill2.location}) (1 items in directory)`),
           '',
           '',
@@ -411,7 +411,7 @@ describe('consent', () => {
       );
       expect(consentString).toContain('Install Destination: /mock/target/dir');
       expect(consentString).toContain('\n' + SKILLS_WARNING_MESSAGE);
-      expect(consentString).toContain(`  - ${chalk.bold('skill1')}: desc1`);
+      expect(consentString).toContain(`  * ${chalk.bold('skill1')}: desc1`);
       expect(consentString).toContain(
         chalk.dim(`(Source: ${skill1.location}) (1 items in directory)`),
       );

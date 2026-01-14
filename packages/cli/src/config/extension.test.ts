@@ -1297,8 +1297,8 @@ describe('extension tests', () => {
       expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
 This extension will run the following MCP servers:
-  - test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
-  - test-server-2 (remote): https://google.com
+  * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
+  * test-server-2 (remote): https://google.com
 
 ${INSTALL_WARNING_MESSAGE}`,
       );

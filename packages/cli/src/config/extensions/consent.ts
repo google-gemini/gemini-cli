@@ -149,7 +149,7 @@ async function extensionConsentString(
       const source =
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
-      output.push(`  - ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
     }
   }
   if (sanitizedConfig.contextFileName) {
@@ -187,7 +187,7 @@ async function extensionConsentString(
 async function renderSkillsList(skills: SkillDefinition[]): Promise<string[]> {
   const output: string[] = [];
   for (const skill of skills) {
-    output.push(`  - ${chalk.bold(skill.name)}: ${skill.description}`);
+    output.push(`  * ${chalk.bold(skill.name)}: ${skill.description}`);
     const skillDir = path.dirname(skill.location);
     let fileCountStr = '';
     try {
