@@ -106,8 +106,6 @@ import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 
-import { getClientMetadata } from '../code_assist/experiments/client_metadata.js';
-
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -892,10 +890,9 @@ export class Config {
           ExperimentFlags.ENABLE_ADMIN_CONTROLS,
         );
 
-        if (pollingEnabled) {
-          const metadata = await getClientMetadata();
+        if (pollingEnabled && codeAssistServer?.projectId) {
           const adminControls = await codeAssistServer.fetchAdminControls({
-            metadata,
+            project: codeAssistServer.projectId,
           });
           this.setRemoteAdminSettings(adminControls);
           this.startAdminControlsPolling();
@@ -923,12 +920,11 @@ export class Config {
     this.adminControlsPollingInterval = setInterval(
       async () => {
         const codeAssistServer = getCodeAssistServer(this);
-        if (!codeAssistServer) return;
+        if (!codeAssistServer?.projectId) return;
 
         try {
-          const metadata = await getClientMetadata();
           const newSettings = await codeAssistServer.fetchAdminControls({
-            metadata,
+            project: codeAssistServer.projectId,
           });
           const currentSettings = this.getRemoteAdminSettings();
 

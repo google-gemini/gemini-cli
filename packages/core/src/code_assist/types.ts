@@ -288,7 +288,7 @@ export interface ConversationInteraction {
 
 // Request for FetchAdminControls RPC
 export interface FetchAdminControlsRequest {
-  metadata: ClientMetadata;
+  project: string;
 }
 
 export interface FetchAdminControlsResponse {
