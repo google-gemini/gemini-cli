@@ -45,7 +45,7 @@ jobs:
       - name: 'Run Evals'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          RUN_EVALS: '${{ github.event.inputs.run_all != "false" }}'
+          RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
         run: 'npm run test:all_evals'
 
       - name: 'Upload Logs'
