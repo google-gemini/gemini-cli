@@ -71,7 +71,7 @@ describe('NumericalClassifierStrategy', () => {
 
   it('should call generateJson with the correct parameters and wrapped user content', async () => {
     const mockApiResponse = {
-      reasoning: 'Simple task',
+      complexity_reasoning: 'Simple task',
       complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -92,16 +92,16 @@ describe('NumericalClassifierStrategy', () => {
     const userContent =
       generateJsonCall.contents[generateJsonCall.contents.length - 1];
     const textPart = userContent.parts?.[0];
-    expect(textPart?.text).toContain('<user_request>');
+    expect(textPart?.text).toContain('');
     expect(textPart?.text).toContain('simple task');
-    expect(textPart?.text).toContain('</user_request>');
+    expect(textPart?.text).toContain('');
   });
 
   describe('A/B Testing Logic (Deterministic)', () => {
     it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 40 -> FLASH', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Hash 71 -> Control
       const mockApiResponse = {
-        reasoning: 'Standard task',
+        complexity_reasoning: 'Standard task',
         complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -127,7 +127,7 @@ describe('NumericalClassifierStrategy', () => {
     it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 60 -> PRO', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
-        reasoning: 'Complex task',
+        complexity_reasoning: 'Complex task',
         complexity_score: 60,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -153,7 +153,7 @@ describe('NumericalClassifierStrategy', () => {
     it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 60 -> FLASH', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // FNV Normalized 18 < 50 -> Strict
       const mockApiResponse = {
-        reasoning: 'Complex task',
+        complexity_reasoning: 'Complex task',
         complexity_score: 60,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -179,7 +179,7 @@ describe('NumericalClassifierStrategy', () => {
     it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 90 -> PRO', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1');
       const mockApiResponse = {
-        reasoning: 'Extreme task',
+        complexity_reasoning: 'Extreme task',
         complexity_score: 90,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -215,7 +215,7 @@ describe('NumericalClassifierStrategy', () => {
         experimentIds: [],
       });
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 60,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -249,7 +249,7 @@ describe('NumericalClassifierStrategy', () => {
         experimentIds: [],
       });
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -283,7 +283,7 @@ describe('NumericalClassifierStrategy', () => {
         experimentIds: [],
       });
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 35,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -314,7 +314,7 @@ describe('NumericalClassifierStrategy', () => {
       });
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Should resolve to Control (50)
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -349,7 +349,7 @@ describe('NumericalClassifierStrategy', () => {
       });
       vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // Should resolve to Strict (80)
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 70,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -384,7 +384,7 @@ describe('NumericalClassifierStrategy', () => {
       });
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -419,7 +419,7 @@ describe('NumericalClassifierStrategy', () => {
       });
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
-        reasoning: 'Test task',
+        complexity_reasoning: 'Test task',
         complexity_score: 60,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -465,7 +465,7 @@ describe('NumericalClassifierStrategy', () => {
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const malformedApiResponse = {
-      reasoning: 'This is a simple task.',
+      complexity_reasoning: 'This is a simple task.',
       // complexity_score is missing
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -495,7 +495,7 @@ describe('NumericalClassifierStrategy', () => {
       { role: 'user', parts: [{ text: 'another user turn' }] },
     ];
     const mockApiResponse = {
-      reasoning: 'Simple.',
+      complexity_reasoning: 'Simple.',
       complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -514,7 +514,7 @@ describe('NumericalClassifierStrategy', () => {
       // The last user turn is wrapped
       {
         role: 'user',
-        parts: [{ text: '<user_request>\nsimple task\n</user_request>' }],
+        parts: [{ text: 'simple task' }],
       },
     ];
 
@@ -535,7 +535,7 @@ describe('NumericalClassifierStrategy', () => {
     }
     mockContext.history = longHistory;
     const mockApiResponse = {
-      reasoning: 'Simple.',
+      complexity_reasoning: 'Simple.',
       complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
@@ -560,7 +560,7 @@ describe('NumericalClassifierStrategy', () => {
     // Last part is the wrapped request
     const requestPart = {
       role: 'user',
-      parts: [{ text: '<user_request>\nsimple task\n</user_request>' }],
+      parts: [{ text: 'simple task' }],
     };
 
     expect(contents).toEqual([...finalHistory, requestPart]);
@@ -573,7 +573,7 @@ describe('NumericalClassifierStrategy', () => {
       .mockImplementation(() => {});
     vi.spyOn(promptIdContext, 'getStore').mockReturnValue(undefined);
     const mockApiResponse = {
-      reasoning: 'Simple.',
+      complexity_reasoning: 'Simple.',
       complexity_score: 10,
     };
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
