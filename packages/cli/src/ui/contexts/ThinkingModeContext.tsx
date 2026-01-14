@@ -47,68 +47,43 @@ export const ThinkingModeProvider: React.FC<{
     budget: THINKING_BUDGETS.medium,
   });
 
-  const setThinkingLevel = useCallback(
-    (level: ThinkingLevel) => {
-      const budget = THINKING_BUDGETS[level];
-      setState({ level, budget });
+  const setThinkingLevel = useCallback((level: ThinkingLevel) => {
+    const budget = THINKING_BUDGETS[level];
+    setState({ level, budget });
+  }, []);
 
-      if (config?.modelConfigService) {
-        // Register override for Gemini 2.5 models (use thinkingBudget)
-        config.modelConfigService.registerRuntimeModelOverride({
-          match: { model: 'chat-base-2.5' },
-          modelConfig: {
-            generateContentConfig: {
-              thinkingConfig: {
-                thinkingBudget: budget,
-              },
-            },
-          },
-        });
-
-        // Register override for Gemini 3 models (use thinkingLevel enum)
-        // Note: For now we only support thinkingBudget, but this can be extended
-        // to map budget values to ThinkingLevel enum for Gemini 3 models
-        config.modelConfigService.registerRuntimeModelOverride({
-          match: { model: 'chat-base-3' },
-          modelConfig: {
-            generateContentConfig: {
-              thinkingConfig: {
-                thinkingBudget: budget,
-              },
-            },
-          },
-        });
-      }
-    },
-    [config],
-  );
-
-  // Apply default thinking budget on mount
+  // This effect synchronizes the thinking budget with the ModelConfigService.
+  // It runs when the component mounts with a valid config, when the budget
+  // is changed by the user, or when the config object itself is updated.
   useEffect(() => {
     if (config?.modelConfigService) {
-      const defaultBudget = THINKING_BUDGETS.medium;
+      const budget = state.budget;
+
+      // Register override for Gemini 2.5 models (use thinkingBudget)
       config.modelConfigService.registerRuntimeModelOverride({
         match: { model: 'chat-base-2.5' },
         modelConfig: {
           generateContentConfig: {
             thinkingConfig: {
-              thinkingBudget: defaultBudget,
+              thinkingBudget: budget,
             },
           },
         },
       });
+
+      // Register override for Gemini 3 models
       config.modelConfigService.registerRuntimeModelOverride({
         match: { model: 'chat-base-3' },
         modelConfig: {
           generateContentConfig: {
             thinkingConfig: {
-              thinkingBudget: defaultBudget,
+              thinkingBudget: budget,
             },
           },
         },
       });
     }
-  }, [config]);
+  }, [config, state.budget]);
 
   const value = useMemo(
     () => ({
