@@ -22,6 +22,7 @@ export * from './confirmation-bus/message-bus.js';
 export * from './commands/extensions.js';
 export * from './commands/restore.js';
 export * from './commands/init.js';
+export * from './commands/memory.js';
 export * from './commands/types.js';
 
 // Export Core Logic
@@ -65,6 +66,7 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
 export { PolicyDecision, ApprovalMode } from './policy/types.js';
@@ -88,6 +90,8 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
+export * from './utils/apiConversionUtils.js';
+export * from './utils/channel.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -119,6 +123,10 @@ export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
+
+// Export agent definitions
+export * from './agents/types.js';
+export * from './agents/agentLoader.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -162,6 +170,9 @@ export * from './hooks/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
+
+// Export agent types
+export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

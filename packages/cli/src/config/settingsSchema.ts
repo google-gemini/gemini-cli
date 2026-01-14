@@ -323,7 +323,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: 'text',
-        description: 'The format of the CLI output.',
+        description: 'The format of the CLI output. Can be `text` or `json`.',
         showInDialog: true,
         options: [
           { value: 'text', label: 'Text' },
@@ -376,12 +376,32 @@ const SETTINGS_SCHEMA = {
       },
       showStatusInTitle: {
         type: 'boolean',
-        label: 'Show Status in Title',
+        label: 'Show Thoughts in Title',
         category: 'UI',
         requiresRestart: false,
         default: false,
         description:
-          'Show Gemini CLI status and thoughts in the terminal window title',
+          'Show Gemini CLI model thoughts in the terminal window title during the working phase',
+        showInDialog: true,
+      },
+      dynamicWindowTitle: {
+        type: 'boolean',
+        label: 'Dynamic Window Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)',
+        showInDialog: true,
+      },
+      showHomeDirectoryWarning: {
+        type: 'boolean',
+        label: 'Show Home Directory Warning',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description:
+          'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
       hideTips: {
@@ -595,7 +615,7 @@ const SETTINGS_SCHEMA = {
         category: 'IDE',
         requiresRestart: true,
         default: false,
-        description: 'Enable IDE integration mode',
+        description: 'Enable IDE integration mode.',
         showInDialog: true,
       },
       hasSeenNudge: {
@@ -765,6 +785,32 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  agents: {
+    type: 'object',
+    label: 'Agents',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for subagents.',
+    showInDialog: false,
+    properties: {
+      overrides: {
+        type: 'object',
+        label: 'Agent Overrides',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'AgentOverride',
+        },
+      },
+    },
+  },
+
   context: {
     type: 'object',
     label: 'Context',
@@ -844,7 +890,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .gitignore files when searching',
+            description: 'Respect .gitignore files when searching.',
             showInDialog: true,
           },
           respectGeminiIgnore: {
@@ -853,7 +899,7 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: true,
-            description: 'Respect .geminiignore files when searching',
+            description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
@@ -1071,6 +1117,18 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
         description: 'The number of lines to keep when truncating tool output.',
+        showInDialog: true,
+      },
+      disableLLMCorrection: {
+        type: 'boolean',
+        label: 'Disable LLM Correction',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: oneLine`
+          Disable LLM-based error correction for edit tools.
+          When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
+        `,
         showInDialog: true,
       },
       enableHooks: {
@@ -1967,6 +2025,36 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'number',
         description:
           'Maximum number of tokens used when summarizing tool output.',
+      },
+    },
+  },
+  AgentOverride: {
+    type: 'object',
+    description: 'Override settings for a specific agent.',
+    additionalProperties: false,
+    properties: {
+      modelConfig: {
+        type: 'object',
+        additionalProperties: true,
+      },
+      runConfig: {
+        type: 'object',
+        description: 'Run configuration for an agent.',
+        additionalProperties: false,
+        properties: {
+          maxTimeMinutes: {
+            type: 'number',
+            description: 'The maximum execution time for the agent in minutes.',
+          },
+          maxTurns: {
+            type: 'number',
+            description: 'The maximum number of conversational turns.',
+          },
+        },
+      },
+      disabled: {
+        type: 'boolean',
+        description: 'Whether to disable the agent.',
       },
     },
   },
