@@ -1994,21 +1994,6 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
-      it('should quit on second press', async () => {
-        await setupKeypressTest();
-
-        pressKey({ name: 'c', ctrl: true }, 2);
-
-        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
-          '/quit',
-          undefined,
-          undefined,
-          false,
-        );
-        unmount();
-      });
-
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
@@ -2023,6 +2008,34 @@ describe('AppContainer State Management', () => {
         pressKey({ name: 'c', ctrl: true });
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
+      });
+      it('should not call quit if second press < 400ms', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'c', ctrl: true });
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+        pressKey({ name: 'c', ctrl: true });
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+      });
+      it('should call quit if second press > 400ms', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'c', ctrl: true });
+
+        act(() => {
+          vi.advanceTimersByTime(401);
+        });
+        pressKey({ name: 'c', ctrl: true });
+        expect(mockCancelOngoingRequest).toHaveBeenCalledTimes(2);
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
       });
     });
 

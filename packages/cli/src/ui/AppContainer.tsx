@@ -137,6 +137,7 @@ import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js'
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
+  MIN_CTRL_C_INTERVAL_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
@@ -1297,6 +1298,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCtrlCPressTimeRef = useRef<number>(0);
   const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
@@ -1407,15 +1409,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
       clearTimeout(ctrlCTimerRef.current);
       ctrlCTimerRef.current = null;
     }
+    const now = Date.now();
+    const timeBetweenCtrlCPress = now - lastCtrlCPressTimeRef.current;
+
     if (ctrlCPressCount > 2) {
       recordExitFail(config);
     }
-    if (ctrlCPressCount > 1) {
+    if (ctrlCPressCount > 1 && timeBetweenCtrlCPress > MIN_CTRL_C_INTERVAL_MS) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
-    } else if (ctrlCPressCount > 0) {
+    } else {
+      lastCtrlCPressTimeRef.current = now;
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
+        lastCtrlCPressTimeRef.current = 0;
         ctrlCTimerRef.current = null;
       }, WARNING_PROMPT_DURATION_MS);
     }
