@@ -231,6 +231,16 @@ Releases. Using a public Git repository is the simplest method.
 For detailed instructions on both methods, please refer to the
 [Extension Releasing Guide](./extension-releasing.md).
 
+## Installing Extensions
+
+You can install extensions from a Git repository. For example, to install an extension from `https://github.com/example/gemini-extension.git`:
+
+```bash
+gemini extensions install https://github.com/example/gemini-extension.git
+```
+
+Once installed, the extension's tools and commands will be available in your Gemini CLI session.
+
 ## Conclusion
 
 You've successfully created a Gemini CLI extension! You learned how to:

@@ -54,6 +54,16 @@ npm install -g @google/gemini-cli
 brew install gemini-cli
 ```
 
+### Installing Extensions
+
+You can install extensions from a Git repository. For example, to install an extension from `https://github.com/example/gemini-extension.git`:
+
+```bash
+gemini extensions install https://github.com/example/gemini-extension.git
+```
+
+For more details on creating and using extensions, see the [Getting Started with Extensions](./docs/extensions/getting-started-extensions.md) guide.
+
 ## Release Cadence and Tags
 
 See [Releases](./docs/releases.md) for more details.
