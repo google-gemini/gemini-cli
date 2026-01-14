@@ -57,6 +57,8 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 
+const INPUT_PROMPT_BACKGROUND_OPACITY = 0.08;
+
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
  * rather than potentially sending multiple paste events separated by line
@@ -1137,8 +1139,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
     const resolvedBorder = resolveColor(borderColor) || borderColor;
     const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
-    // Blend 15% of the border color onto the terminal background
-    return interpolateColor(resolvedTerminalBg, resolvedBorder, 0.15);
+    // Blend 8% of the border color onto the terminal background
+    return interpolateColor(
+      resolvedTerminalBg,
+      resolvedBorder,
+      INPUT_PROMPT_BACKGROUND_OPACITY,
+    );
   }, [useBackgroundColor, borderColor, terminalBg, isLowColorDepth]);
 
   return (
