@@ -47,7 +47,7 @@ export function renderSkillActionFeedback(
 
   const formatScopeItem = (s: { scope: SettingScope; path: string }) => {
     const label =
-      s.scope === SettingScope.Workspace ? 'project' : s.scope.toLowerCase();
+      s.scope === SettingScope.Workspace ? 'workspace' : s.scope.toLowerCase();
     return formatScope(label, s.path);
   };
 

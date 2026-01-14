@@ -64,7 +64,7 @@ describe('skills enable command', () => {
               path: '/user/settings.json',
             };
           }
-          return { settings: {}, path: '/project/settings.json' };
+          return { settings: {}, path: '/workspace/settings.json' };
         }),
         setValue: vi.fn(),
       };
@@ -81,7 +81,7 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" enabled by removing it from the disabled list in user (/user/settings.json) and project (/project/settings.json) settings.',
+        'Skill "skill1" enabled by removing it from the disabled list in user (/user/settings.json) and workspace (/workspace/settings.json) settings.',
       );
     });
 
@@ -122,7 +122,7 @@ describe('skills enable command', () => {
       );
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Skill "skill1" enabled by removing it from the disabled list in project (/workspace/settings.json) and user (/user/settings.json) settings.',
+        'Skill "skill1" enabled by removing it from the disabled list in workspace (/workspace/settings.json) and user (/user/settings.json) settings.',
       );
     });
 
