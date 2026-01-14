@@ -861,10 +861,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     backgroundShellsRef.current = backgroundShells;
   }, [backgroundShells]);
-  const lastOutputTimeRef = useRef(0);
-  useEffect(() => {
-    lastOutputTimeRef.current = lastOutputTime;
-  }, [lastOutputTime]);
 
   const isShellAwaitingFocus =
     !!activePtyId &&
@@ -1170,7 +1166,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleWarning = useCallback((message: string) => {
     setWarningMessage(message);
@@ -1196,9 +1191,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
-      }
-      if (tabFocusTimeoutRef.current) {
-        clearTimeout(tabFocusTimeoutRef.current);
       }
     };
   }, [handleWarning]);
@@ -1390,40 +1382,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
       } else if (
-        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) &&
-        activePtyId &&
-        embeddedShellFocused
+        keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
+        (activePtyId ||
+          (isBackgroundShellVisible && backgroundShells.size > 0)) &&
+        !embeddedShellFocused &&
+        buffer.text.length === 0
       ) {
-        if (key.name === 'tab' && key.shift) {
-          // Always change focus
-          setEmbeddedShellFocused(false);
-          return;
-        }
-
-        const now = Date.now();
-        // If the shell hasn't produced output in the last 100ms, it's considered idle.
-        const isIdle = now - lastOutputTimeRef.current >= 100;
-        if (isIdle) {
-          if (tabFocusTimeoutRef.current) {
-            clearTimeout(tabFocusTimeoutRef.current);
-          }
-          tabFocusTimeoutRef.current = setTimeout(() => {
-            tabFocusTimeoutRef.current = null;
-            // If the shell produced output since the tab press, we assume it handled the tab
-            // (e.g. autocomplete) so we should not toggle focus.
-            if (lastOutputTimeRef.current > now) {
-              handleWarning('Press Shift+Tab to focus out.');
-              return;
-            }
-            setEmbeddedShellFocused(false);
-          }, 100);
-          return;
-        }
-        handleWarning('Press Shift+Tab to focus out.');
+        setEmbeddedShellFocused(true);
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();
         } else {
+          if (isBackgroundShellVisible && !embeddedShellFocused) {
+            setEmbeddedShellFocused(true);
+            return;
+          }
           toggleBackgroundShell();
           if (!isBackgroundShellVisible) {
             // We are about to show it, so focus it
@@ -1465,7 +1438,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
-      handleWarning,
     ],
   );
 
@@ -1885,6 +1857,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
@@ -1924,6 +1897,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,

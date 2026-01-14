@@ -175,6 +175,7 @@ const mockUIActions: UIActions = {
   setActiveBackgroundShellPid: vi.fn(),
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  handleWarning: vi.fn(),
 };
 
 export const renderWithProviders = (

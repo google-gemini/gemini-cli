@@ -20,12 +20,16 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
+const mockHandleWarning = vi.fn();
+const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
+    handleWarning: mockHandleWarning,
+    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
 
@@ -36,7 +40,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     ShellExecutionService: {
       resizePty: vi.fn(),
-      subscribe: vi.fn(() => vi.fn()), // Returns cleanup function
+      subscribe: vi.fn(() => vi.fn()),
     },
   };
 });
@@ -50,15 +54,22 @@ vi.mock('./AnsiOutput.js', () => ({
   },
 }));
 
-// Mock useKeypress and useMouse
-let keypressHandler: KeypressHandler | undefined;
+// Mock useKeypress
+let keypressHandlers: Array<{ handler: KeypressHandler; isActive: boolean }> = [];
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn((handler, { isActive }) => {
-    if (isActive) {
-      keypressHandler = handler;
-    }
+    keypressHandlers.push({ handler, isActive });
   }),
 }));
+
+const simulateKey = (key: Partial<Key>) => {
+  const fullKey: Key = createMockKey(key);
+  keypressHandlers.forEach(({ handler, isActive }) => {
+    if (isActive) {
+      handler(fullKey);
+    }
+  });
+};
 
 vi.mock('../contexts/MouseContext.js', () => ({
   useMouseContext: vi.fn(() => ({
@@ -125,7 +136,7 @@ describe('<BackgroundShellDisplay />', () => {
     mockShells.clear();
     mockShells.set(shell1.pid, shell1);
     mockShells.set(shell2.pid, shell2);
-    keypressHandler = undefined;
+    keypressHandlers = [];
   });
 
   it('renders the output of the active shell', async () => {
@@ -146,7 +157,6 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     expect(lastFrame()).toContain('Starting server...');
-    // The command is shown in the tab, but might be truncated
     expect(lastFrame()).toContain('1: npm');
     expect(lastFrame()).toContain('(PID: 1001)');
   });
@@ -209,9 +219,6 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    // Initial resize (width - 4, height - 3 approx based on logic)
-    // Logic: width - 2 (border) - 2 (padding)
-    // Logic: height - 2 (border) - 1 (header)
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
       76,
@@ -260,8 +267,9 @@ describe('<BackgroundShellDisplay />', () => {
 
     const frame = lastFrame();
     expect(frame).toContain('Select Process');
-    expect(frame).toContain('> 1: npm start (PID: 1001)');
-    expect(frame).toContain('  2: tail -f log.txt (PID: 1002)');
+    expect(frame).toContain('●');
+    expect(frame).toContain('1.'); // Numbering
+    expect(frame).toContain('npm start (PID: 1001)');
   });
 
   it('selects the current process and closes the list when Ctrl+O is pressed in list view', async () => {
@@ -281,20 +289,74 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    expect(keypressHandler).toBeDefined();
-
-    // Simulate down arrow to select the second process
+    // Simulate down arrow to select the second process (handled by RadioButtonSelect)
     act(() => {
-      keypressHandler!(createMockKey({ name: 'down' }));
+      simulateKey({ name: 'down' });
     });
 
-    // Simulate Ctrl+O
+    // Simulate Ctrl+O (handled by BackgroundShellDisplay)
     act(() => {
-      keypressHandler!(createMockKey({ name: 'o', ctrl: true }));
+      simulateKey({ name: 'o', ctrl: true });
     });
 
     expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
     expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('kills the highlighted process when Ctrl+K is pressed in list view', async () => {
+    render(
+      <ScrollProvider>
+        <BackgroundShellDisplay
+          shells={mockShells}
+          activePid={shell1.pid}
+          width={80}
+          height={24}
+          isFocused={true}
+          isListOpenProp={true}
+        />
+      </ScrollProvider>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Initial state: shell1 (active) is highlighted
+
+    // Move to shell2
+    act(() => {
+      simulateKey({ name: 'down' });
+    });
+
+    // Press Ctrl+K
+    act(() => {
+      simulateKey({ name: 'k', ctrl: true });
+    });
+
+    expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell2.pid);
+  });
+
+  it('kills the active process when Ctrl+K is pressed in output view', async () => {
+    render(
+      <ScrollProvider>
+        <BackgroundShellDisplay
+          shells={mockShells}
+          activePid={shell1.pid}
+          width={80}
+          height={24}
+          isFocused={true}
+          isListOpenProp={false}
+        />
+      </ScrollProvider>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    act(() => {
+      simulateKey({ name: 'k', ctrl: true });
+    });
+
+    expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell1.pid);
   });
 
   it('scrolls to active shell when list opens', async () => {
@@ -316,8 +378,9 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     const frame = lastFrame();
-    // Highlighted via index match in renderItem
-    expect(frame).toContain('> 2: tail -f log.txt (PID: 1002)');
+    // Verify shell2 is selected (● indicates selection)
+    expect(frame).toMatch(/●\s+2\./); // Rough check
+    expect(frame).toContain('tail -f log.txt (PID: 1002)');
   });
 
   it('keeps exit code status color even when selected', async () => {
@@ -348,12 +411,60 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    // Check that we render the exit code part
-    // Note: verifying exact color in ink test output string is tricky without analyzing the ANSI codes or internal structure,
-    // but at least we can verify the text is present. To truly verify color, we'd need to inspect the react tree props or use a snapshot.
-    // For now, let's verify it renders.
     const frame = lastFrame();
     expect(frame).toContain('(Exit Code: 0)');
-    expect(frame).toContain('> 3: exit 0 (PID: 1003)');
+    // 3rd item, RadioButtonSelect uses "3." format
+    expect(frame).toContain('3. exit 0 (PID: 1003)');
+  });
+
+  it('unfocuses the shell when Shift+Tab is pressed', async () => {
+    render(
+      <ScrollProvider>
+        <BackgroundShellDisplay
+          shells={mockShells}
+          activePid={shell1.pid}
+          width={80}
+          height={24}
+          isFocused={true}
+          isListOpenProp={false}
+        />
+      </ScrollProvider>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    act(() => {
+      simulateKey({ name: 'tab', shift: true });
+    });
+
+    expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+  });
+
+  it('shows a warning when Tab is pressed', async () => {
+    render(
+      <ScrollProvider>
+        <BackgroundShellDisplay
+          shells={mockShells}
+          activePid={shell1.pid}
+          width={80}
+          height={24}
+          isFocused={true}
+          isListOpenProp={false}
+        />
+      </ScrollProvider>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    act(() => {
+      simulateKey({ name: 'tab' });
+    });
+
+    expect(mockHandleWarning).toHaveBeenCalledWith(
+      'Press Shift+Tab to focus out.',
+    );
+    expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
   });
 });

@@ -21,6 +21,10 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './shared/RadioButtonSelect.js';
 
 interface BackgroundShellDisplayProps {
   shells: Map<number, BackgroundShell>;
@@ -38,6 +42,13 @@ const HEADER_HEIGHT = 3; // 2 for border, 1 for header
 const TAB_PADDING = 2; // Spaces around tab text
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
+const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
+  const commandFirstLine = command.split('\n')[0];
+  return commandFirstLine.length > maxWidth
+    ? `${commandFirstLine.substring(0, maxWidth - 3)}...`
+    : commandFirstLine;
+};
+
 export const BackgroundShellDisplay = ({
   shells,
   activePid,
@@ -50,13 +61,18 @@ export const BackgroundShellDisplay = ({
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
+    handleWarning,
+    setEmbeddedShellFocused,
   } = useUIActions();
   const activeShell = shells.get(activePid);
   const [output, setOutput] = useState<string | AnsiOutput>(
     activeShell?.output || '',
   );
-  const [listSelectionIndex, setListSelectionIndex] = useState(0);
-  const listRef = useRef<ScrollableListRef<BackgroundShell>>(null);
+  const [highlightedPid, setHighlightedPid] = useState<number | null>(
+    activePid,
+  );
+  // Remove manual listSelectionIndex as RadioButtonSelect handles it
+  // const [listSelectionIndex, setListSelectionIndex] = useState(0);
   const outputRef = useRef<ScrollableListRef<AnsiLine | string>>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const subscribedRef = useRef(false);
@@ -117,55 +133,50 @@ export const BackgroundShellDisplay = ({
     }
   }, [output, isListOpenProp, isAtBottom]);
 
+  // Sync highlightedPid with activePid when list opens
   useEffect(() => {
-    if (isListOpenProp && activeShell) {
-      const shellPids = Array.from(shells.keys());
-      const index = shellPids.indexOf(activeShell.pid);
-      if (index !== -1) {
-        setListSelectionIndex(index);
-      }
+    if (isListOpenProp) {
+      setHighlightedPid(activePid);
     }
-  }, [isListOpenProp, activeShell, shells]);
-
-  useEffect(() => {
-    if (isListOpenProp && listRef.current) {
-      listRef.current.scrollToIndex({ index: listSelectionIndex });
-    }
-  }, [listSelectionIndex, isListOpenProp]);
+  }, [isListOpenProp, activePid]);
 
   useKeypress(
     (key) => {
       if (!activeShell) return;
 
-      if (isListOpenProp) {
-        const shellPids = Array.from(shells.keys());
+      // Handle Shift+Tab to focus out
+      if (key.name === 'tab' && key.shift) {
+        setEmbeddedShellFocused(false);
+        return;
+      }
 
-        if (key.name === 'up') {
-          setListSelectionIndex(
-            (prev) => (prev - 1 + shellPids.length) % shellPids.length,
-          );
-          return;
-        }
-        if (key.name === 'down') {
-          setListSelectionIndex((prev) => (prev + 1) % shellPids.length);
-          return;
-        }
-        if (key.name === 'return' || key.name === 'enter') {
-          const selectedPid = shellPids[listSelectionIndex];
-          if (selectedPid) {
-            setActiveBackgroundShellPid(selectedPid);
-          }
-          setIsBackgroundShellListOpen(false);
-          return;
-        }
+      // Handle Tab to warn but propagate
+      if (key.name === 'tab' && !key.shift) {
+        handleWarning('Press Shift+Tab to focus out.');
+        // Fall through to allow Tab to be sent to the shell
+      }
+
+      if (isListOpenProp) {
+        // Navigation (Up/Down/Enter) is handled by RadioButtonSelect
+        // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
+        // RadioButtonSelect handles Enter -> onSelect
+
         if (key.name === 'escape') {
           setIsBackgroundShellListOpen(false);
           return;
         }
+
+        if (key.ctrl && key.name === 'k') {
+          if (highlightedPid) {
+            dismissBackgroundShell(highlightedPid);
+            // If we killed the active one, the list might update via props
+          }
+          return;
+        }
+
         if (key.ctrl && key.name === 'o') {
-          const selectedPid = shellPids[listSelectionIndex];
-          if (selectedPid) {
-            setActiveBackgroundShellPid(selectedPid);
+          if (highlightedPid) {
+            setActiveBackgroundShellPid(highlightedPid);
           }
           setIsBackgroundShellListOpen(false);
           return;
@@ -239,15 +250,14 @@ export const BackgroundShellDisplay = ({
 
     for (let i = 0; i < shellList.length; i++) {
       const shell = shellList[i];
-      const commandFirstLine = shell.command.split('\n')[0];
       const maxTabLabelLength = Math.max(
         1,
         Math.floor(availableWidth / shellList.length) - TAB_PADDING,
       );
-      const truncatedCommand =
-        commandFirstLine.length > maxTabLabelLength
-          ? `${commandFirstLine.substring(0, maxTabLabelLength - 3)}...`
-          : commandFirstLine;
+      const truncatedCommand = formatShellCommandForDisplay(
+        shell.command,
+        maxTabLabelLength,
+      );
       const label = ` ${i + 1}: ${truncatedCommand} `;
       const labelWidth = label.length;
 
@@ -283,37 +293,75 @@ export const BackgroundShellDisplay = ({
   };
 
   const renderProcessList = () => {
-    const shellList = Array.from(shells.values());
     const headerText = 'Select Process (Enter to select, Esc to cancel):';
     const maxCommandLength = Math.max(
       0,
       width - BORDER_WIDTH - CONTENT_PADDING_X * 2 - 10,
     );
 
+    const items: Array<RadioSelectItem<number>> = Array.from(shells.values()).map(
+      (shell, index) => {
+        const truncatedCommand = formatShellCommandForDisplay(
+          shell.command,
+          maxCommandLength,
+        );
+
+        let label = `${index + 1}: ${truncatedCommand} (PID: ${shell.pid})`;
+        if (shell.status === 'exited') {
+          label += ` (Exit Code: ${shell.exitCode})`;
+        }
+
+        return {
+          key: shell.pid.toString(),
+          value: shell.pid,
+          label,
+        };
+      },
+    );
+
+    const initialIndex = items.findIndex((item) => item.value === activePid);
+
     return (
       <Box flexDirection="column" height="100%" width="100%">
         <Box flexShrink={0} marginBottom={1} paddingTop={1}>
-          <Text bold underline>
-            {headerText}
-          </Text>
+          <Text bold>{headerText}</Text>
         </Box>
         <Box flexGrow={1} width="100%">
-          <ScrollableList
-            ref={listRef}
-            data={shellList}
-            renderItem={({ item: shell, index }) => {
-              const isSelected = index === listSelectionIndex;
-              const commandText = shell.command.split('\n')[0];
-              const truncatedCommand =
-                commandText.length > maxCommandLength
-                  ? `${commandText.substring(0, maxCommandLength - 3)}...`
-                  : commandText;
+          <RadioButtonSelect
+            items={items}
+            initialIndex={initialIndex >= 0 ? initialIndex : 0}
+            onSelect={(pid) => {
+              setActiveBackgroundShellPid(pid);
+              setIsBackgroundShellListOpen(false);
+            }}
+            onHighlight={(pid) => setHighlightedPid(pid)}
+            isFocused={isFocused}
+            maxItemsToShow={Math.max(1, height - HEADER_HEIGHT - 3)} // Adjust for header
+            renderItem={(
+              item,
+              { isSelected: _isSelected, titleColor: _titleColor },
+            ) => {
+              // Custom render to handle exit code coloring if needed,
+              // or just use default. The default RadioButtonSelect renderer
+              // handles standard label.
+              // But we want to color exit code differently?
+              // The previous implementation colored exit code green/red.
+              // Let's reimplement that.
+
+              // We need access to shell details here.
+              // We can put shell details in the item or lookup.
+              // Lookup from shells map.
+              const shell = shells.get(item.value);
+              if (!shell) return <Text>{item.label}</Text>;
+
+              const truncatedCommand = formatShellCommandForDisplay(
+                shell.command,
+                maxCommandLength,
+              );
+
               return (
                 <Text>
-                  <Text color={isSelected ? theme.status.success : undefined}>
-                    {isSelected ? '> ' : '  '}
-                  </Text>
-                  {index + 1}: {truncatedCommand} (PID: {shell.pid})
+                  {truncatedCommand} (PID: {shell.pid})
                   {shell.status === 'exited' ? (
                     <Text
                       color={
@@ -329,12 +377,6 @@ export const BackgroundShellDisplay = ({
                 </Text>
               );
             }}
-            estimatedItemHeight={() => 1}
-            keyExtractor={(shell) => shell.pid.toString()}
-            hasFocus={isFocused}
-            initialScrollIndex={
-              listSelectionIndex >= 0 ? listSelectionIndex : 0
-            }
           />
         </Box>
       </Box>

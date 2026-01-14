@@ -135,7 +135,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId } = useUIState();
+  const {
+    mainAreaWidth,
+    activePtyId,
+    backgroundShells,
+    backgroundShellHeight,
+  } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -831,7 +836,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
         // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
-        if (activePtyId) {
+        if (
+          activePtyId ||
+          (backgroundShells.size > 0 && backgroundShellHeight > 0)
+        ) {
           setEmbeddedShellFocused(true);
         }
         return;
@@ -880,6 +888,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setBannerVisible,
       activePtyId,
       setEmbeddedShellFocused,
+      backgroundShells.size,
+      backgroundShellHeight,
     ],
   );
 
