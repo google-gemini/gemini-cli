@@ -13,6 +13,7 @@ on:
 permissions:
   contents: 'read'
   checks: 'write'
+  actions: 'read'
 
 jobs:
   evals:
@@ -70,4 +71,6 @@ jobs:
           path: 'artifacts'
 
       - name: 'Generate Summary'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: 'node scripts/aggregate_evals.js artifacts >> $GITHUB_STEP_SUMMARY'
