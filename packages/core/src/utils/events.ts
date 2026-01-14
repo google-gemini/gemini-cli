@@ -121,7 +121,6 @@ export interface CoreEvents {
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
-  [CoreEvent.HookEnd]: [HookEndPayload];
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
 }

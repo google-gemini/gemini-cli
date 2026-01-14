@@ -105,6 +105,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -507,7 +508,7 @@ export class Config {
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<Experiments | void> | undefined;
+  private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -525,7 +526,6 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private adminControlsPollingInterval: NodeJS.Timeout | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -862,8 +862,6 @@ export class Config {
             this.setPreviewFeatures(remotePreviewFeatures);
           }
         }
-
-        return experiments;
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
@@ -883,70 +881,16 @@ export class Config {
     }
 
     // Fetch admin controls
-    if (codeAssistServer) {
-      try {
-        const experiments = await this.experimentsPromise;
-        const pollingEnabled = experiments?.experimentIds.includes(
-          ExperimentFlags.ENABLE_ADMIN_CONTROLS,
-        );
-
-        if (pollingEnabled && codeAssistServer?.projectId) {
-          const adminControls = await codeAssistServer.fetchAdminControls({
-            project: codeAssistServer.projectId,
-          });
-          this.setRemoteAdminSettings(adminControls);
-          this.startAdminControlsPolling();
-        } else {
-          this.stopAdminControlsPolling();
-        }
-      } catch (e) {
-        debugLogger.error('Failed to fetch admin controls', e);
-      }
-    } else {
-      this.stopAdminControlsPolling();
-    }
-  }
-
-  private stopAdminControlsPolling() {
-    if (this.adminControlsPollingInterval) {
-      clearInterval(this.adminControlsPollingInterval);
-      this.adminControlsPollingInterval = undefined;
-    }
-  }
-
-  private startAdminControlsPolling() {
-    this.stopAdminControlsPolling();
-
-    this.adminControlsPollingInterval = setInterval(
-      async () => {
-        const codeAssistServer = getCodeAssistServer(this);
-        if (!codeAssistServer?.projectId) return;
-
-        try {
-          const newSettings = await codeAssistServer.fetchAdminControls({
-            project: codeAssistServer.projectId,
-          });
-          const currentSettings = this.getRemoteAdminSettings();
-
-          // Compare relevant fields
-          const hasChanged =
-            newSettings.secureModeEnabled !==
-              currentSettings?.secureModeEnabled ||
-            JSON.stringify(newSettings.mcpSetting) !==
-              JSON.stringify(currentSettings?.mcpSetting) ||
-            JSON.stringify(newSettings.cliFeatureSetting) !==
-              JSON.stringify(currentSettings?.cliFeatureSetting);
-
-          if (hasChanged) {
-            this.setRemoteAdminSettings(newSettings);
-            coreEvents.emitAdminSettingsChanged();
-          }
-        } catch (e) {
-          debugLogger.error('Failed to poll admin controls', e);
-        }
+    const adminControls = await fetchAdminControls(
+      codeAssistServer,
+      (newSettings: FetchAdminControlsResponse) => {
+        this.setRemoteAdminSettings(newSettings);
+        coreEvents.emitAdminSettingsChanged();
       },
-      5 * 60 * 1000,
-    ); // 5 minutes
+      this.getRemoteAdminSettings(),
+    );
+
+    this.setRemoteAdminSettings(adminControls);
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {

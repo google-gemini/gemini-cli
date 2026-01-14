@@ -304,7 +304,6 @@ export async function main() {
   });
 
   // Listen for admin settings from parent process (IPC)
-  // Listen for admin settings from parent process (IPC)
   process.on('message', (msg: unknown) => {
     const message = msg as {
       type?: string;

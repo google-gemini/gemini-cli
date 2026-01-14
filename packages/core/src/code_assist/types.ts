@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
+
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
   ideVersion?: string;
@@ -286,63 +288,29 @@ export interface ConversationInteraction {
   isAgentic?: boolean;
 }
 
-// Request for FetchAdminControls RPC
 export interface FetchAdminControlsRequest {
   project: string;
 }
 
-export interface FetchAdminControlsResponse {
-  secureModeEnabled?: boolean;
-  mcpSetting?: McpSetting;
-  cliFeatureSetting?: CliFeatureSetting;
-  // Add other fields as they become relevant
-  recitationPolicy?: RecitationPolicy;
-  groundingType?: GroundingType;
-  turboModeSetting?: TurboModeSetting;
-  browserSetting?: BrowserSetting;
-  previewFeatureSetting?: PreviewFeatureSetting;
-  agentSetting?: AgentSetting;
-}
+export type FetchAdminControlsResponse = z.infer<
+  typeof FetchAdminControlsResponseSchema
+>;
 
-export interface RecitationPolicy {
-  recitationEnabled?: boolean;
-}
+const ExtensionsSettingSchema = z.object({
+  extensionsEnabled: z.boolean().optional(),
+});
 
-export enum GroundingType {
-  GROUNDING_TYPE_UNSPECIFIED = 0,
-  GROUNDING_TYPE_DISABLED = 1,
-  GROUNDING_TYPE_ENABLED = 2,
-}
+const CliFeatureSettingSchema = z.object({
+  extensionsSetting: ExtensionsSettingSchema.optional(),
+});
 
-export interface TurboModeSetting {
-  turboModeEnabled?: boolean;
-}
+const McpSettingSchema = z.object({
+  mcpEnabled: z.boolean().optional(),
+  overrideMcpConfigJson: z.string().optional(),
+});
 
-export interface BrowserSetting {
-  browserEnabled?: boolean;
-}
-
-export interface PreviewFeatureSetting {
-  previewFeatureEnabled?: boolean;
-}
-
-export interface AgentSetting {
-  agentEnabled?: boolean;
-}
-
-export interface McpSetting {
-  mcpEnabled?: boolean;
-  allowedMcpConfigs?: McpConfig[];
-}
-
-export interface McpConfig {
-  mcpServer?: string;
-}
-
-export interface CliFeatureSetting {
-  extensionsSetting?: ExtensionsSetting;
-}
-
-export interface ExtensionsSetting {
-  extensionsEnabled?: boolean;
-}
+export const FetchAdminControlsResponseSchema = z.object({
+  secureModeEnabled: z.boolean().optional(),
+  mcpSetting: McpSettingSchema.optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});
