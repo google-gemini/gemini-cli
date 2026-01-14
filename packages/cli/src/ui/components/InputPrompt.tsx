@@ -1092,7 +1092,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 color={theme.text.link}
                 aria-label={SCREEN_READER_USER_PREFIX}
               >
-                (r:){' '}
+                (r:)
               </Text>
             ) : (
               '!'
