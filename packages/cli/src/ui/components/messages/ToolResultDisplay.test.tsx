@@ -27,31 +27,6 @@ vi.mock('./DiffRenderer.js', () => ({
   ),
 }));
 
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: ({ text }: { text: string }) => (
-    <Box>
-      <Text>MarkdownDisplay: {text}</Text>
-    </Box>
-  ),
-}));
-
-vi.mock('../AnsiOutput.js', () => ({
-  AnsiOutputText: ({ data }: { data: unknown }) => (
-    <Box>
-      <Text>AnsiOutputText: {JSON.stringify(data)}</Text>
-    </Box>
-  ),
-}));
-
-vi.mock('../shared/MaxSizedBox.js', () => ({
-  MaxSizedBox: ({ children }: { children: React.ReactNode }) => (
-    <Box>
-      <Text>MaxSizedBox:</Text>
-      {children}
-    </Box>
-  ),
-}));
-
 // Mock UIStateContext
 const mockUseUIState = vi.fn();
 vi.mock('../../contexts/UIStateContext.js', () => ({
@@ -64,6 +39,25 @@ vi.mock('../../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: () => mockUseAlternateBuffer(),
 }));
 
+// Mock useSettings
+vi.mock('../../contexts/SettingsContext.js', () => ({
+  useSettings: () => ({
+    merged: {
+      ui: {
+        useAlternateBuffer: false,
+      },
+    },
+  }),
+}));
+
+// Mock useOverflowActions
+vi.mock('../../contexts/OverflowContext.js', () => ({
+  useOverflowActions: () => ({
+    addOverflowingId: vi.fn(),
+    removeOverflowingId: vi.fn(),
+  }),
+}));
+
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,7 +67,7 @@ describe('ToolResultDisplay', () => {
 
   it('renders string result as markdown by default', () => {
     const { lastFrame } = render(
-      <ToolResultDisplay resultDisplay="Some result" terminalWidth={80} />,
+      <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
     );
     const output = lastFrame();
 
@@ -83,7 +77,7 @@ describe('ToolResultDisplay', () => {
   it('renders string result as plain text when renderOutputAsMarkdown is false', () => {
     const { lastFrame } = render(
       <ToolResultDisplay
-        resultDisplay="Some result"
+        resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={false}
@@ -126,9 +120,20 @@ describe('ToolResultDisplay', () => {
   });
 
   it('renders ANSI output result', () => {
-    const ansiResult = {
-      text: 'ansi content',
-    };
+    const ansiResult: AnsiOutput = [
+      [
+        {
+          text: 'ansi content',
+          fg: 'red',
+          bg: 'black',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+    ];
     const { lastFrame } = render(
       <ToolResultDisplay
         resultDisplay={ansiResult as unknown as AnsiOutput}
@@ -157,20 +162,18 @@ describe('ToolResultDisplay', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('falls back to plain text if availableHeight is set and not in alternate buffer', () => {
+  it('does not fall back to plain text if availableHeight is set and not in alternate buffer', () => {
     mockUseAlternateBuffer.mockReturnValue(false);
     // availableHeight calculation: 20 - 1 - 5 = 14 > 3
     const { lastFrame } = render(
       <ToolResultDisplay
-        resultDisplay="Some result"
+        resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
     );
     const output = lastFrame();
-
-    // Should force renderOutputAsMarkdown to false
     expect(output).toMatchSnapshot();
   });
 
@@ -178,7 +181,7 @@ describe('ToolResultDisplay', () => {
     mockUseAlternateBuffer.mockReturnValue(true);
     const { lastFrame } = render(
       <ToolResultDisplay
-        resultDisplay="Some result"
+        resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
