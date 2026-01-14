@@ -42,9 +42,10 @@ vi.mock('./ui/hooks/atCommandProcessor.js');
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
-  drainBacklogs: vi.fn(),
   emit: vi.fn(),
+  emitConsoleLog: vi.fn(),
   emitFeedback: vi.fn(),
+  drainBacklogs: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

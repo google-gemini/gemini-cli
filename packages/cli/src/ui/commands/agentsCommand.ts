@@ -44,7 +44,7 @@ const agentsListCommand: SlashCommand = {
       agents,
     };
 
-    context.ui.addItem(agentsListItem, Date.now());
+    context.ui.addItem(agentsListItem);
 
     return;
   },
@@ -64,6 +64,11 @@ const agentsRefreshCommand: SlashCommand = {
         content: 'Agent registry not found.',
       };
     }
+
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: 'Refreshing agent registry...',
+    });
 
     await agentRegistry.reload();
 

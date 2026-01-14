@@ -39,3 +39,7 @@ jobs:
           GITHUB_REPOSITORY: '${{ github.repository }}'
         run: |-
           ./.github/scripts/pr-triage.sh
+          # If prs_needing_comment is empty, set it to [] explicitly for downstream steps
+          if [[ -z "$(grep 'prs_needing_comment' "${GITHUB_OUTPUT}" | cut -d'=' -f2-)" ]]; then
+            echo "prs_needing_comment=[]" >> "${GITHUB_OUTPUT}"
+          fi
