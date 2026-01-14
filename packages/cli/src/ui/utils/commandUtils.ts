@@ -74,13 +74,13 @@ const pickTty = (): Promise<TtyTarget> =>
         const devTty = fs.createWriteStream('/dev/tty');
 
         // Safety timeout: if /dev/tty doesn't respond quickly, fallback to avoid hanging.
-const timeout = setTimeout(() => {
-  // Remove listeners to prevent them from firing after timeout.
-  devTty.removeAllListeners('open');
-  devTty.removeAllListeners('error');
-  devTty.destroy();
-  resolve(getStdioTty());
-}, 100);
+        const timeout = setTimeout(() => {
+          // Remove listeners to prevent them from firing after timeout.
+          devTty.removeAllListeners('open');
+          devTty.removeAllListeners('error');
+          devTty.destroy();
+          resolve(getStdioTty());
+        }, 100);
 
         // If we can't open it (e.g. sandbox), we'll get an error.
         // We wait for 'open' to confirm it's usable, or 'error' to fallback.
