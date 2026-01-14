@@ -70,7 +70,7 @@ Respond *only* in JSON format according to the following schema.
   "properties": {
     "reasoning": {
       "type": "string",
-      "description": "Brief explanation for the score."
+      "description": "Brief explanation of the requests complexity."
     },
     "complexity_score": {
       "type": "integer",
