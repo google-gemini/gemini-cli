@@ -136,3 +136,7 @@ aggregated into a **Nightly Summary** attached to the workflow run.
 A significant drop in the pass rate for a `USUALLY_PASSES` test—even if it
 doesn't drop to 0%—often indicates that a recent change to a system prompt or
 tool definition has made the model's behavior less reliable.
+
+You may be able to investigate the regression using Gemini CLI by giving it the
+link to the runs before and after the change and the name of the test and asking
+it to investigate what changes may have impacted the test.
