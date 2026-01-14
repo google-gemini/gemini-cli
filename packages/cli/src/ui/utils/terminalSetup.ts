@@ -54,6 +54,65 @@ export interface TerminalSetupResult {
 
 type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'antigravity';
 
+/**
+ * Terminal metadata used for configuration.
+ */
+interface TerminalData {
+  /** Display name for the terminal (e.g., "VS Code") */
+  terminalName: string;
+  /** Application folder name used in config paths (e.g., "Code") */
+  appName: string;
+}
+
+/**
+ * Maps a supported terminal ID to its display name and config folder name.
+ * Returns null if the terminal is not supported.
+ */
+function getTerminalData(terminal: SupportedTerminal): TerminalData | null {
+  switch (terminal) {
+    case 'vscode':
+      return { terminalName: 'VS Code', appName: 'Code' };
+    case 'cursor':
+      return { terminalName: 'Cursor', appName: 'Cursor' };
+    case 'windsurf':
+      return { terminalName: 'Windsurf', appName: 'Windsurf' };
+    case 'antigravity':
+      return { terminalName: 'Antigravity', appName: 'Antigravity' };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Type for a keybinding entry in keybindings.json
+ */
+type Keybinding = {
+  key?: string;
+  command?: string;
+  args?: { text?: string };
+};
+
+/**
+ * Checks if a keybindings array contains our specific binding for a given key.
+ * Our bindings are identified by:
+ * - The key ('shift+enter' or 'ctrl+enter')
+ * - The command 'workbench.action.terminal.sendSequence'
+ * - The args.text value matching VSCODE_SHIFT_ENTER_SEQUENCE
+ */
+function hasOurBinding(
+  keybindings: unknown[],
+  key: 'shift+enter' | 'ctrl+enter',
+): boolean {
+  return keybindings.some((kb) => {
+    const binding = kb as Keybinding;
+    return (
+      binding.key === key &&
+      binding.command === 'workbench.action.terminal.sendSequence' &&
+      binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+    );
+  });
+}
+
 export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
 
@@ -219,31 +278,8 @@ async function configureVSCodeStyle(
     };
 
     // Check if our specific bindings already exist
-    const hasOurShiftEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'shift+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
-    });
-
-    const hasOurCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'ctrl+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
-    });
+    const hasOurShiftEnter = hasOurBinding(keybindings, 'shift+enter');
+    const hasOurCtrlEnter = hasOurBinding(keybindings, 'ctrl+enter');
 
     if (hasOurShiftEnter && hasOurCtrlEnter) {
       return {
@@ -302,24 +338,6 @@ async function configureVSCodeStyle(
   }
 }
 
-// Terminal-specific configuration functions
-
-async function configureVSCode(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('VS Code', 'Code');
-}
-
-async function configureCursor(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Cursor', 'Cursor');
-}
-
-async function configureWindsurf(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Windsurf', 'Windsurf');
-}
-
-async function configureAntigravity(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Antigravity', 'Antigravity');
-}
-
 /**
  * Determines whether it is useful to prompt the user to run /terminal-setup
  * in the current environment.
@@ -340,25 +358,12 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
     return false;
   }
 
-  let appName: string;
-  switch (terminal) {
-    case 'vscode':
-      appName = 'Code';
-      break;
-    case 'cursor':
-      appName = 'Cursor';
-      break;
-    case 'windsurf':
-      appName = 'Windsurf';
-      break;
-    case 'antigravity':
-      appName = 'Antigravity';
-      break;
-    default:
-      return false;
+  const terminalData = getTerminalData(terminal);
+  if (!terminalData) {
+    return false;
   }
 
-  const configDir = getVSCodeStyleConfigDir(appName);
+  const configDir = getVSCodeStyleConfigDir(terminalData.appName);
   if (!configDir) {
     return false;
   }
@@ -374,31 +379,8 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
       return true;
     }
 
-    const hasOurShiftEnter = parsedContent.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'shift+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
-      );
-    });
-
-    const hasOurCtrlEnter = parsedContent.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'ctrl+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
-      );
-    });
+    const hasOurShiftEnter = hasOurBinding(parsedContent, 'shift+enter');
+    const hasOurCtrlEnter = hasOurBinding(parsedContent, 'ctrl+enter');
 
     return !(hasOurShiftEnter && hasOurCtrlEnter);
   } catch (error) {
@@ -448,19 +430,13 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     };
   }
 
-  switch (terminal) {
-    case 'vscode':
-      return configureVSCode();
-    case 'cursor':
-      return configureCursor();
-    case 'windsurf':
-      return configureWindsurf();
-    case 'antigravity':
-      return configureAntigravity();
-    default:
-      return {
-        success: false,
-        message: `Terminal "${terminal}" is not supported yet.`,
-      };
+  const terminalData = getTerminalData(terminal);
+  if (!terminalData) {
+    return {
+      success: false,
+      message: `Terminal "${terminal}" is not supported yet.`,
+    };
   }
+
+  return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
 }
