@@ -1533,7 +1533,16 @@ export class Config {
   }
 
   async getCompressionThreshold(): Promise<number | undefined> {
-    return this.compressionThreshold;
+    if (this.compressionThreshold !== undefined) {
+      return this.compressionThreshold;
+    }
+    const remoteThreshold =
+      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
+        ?.floatValue;
+    if (remoteThreshold === 0) {
+      return undefined;
+    }
+    return remoteThreshold;
   }
 
   async getUserCaching(): Promise<boolean | undefined> {

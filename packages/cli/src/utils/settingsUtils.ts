@@ -103,12 +103,10 @@ export function getDefaultValue(key: string): SettingsValue {
  * For settings like compressionThreshold, this will return the experiment value if set,
  * otherwise falls back to the schema default.
  */
-export async function getEffectiveDefaultValue(
+export function getEffectiveDefaultValue(
   key: string,
   config?: Config,
-): Promise<SettingsValue> {
-  const schemaDefault = getDefaultValue(key);
-
+): SettingsValue {
   if (key === 'model.compressionThreshold' && config) {
     const experiments = config.getExperiments();
     const experimentValue =
@@ -119,7 +117,7 @@ export async function getEffectiveDefaultValue(
     }
   }
 
-  return schemaDefault;
+  return getDefaultValue(key);
 }
 
 /**
