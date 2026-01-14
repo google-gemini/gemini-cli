@@ -112,7 +112,7 @@ export const INFORMATIVE_TIPS = [
   'Paste from your clipboard with Ctrl+V...',
   'Undo text edits in the input with Ctrl+Z...',
   'Redo undone text edits with Ctrl+Shift+Z...',
-  'Open the current prompt in an external editor with Ctrl+X or Meta+Enter...',
+  'Open the current prompt in an external editor with Ctrl+X...',
   'In menus, move up/down with k/j or the arrow keys...',
   'In menus, select an item by typing its number...',
   "If you're using an IDE, see the context with Ctrl+G...",

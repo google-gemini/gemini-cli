@@ -113,9 +113,7 @@ const isWSL = (): boolean =>
 const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
 
 const shouldUseOsc52 = (tty: TtyTarget): boolean =>
-  Boolean(tty) &&
-  !isDumbTerm() &&
-  (isSSH() || inTmux() || inScreen() || isWSL());
+  Boolean(tty) && !isDumbTerm() && (isSSH() || isWSL());
 
 const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
   if (buf.length <= maxBytes) return buf;
