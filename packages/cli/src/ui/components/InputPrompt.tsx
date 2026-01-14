@@ -1120,9 +1120,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         resolvedTerminalBg === '#000'
       ) {
         // In 256-color mode, we use a safe grey from the grayscale ramp
-        // (#121212 is index 233) which is a subtle lift from black and is
+        // (#1c1c1c is index 234) which is a subtle lift from black and is
         // guaranteed to be available and look consistent.
-        return '#121212';
+        return '#1c1c1c';
       }
       if (
         resolvedTerminalBg === 'white' ||
