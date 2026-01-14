@@ -322,6 +322,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  seed?: number;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
@@ -771,6 +772,17 @@ export class Config {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+
+    if (params.seed !== undefined) {
+      this.modelConfigService.registerRuntimeModelOverride({
+        match: {},
+        modelConfig: {
+          generateContentConfig: {
+            seed: params.seed,
+          },
+        },
+      });
+    }
   }
 
   /**

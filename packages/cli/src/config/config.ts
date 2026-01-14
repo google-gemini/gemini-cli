@@ -62,6 +62,7 @@ import { runExitCleanup } from '../utils/cleanup.js';
 export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
+  seed: number | undefined;
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
@@ -113,6 +114,11 @@ export async function parseArguments(
           type: 'string',
           nargs: 1,
           description: `Model`,
+        })
+        .option('seed', {
+          type: 'number',
+          nargs: 1,
+          description: 'Seed for the model.',
         })
         .option('prompt', {
           alias: 'p',
@@ -711,6 +717,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
+    seed: argv.seed ?? settings.model?.seed,
     maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,

@@ -2837,3 +2837,54 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
   });
 });
+
+describe('seed parameter', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js'];
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should parse --seed argument', async () => {
+    process.argv = ['node', 'script.js', '--seed', '123'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.seed).toBe(123);
+  });
+
+  it('should pass seed to Config and register runtime override', async () => {
+    process.argv = ['node', 'script.js', '--seed', '456'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    // We can verify that the override is applied by resolving the config.
+    const resolvedConfig = config.modelConfigService.getResolvedConfig({
+      model: config.getModel(),
+    });
+
+    expect(resolvedConfig.generateContentConfig.seed).toBe(456);
+  });
+
+  it('should not register runtime override if seed is not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const resolvedConfig = config.modelConfigService.getResolvedConfig({
+      model: config.getModel(),
+    });
+
+    expect(resolvedConfig.generateContentConfig.seed).toBeUndefined();
+  });
+});

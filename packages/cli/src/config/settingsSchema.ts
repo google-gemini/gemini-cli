@@ -732,6 +732,15 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      seed: {
+        type: 'number',
+        label: 'Seed',
+        category: 'Model',
+        requiresRestart: false,
+        default: undefined as number | undefined,
+        description: 'The seed for the model.',
+        showInDialog: false,
+      },
     },
   },
 

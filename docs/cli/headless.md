@@ -301,6 +301,7 @@ Key command-line options for headless usage:
 | `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
 | `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
 | `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
+| `--seed`                | Specify a seed for the model       | `gemini -p "query" --seed 123`                     |
 | `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
 | `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
 | `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |

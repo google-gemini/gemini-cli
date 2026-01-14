@@ -240,7 +240,15 @@ export class ModelConfigService {
     return overrides
       .map((override, index) => {
         const matchEntries = Object.entries(override.match);
-        if (matchEntries.length === 0) return null;
+        if (matchEntries.length === 0) {
+          // Provide global parameters, like seed
+          return {
+            specificity: 0,
+            level: 0,
+            modelConfig: override.modelConfig,
+            index,
+          };
+        }
 
         let matchedLevel = 0; // Default to Global
         const isMatch = matchEntries.every(([key, value]) => {

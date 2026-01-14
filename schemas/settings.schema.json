@@ -449,6 +449,12 @@
           "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "seed": {
+          "title": "Seed",
+          "description": "The seed for the model.",
+          "markdownDescription": "The seed for the model.\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
         }
       },
       "additionalProperties": false
