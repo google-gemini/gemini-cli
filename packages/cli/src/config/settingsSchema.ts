@@ -257,20 +257,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
-      verbosity: {
-        type: 'enum',
-        label: 'Verbosity Level',
-        category: 'General',
-        requiresRestart: false,
-        default: 'info',
-        description: 'Controls the level of output detail in the history.',
-        showInDialog: true,
-        options: [
-          { value: 'info', label: 'Default' },
-          { value: 'verbose', label: 'Verbose' },
-          { value: 'trace', label: 'Show all' },
-        ],
-      },
       sessionRetention: {
         type: 'object',
         label: 'Session Retention',
@@ -342,6 +328,20 @@ const SETTINGS_SCHEMA = {
         options: [
           { value: 'text', label: 'Text' },
           { value: 'json', label: 'JSON' },
+        ],
+      },
+      verbosity: {
+        type: 'enum',
+        label: 'Output Verbosity',
+        category: 'General',
+        requiresRestart: false,
+        default: 'info',
+        description:
+          'Controls the detail level of the conversation history. `Verbose` will include autonomous tool calls, additional logs, etc.',
+        showInDialog: true,
+        options: [
+          { value: 'info', label: 'Normal' },
+          { value: 'verbose', label: 'Verbose' },
         ],
       },
     },

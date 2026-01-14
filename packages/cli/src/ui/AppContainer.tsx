@@ -166,7 +166,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
-    verbosity: settings.merged.general?.verbosity,
+    verbosity: settings.merged.output?.verbosity,
   });
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
