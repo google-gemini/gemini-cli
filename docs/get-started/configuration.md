@@ -557,6 +557,14 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+#### `agents`
+
+- **`agents.overrides`** (object):
+  - **Description:** Override settings for specific agents, e.g. to disable the
+    agent, set a custom model config, or run config.
+  - **Default:** `{}`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -965,6 +973,10 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`admin.mcp.enabled`** (boolean):
   - **Description:** If false, disallows MCP servers from being used.
+  - **Default:** `true`
+
+- **`admin.skills.enabled`** (boolean):
+  - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
   <!-- SETTINGS-AUTOGEN:END -->
 
