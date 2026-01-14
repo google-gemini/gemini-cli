@@ -622,14 +622,15 @@ export async function loadCliConfig(
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL_AUTO;
-  const model: string =
+  const specifiedModel =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
-    settings.model?.name ||
-    defaultModel;
+    settings.model?.name;
 
   const resolvedModel =
-    model === GEMINI_MODEL_ALIAS_AUTO ? defaultModel : model;
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
