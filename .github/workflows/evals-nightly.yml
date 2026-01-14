@@ -49,7 +49,7 @@ jobs:
 
       - name: 'Upload Logs'
         if: always()
-        uses: 'actions/upload-artifact@4cec3d8aa04e39d1a6839979c1cb4c33af75e050' # ratchet:actions/upload-artifact@v4
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'eval-logs-${{ matrix.run_attempt }}'
           path: 'evals/logs'
