@@ -1816,13 +1816,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }
 
   if (adminSettingsChanged) {
-    return (
-      <AdminSettingsChangedDialog
-        onDismiss={() => {
-          setAdminSettingsChanged(false);
-        }}
-      />
-    );
+    return <AdminSettingsChangedDialog />;
   }
 
   return (

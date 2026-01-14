@@ -20,9 +20,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 
 describe('AdminSettingsChangedDialog', () => {
   it('renders correctly', () => {
-    const { lastFrame } = renderWithProviders(
-      <AdminSettingsChangedDialog onDismiss={() => {}} />,
-    );
+    const { lastFrame } = renderWithProviders(<AdminSettingsChangedDialog />);
     expect(lastFrame()).toContain('Admin settings have changed');
   });
 
@@ -32,9 +30,7 @@ describe('AdminSettingsChangedDialog', () => {
       .mockImplementation((() => {}) as unknown as (
         code?: number | string | null,
       ) => never);
-    const { stdin } = renderWithProviders(
-      <AdminSettingsChangedDialog onDismiss={() => {}} />,
-    );
+    const { stdin } = renderWithProviders(<AdminSettingsChangedDialog />);
 
     act(() => {
       stdin.write('r');
@@ -47,21 +43,5 @@ describe('AdminSettingsChangedDialog', () => {
     expect(exitSpy).toHaveBeenCalledWith(199);
 
     exitSpy.mockRestore();
-  });
-
-  it('dismisses on "escape" key press', async () => {
-    const onDismiss = vi.fn();
-    const { stdin } = renderWithProviders(
-      <AdminSettingsChangedDialog onDismiss={onDismiss} />,
-    );
-
-    act(() => {
-      stdin.write('\x1B'); // Escape key
-    });
-
-    // Wait for async operations
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    expect(onDismiss).toHaveBeenCalled();
   });
 });

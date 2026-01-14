@@ -10,18 +10,10 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
-interface AdminSettingsChangedDialogProps {
-  onDismiss: () => void;
-}
-
-export const AdminSettingsChangedDialog = ({
-  onDismiss,
-}: AdminSettingsChangedDialogProps) => {
+export const AdminSettingsChangedDialog = () => {
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
-        onDismiss();
-      } else if (key.name === 'r' || key.name === 'R') {
+      if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
           await runExitCleanup();
           process.exit(RELAUNCH_EXIT_CODE);
@@ -37,8 +29,7 @@ export const AdminSettingsChangedDialog = ({
   return (
     <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
       <Text color={theme.status.warning}>
-        {message} Press &apos;r&apos; to restart, or &apos;escape&apos; to
-        continue.
+        {message} Press &apos;r&apos; to restart, or &apos;Ctrl+C&apos; to exit.
       </Text>
     </Box>
   );
