@@ -219,6 +219,7 @@ describe('useLoadingIndicator', () => {
       model: 'gemini-pro',
       attempt: 2,
       maxAttempts: 3,
+      delayMs: 1000,
     };
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,

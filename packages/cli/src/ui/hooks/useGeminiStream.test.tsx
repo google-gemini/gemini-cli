@@ -1346,6 +1346,7 @@ describe('useGeminiStream', () => {
         model: 'gemini-2.5-pro',
         attempt: 2,
         maxAttempts: 3,
+        delayMs: 1000,
       };
 
       await act(async () => {
@@ -1362,6 +1363,7 @@ describe('useGeminiStream', () => {
         model: 'gemini-2.5-pro',
         attempt: 2,
         maxAttempts: 3,
+        delayMs: 1000,
       };
 
       // Start a query to make isResponding true
