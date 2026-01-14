@@ -1,4 +1,4 @@
-# Todo Tool (`write_todos`)
+# Todo tool (`write_todos`)
 
 This document describes the `write_todos` tool for the Gemini CLI.
 
@@ -6,7 +6,8 @@ This document describes the `write_todos` tool for the Gemini CLI.
 
 The `write_todos` tool allows the Gemini agent to create and manage a list of
 subtasks for complex user requests. This provides you, the user, with greater
-visibility into the agent's plan and its current progress.
+visibility into the agent's plan and its current progress. It also helps with
+alignment where the agent is less likely to lose track of its current goal.
 
 ### Arguments
 
@@ -23,11 +24,11 @@ visibility into the agent's plan and its current progress.
 The agent uses this tool to break down complex multi-step requests into a clear
 plan.
 
-- **Progress Tracking:** The agent updates this list as it works, marking tasks
+- **Progress tracking:** The agent updates this list as it works, marking tasks
   as `completed` when done.
-- **Single Focus:** Only one task will be marked `in_progress` at a time,
+- **Single focus:** Only one task will be marked `in_progress` at a time,
   indicating exactly what the agent is currently working on.
-- **Dynamic Updates:** The plan may evolve as the agent discovers new
+- **Dynamic updates:** The plan may evolve as the agent discovers new
   information, leading to new tasks being added or unnecessary ones being
   cancelled.
 
@@ -49,8 +50,8 @@ write_todos({
 
 ## Important notes
 
-- **Enabling:** This tool is disabled by default. To use it, you must enable it
-  in your `settings.json` file by setting `"useWriteTodos": true`.
+- **Enabling:** This tool is enabled by default. You can disable it in your
+  `settings.json` file by setting `"useWriteTodos": false`.
 
-- **Intended Use:** This tool is primarily used by the agent for complex,
+- **Intended use:** This tool is primarily used by the agent for complex,
   multi-turn tasks. It is generally not used for simple, single-turn questions.

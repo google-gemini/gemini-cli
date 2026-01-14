@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -14,6 +14,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import { relaunchApp } from '../../utils/processUtils.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
+import { ExitCodes } from '@google/gemini-cli-core';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',
@@ -31,24 +33,32 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   isRestarting,
 }) => {
   const [exiting, setExiting] = useState(false);
+
   useEffect(() => {
-    const doRelaunch = async () => {
-      if (isRestarting) {
-        setTimeout(async () => {
-          await relaunchApp();
-        }, 250);
-      }
+    let timer: ReturnType<typeof setTimeout>;
+    if (isRestarting) {
+      timer = setTimeout(async () => {
+        await relaunchApp();
+      }, 250);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
     };
-    doRelaunch();
   }, [isRestarting]);
+
+  const handleExit = useCallback(() => {
+    setExiting(true);
+    // Give time for the UI to render the exiting message
+    setTimeout(async () => {
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
+    }, 100);
+  }, []);
 
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        setExiting(true);
-        setTimeout(() => {
-          process.exit(1);
-        }, 100);
+        handleExit();
       }
     },
     { isActive: !isRestarting },
@@ -76,14 +86,14 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   ];
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width="100%">
       <Box
         flexDirection="column"
         borderStyle="round"
         borderColor={theme.status.warning}
         padding={1}
-        width="100%"
         marginLeft={1}
+        marginRight={1}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>

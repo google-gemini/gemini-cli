@@ -11,6 +11,7 @@ import { vi, type Mock } from 'vitest';
 import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -20,6 +21,18 @@ vi.mock('ink', async (importOriginal) => {
     useStdin: vi.fn(),
   };
 });
+
+// Mock appEvents
+vi.mock('../../utils/events.js', () => ({
+  appEvents: {
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+  },
+  AppEvent: {
+    SelectionWarning: 'selection-warning',
+  },
+}));
 
 class MockStdin extends EventEmitter {
   isTTY = true;
@@ -47,6 +60,7 @@ describe('MouseContext', () => {
     wrapper = ({ children }: { children: React.ReactNode }) => (
       <MouseProvider mouseEventsEnabled={true}>{children}</MouseProvider>
     );
+    vi.mocked(appEvents.emit).mockClear();
   });
 
   afterEach(() => {
@@ -89,6 +103,34 @@ describe('MouseContext', () => {
     });
 
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('should emit SelectionWarning when move event is unhandled and has coordinates', () => {
+    renderHook(() => useMouseContext(), { wrapper });
+
+    act(() => {
+      // Move event (32) at 10, 20
+      stdin.write('\x1b[<32;10;20M');
+    });
+
+    expect(appEvents.emit).toHaveBeenCalledWith(AppEvent.SelectionWarning);
+  });
+
+  it('should not emit SelectionWarning when move event is handled', () => {
+    const handler = vi.fn().mockReturnValue(true);
+    const { result } = renderHook(() => useMouseContext(), { wrapper });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    act(() => {
+      // Move event (32) at 10, 20
+      stdin.write('\x1b[<32;10;20M');
+    });
+
+    expect(handler).toHaveBeenCalled();
+    expect(appEvents.emit).not.toHaveBeenCalled();
   });
 
   describe('SGR Mouse Events', () => {

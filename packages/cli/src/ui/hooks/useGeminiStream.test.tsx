@@ -24,7 +24,6 @@ import { useReactToolScheduler } from './useReactToolScheduler.js';
 import type {
   Config,
   EditorType,
-  GeminiClient,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
@@ -35,6 +34,8 @@ import {
   ToolConfirmationOutcome,
   tokenLimit,
   debugLogger,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -101,6 +102,8 @@ vi.mock('./useKeypress.js', () => ({
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
+    activeShellPtyId: null,
+    lastShellOutputTime: 0,
   }),
 }));
 
@@ -221,9 +224,8 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getUseSmartEdit: () => false,
-      getUseModelRouter: () => false,
       isInteractive: () => false,
+      getExperiments: () => {},
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -240,6 +242,7 @@ describe('useGeminiStream', () => {
       mockMarkToolsAsSubmitted,
       vi.fn(), // setToolCallsForDisplay
       mockCancelAllToolCalls,
+      0, // lastToolOutputTime
     ]);
 
     // Reset mocks for GeminiClient instance methods (startChat and sendMessageStream)
@@ -347,7 +350,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         );
@@ -419,7 +421,6 @@ describe('useGeminiStream', () => {
       setShellInputFocused?: (focused: boolean) => void;
       performMemoryRefresh?: () => Promise<void>;
       onAuthError?: () => void;
-      onEditorClose?: () => void;
       setModelSwitched?: Mock;
       modelSwitched?: boolean;
     } = {},
@@ -430,7 +431,6 @@ describe('useGeminiStream', () => {
       setShellInputFocused = () => {},
       performMemoryRefresh = () => Promise.resolve(),
       onAuthError = () => {},
-      onEditorClose = () => {},
       setModelSwitched = vi.fn(),
       modelSwitched = false,
     } = options;
@@ -450,7 +450,6 @@ describe('useGeminiStream', () => {
         performMemoryRefresh,
         modelSwitched,
         setModelSwitched,
-        onEditorClose,
         onCancelSubmit,
         setShellInputFocused,
         80,
@@ -594,7 +593,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -677,7 +675,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -698,6 +695,98 @@ describe('useGeminiStream', () => {
       });
       // Ensure we do NOT call back to the API
       expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
+    const stopExecutionToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'stop-call',
+          name: 'stopTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-stop',
+        },
+        status: 'error',
+        response: {
+          callId: 'stop-call',
+          responseParts: [{ text: 'error occurred' }],
+          errorType: ToolErrorType.STOP_EXECUTION,
+          error: new Error('Stop reason from hook'),
+          resultDisplay: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'stop tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as unknown as TrackedCompletedToolCall,
+    ];
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    // Capture the onComplete callback
+    let capturedOnComplete:
+      | ((completedTools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+      ];
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        client,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Trigger the onComplete callback with STOP_EXECUTION tool
+    await act(async () => {
+      if (capturedOnComplete) {
+        await (capturedOnComplete as any)(stopExecutionToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['stop-call']);
+      // Should add an info message to history
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            'Agent execution stopped: Stop reason from hook',
+          ),
+        }),
+      );
+      // Ensure we do NOT call back to the API
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      // Streaming state should be Idle
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
   });
 
@@ -789,7 +878,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -816,8 +904,8 @@ describe('useGeminiStream', () => {
       expect(client.addHistory).toHaveBeenCalledWith({
         role: 'user',
         parts: [
-          ...(cancelledToolCall1.response.responseParts as Part[]),
-          ...(cancelledToolCall2.response.responseParts as Part[]),
+          ...cancelledToolCall1.response.responseParts,
+          ...cancelledToolCall2.response.responseParts,
         ],
       });
 
@@ -903,7 +991,6 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
         80,
         24,
       ),
@@ -985,6 +1072,7 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
@@ -998,13 +1086,10 @@ describe('useGeminiStream', () => {
 
       // Verify cancellation message is added
       await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'Request cancelled.',
-          },
-          expect.any(Number),
-        );
+        expect(mockAddItem).toHaveBeenCalledWith({
+          type: MessageType.INFO,
+          text: 'Request cancelled.',
+        });
       });
 
       // Verify state is reset
@@ -1035,7 +1120,6 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
-          () => {},
           cancelSubmitSpy,
           () => {},
           80,
@@ -1045,12 +1129,13 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
       simulateEscapeKeyPress();
 
-      expect(cancelSubmitSpy).toHaveBeenCalled();
+      expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
@@ -1076,7 +1161,6 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
-          () => {},
           vi.fn(),
           setShellInputFocusedSpy, // Pass the spy here
           80,
@@ -1086,6 +1170,7 @@ describe('useGeminiStream', () => {
 
       // Start a query
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('test query');
       });
 
@@ -1107,7 +1192,6 @@ describe('useGeminiStream', () => {
         expect.objectContaining({
           text: 'Request cancelled.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -1127,6 +1211,7 @@ describe('useGeminiStream', () => {
       const { result } = renderTestHook();
 
       await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         result.current.submitQuery('long running query');
       });
 
@@ -1242,12 +1327,71 @@ describe('useGeminiStream', () => {
           expect.objectContaining({
             text: 'Request cancelled.',
           }),
-          expect.any(Number),
         );
       });
 
       // The final state should be idle
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+  });
+
+  describe('Retry Handling', () => {
+    it('should update retryStatus when CoreEvent.RetryAttempt is emitted', async () => {
+      const { result } = renderHookWithDefaults();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 1000,
+      };
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+    });
+
+    it('should reset retryStatus when isResponding becomes false', async () => {
+      const { result } = renderTestHook();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 1000,
+      };
+
+      // Start a query to make isResponding true
+      const mockStream = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Emit retry event
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+
+      // Cancel to make isResponding false
+      await act(async () => {
+        result.current.cancelOngoingRequest();
+      });
+
+      expect(result.current.retryStatus).toBeNull();
     });
   });
 
@@ -1413,7 +1557,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1487,7 +1630,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1541,7 +1683,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           () => {},
           () => {},
@@ -1846,7 +1987,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -1911,13 +2051,10 @@ describe('useGeminiStream', () => {
           });
 
           await waitFor(() => {
-            expect(mockAddItem).toHaveBeenCalledWith(
-              {
-                type: 'info',
-                text: expectedMessage,
-              },
-              expect.any(Number),
-            );
+            expect(mockAddItem).toHaveBeenCalledWith({
+              type: 'info',
+              text: expectedMessage,
+            });
           });
         },
       );
@@ -1953,7 +2090,6 @@ describe('useGeminiStream', () => {
           () => Promise.resolve(),
           false,
           () => {},
-          () => {},
           onCancelSubmitSpy,
           () => {},
           80,
@@ -1968,7 +2104,7 @@ describe('useGeminiStream', () => {
 
       // Check that onCancelSubmit was called
       await waitFor(() => {
-        expect(onCancelSubmitSpy).toHaveBeenCalled();
+        expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
       });
     });
 
@@ -2085,7 +2221,7 @@ describe('useGeminiStream', () => {
 
     const { result } = renderHook(() =>
       useGeminiStream(
-        mockConfig.getGeminiClient() as GeminiClient,
+        mockConfig.getGeminiClient(),
         [],
         mockAddItem,
         mockConfig,
@@ -2098,7 +2234,6 @@ describe('useGeminiStream', () => {
         vi.fn(), // performMemoryRefresh
         false, // modelSwitched
         vi.fn(), // setModelSwitched
-        vi.fn(), // onEditorClose
         vi.fn(), // onCancelSubmit
         vi.fn(), // setShellInputFocused
         80, // terminalWidth
@@ -2168,7 +2303,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => Promise.resolve(),
           false,
-          () => {},
           () => {},
           () => {},
           () => {},
@@ -2252,7 +2386,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -2322,7 +2455,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -2380,7 +2512,6 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
           80,
           24,
         ),
@@ -2409,6 +2540,61 @@ describe('useGeminiStream', () => {
         'gemini-2.5-pro',
         'gemini-2.5-flash',
       );
+    });
+
+    it('should update lastOutputTime on Gemini thought and content events', async () => {
+      vi.useFakeTimers();
+      const startTime = 1000000;
+      vi.setSystemTime(startTime);
+
+      // Mock a stream that yields a thought then content
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: { subject: 'Thinking...', description: '' },
+          };
+          // Advance time for the next event
+          vi.advanceTimersByTime(1000);
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Hello',
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      // Submit query
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      // Verify lastOutputTime was updated
+      // It should be the time of the last event (startTime + 1000)
+      expect(result.current.lastOutputTime).toBe(startTime + 1000);
+
+      vi.useRealTimers();
     });
   });
 
@@ -2511,13 +2697,10 @@ describe('useGeminiStream', () => {
       expect(result.current.loopDetectionConfirmationRequest).toBeNull();
 
       // Verify appropriate message was added
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: 'info',
-          text: 'Loop detection has been disabled for this session. Retrying request...',
-        },
-        expect.any(Number),
-      );
+      expect(mockAddItem).toHaveBeenCalledWith({
+        type: 'info',
+        text: 'Loop detection has been disabled for this session. Retrying request...',
+      });
 
       // Verify that the request was retried
       await waitFor(() => {
@@ -2574,13 +2757,10 @@ describe('useGeminiStream', () => {
       expect(result.current.loopDetectionConfirmationRequest).toBeNull();
 
       // Verify appropriate message was added
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: 'info',
-          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
-        },
-        expect.any(Number),
-      );
+      expect(mockAddItem).toHaveBeenCalledWith({
+        type: 'info',
+        text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
+      });
 
       // Verify that the request was NOT retried
       expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
@@ -2617,13 +2797,10 @@ describe('useGeminiStream', () => {
       expect(result.current.loopDetectionConfirmationRequest).toBeNull();
 
       // Verify first message was added
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: 'info',
-          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
-        },
-        expect.any(Number),
-      );
+      expect(mockAddItem).toHaveBeenCalledWith({
+        type: 'info',
+        text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
+      });
 
       // Second loop detection - set up fresh mock for second call
       mockSendMessageStream.mockReturnValueOnce(
@@ -2667,13 +2844,10 @@ describe('useGeminiStream', () => {
       expect(result.current.loopDetectionConfirmationRequest).toBeNull();
 
       // Verify second message was added
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: 'info',
-          text: 'Loop detection has been disabled for this session. Retrying request...',
-        },
-        expect.any(Number),
-      );
+      expect(mockAddItem).toHaveBeenCalledWith({
+        type: 'info',
+        text: 'Loop detection has been disabled for this session. Retrying request...',
+      });
 
       // Verify that the request was retried
       await waitFor(() => {
@@ -2720,6 +2894,124 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+  });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event with systemMessage', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: {
+              reason: 'hook-reason',
+              systemMessage: 'Custom stop message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Custom stop message',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionStopped event by falling back to reason when systemMessage is missing', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionStopped,
+            value: { reason: 'Stopped by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test stop');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Agent execution stopped: Stopped by hook',
+          },
+          expect.any(Number),
+        );
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event with systemMessage', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: {
+              reason: 'hook-reason',
+              systemMessage: 'Custom block message',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Custom block message',
+          },
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should handle AgentExecutionBlocked event by falling back to reason when systemMessage is missing', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.AgentExecutionBlocked,
+            value: { reason: 'Blocked by hook' },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test block');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.WARNING,
+            text: 'Agent execution blocked: Blocked by hook',
+          },
+          expect.any(Number),
+        );
       });
     });
   });

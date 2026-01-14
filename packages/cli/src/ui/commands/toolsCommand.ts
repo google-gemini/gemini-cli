@@ -15,6 +15,7 @@ export const toolsCommand: SlashCommand = {
   name: 'tools',
   description: 'List available Gemini CLI tools. Usage: /tools [desc]',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
 
@@ -26,13 +27,10 @@ export const toolsCommand: SlashCommand = {
 
     const toolRegistry = context.services.config?.getToolRegistry();
     if (!toolRegistry) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Could not retrieve tool registry.',
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: 'Could not retrieve tool registry.',
+      });
       return;
     }
 
@@ -50,6 +48,6 @@ export const toolsCommand: SlashCommand = {
       showDescriptions: useShowDescriptions,
     };
 
-    context.ui.addItem(toolsListItem, Date.now());
+    context.ui.addItem(toolsListItem);
   },
 };

@@ -55,14 +55,26 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
   );
 
   const reloadApiKey = useCallback(async () => {
+    const envKey = process.env['GEMINI_API_KEY'];
+    if (envKey !== undefined) {
+      setApiKeyDefaultValue(envKey);
+      return envKey;
+    }
+
     const storedKey = (await loadApiKey()) ?? '';
-    const envKey = process.env['GEMINI_API_KEY'] ?? '';
-    const key = storedKey || envKey;
-    setApiKeyDefaultValue(key);
-    return key; // Return the key for immediate use
+    setApiKeyDefaultValue(storedKey);
+    return storedKey;
   }, []);
 
   useEffect(() => {
+    if (authState === AuthState.AwaitingApiKeyInput) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      reloadApiKey();
+    }
+  }, [authState, reloadApiKey]);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     (async () => {
       if (authState !== AuthState.Unauthenticated) {
         return;

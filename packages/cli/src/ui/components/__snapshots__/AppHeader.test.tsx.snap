@@ -1,0 +1,118 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<AppHeader /> > should not render the banner when no flags are set 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;
+
+exports[`<AppHeader /> > should not render the banner when previewFeatures is enabled 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;
+
+exports[`<AppHeader /> > should not render the default banner if shown count is 5 or more 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;
+
+exports[`<AppHeader /> > should render the banner when previewFeatures is disabled 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ This is the default banner                                                                                          │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;
+
+exports[`<AppHeader /> > should render the banner with default text 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ This is the default banner                                                                                          │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;
+
+exports[`<AppHeader /> > should render the banner with warning text 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ There are capacity issues                                                                                           │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information."
+`;

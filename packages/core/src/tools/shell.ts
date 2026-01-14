@@ -9,7 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import { debugLogger, type AnyToolInvocation } from '../index.js';
+import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -22,8 +22,8 @@ import {
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type PolicyUpdateOptions,
 } from './tools.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -37,8 +37,6 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
-  isCommandAllowed,
-  isShellInvocationAllowlisted,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
@@ -59,8 +57,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -83,47 +80,48 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
+  protected override getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      outcome === ToolConfirmationOutcome.ProceedAlways
+    ) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = [...new Set(getCommandRoots(command))];
+      if (rootCommands.length > 0) {
+        return { commandPrefix: rootCommands };
+      }
+      return { commandPrefix: this.params.command };
+    }
+    return undefined;
+  }
+
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    let rootCommands = [...new Set(getCommandRoots(command))];
 
-    // In non-interactive mode, we need to prevent the tool from hanging while
-    // waiting for user input. If a tool is not fully allowed (e.g. via
-    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
-    // prompting for confirmation. This check is skipped in YOLO mode.
-    if (
-      !this.config.isInteractive() &&
-      this.config.getApprovalMode() !== ApprovalMode.YOLO
-    ) {
-      if (this.isInvocationAllowlisted(command)) {
-        // If it's an allowed shell command, we don't need to confirm execution.
-        return false;
+    // Fallback for UI display if parser fails or returns no commands (e.g.
+    // variable assignments only)
+    if (rootCommands.length === 0 && command.trim()) {
+      const fallback = command.trim().split(/\s+/)[0];
+      if (fallback) {
+        rootCommands = [fallback];
       }
-
-      throw new Error(
-        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-      );
     }
 
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
-
-    if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
-    }
-
+    // Rely entirely on PolicyEngine for interactive confirmation.
+    // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
+    // so we must provide confirmation details.
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
-      rootCommand: commandsToConfirm.join(', '),
+      rootCommand: rootCommands.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
-        }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;
@@ -150,6 +148,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       .toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
+    const timeoutMs = this.config.getShellToolInactivityTimeout();
+    const timeoutController = new AbortController();
+    let timeoutTimer: NodeJS.Timeout | undefined;
+
+    // Handle signal combination manually to avoid TS issues or runtime missing features
+    const combinedController = new AbortController();
+
+    const onAbort = () => combinedController.abort();
+
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
@@ -169,11 +176,30 @@ export class ShellToolInvocation extends BaseToolInvocation<
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
+      const resetTimeout = () => {
+        if (timeoutMs <= 0) {
+          return;
+        }
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        timeoutTimer = setTimeout(() => {
+          timeoutController.abort();
+        }, timeoutMs);
+      };
+
+      signal.addEventListener('abort', onAbort, { once: true });
+      timeoutController.signal.addEventListener('abort', onAbort, {
+        once: true,
+      });
+
+      // Start timeout
+      resetTimeout();
+
       const { result: resultPromise, pid } =
         await ShellExecutionService.execute(
           commandToExecute,
           cwd,
           (event: ShellOutputEvent) => {
+            resetTimeout(); // Reset timeout on any event
             if (!updateOutput) {
               return;
             }
@@ -211,9 +237,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
               lastUpdateTime = Date.now();
             }
           },
-          signal,
+          combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          shellExecutionConfig ?? {},
+          {
+            ...shellExecutionConfig,
+            pager: 'cat',
+            sanitizationConfig:
+              shellExecutionConfig?.sanitizationConfig ??
+              this.config.sanitizationConfig,
+          },
         );
 
       if (pid && setPidCallback) {
@@ -246,8 +278,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       let llmContent = '';
+      let timeoutMessage = '';
       if (result.aborted) {
-        llmContent = 'Command was cancelled by user before it could complete.';
+        if (timeoutController.signal.aborted) {
+          timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
+            timeoutMs / 60000
+          ).toFixed(1)} minutes without output.`;
+          llmContent = timeoutMessage;
+        } else {
+          llmContent =
+            'Command was cancelled by user before it could complete.';
+        }
         if (result.output.trim()) {
           llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
@@ -282,7 +323,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
-            returnDisplayMessage = 'Command cancelled by user.';
+            if (timeoutMessage) {
+              returnDisplayMessage = timeoutMessage;
+            } else {
+              returnDisplayMessage = 'Command cancelled by user.';
+            }
           } else if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
@@ -327,20 +372,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ...executionError,
       };
     } finally {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      signal.removeEventListener('abort', onAbort);
+      timeoutController.signal.removeEventListener('abort', onAbort);
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
       }
     }
-  }
-
-  private isInvocationAllowlisted(command: string): boolean {
-    const allowedTools = this.config.getAllowedTools() || [];
-    if (allowedTools.length === 0) {
-      return false;
-    }
-
-    const invocation = { params: { command } } as unknown as AnyToolInvocation;
-    return isShellInvocationAllowlisted(invocation, allowedTools);
   }
 }
 
@@ -380,11 +418,9 @@ export class ShellTool extends BaseDeclarativeTool<
 > {
   static readonly Name = SHELL_TOOL_NAME;
 
-  private allowlist: Set<string> = new Set();
-
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
@@ -414,9 +450,9 @@ export class ShellTool extends BaseDeclarativeTool<
         },
         required: ['command'],
       },
+      messageBus,
       false, // output is not markdown
       true, // output can be updated
-      messageBus,
     );
   }
 
@@ -427,19 +463,6 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        debugLogger.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
-    }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
@@ -455,14 +478,13 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
       params,
-      this.allowlist,
       messageBus,
       _toolName,
       _toolDisplayName,

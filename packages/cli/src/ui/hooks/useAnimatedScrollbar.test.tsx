@@ -70,4 +70,32 @@ describe('useAnimatedScrollbar', () => {
 
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
+
+  it('should not crash if Date.now() goes backwards (regression test)', async () => {
+    // Only fake timers, keep Date real so we can mock it manually
+    vi.useFakeTimers({
+      toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+    });
+    const dateSpy = vi.spyOn(Date, 'now');
+    let currentTime = 1000;
+    dateSpy.mockImplementation(() => currentTime);
+
+    const { rerender } = render(<TestComponent isFocused={false} />);
+
+    // Start animation. This captures start = 1000.
+    rerender(<TestComponent isFocused={true} />);
+
+    // Simulate time going backwards before the next frame
+    currentTime = 900;
+
+    // Trigger the interval (33ms)
+    await act(async () => {
+      vi.advanceTimersByTime(50);
+    });
+
+    // If it didn't crash, we are good.
+    // Cleanup
+    dateSpy.mockRestore();
+    // Reset timers to default full fake for other tests (handled by afterEach/beforeEach usually, but here we overrode it)
+  });
 });

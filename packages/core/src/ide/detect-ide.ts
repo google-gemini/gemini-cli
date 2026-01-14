@@ -14,6 +14,8 @@ export const IDE_DEFINITIONS = {
   trae: { name: 'trae', displayName: 'Trae' },
   vscode: { name: 'vscode', displayName: 'VS Code' },
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  antigravity: { name: 'antigravity', displayName: 'Antigravity' },
+  sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
 } as const;
 
 export interface IdeInfo {
@@ -26,6 +28,9 @@ export function isCloudShell(): boolean {
 }
 
 export function detectIdeFromEnv(): IdeInfo {
+  if (process.env['ANTIGRAVITY_CLI_ALIAS']) {
+    return IDE_DEFINITIONS.antigravity;
+  }
   if (process.env['__COG_BASHRC_SOURCED']) {
     return IDE_DEFINITIONS.devin;
   }
@@ -46,6 +51,9 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['MONOSPACE_ENV']) {
     return IDE_DEFINITIONS.firebasestudio;
+  }
+  if (process.env['TERM_PROGRAM'] === 'sublime') {
+    return IDE_DEFINITIONS.sublimetext;
   }
   return IDE_DEFINITIONS.vscode;
 }
@@ -83,8 +91,11 @@ export function detectIde(
     };
   }
 
-  // Only VSCode-based integrations are currently supported.
-  if (process.env['TERM_PROGRAM'] !== 'vscode') {
+  // Only VS Code and Sublime Text integrations are currently supported.
+  if (
+    process.env['TERM_PROGRAM'] !== 'vscode' &&
+    process.env['TERM_PROGRAM'] !== 'sublime'
+  ) {
     return undefined;
   }
 

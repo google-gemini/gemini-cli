@@ -43,18 +43,24 @@ export class StreamJsonFormatter {
     let totalTokens = 0;
     let inputTokens = 0;
     let outputTokens = 0;
+    let cached = 0;
+    let input = 0;
 
     // Aggregate token counts across all models
     for (const modelMetrics of Object.values(metrics.models)) {
       totalTokens += modelMetrics.tokens.total;
       inputTokens += modelMetrics.tokens.prompt;
       outputTokens += modelMetrics.tokens.candidates;
+      cached += modelMetrics.tokens.cached;
+      input += modelMetrics.tokens.input;
     }
 
     return {
       total_tokens: totalTokens,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
+      cached,
+      input,
       duration_ms: durationMs,
       tool_calls: metrics.tools.totalCalls,
     };

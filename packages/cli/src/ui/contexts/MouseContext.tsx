@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { ESC } from '../utils/input.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { appEvents, AppEvent } from '../../utils/events.js';
 import {
   isIncompleteMouseSequence,
   parseMouseEvent,
@@ -89,8 +90,24 @@ export function MouseProvider({
     let mouseBuffer = '';
 
     const broadcast = (event: MouseEvent) => {
+      let handled = false;
       for (const handler of subscribers) {
-        handler(event);
+        if (handler(event) === true) {
+          handled = true;
+        }
+      }
+      if (
+        !handled &&
+        event.name === 'move' &&
+        event.col >= 0 &&
+        event.row >= 0 &&
+        event.button === 'left'
+      ) {
+        // Terminal apps only receive mouse move events when the mouse is down
+        // so this always indicates a mouse drag that the user was expecting
+        // would trigger text selection but does not as we are handling mouse
+        // events not the terminal.
+        appEvents.emit(AppEvent.SelectionWarning);
       }
     };
 

@@ -59,11 +59,12 @@ export function useSessionResume({
       setQuittingMessages(null);
       historyManagerRef.current.clearItems();
       uiHistory.forEach((item, index) => {
-        historyManagerRef.current.addItem(item, index);
+        historyManagerRef.current.addItem(item, index, true);
       });
       refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
       // Give the history to the Gemini client.
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
     },
     [config, isGeminiClientInitialized, setQuittingMessages],

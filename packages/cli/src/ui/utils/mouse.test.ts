@@ -27,6 +27,7 @@ describe('mouse utils', () => {
         shift: false,
         meta: false,
         ctrl: false,
+        button: 'left',
       });
       expect(result!.length).toBe(input.length);
     });
@@ -43,6 +44,7 @@ describe('mouse utils', () => {
         shift: false,
         meta: false,
         ctrl: false,
+        button: 'left',
       });
     });
 
@@ -58,6 +60,7 @@ describe('mouse utils', () => {
         shift: true,
         meta: true,
         ctrl: true,
+        button: 'left',
       });
     });
 
@@ -67,6 +70,7 @@ describe('mouse utils', () => {
       const result = parseSGRMouseEvent(input);
       expect(result).not.toBeNull();
       expect(result!.event.name).toBe('move');
+      expect(result!.event.button).toBe('left');
     });
 
     it('parses SGR scroll events', () => {
@@ -100,6 +104,7 @@ describe('mouse utils', () => {
         shift: false,
         meta: false,
         ctrl: false,
+        button: 'left',
       });
       expect(result!.length).toBe(6);
     });

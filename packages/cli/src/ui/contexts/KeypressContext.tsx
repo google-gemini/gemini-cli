@@ -18,10 +18,13 @@ import {
 import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
-export const PASTE_TIMEOUT = 50;
+export const PASTE_TIMEOUT = 30_000;
+export const FAST_RETURN_TIMEOUT = 30;
 
 // Parse the key itself
 const KEY_INFO_MAP: Record<
@@ -82,6 +85,7 @@ const KEY_INFO_MAP: Record<
   '[9u': { name: 'tab' },
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
+  '[32u': { name: 'space' },
   '[127u': { name: 'backspace' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
@@ -141,13 +145,37 @@ function nonKeyboardEventFilter(
 }
 
 /**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accommodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: '',
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
+  };
+}
+
+/**
  * Buffers "/" keys to see if they are followed return.
  * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
  * or when a null key is received.
  */
 function bufferBackslashEnter(
   keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
+): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
     while (true) {
       const key = yield;
@@ -183,7 +211,7 @@ function bufferBackslashEnter(
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => bufferer.next(key);
+  return (key: Key) => bufferer.next(key);
 }
 
 /**
@@ -191,9 +219,7 @@ function bufferBackslashEnter(
  * Will flush the buffer if no data is received for PASTE_TIMEOUT ms or
  * when a null key is received.
  */
-function bufferPaste(
-  keypressHandler: KeypressHandler,
-): (key: Key | null) => void {
+function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
     while (true) {
       let key = yield;
@@ -211,7 +237,12 @@ function bufferPaste(
         key = yield;
         clearTimeout(timeoutId);
 
-        if (key === null || key.name === 'paste-end') {
+        if (key === null) {
+          appEvents.emit(AppEvent.PasteTimeout);
+          break;
+        }
+
+        if (key.name === 'paste-end') {
           break;
         }
         buffer += key.sequence;
@@ -232,7 +263,7 @@ function bufferPaste(
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key | null) => bufferer.next(key);
+  return (key: Key) => bufferer.next(key);
 }
 
 /**
@@ -287,12 +318,56 @@ function* emitKeys(
       }
     }
 
-    if (escaped && (ch === 'O' || ch === '[')) {
+    if (escaped && (ch === 'O' || ch === '[' || ch === ']')) {
       // ANSI escape sequence
       code = ch;
       let modifier = 0;
 
-      if (ch === 'O') {
+      if (ch === ']') {
+        // OSC sequence
+        // ESC ] <params> ; <data> BEL
+        // ESC ] <params> ; <data> ESC \
+        let buffer = '';
+
+        // Read until BEL, `ESC \`, or timeout (empty string)
+        while (true) {
+          const next = yield;
+          if (next === '' || next === '\u0007') {
+            break;
+          } else if (next === ESC) {
+            const afterEsc = yield;
+            if (afterEsc === '' || afterEsc === '\\') {
+              break;
+            }
+            buffer += next + afterEsc;
+            continue;
+          }
+          buffer += next;
+        }
+
+        // Check for OSC 52 (Clipboard) response
+        // Format: 52;c;<base64> or 52;p;<base64>
+        const match = /^52;[cp];(.*)$/.exec(buffer);
+        if (match) {
+          try {
+            const base64Data = match[1];
+            const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
+            keypressHandler({
+              name: 'paste',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: true,
+              insertable: true,
+              sequence: decoded,
+            });
+          } catch (_e) {
+            debugLogger.log('Failed to decode OSC 52 clipboard data');
+          }
+        }
+
+        continue; // resume main loop
+      } else if (ch === 'O') {
         // ESC O letter
         // ESC O modifier letter
         ch = yield;
@@ -360,13 +435,15 @@ function* emitKeys(
 
         // skip modifier
         if (ch === ';') {
-          ch = yield;
-          sequence += ch;
-
-          // collect as many digits as possible
-          while (ch >= '0' && ch <= '9') {
+          while (ch === ';') {
             ch = yield;
             sequence += ch;
+
+            // collect as many digits as possible
+            while (ch >= '0' && ch <= '9') {
+              ch = yield;
+              sequence += ch;
+            }
           }
         } else if (ch === '<') {
           // SGR mouse mode
@@ -395,13 +472,20 @@ function* emitKeys(
         const cmd = sequence.slice(cmdStart);
         let match;
 
-        if ((match = /^(\d+)(?:;(\d+))?([~^$u])$/.exec(cmd))) {
-          code += match[1] + match[3];
-          // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
-          modifier = parseInt(match[2] ?? '1', 10) - 1;
-        } else if ((match = /^((\d;)?(\d))?([A-Za-z])$/.exec(cmd))) {
-          code += match[4];
-          modifier = parseInt(match[3] ?? '1', 10) - 1;
+        if ((match = /^(\d+)(?:;(\d+))?(?:;(\d+))?([~^$u])$/.exec(cmd))) {
+          if (match[1] === '27' && match[3] && match[4] === '~') {
+            // modifyOtherKeys format: CSI 27 ; modifier ; key ~
+            // Treat as CSI u: key + 'u'
+            code += match[3] + 'u';
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          } else {
+            code += match[1] + match[4];
+            // Defaults to '1' if no modifier exists, resulting in a 0 modifier value
+            modifier = parseInt(match[2] ?? '1', 10) - 1;
+          }
+        } else if ((match = /^(\d+)?(?:;(\d+))?([A-Za-z])$/.exec(cmd))) {
+          code += match[3];
+          modifier = parseInt(match[2] ?? match[1] ?? '1', 10) - 1;
         } else {
           code += cmd;
         }
@@ -420,6 +504,10 @@ function* emitKeys(
         }
         if (keyInfo.ctrl) {
           ctrl = true;
+        }
+        if (name === 'space' && !ctrl && !meta) {
+          sequence = ' ';
+          insertable = true;
         }
       } else {
         name = 'undefined';
@@ -577,10 +665,13 @@ export function KeypressProvider({
 
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
-    const mouseFilterer = nonKeyboardEventFilter(broadcast);
-    const backslashBufferer = bufferBackslashEnter(mouseFilterer);
-    const pasteBufferer = bufferPaste(backslashBufferer);
-    let dataListener = createDataListener(pasteBufferer);
+    let processor = nonKeyboardEventFilter(broadcast);
+    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+      processor = bufferFastReturn(processor);
+    }
+    processor = bufferBackslashEnter(processor);
+    processor = bufferPaste(processor);
+    let dataListener = createDataListener(processor);
 
     if (debugKeystrokeLogging) {
       const old = dataListener;
@@ -593,16 +684,8 @@ export function KeypressProvider({
     }
 
     stdin.on('data', dataListener);
-
     return () => {
-      // flush buffers by sending null key
-      backslashBufferer(null);
-      pasteBufferer(null);
-      // flush by sending empty string to the data listener
-      dataListener('');
       stdin.removeListener('data', dataListener);
-
-      // Restore the terminal to its original state.
       if (wasRaw === false) {
         setRawMode(false);
       }

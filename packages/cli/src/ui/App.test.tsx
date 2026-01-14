@@ -14,11 +14,7 @@ import { StreamingState } from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
 import { AppContext, type AppState } from './contexts/AppContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import {
-  type SettingScope,
-  LoadedSettings,
-  type SettingsFile,
-} from '../config/settings.js';
+import { LoadedSettings, type SettingsFile } from '../config/settings.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -72,6 +68,10 @@ describe('App', () => {
     },
     history: [],
     pendingHistoryItems: [],
+    bannerData: {
+      defaultText: 'Mock Banner Text',
+      warningText: '',
+    },
   };
 
   const mockConfig = makeFakeConfig();
@@ -88,7 +88,7 @@ describe('App', () => {
     mockSettingsFile,
     mockSettingsFile,
     true,
-    new Set<SettingScope>(),
+    [],
   );
 
   const mockAppState: AppState = {
@@ -160,29 +160,23 @@ describe('App', () => {
     expect(lastFrame()).toContain('DialogManager');
   });
 
-  it('should show Ctrl+C exit prompt when dialogs are visible and ctrlCPressedOnce is true', () => {
-    const ctrlCUIState = {
-      ...mockUIState,
-      dialogsVisible: true,
-      ctrlCPressedOnce: true,
-    } as UIState;
+  it.each([
+    { key: 'C', stateKey: 'ctrlCPressedOnce' },
+    { key: 'D', stateKey: 'ctrlDPressedOnce' },
+  ])(
+    'should show Ctrl+$key exit prompt when dialogs are visible and $stateKey is true',
+    ({ key, stateKey }) => {
+      const uiState = {
+        ...mockUIState,
+        dialogsVisible: true,
+        [stateKey]: true,
+      } as UIState;
 
-    const { lastFrame } = renderWithProviders(<App />, ctrlCUIState);
+      const { lastFrame } = renderWithProviders(<App />, uiState);
 
-    expect(lastFrame()).toContain('Press Ctrl+C again to exit.');
-  });
-
-  it('should show Ctrl+D exit prompt when dialogs are visible and ctrlDPressedOnce is true', () => {
-    const ctrlDUIState = {
-      ...mockUIState,
-      dialogsVisible: true,
-      ctrlDPressedOnce: true,
-    } as UIState;
-
-    const { lastFrame } = renderWithProviders(<App />, ctrlDUIState);
-
-    expect(lastFrame()).toContain('Press Ctrl+D again to exit.');
-  });
+      expect(lastFrame()).toContain(`Press Ctrl+${key} again to exit.`);
+    },
+  );
 
   it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
@@ -200,5 +194,34 @@ describe('App', () => {
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
     expect(lastFrame()).toContain('MainContent\nNotifications\nComposer');
+  });
+
+  describe('Snapshots', () => {
+    it('renders default layout correctly', () => {
+      (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
+      const { lastFrame } = renderWithProviders(
+        <App />,
+        mockUIState as UIState,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders screen reader layout correctly', () => {
+      (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
+      const { lastFrame } = renderWithProviders(
+        <App />,
+        mockUIState as UIState,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders with dialogs visible', () => {
+      const dialogUIState = {
+        ...mockUIState,
+        dialogsVisible: true,
+      } as UIState;
+      const { lastFrame } = renderWithProviders(<App />, dialogUIState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
   });
 });

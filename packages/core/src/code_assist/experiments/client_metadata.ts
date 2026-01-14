@@ -8,6 +8,7 @@ import { getReleaseChannel } from '../../utils/channel.js';
 import type { ClientMetadata, ClientMetadataPlatform } from '../types.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { getVersion } from '../../utils/version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,11 +46,12 @@ function getPlatform(): ClientMetadataPlatform {
 export async function getClientMetadata(): Promise<ClientMetadata> {
   if (!clientMetadataPromise) {
     clientMetadataPromise = (async () => ({
-      ideName: 'GEMINI_CLI',
-      ideVersion: process.env['CLI_VERSION'] || process.version,
+      ideName: 'IDE_UNSPECIFIED',
+      pluginType: 'GEMINI',
+      ideVersion: await getVersion(),
       platform: getPlatform(),
       updateChannel: await getReleaseChannel(__dirname),
     }))();
   }
-  return await clientMetadataPromise;
+  return clientMetadataPromise;
 }

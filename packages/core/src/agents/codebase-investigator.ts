@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentDefinition } from './types.js';
+import type { LocalAgentDefinition } from './types.js';
 import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -41,18 +41,19 @@ const CodebaseInvestigationReportSchema = z.object({
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
  * dependencies, and technologies.
  */
-export const CodebaseInvestigatorAgent: AgentDefinition<
+export const CodebaseInvestigatorAgent: LocalAgentDefinition<
   typeof CodebaseInvestigationReportSchema
 > = {
   name: 'codebase_investigator',
+  kind: 'local',
   displayName: 'Codebase Investigator Agent',
-  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. 
-    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. 
+  description: `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
+    Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation.
     It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
   inputConfig: {
     inputs: {
       objective: {
-        description: `A comprehensive and detailed description of the user's ultimate goal. 
+        description: `A comprehensive and detailed description of the user's ultimate goal.
           You must include original user's objective as well as questions and any extra context and questions you may have.`,
         type: 'string',
         required: true,
@@ -70,14 +71,19 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
 
   modelConfig: {
     model: DEFAULT_GEMINI_MODEL,
-    temp: 0.1,
-    top_p: 0.95,
-    thinkingBudget: -1,
+    generateContentConfig: {
+      temperature: 0.1,
+      topP: 0.95,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      },
+    },
   },
 
   runConfig: {
-    max_time_minutes: 5,
-    max_turns: 15,
+    maxTimeMinutes: 5,
+    maxTurns: 15,
   },
 
   toolConfig: {
@@ -96,7 +102,7 @@ You are a sub-agent in a larger system. Your only responsibility is to provide d
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
 - **DO:** Understand *why* the code is written the way it is. Question everything.
 - **DO:** Foresee the ripple effects of a change. If \`function A\` is modified, you must check its callers. If a data structure is altered, you must identify where its type definitions need to be updated.
-- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what chagnes are necessary etc. 
+- **DO:** provide a conclusion and insights to the main agent that invoked you. If the agent is trying to solve a bug, you should provide the root cause of the bug, its impacts, how to fix it etc. If it's a new feature, you should provide insights on where to implement it, what changes are necessary etc.
 - **DO NOT:** Write the final implementation code yourself.
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools.

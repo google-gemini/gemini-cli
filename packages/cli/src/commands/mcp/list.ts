@@ -17,6 +17,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { exitCli } from '../utils.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -58,10 +59,23 @@ async function testMCPConnection(
     version: '0.0.1',
   });
 
+  const settings = loadSettings();
+  const sanitizationConfig = {
+    enableEnvironmentVariableRedaction: true,
+    allowedEnvironmentVariables: [],
+    blockedEnvironmentVariables:
+      settings.merged.advanced?.excludedEnvVars || [],
+  };
+
   let transport;
   try {
     // Use the same transport creation logic as core
-    transport = await createTransport(serverName, config, false);
+    transport = await createTransport(
+      serverName,
+      config,
+      false,
+      sanitizationConfig,
+    );
   } catch (_error) {
     await client.close();
     return MCPServerStatus.DISCONNECTED;
@@ -87,7 +101,7 @@ async function getServerStatus(
   server: MCPServerConfig,
 ): Promise<MCPServerStatus> {
   // Test all server types by attempting actual connection
-  return await testMCPConnection(serverName, server);
+  return testMCPConnection(serverName, server);
 }
 
 export async function listMcpServers(): Promise<void> {
@@ -145,5 +159,6 @@ export const listCommand: CommandModule = {
   describe: 'List all configured MCP servers',
   handler: async () => {
     await listMcpServers();
+    await exitCli();
   },
 };

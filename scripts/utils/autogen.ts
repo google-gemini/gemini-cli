@@ -57,7 +57,7 @@ export function formatDefaultValue(
       return '[]';
     }
     try {
-      return JSON.stringify(value);
+      return JSON.stringify(value, null, 2);
     } catch {
       return String(value);
     }
@@ -65,7 +65,7 @@ export function formatDefaultValue(
 
   if (typeof value === 'object') {
     try {
-      const json = JSON.stringify(value);
+      const json = JSON.stringify(value, null, 2);
       if (json === '{}') {
         return '{}';
       }
@@ -80,4 +80,40 @@ export function formatDefaultValue(
   } catch {
     return String(value);
   }
+}
+
+interface MarkerInsertionOptions {
+  document: string;
+  startMarker: string;
+  endMarker: string;
+  newContent: string;
+  paddingBefore?: string;
+  paddingAfter?: string;
+}
+
+/**
+ * Replaces the content between two markers with `newContent`, preserving the
+ * original document outside the markers and applying optional padding.
+ */
+export function injectBetweenMarkers({
+  document,
+  startMarker,
+  endMarker,
+  newContent,
+  paddingBefore = '\n',
+  paddingAfter = '\n',
+}: MarkerInsertionOptions): string {
+  const startIndex = document.indexOf(startMarker);
+  const endIndex = document.indexOf(endMarker);
+
+  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
+    throw new Error(
+      `Could not locate documentation markers (${startMarker}, ${endMarker}).`,
+    );
+  }
+
+  const before = document.slice(0, startIndex + startMarker.length);
+  const after = document.slice(endIndex);
+
+  return `${before}${paddingBefore}${newContent}${paddingAfter}${after}`;
 }

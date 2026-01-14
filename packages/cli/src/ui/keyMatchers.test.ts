@@ -22,59 +22,6 @@ describe('keyMatchers', () => {
     ...mods,
   });
 
-  // Original hard-coded logic (for comparison)
-  const originalMatchers: Record<Command, (key: Key) => boolean> = {
-    [Command.RETURN]: (key: Key) => key.name === 'return',
-    [Command.HOME]: (key: Key) => key.ctrl && key.name === 'a',
-    [Command.END]: (key: Key) => key.ctrl && key.name === 'e',
-    [Command.KILL_LINE_RIGHT]: (key: Key) => key.ctrl && key.name === 'k',
-    [Command.KILL_LINE_LEFT]: (key: Key) => key.ctrl && key.name === 'u',
-    [Command.CLEAR_INPUT]: (key: Key) => key.ctrl && key.name === 'c',
-    [Command.DELETE_WORD_BACKWARD]: (key: Key) =>
-      (key.ctrl || key.meta) && key.name === 'backspace',
-    [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
-    [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
-    [Command.HISTORY_DOWN]: (key: Key) => key.ctrl && key.name === 'n',
-    [Command.NAVIGATION_UP]: (key: Key) => key.name === 'up',
-    [Command.NAVIGATION_DOWN]: (key: Key) => key.name === 'down',
-    [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
-      !key.shift && (key.name === 'up' || key.name === 'k'),
-    [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
-      !key.shift && (key.name === 'down' || key.name === 'j'),
-    [Command.ACCEPT_SUGGESTION]: (key: Key) =>
-      key.name === 'tab' || (key.name === 'return' && !key.ctrl),
-    [Command.COMPLETION_UP]: (key: Key) =>
-      key.name === 'up' || (key.ctrl && key.name === 'p'),
-    [Command.COMPLETION_DOWN]: (key: Key) =>
-      key.name === 'down' || (key.ctrl && key.name === 'n'),
-    [Command.ESCAPE]: (key: Key) => key.name === 'escape',
-    [Command.SUBMIT]: (key: Key) =>
-      key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
-    [Command.NEWLINE]: (key: Key) =>
-      key.name === 'return' && (key.ctrl || key.meta || key.paste),
-    [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
-      key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
-    [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
-    [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.name === 'f12',
-    [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
-    [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
-      key.ctrl && key.name === 'g',
-    [Command.TOGGLE_MARKDOWN]: (key: Key) => key.meta && key.name === 'm',
-    [Command.TOGGLE_COPY_MODE]: (key: Key) => key.ctrl && key.name === 's',
-    [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
-    [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
-    [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
-    [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
-    [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
-      key.name === 'return' && !key.ctrl,
-    [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: (key: Key) =>
-      key.name === 'tab',
-    [Command.TOGGLE_SHELL_INPUT_FOCUS]: (key: Key) =>
-      key.ctrl && key.name === 'f',
-    [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
-    [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
-  };
-
   // Test data for each command with positive and negative test cases
   const testCases = [
     // Basic bindings
@@ -92,7 +39,7 @@ describe('keyMatchers', () => {
     // Cursor movement
     {
       command: Command.HOME,
-      positive: [createKey('a', { ctrl: true })],
+      positive: [createKey('a', { ctrl: true }), createKey('home')],
       negative: [
         createKey('a'),
         createKey('a', { shift: true }),
@@ -101,12 +48,40 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.END,
-      positive: [createKey('e', { ctrl: true })],
+      positive: [createKey('e', { ctrl: true }), createKey('end')],
       negative: [
         createKey('e'),
         createKey('e', { shift: true }),
         createKey('a', { ctrl: true }),
       ],
+    },
+    {
+      command: Command.MOVE_LEFT,
+      positive: [createKey('left'), createKey('b', { ctrl: true })],
+      negative: [createKey('left', { ctrl: true }), createKey('b')],
+    },
+    {
+      command: Command.MOVE_RIGHT,
+      positive: [createKey('right'), createKey('f', { ctrl: true })],
+      negative: [createKey('right', { ctrl: true }), createKey('f')],
+    },
+    {
+      command: Command.MOVE_WORD_LEFT,
+      positive: [
+        createKey('left', { ctrl: true }),
+        createKey('left', { meta: true }),
+        createKey('b', { meta: true }),
+      ],
+      negative: [createKey('left'), createKey('b', { ctrl: true })],
+    },
+    {
+      command: Command.MOVE_WORD_RIGHT,
+      positive: [
+        createKey('right', { ctrl: true }),
+        createKey('right', { meta: true }),
+        createKey('f', { meta: true }),
+      ],
+      negative: [createKey('right'), createKey('f', { ctrl: true })],
     },
 
     // Text deletion
@@ -126,12 +101,47 @@ describe('keyMatchers', () => {
       negative: [createKey('c'), createKey('k', { ctrl: true })],
     },
     {
+      command: Command.DELETE_CHAR_LEFT,
+      positive: [
+        createKey('backspace'),
+        { ...createKey('\x7f'), sequence: '\x7f' },
+        createKey('h', { ctrl: true }),
+      ],
+      negative: [createKey('h'), createKey('x', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_CHAR_RIGHT,
+      positive: [createKey('delete'), createKey('d', { ctrl: true })],
+      negative: [createKey('d'), createKey('x', { ctrl: true })],
+    },
+    {
       command: Command.DELETE_WORD_BACKWARD,
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
+        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
+        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
+        createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_WORD_FORWARD,
+      positive: [
+        createKey('delete', { ctrl: true }),
+        createKey('delete', { meta: true }),
+      ],
+      negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
+    },
+    {
+      command: Command.UNDO,
+      positive: [createKey('z', { ctrl: true, shift: false })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: true })],
+    },
+    {
+      command: Command.REDO,
+      positive: [createKey('z', { ctrl: true, shift: true })],
+      negative: [createKey('z'), createKey('z', { ctrl: true, shift: false })],
     },
 
     // Screen control
@@ -139,6 +149,38 @@ describe('keyMatchers', () => {
       command: Command.CLEAR_SCREEN,
       positive: [createKey('l', { ctrl: true })],
       negative: [createKey('l'), createKey('k', { ctrl: true })],
+    },
+
+    // Scrolling
+    {
+      command: Command.SCROLL_UP,
+      positive: [createKey('up', { shift: true })],
+      negative: [createKey('up'), createKey('up', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_DOWN,
+      positive: [createKey('down', { shift: true })],
+      negative: [createKey('down'), createKey('down', { ctrl: true })],
+    },
+    {
+      command: Command.SCROLL_HOME,
+      positive: [createKey('home')],
+      negative: [createKey('end')],
+    },
+    {
+      command: Command.SCROLL_END,
+      positive: [createKey('end')],
+      negative: [createKey('home')],
+    },
+    {
+      command: Command.PAGE_UP,
+      positive: [createKey('pageup'), createKey('pageup', { shift: true })],
+      negative: [createKey('pagedown'), createKey('up')],
+    },
+    {
+      command: Command.PAGE_DOWN,
+      positive: [createKey('pagedown'), createKey('pagedown', { ctrl: true })],
+      negative: [createKey('pageup'), createKey('down')],
     },
 
     // History navigation
@@ -230,7 +272,7 @@ describe('keyMatchers', () => {
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
     {
-      command: Command.PASTE_CLIPBOARD_IMAGE,
+      command: Command.PASTE_CLIPBOARD,
       positive: [createKey('v', { ctrl: true })],
       negative: [createKey('v'), createKey('c', { ctrl: true })],
     },
@@ -247,7 +289,7 @@ describe('keyMatchers', () => {
       negative: [createKey('t'), createKey('e', { ctrl: true })],
     },
     {
-      command: Command.TOGGLE_IDE_CONTEXT_DETAIL,
+      command: Command.SHOW_IDE_CONTEXT_DETAIL,
       positive: [createKey('g', { ctrl: true })],
       negative: [createKey('g'), createKey('t', { ctrl: true })],
     },
@@ -294,9 +336,19 @@ describe('keyMatchers', () => {
       negative: [createKey('return'), createKey('space')],
     },
     {
-      command: Command.TOGGLE_SHELL_INPUT_FOCUS,
-      positive: [createKey('f', { ctrl: true })],
-      negative: [createKey('f')],
+      command: Command.FOCUS_SHELL_INPUT,
+      positive: [createKey('tab')],
+      negative: [createKey('f', { ctrl: true }), createKey('f')],
+    },
+    {
+      command: Command.TOGGLE_YOLO,
+      positive: [createKey('y', { ctrl: true })],
+      negative: [createKey('y'), createKey('y', { meta: true })],
+    },
+    {
+      command: Command.TOGGLE_AUTO_EDIT,
+      positive: [createKey('tab', { shift: true })],
+      negative: [createKey('tab')],
     },
   ];
 
@@ -308,20 +360,12 @@ describe('keyMatchers', () => {
             keyMatchers[command](key),
             `Expected ${command} to match ${JSON.stringify(key)}`,
           ).toBe(true);
-          expect(
-            originalMatchers[command](key),
-            `Original matcher should also match ${JSON.stringify(key)}`,
-          ).toBe(true);
         });
 
         negative.forEach((key) => {
           expect(
             keyMatchers[command](key),
             `Expected ${command} to NOT match ${JSON.stringify(key)}`,
-          ).toBe(false);
-          expect(
-            originalMatchers[command](key),
-            `Original matcher should also NOT match ${JSON.stringify(key)}`,
           ).toBe(false);
         });
       });
