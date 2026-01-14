@@ -6,14 +6,14 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 import { RewindViewer } from '../components/RewindViewer.js';
-import { MessageType, type HistoryItem } from '../types.js';
+import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
 import { checkExhaustive } from '../../utils/checks.js';
 
 import type { Content } from '@google/genai';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 
 export const rewindCommand: SlashCommand = {
   name: 'rewind',
@@ -70,13 +70,7 @@ export const rewindCommand: SlashCommand = {
                     await revertFileChanges(conversation, messageId);
                   }
                   context.ui.removeComponent();
-                  context.ui.addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: 'File changes reverted.',
-                    },
-                    Date.now(),
-                  );
+                  coreEvents.emitFeedback('info', 'File changes reverted.');
                   return;
 
                 case RewindOutcome.RewindAndRevert:
@@ -96,7 +90,10 @@ export const rewindCommand: SlashCommand = {
 
               const rewindedConvesation = recordingService.rewindTo(messageId);
               if (!rewindedConvesation) {
-                debugLogger.error('Could not fetch conversation file');
+                const errorMsg = 'Could not fetch conversation file';
+                debugLogger.error(errorMsg);
+                context.ui.removeComponent();
+                coreEvents.emitFeedback('error', errorMsg);
                 return;
               }
 
@@ -129,15 +126,11 @@ export const rewindCommand: SlashCommand = {
             } catch (error) {
               // If an error occurs, we still want to remove the component if possible
               context.ui.removeComponent();
-              context.ui.addItem(
-                {
-                  type: MessageType.ERROR,
-                  text:
-                    error instanceof Error
-                      ? error.message
-                      : 'Unknown error during rewind',
-                },
-                Date.now(),
+              coreEvents.emitFeedback(
+                'error',
+                error instanceof Error
+                  ? error.message
+                  : 'Unknown error during rewind',
               );
             }
           }}

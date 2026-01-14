@@ -24,6 +24,9 @@ import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
+const REF_CONTENT_HEADER = '\n--- Content from referenced files ---';
+const REF_CONTENT_FOOTER = '\n--- End of content ---';
+
 interface HandleAtCommandParams {
   query: string;
   config: Config;
@@ -506,7 +509,7 @@ export async function handleAtCommand({
     if (result.success) {
       if (!hasAddedReferenceHeader) {
         processedQueryParts.push({
-          text: '\n--- Content from referenced files ---',
+          text: REF_CONTENT_HEADER,
         });
         hasAddedReferenceHeader = true;
       }
@@ -548,7 +551,7 @@ export async function handleAtCommand({
       );
     }
     if (hasAddedReferenceHeader) {
-      processedQueryParts.push({ text: '\n--- End of content ---' });
+      processedQueryParts.push({ text: REF_CONTENT_FOOTER });
     }
     return { processedQuery: processedQueryParts };
   }
@@ -582,7 +585,7 @@ export async function handleAtCommand({
       const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
       if (!hasAddedReferenceHeader) {
         processedQueryParts.push({
-          text: '\n--- Content from referenced files ---',
+          text: REF_CONTENT_HEADER,
         });
         hasAddedReferenceHeader = true;
       }

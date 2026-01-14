@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
@@ -21,6 +21,7 @@ import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { CliSpinner } from './CliSpinner.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -29,7 +30,7 @@ interface RewindViewerProps {
     messageId: string,
     newText: string,
     outcome: RewindOutcome,
-  ) => void;
+  ) => Promise<void>;
 }
 
 const MAX_LINES_PER_BOX = 2;
@@ -39,6 +40,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onExit,
   onRewind,
 }) => {
+  const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
   const {
     selectedMessageId,
@@ -89,6 +91,23 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
+    if (isRewinding) {
+      return (
+        <Box
+          borderStyle="round"
+          borderColor={theme.border.default}
+          padding={1}
+          width={terminalWidth}
+          flexDirection="row"
+        >
+          <Box marginRight={1}>
+            <CliSpinner />
+          </Box>
+          <Text>Rewinding...</Text>
+        </Box>
+      );
+    }
+
     const selectedMessage = interactions.find(
       (m) => m.id === selectedMessageId,
     );
@@ -97,7 +116,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
         stats={confirmationStats}
         terminalWidth={terminalWidth}
         timestamp={selectedMessage?.timestamp}
-        onConfirm={(outcome) => {
+        onConfirm={async (outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();
           } else {
@@ -109,7 +128,8 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                 ? partToString(userPrompt.content)
                 : '';
               const cleanedText = stripReferenceContent(originalUserText);
-              onRewind(selectedMessageId, cleanedText, outcome);
+              setIsRewinding(true);
+              await onRewind(selectedMessageId, cleanedText, outcome);
             }
           }
         }}
