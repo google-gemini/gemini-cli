@@ -11,8 +11,6 @@ import nodePath from 'node:path';
 import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 
-import { Storage } from '../config/storage.js';
-
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
@@ -20,7 +18,9 @@ afterEach(() => {
 });
 
 describe('createPolicyEngineConfig', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    const { Storage } = await import('../config/storage.js');
     // Mock Storage to avoid picking up real user/system policies from the host environment
     vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
       '/non/existent/user/policies',
