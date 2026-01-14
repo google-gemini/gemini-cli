@@ -98,7 +98,20 @@ gemini skills disable my-expertise --scope project
 A skill is a directory containing a `SKILL.md` file at its root. This file uses
 YAML frontmatter for metadata and Markdown for instructions.
 
-### Basic Structure
+### Folder Structure
+
+Skills are self-contained directories. At a minimum, a skill requires a
+`SKILL.md` file, but can include other resources:
+
+```text
+my-skill/
+├── SKILL.md       (Required) Instructions and metadata
+├── scripts/       (Optional) Executable scripts/tools
+├── references/    (Optional) Static documentation and examples
+└── assets/        (Optional) Templates and binary resources
+```
+
+### Basic Structure (SKILL.md)
 
 ```markdown
 ---
@@ -116,6 +129,8 @@ description: <what the skill does and when Gemini should use it>
   guidance for the model.
 
 ### Example: Team Code Reviewer
+
+Create `~/.gemini/skills/code-reviewer/SKILL.md`:
 
 ```markdown
 ---

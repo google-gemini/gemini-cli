@@ -26,11 +26,12 @@ vi.mock('node:os', async (importOriginal) => {
 
 // Mock @google/gemini-cli-core
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const core = await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
-    ...actual,
+    ...core,
     homedir: mockHomedir,
+    loadAgentsFromDirectory: core.loadAgentsFromDirectory,
+    loadSkillsFromDir: core.loadSkillsFromDir,
   };
 });
 
