@@ -90,15 +90,6 @@ describe('resolveModel', () => {
       expect(model).toBe(DEFAULT_GEMINI_MODEL);
     });
 
-    it('should return the correct model when "auto" alias is requested', () => {
-      expect(resolveModel(GEMINI_MODEL_ALIAS_AUTO, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-      expect(resolveModel(GEMINI_MODEL_ALIAS_AUTO, true)).toBe(
-        PREVIEW_GEMINI_MODEL,
-      );
-    });
-
     it('should return the requested model as-is for explicit specific models', () => {
       expect(resolveModel(DEFAULT_GEMINI_MODEL, false)).toBe(
         DEFAULT_GEMINI_MODEL,

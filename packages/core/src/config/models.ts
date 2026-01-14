@@ -64,11 +64,6 @@ export function resolveModel(
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       return DEFAULT_GEMINI_FLASH_LITE_MODEL;
     }
-    case GEMINI_MODEL_ALIAS_AUTO: {
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_MODEL
-        : DEFAULT_GEMINI_MODEL;
-    }
     default: {
       return requestedModel;
     }
