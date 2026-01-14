@@ -221,7 +221,11 @@ exports[`RewindViewer > updates selection and expansion on navigation > after-do
 │                                                                                                                      │
 │   Line 1                                                                                                             │
 │   Line 2                                                                                                             │
-│   ... last 5 lines hidden ...                                                                                        │
+│   Line 3                                                                                                             │
+│   Line 4                                                                                                             │
+│   Line 5                                                                                                             │
+│   Line 6                                                                                                             │
+│   Line 7                                                                                                             │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │ ● Line A                                                                                                             │
@@ -255,7 +259,11 @@ exports[`RewindViewer > updates selection and expansion on navigation > initial-
 │                                                                                                                      │
 │   Line A                                                                                                             │
 │   Line B                                                                                                             │
-│   ... last 5 lines hidden ...                                                                                        │
+│   Line C                                                                                                             │
+│   Line D                                                                                                             │
+│   Line E                                                                                                             │
+│   Line F                                                                                                             │
+│   Line G                                                                                                             │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
