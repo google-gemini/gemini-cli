@@ -12,6 +12,7 @@ import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
 
 import type { Content } from '@google/genai';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export const rewindCommand: SlashCommand = {
   name: 'rewind',
@@ -90,7 +91,14 @@ export const rewindCommand: SlashCommand = {
                 outcome === RewindOutcome.RewindOnly ||
                 outcome === RewindOutcome.RewindAndRevert
               ) {
-                updatedConversation = recordingService.rewindTo(messageId);
+                const rewindedConvesation =
+                  recordingService.rewindTo(messageId);
+                if (rewindedConvesation) {
+                  updatedConversation = rewindedConvesation;
+                } else {
+                  debugLogger.error('Could not fetch conversation file');
+                  return;
+                }
               }
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
