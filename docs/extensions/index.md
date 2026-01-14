@@ -311,6 +311,31 @@ Just like `gemini-extension.json`, the `hooks/hooks.json` file supports
 [variable substitution](#variables). This is particularly useful for referencing
 scripts within the extension directory using `${extensionPath}`.
 
+### Sub-agents
+
+> **Note: Sub-agents are currently an experimental feature.**
+
+Extensions can provide [sub-agents](../core/subagents.md) that users can
+delegate tasks to.
+
+To bundle sub-agents with your extension, create an `agents/` directory in your
+extension's root folder and add your agent definition files (`.md`) there.
+
+#### Directory structure
+
+```
+.gemini/extensions/my-extension/
+├── gemini-extension.json
+└── agents/
+    ├── security-auditor.md
+    └── database-expert.md
+```
+
+Gemini CLI will automatically discover and load these agents when the extension
+is installed and enabled. See the
+[Sub-Agents documentation](../core/subagents.md) for details on the agent
+definition file format.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user
