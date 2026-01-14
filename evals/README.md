@@ -46,6 +46,12 @@ two arguments:
 
 #### Policies
 
+Policies control how strictly a test is validated. Tests should generally use
+the ALWAYS_PASSES policy to offer the strictest guarantees.
+
+USUALLY_PASSES exists to enable assertion of less consistent or aspirational
+behaviors.
+
 - `ALWAYS_PASSES`: Tests expected to pass 100% of the time. These are typically
   trivial and test basic functionality. These run in every CI.
 - `USUALLY_PASSES`: Tests expected to pass most of the time but may have some
@@ -100,3 +106,37 @@ npm run test:all_evals
 
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
+
+## Reporting
+
+Results for evaluations are available on GitHub Actions:
+
+- **CI Evals**: Included in the
+  [E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
+  workflow. These must pass 100% for every PR.
+- **Nightly Evals**: Run daily via the
+  [Evals: Nightly](https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml)
+  workflow. These track the long-term health and stability of model steering.
+
+### Nightly Report Format
+
+The nightly workflow executes the full evaluation suite multiple times
+(currently 3 attempts) to account for non-determinism. These results are
+aggregated into a **Nightly Summary** attached to the workflow run.
+
+#### How to interpret the report:
+
+- **Pass Rate (%)**: Each cell represents the percentage of successful runs for
+  a specific test in that workflow instance.
+- **History**: The table shows the pass rates for the last 10 nightly runs,
+  allowing you to identify if a model's behavior is trending towards
+  instability.
+- **Total Pass Rate**: An aggregate metric of all evaluations run in that batch.
+
+A significant drop in the pass rate for a `USUALLY_PASSES` test—even if it
+doesn't drop to 0%—often indicates that a recent change to a system prompt or
+tool definition has made the model's behavior less reliable.
+
+You may be able to investigate the regression using Gemini CLI by giving it the
+link to the runs before and after the change and the name of the test and asking
+it to investigate what changes may have impacted the test.

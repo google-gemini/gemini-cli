@@ -13,11 +13,16 @@ on:
 permissions:
   contents: 'read'
   checks: 'write'
+  actions: 'read'
 
 jobs:
   evals:
     name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    strategy:
+      fail-fast: false
+      matrix:
+        run_attempt: [1, 2, 3]
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -34,8 +39,38 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
+      - name: 'Create logs directory'
+        run: 'mkdir -p evals/logs'
+
       - name: 'Run Evals'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
         run: 'npm run test:all_evals'
+
+      - name: 'Upload Logs'
+        if: 'always()'
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'eval-logs-${{ matrix.run_attempt }}'
+          path: 'evals/logs'
+          retention-days: 7
+
+  aggregate-results:
+    name: 'Aggregate Results'
+    needs: ['evals']
+    if: 'always()'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Download Logs'
+        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
+        with:
+          path: 'artifacts'
+
+      - name: 'Generate Summary'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: 'node scripts/aggregate_evals.js artifacts >> "$GITHUB_STEP_SUMMARY"'
