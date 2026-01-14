@@ -8,7 +8,7 @@ import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
 import { theme } from '../../semantic-colors.js';
-import { toCodePoints } from '../../utils/textUtils.js';
+import { stripUnsafeCharacters, toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
@@ -23,6 +23,13 @@ export const MINIMUM_MAX_HEIGHT = 2;
 
 export function setMaxSizedBoxDebugging(value: boolean) {
   enableDebugLog = value;
+}
+
+function sanitizeTextForMeasurement(text: string): string {
+  // `string-width` can throw when it encounters certain Unicode Format-only
+  // grapheme clusters (e.g. interlinear annotation characters).
+  // Strip terminal-unsafe characters first, then remove Format characters.
+  return stripUnsafeCharacters(text).replace(/\p{Format}+/gu, '');
 }
 
 function debugReportError(message: string, element: React.ReactNode) {
@@ -315,7 +322,7 @@ function visitBoxRow(element: React.ReactNode): Row {
       return;
     }
     if (typeof element === 'string' || typeof element === 'number') {
-      const text = String(element);
+      const text = sanitizeTextForMeasurement(String(element));
       // Ignore empty strings as they don't need to be rendered.
       if (!text) {
         return;

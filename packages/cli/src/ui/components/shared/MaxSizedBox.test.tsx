@@ -443,4 +443,67 @@ Line 3 direct child`);
     expect(lastFrame()).equals(expected);
     unmount();
   });
+
+  it('handles Unicode Format characters that cause string-width errors', () => {
+    // These characters (U+FFF9, U+FFFA, U+FFFB, U+110BD, U+110CD) are Format-only
+    // grapheme clusters that can cause string-width to throw:
+    // "Expected a code point, got `undefined`"
+    const textWithFormatChars = `Hello${String.fromCodePoint(0xfff9)} World${String.fromCodePoint(0xfffa)} Test${String.fromCodePoint(0xfffb)}`;
+
+    const { lastFrame, unmount } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={80} maxHeight={10}>
+          <Box>
+            <Text>{textWithFormatChars}</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    // The component should sanitize the text and render without crashing
+    // Format characters should be removed
+    expect(lastFrame()).equals('Hello World Test');
+    unmount();
+  });
+
+  it('handles Format characters in wrapping text', () => {
+    const textWithFormatChars = `Prefix${String.fromCodePoint(0x110bd)} ${String.fromCodePoint(0x110cd)}Middle word`;
+
+    const { lastFrame, unmount } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={10} maxHeight={10}>
+          <Box>
+            <Text wrap="wrap">{textWithFormatChars}</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    // Format characters should be removed and text should wrap correctly
+    // After sanitization: "Prefix Middle word" (20 chars)
+    // With maxWidth=10: "Prefix " (7), "Middle " (7), "word" (4)
+    // Wrapping: "Prefix ", "Middle ", "word"
+    expect(lastFrame()).equals(`Prefix
+Middle
+word`);
+    unmount();
+  });
+
+  it('handles Format characters in non-wrapping text', () => {
+    const textWithFormatChars = `Label${String.fromCodePoint(0xfff9)}: value`;
+
+    const { lastFrame, unmount } = render(
+      <OverflowProvider>
+        <MaxSizedBox maxWidth={80} maxHeight={10}>
+          <Box>
+            <Text wrap="truncate">{textWithFormatChars}</Text>
+          </Box>
+        </MaxSizedBox>
+      </OverflowProvider>,
+    );
+
+    // Format characters should be removed from non-wrapping text
+    expect(lastFrame()).equals('Label: value');
+    unmount();
+  });
 });
