@@ -16,6 +16,9 @@ import {
   refreshServerHierarchicalMemory,
   SimpleExtensionLoader,
   type FileDiscoveryService,
+  showMemory,
+  addMemory,
+  listMemoryFiles,
 } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -44,6 +47,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         content: 'Memory refreshed successfully.',
       };
     }),
+    showMemory: vi.fn(),
+    addMemory: vi.fn(),
+    listMemoryFiles: vi.fn(),
     refreshServerHierarchicalMemory: vi.fn(),
   };
 });
@@ -77,6 +83,22 @@ describe('memoryCommand', () => {
 
       mockGetUserMemory = vi.fn();
       mockGetGeminiMdFileCount = vi.fn();
+
+      vi.mocked(showMemory).mockImplementation((config) => {
+        const memoryContent = config.getUserMemory() || '';
+        const fileCount = config.getGeminiMdFileCount() || 0;
+        let content;
+        if (memoryContent.length > 0) {
+          content = `Current memory content from ${fileCount} file(s):\n\n---\n${memoryContent}\n---`;
+        } else {
+          content = 'Memory is currently empty.';
+        }
+        return {
+          type: 'message',
+          messageType: 'info',
+          content,
+        };
+      });
 
       mockContext = createMockCommandContext({
         services: {
@@ -131,6 +153,20 @@ describe('memoryCommand', () => {
 
     beforeEach(() => {
       addCommand = getSubCommand('add');
+      vi.mocked(addMemory).mockImplementation((args) => {
+        if (!args || args.trim() === '') {
+          return {
+            type: 'message',
+            messageType: 'error',
+            content: 'Usage: /memory add <text to remember>',
+          };
+        }
+        return {
+          type: 'tool',
+          toolName: 'save_memory',
+          toolArgs: { fact: args.trim() },
+        };
+      });
       mockContext = createMockCommandContext();
     });
 
@@ -360,6 +396,21 @@ describe('memoryCommand', () => {
     beforeEach(() => {
       listCommand = getSubCommand('list');
       mockGetGeminiMdfilePaths = vi.fn();
+      vi.mocked(listMemoryFiles).mockImplementation((config) => {
+        const filePaths = config.getGeminiMdFilePaths() || [];
+        const fileCount = filePaths.length;
+        let content;
+        if (fileCount > 0) {
+          content = `There are ${fileCount} GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`;
+        } else {
+          content = 'No GEMINI.md files in use.';
+        }
+        return {
+          type: 'message',
+          messageType: 'info',
+          content,
+        };
+      });
       mockContext = createMockCommandContext({
         services: {
           config: {

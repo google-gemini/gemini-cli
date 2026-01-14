@@ -308,6 +308,7 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Skill "non-existent" not found.',
         }),
+        expect.any(Number),
       );
     });
 
