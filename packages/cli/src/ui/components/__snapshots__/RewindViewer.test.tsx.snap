@@ -22,9 +22,6 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 │ ● read @server3:mcp://demo-resource hello                                                                            │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Original Prompt                                                                                                    │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
 │                                                                                                                      │
 │ (Use Enter to select a message, Esc to close)                                                                        │
 │                                                                                                                      │
@@ -81,47 +78,7 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 2`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│   Q3                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│ ● Q2                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│   Q1                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│   Q3                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│   Q2                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│ ● Q1                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
@@ -162,26 +119,6 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 `;
 
 exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│   Q3                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│   Q2                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│ ● Q1                                                                                                                 │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
@@ -278,31 +215,6 @@ exports[`RewindViewer > updates content when conversation changes (background up
 `;
 
 exports[`RewindViewer > updates selection and expansion on navigation > after-down 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                                      │
-│ > Rewind                                                                                                             │
-│                                                                                                                      │
-│   Line 1                                                                                                             │
-│   Line 2                                                                                                             │
-│   ... last 5 lines hidden ...                                                                                        │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│ ● Line A                                                                                                             │
-│   Line B                                                                                                             │
-│   Line C                                                                                                             │
-│   Line D                                                                                                             │
-│   Line E                                                                                                             │
-│   Line F                                                                                                             │
-│   Line G                                                                                                             │
-│   No files have been changed                                                                                         │
-│                                                                                                                      │
-│                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`RewindViewer > updates selection and expansion on navigation > after-down 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
