@@ -15,7 +15,7 @@ export * from '@google/gemini-cli-test-utils';
 //   These tests are typically trivial and test basic functionality with unambiguous
 //   prompts. For example: "call save_memory to remember foo" should be fairly reliable.
 //   These are the first line of defense against regressions in key behaviors and run in
-//   every CI.
+//   every CI. You can run these locally with 'npm run test:always_passing_evals'.
 //
 // - USUALLY_PASSES - Means that the test is expected to pass most of the time but
 //   may have some flakiness as a result of relying on non-deterministic prompted
@@ -24,7 +24,8 @@ export * from '@google/gemini-cli-test-utils';
 //   the agent should add to memory without more explicit system prompt or user
 //   instructions. There are many more of these tests and they may pass less consistently.
 //   The pass/fail trendline of this set of tests can be used as a general measure
-//   of product quality.
+//   of product quality. You can run these locally with 'npm run test:all_evals'.
+//   This may take a really long time and is not recommended.
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
