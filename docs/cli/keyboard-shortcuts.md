@@ -64,7 +64,6 @@ available combinations.
 | Start reverse search through history.        | `Ctrl + R`            |
 | Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
 | Accept a suggestion while reverse searching. | `Tab`                 |
-| Browse and rewind previous interactions.     | `Esc (×2)`            |
 
 #### Navigation
 
