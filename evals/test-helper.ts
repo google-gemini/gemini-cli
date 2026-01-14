@@ -33,7 +33,14 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     const rig = new TestRig();
     try {
       await rig.setup(evalCase.name, evalCase.params);
-      const result = await rig.run({ args: evalCase.prompt });
+      if (evalCase.beforeRun) {
+        await evalCase.beforeRun(rig);
+      }
+      const result = await rig.run({
+        args: evalCase.args,
+        stdin: evalCase.stdin ?? evalCase.prompt,
+        yolo: evalCase.yolo ?? true,
+      });
       await evalCase.assert(rig, result);
     } finally {
       if (evalCase.log) {
@@ -56,7 +63,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 export interface EvalCase {
   name: string;
   params?: Record<string, any>;
+  args?: string | string[];
   prompt: string;
+  stdin?: string;
+  yolo?: boolean;
+  beforeRun?: (rig: TestRig) => Promise<void>;
   assert: (rig: TestRig, result: string) => Promise<void>;
   log?: boolean;
 }
