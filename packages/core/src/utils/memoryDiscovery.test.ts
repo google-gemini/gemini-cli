@@ -165,6 +165,29 @@ describe('memoryDiscovery', () => {
     });
   });
 
+  it('should skip GEMINI.md directories without warnings', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+    await createEmptyDir(path.join(projectRoot, DEFAULT_CONTEXT_FILENAME));
+
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      [],
+      false,
+      new FileDiscoveryService(projectRoot),
+      new SimpleExtensionLoader([]),
+      DEFAULT_FOLDER_TRUST,
+    );
+
+    expect(result.memoryContent).toBe('');
+    expect(result.filePaths).toContain(
+      path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('should load only the global context file if present and others are not (default filename)', async () => {
     const defaultContextFile = await createTestFile(
       path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
