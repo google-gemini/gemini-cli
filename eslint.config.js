@@ -35,6 +35,9 @@ export default tseslint.config(
       'package/bundle/**',
       '.integration-tests/**',
       'dist/**',
+      'evals/**',
+      'packages/test-utils/**',
+      'packages/core/src/skills/builtin/skill-creator/scripts/*.cjs',
     ],
   },
   eslint.configs.recommended,
@@ -169,6 +172,38 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
       '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'node:os',
+              importNames: ['homedir', 'tmpdir'],
+              message:
+                'Please use the helpers from @google/gemini-cli-core instead of node:os homedir()/tmpdir() to ensure strict environment isolation.',
+            },
+            {
+              name: 'os',
+              importNames: ['homedir', 'tmpdir'],
+              message:
+                'Please use the helpers from @google/gemini-cli-core instead of os homedir()/tmpdir() to ensure strict environment isolation.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Allow os.homedir() in tests and paths.ts where it is used to implement the helper
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'packages/core/src/utils/paths.ts',
+      'packages/test-utils/src/**/*.ts',
+      'scripts/**/*.js',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
   {

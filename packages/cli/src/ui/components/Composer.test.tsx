@@ -36,6 +36,10 @@ vi.mock('./ContextSummaryDisplay.js', () => ({
   ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
 }));
 
+vi.mock('./HookStatusDisplay.js', () => ({
+  HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
+}));
+
 vi.mock('./AutoAcceptIndicator.js', () => ({
   AutoAcceptIndicator: () => <Text>AutoAcceptIndicator</Text>,
 }));
@@ -125,6 +129,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     errorCount: 0,
     nightly: false,
     isTrustedFolder: true,
+    activeHooks: [],
     ...overrides,
   }) as UIState;
 
@@ -149,6 +154,7 @@ const createMockConfig = (overrides = {}) => ({
   }),
   getSkillManager: () => ({
     getSkills: () => [],
+    getDisplayableSkills: () => [],
   }),
   getMcpClientManager: () => ({
     getMcpServers: () => ({}),
@@ -341,6 +347,17 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ContextSummaryDisplay');
     });
 
+    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
+      const uiState = createMockUIState({
+        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('HookStatusDisplay');
+      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
+    });
+
     it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
@@ -368,7 +385,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Esc again to clear');
+      expect(lastFrame()).toContain('Press Esc again to rewind');
     });
   });
 

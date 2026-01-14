@@ -12,7 +12,7 @@ import type {
 } from '../index.js';
 import {
   AuthType,
-  SmartEditTool,
+  EditTool,
   GeminiClient,
   ToolConfirmationOutcome,
   ToolErrorType,
@@ -110,6 +110,14 @@ import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { AgentTerminateMode } from '../agents/types.js';
+
+vi.mock('systeminformation', () => ({
+  default: {
+    graphics: vi.fn().mockResolvedValue({
+      controllers: [{ model: 'Mock GPU' }],
+    }),
+  },
+}));
 
 describe('loggers', () => {
   const mockLogger = {
@@ -1034,7 +1042,7 @@ describe('loggers', () => {
     });
 
     it('should log a tool call with all fields', () => {
-      const tool = new SmartEditTool(mockConfig, createMockMessageBus());
+      const tool = new EditTool(mockConfig, createMockMessageBus());
       const call: CompletedToolCall = {
         status: 'success',
         request: {
@@ -1053,6 +1061,7 @@ describe('loggers', () => {
           resultDisplay: {
             fileDiff: 'diff',
             fileName: 'file.txt',
+            filePath: 'file.txt',
             originalContent: 'old content',
             newContent: 'new content',
             diffStat: {
@@ -1250,7 +1259,7 @@ describe('loggers', () => {
           contentLength: 13,
         },
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
-        tool: new SmartEditTool(mockConfig, createMockMessageBus()),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1329,7 +1338,7 @@ describe('loggers', () => {
           errorType: undefined,
           contentLength: 13,
         },
-        tool: new SmartEditTool(mockConfig, createMockMessageBus()),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };

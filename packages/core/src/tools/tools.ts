@@ -647,9 +647,11 @@ export interface Todo {
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  filePath: string;
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  isNewFile?: boolean;
 }
 
 export interface DiffStat {
@@ -691,6 +693,7 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  rootCommands: string[];
 }
 
 export interface ToolMcpConfirmationDetails {

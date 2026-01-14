@@ -1,25 +1,10 @@
 # Gemini 3 Pro and Gemini 3 Flash on Gemini CLI
 
-Gemini 3 Pro and Gemini 3 Flash are now available on Gemini CLI! Currently, most
-paid customers of Gemini CLI will have access to both Gemini 3 Pro and Gemini 3
-Flash, including the following subscribers:
-
-- Google AI Pro and Google AI Ultra (excluding business customers).
-- Gemini Code Assist Standard and Enterprise (requires
-  [administrative enablement](#administrator-instructions)).
-- Paid Gemini API and Vertex API key holders.
-
-For free tier users:
-
-- If you signed up for the waitlist, please check your email for details. We’ve
-  onboarded everyone who signed up to the previously available waitlist.
-- If you were not on our waitlist, we’re rolling out additional access gradually
-  to ensure the experience remains fast and reliable. Stay tuned for more
-  details.
+Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 
 ## How to get started with Gemini 3 on Gemini CLI
 
-Get started by upgrading Gemini CLI to the latest version (0.21.1):
+Get started by upgrading Gemini CLI to the latest version:
 
 ```bash
 npm install -g @google/gemini-cli@latest

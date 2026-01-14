@@ -12,7 +12,6 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import { createUserContent } from '@google/genai';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
@@ -40,10 +39,6 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
-import {
-  fireBeforeAgentHook,
-  fireAfterAgentHook,
-} from './clientHookTriggers.js';
 import type { DefaultHookOutput } from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
@@ -60,18 +55,20 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { partToString } from '../utils/partUtils.js';
 
 const MAX_TURNS = 100;
 
 type BeforeAgentHookReturn =
   | {
       type: GeminiEventType.AgentExecutionStopped;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | {
       type: GeminiEventType.AgentExecutionBlocked;
-      value: { reason: string };
+      value: { reason: string; systemMessage?: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -112,7 +109,6 @@ export class GeminiClient {
   >();
 
   private async fireBeforeAgentHookSafe(
-    messageBus: MessageBus,
     request: PartListUnion,
     prompt_id: string,
   ): Promise<BeforeAgentHookReturn> {
@@ -137,7 +133,9 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookOutput = await fireBeforeAgentHook(messageBus, request);
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireBeforeAgentEvent(partToString(request));
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -145,6 +143,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionStopped,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -154,6 +153,7 @@ export class GeminiClient {
         type: GeminiEventType.AgentExecutionBlocked,
         value: {
           reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -166,7 +166,6 @@ export class GeminiClient {
   }
 
   private async fireAfterAgentHookSafe(
-    messageBus: MessageBus,
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
@@ -187,11 +186,10 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookOutput = await fireAfterAgentHook(
-      messageBus,
-      finalRequest,
-      finalResponseText,
-    );
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+
     return hookOutput;
   }
 
@@ -508,7 +506,7 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
+    return resolveModel(this.config.getActiveModel());
   }
 
   private async *processTurn(
@@ -605,6 +603,7 @@ export class GeminiClient {
       history: this.getChat().getHistory(/*curated=*/ true),
       request,
       signal,
+      requestedModel: this.config.getModel(),
     };
 
     let modelToUse: string;
@@ -753,11 +752,7 @@ export class GeminiClient {
     }
 
     if (hooksEnabled && messageBus) {
-      const hookResult = await this.fireBeforeAgentHookSafe(
-        messageBus,
-        request,
-        prompt_id,
-      );
+      const hookResult = await this.fireBeforeAgentHookSafe(request, prompt_id);
       if (hookResult) {
         if (
           'type' in hookResult &&
@@ -798,7 +793,6 @@ export class GeminiClient {
       // Fire AfterAgent hook if we have a turn and no pending tools
       if (hooksEnabled && messageBus) {
         const hookOutput = await this.fireAfterAgentHookSafe(
-          messageBus,
           request,
           prompt_id,
           turn,
@@ -809,6 +803,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
               reason: hookOutput.getEffectiveReason(),
+              systemMessage: hookOutput.systemMessage,
             },
           };
           return turn;
@@ -820,6 +815,7 @@ export class GeminiClient {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
+              systemMessage: hookOutput.systemMessage,
             },
           };
           const continueRequest = [{ text: continueReason }];
@@ -971,7 +967,19 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        this.chat = await this.startChat(newHistory);
+        // capture current session data before resetting
+        const currentRecordingService =
+          this.getChat().getChatRecordingService();
+        const conversation = currentRecordingService.getConversation();
+        const filePath = currentRecordingService.getConversationFilePath();
+
+        let resumedData: ResumedSessionData | undefined;
+
+        if (conversation && filePath) {
+          resumedData = { conversation, filePath };
+        }
+
+        this.chat = await this.startChat(newHistory, resumedData);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

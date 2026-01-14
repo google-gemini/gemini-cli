@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MainContent > does not constrain height in alternate buffer mode 1`] = `
+"ScrollableList
+AppHeader
+HistoryItem: Hello (height: undefined)
+HistoryItem: Hi there (height: undefined)
+ShowMoreLines"
+`;
