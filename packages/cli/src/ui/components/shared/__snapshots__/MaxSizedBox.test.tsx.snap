@@ -1,0 +1,71 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<MaxSizedBox /> > accounts for additionalHiddenLinesCount 1`] = `
+"... first 7 lines hidden ...
+Line 3"
+`;
+
+exports[`<MaxSizedBox /> > clips a long single text child from the bottom 1`] = `
+"Line 1
+Line 2
+Line 3
+Line 4
+Line 5
+Line 6
+Line 7
+Line 8
+Line 9
+... last 21 lines hidden ..."
+`;
+
+exports[`<MaxSizedBox /> > clips a long single text child from the top 1`] = `
+"... first 21 lines hidden ...
+Line 22
+Line 23
+Line 24
+Line 25
+Line 26
+Line 27
+Line 28
+Line 29
+Line 30"
+`;
+
+exports[`<MaxSizedBox /> > does not truncate when maxHeight is undefined 1`] = `
+"Line 1
+Line 2"
+`;
+
+exports[`<MaxSizedBox /> > handles React.Fragment as a child 1`] = `
+"Line 1 from Fragment
+Line 2 from Fragment
+Line 3 direct child"
+`;
+
+exports[`<MaxSizedBox /> > hides lines at the end when content exceeds maxHeight and overflowDirection is bottom 1`] = `
+"Line 1
+... last 2 lines hidden ..."
+`;
+
+exports[`<MaxSizedBox /> > hides lines when content exceeds maxHeight 1`] = `
+"... first 2 lines hidden ...
+Line 3"
+`;
+
+exports[`<MaxSizedBox /> > renders children without truncation when they fit 1`] = `"Hello, World!"`;
+
+exports[`<MaxSizedBox /> > shows plural "lines" when more than one line is hidden 1`] = `
+"... first 2 lines hidden ...
+Line 3"
+`;
+
+exports[`<MaxSizedBox /> > shows singular "line" when exactly one line is hidden 1`] = `
+"... first 1 line hidden ...
+Line 1"
+`;
+
+exports[`<MaxSizedBox /> > wraps text that exceeds maxWidth 1`] = `
+"This is a
+long line
+of text"
+`;
