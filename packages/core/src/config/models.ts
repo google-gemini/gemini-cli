@@ -45,6 +45,11 @@ export function resolveModel(
   previewFeaturesEnabled: boolean = false,
 ): string {
   switch (requestedModel) {
+    case GEMINI_MODEL_ALIAS_AUTO: {
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_MODEL
+        : DEFAULT_GEMINI_MODEL;
+    }
     case PREVIEW_GEMINI_MODEL_AUTO: {
       return PREVIEW_GEMINI_MODEL;
     }
