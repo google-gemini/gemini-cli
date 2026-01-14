@@ -16,44 +16,47 @@ import type { AgentOverride } from '@google/gemini-cli-core';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';
 import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
 
-async function listAction(
-  context: CommandContext,
-  _args: string,
-): Promise<SlashCommandActionReturn | void> {
-  const { config } = context.services;
-  if (!config) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Config not loaded.',
+const agentsListCommand: SlashCommand = {
+  name: 'list',
+  description: 'List available local and remote agents',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext) => {
+    const { config } = context.services;
+    if (!config) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      };
+    }
+
+    const agentRegistry = config.getAgentRegistry();
+    if (!agentRegistry) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Agent registry not found.',
+      };
+    }
+
+    const agents = agentRegistry.getAllDefinitions().map((def) => ({
+      name: def.name,
+      displayName: def.displayName,
+      description: def.description,
+      kind: def.kind,
+    }));
+
+    const agentsListItem: HistoryItemAgentsList = {
+      type: MessageType.AGENTS_LIST,
+      agents,
     };
-  }
 
-  const agentRegistry = config.getAgentRegistry();
-  if (!agentRegistry) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Agent registry not found.',
-    };
-  }
+    context.ui.addItem(agentsListItem);
 
-  const agents = agentRegistry.getAllDefinitions().map((def) => ({
-    name: def.name,
-    displayName: def.displayName,
-    description: def.description,
-    kind: def.kind,
-  }));
-
-  const agentsListItem: HistoryItemAgentsList = {
-    type: MessageType.AGENTS_LIST,
-    agents,
-  };
-
-  context.ui.addItem(agentsListItem, Date.now());
-
-  return;
-}
+    return;
+  },
+};
 
 async function enableAction(
   context: CommandContext,
@@ -71,6 +74,40 @@ async function enableAction(
     };
   }
 
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    };
+  }
+
+  const allAgents = agentRegistry.getAllAgentNames();
+  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
+    string,
+    AgentOverride
+  >;
+  const disabledAgents = Object.keys(overrides).filter(
+    (name) => overrides[name]?.disabled === true,
+  );
+
+  if (allAgents.includes(agentName)) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Agent '${agentName}' is already enabled.`,
+    };
+  }
+
+  if (!disabledAgents.includes(agentName)) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Agent '${agentName}' not found.`,
+    };
+  }
+
   const result = enableAgent(settings, agentName);
 
   if (result.status === 'no-op') {
@@ -81,14 +118,6 @@ async function enableAction(
     };
   }
 
-  const agentRegistry = config?.getAgentRegistry();
-  if (!agentRegistry) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Agent registry not found.',
-    };
-  }
   context.ui.addItem({
     type: MessageType.INFO,
     text: `Enabling ${agentName}...`,
@@ -117,6 +146,41 @@ async function disableAction(
       content: 'Usage: /agents disable <agent-name>',
     };
   }
+
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    };
+  }
+
+  const allAgents = agentRegistry.getAllAgentNames();
+  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
+    string,
+    AgentOverride
+  >;
+  const disabledAgents = Object.keys(overrides).filter(
+    (name) => overrides[name]?.disabled === true,
+  );
+
+  if (disabledAgents.includes(agentName)) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `Agent '${agentName}' is already disabled.`,
+    };
+  }
+
+  if (!allAgents.includes(agentName)) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Agent '${agentName}' not found.`,
+    };
+  }
+
   const scope = context.services.settings.workspace.path
     ? SettingScope.Workspace
     : SettingScope.User;
@@ -130,14 +194,6 @@ async function disableAction(
     };
   }
 
-  const agentRegistry = config?.getAgentRegistry();
-  if (!agentRegistry) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: 'Agent registry not found.',
-    };
-  }
   context.ui.addItem({
     type: MessageType.INFO,
     text: `Disabling ${agentName}...`,
@@ -191,14 +247,6 @@ const disableCommand: SlashCommand = {
   autoExecute: false,
   action: disableAction,
   completion: completeAgentsToDisable,
-};
-
-const agentsListCommand: SlashCommand = {
-  name: 'list',
-  description: 'List available local and remote agents',
-  kind: CommandKind.BUILT_IN,
-  autoExecute: true,
-  action: listAction,
 };
 
 const agentsRefreshCommand: SlashCommand = {
