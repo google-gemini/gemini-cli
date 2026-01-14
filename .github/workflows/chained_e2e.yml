@@ -278,7 +278,7 @@ jobs:
         run: 'npm run test:integration:sandbox:none'
 
   evals:
-    name: 'Evals (Always Pass)'
+    name: 'Evals (ALWAYS_PASSING)'
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
@@ -303,7 +303,7 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Run Evals (Always Pass)'
+      - name: 'Run Evals (Required to pass)'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'

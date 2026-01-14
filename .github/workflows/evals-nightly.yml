@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   evals:
-    name: 'Nightly Evaluations'
+    name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
