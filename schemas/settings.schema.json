@@ -1543,26 +1543,6 @@
       },
       "additionalProperties": false
     },
-    "agents": {
-      "title": "Agents",
-      "description": "Settings for agents.",
-      "markdownDescription": "Settings for agents.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
-      "default": {},
-      "type": "object",
-      "properties": {
-        "disabled": {
-          "title": "Disabled Agents",
-          "description": "List of disabled agents.",
-          "markdownDescription": "List of disabled agents.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
-          "default": [],
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
     "hooks": {
       "title": "Hooks",
       "description": "Hook configurations for intercepting and customizing agent behavior.",
