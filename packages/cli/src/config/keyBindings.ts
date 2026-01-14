@@ -94,17 +94,13 @@ export enum Command {
  */
 export interface KeyBinding {
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
-  key?: string;
-  /** The key sequence (e.g., '\x18' for Ctrl+X) - alternative to key name */
-  sequence?: string;
+  key: string;
   /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   ctrl?: boolean;
   /** Shift key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   shift?: boolean;
   /** Command/meta key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   command?: boolean;
-  /** Paste operation requirement: true=must be paste, false=must not be paste, undefined=ignore */
-  paste?: boolean;
 }
 
 /**
@@ -135,8 +131,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
     { key: 'backspace', command: true },
-    { sequence: '\x7f', ctrl: true },
-    { sequence: '\x7f', command: true },
     { key: 'w', ctrl: true },
   ],
   [Command.MOVE_LEFT]: [
@@ -157,11 +151,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', command: true },
     { key: 'f', command: true },
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    { key: 'backspace' },
-    { sequence: '\x7f' },
-    { key: 'h', ctrl: true },
-  ],
+  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
@@ -216,7 +206,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
       key: 'return',
       ctrl: false,
       command: false,
-      paste: false,
       shift: false,
     },
   ],
@@ -225,16 +214,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', command: true },
-    { key: 'return', paste: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
   ],
 
   // External tools
-  [Command.OPEN_EXTERNAL_EDITOR]: [
-    { key: 'x', ctrl: true },
-    { sequence: '\x18', ctrl: true },
-  ],
+  [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
     { key: 'v', command: true },

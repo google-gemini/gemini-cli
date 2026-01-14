@@ -93,7 +93,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .option('debug', {
       alias: 'd',
       type: 'boolean',
-      description: 'Run in debug mode?',
+      description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -242,11 +242,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
-        })
-        .deprecateOption(
-          'prompt',
-          'Use the positional prompt instead. This flag will be removed in a future version.',
-        ),
+        }),
     )
     // Register MCP subcommands
     .command(mcpCommand)
@@ -637,6 +633,7 @@ export async function loadCliConfig(
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
+  const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -661,6 +658,7 @@ export async function loadCliConfig(
     mcpEnabled,
     extensionsEnabled,
     agents: settings.agents,
+    adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -708,6 +706,7 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,
+
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -750,6 +749,8 @@ export async function loadCliConfig(
       const refreshedSettings = loadSettings(cwd);
       return {
         disabledSkills: refreshedSettings.merged.skills?.disabled,
+        adminSkillsEnabled:
+          refreshedSettings.merged.admin?.skills?.enabled ?? adminSkillsEnabled,
       };
     },
   });

@@ -94,7 +94,6 @@ describe('MultiFolderTrustDialog', () => {
         ctrl: false,
         meta: false,
         shift: false,
-        paste: false,
         sequence: '',
         insertable: false,
       });

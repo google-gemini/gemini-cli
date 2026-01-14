@@ -55,7 +55,7 @@ process_pr_optimized() {
     if [[ -z "${ISSUE_NUMBER}" || "${ISSUE_NUMBER}" == "null" || "${ISSUE_NUMBER}" == "" ]]; then
         if [[ "${IS_DRAFT}" == "true" ]]; then
             echo "   📝 PR #${PR_NUMBER} is a draft and has no linked issue"
-            if [[ ",${CURRENT_LABELS}," == ",status/need-issue,"* ]]; then
+            if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
                 echo "      ➖ Removing status/need-issue label"
                 LABELS_TO_REMOVE="status/need-issue"
             fi
