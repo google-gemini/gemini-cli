@@ -218,6 +218,36 @@ export async function fireOperationCompleteHook(
 }
 
 /**
+ * Fires an OperationCancelled notification hook.
+ *
+ * @param messageBus The message bus to use for hook communication
+ * @param message Description of the cancellation
+ * @param details Optional details about the cancellation
+ */
+export async function fireOperationCancelledHook(
+  messageBus: MessageBus,
+  message: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await messageBus.request<HookExecutionRequest, HookExecutionResponse>(
+      {
+        type: MessageBusType.HOOK_EXECUTION_REQUEST,
+        eventName: 'Notification',
+        input: {
+          notification_type: NotificationType.OperationCancelled,
+          message,
+          details,
+        },
+      },
+      MessageBusType.HOOK_EXECUTION_RESPONSE,
+    );
+  } catch (error) {
+    debugLogger.debug(`OperationCancelled notification hook failed:`, error);
+  }
+}
+
+/**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
  *
  * @param invocation The tool invocation

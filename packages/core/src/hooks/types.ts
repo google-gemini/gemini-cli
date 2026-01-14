@@ -444,6 +444,7 @@ export enum NotificationType {
   ToolPermission = 'ToolPermission',
   OperationComplete = 'OperationComplete',
   ActionRequired = 'ActionRequired',
+  OperationCancelled = 'OperationCancelled',
 }
 
 /**

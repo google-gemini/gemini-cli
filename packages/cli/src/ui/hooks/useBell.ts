@@ -65,11 +65,14 @@ export const useBell = () => {
               debugLogger.error('Failed to write bell character', e);
             }
           }
+        }
 
-          // Reset timer after operation complete
-          if (notificationType === NotificationType.OperationComplete) {
-            startTime.current = null;
-          }
+        // Reset timer after operation complete or cancelled
+        if (
+          notificationType === NotificationType.OperationComplete ||
+          notificationType === NotificationType.OperationCancelled
+        ) {
+          startTime.current = null;
         }
       }
     };

@@ -175,6 +175,45 @@ describe('useBell', () => {
     expect(mockWrite).toHaveBeenCalledTimes(2);
   });
 
+  it('should reset startTime after OperationCancelled without ringing bell', () => {
+    const settings = createSettings(true, 5);
+
+    renderHookWithProviders(() => useBell(), {
+      settings,
+      config: mockConfig,
+    });
+    const handler = mockSubscribe.mock.calls[0][1];
+
+    // Start 1st operation (cancelled long running)
+    handler({ eventName: 'BeforeAgent', input: {} });
+
+    // Advance time by 6s (longer than threshold)
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(6000);
+
+    handler({
+      eventName: 'Notification',
+      input: { notification_type: NotificationType.OperationCancelled },
+    });
+    // Should NOT ring bell for cancellation
+    expect(mockWrite).not.toHaveBeenCalled();
+
+    // Start 2nd operation (short)
+    handler({ eventName: 'BeforeAgent', input: {} });
+
+    // Advance time by 1s
+    vi.advanceTimersByTime(1000);
+
+    handler({
+      eventName: 'Notification',
+      input: { notification_type: NotificationType.OperationComplete },
+    });
+    // Should NOT ring bell because timer was reset, so duration is 1s < 5s
+    expect(mockWrite).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   it('should not ring bell if disabled', () => {
     const settings = createSettings(false, 0);
 
