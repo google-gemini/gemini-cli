@@ -509,7 +509,7 @@ export class Config {
     | undefined;
   private readonly disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<void> | undefined;
+  private experimentsPromise: Promise<Experiments | void> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -864,6 +864,8 @@ export class Config {
             this.setPreviewFeatures(remotePreviewFeatures);
           }
         }
+
+        return experiments;
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
@@ -885,12 +887,21 @@ export class Config {
     // Fetch admin controls
     if (codeAssistServer) {
       try {
-        const metadata = await getClientMetadata();
-        const adminControls = await codeAssistServer.fetchAdminControls({
-          metadata,
-        });
-        this.setRemoteAdminSettings(adminControls);
-        this.startAdminControlsPolling();
+        const experiments = await this.experimentsPromise;
+        const pollingEnabled = experiments?.experimentIds.includes(
+          ExperimentFlags.ENABLE_ADMIN_CONTROLS,
+        );
+
+        if (pollingEnabled) {
+          const metadata = await getClientMetadata();
+          const adminControls = await codeAssistServer.fetchAdminControls({
+            metadata,
+          });
+          this.setRemoteAdminSettings(adminControls);
+          this.startAdminControlsPolling();
+        } else {
+          this.stopAdminControlsPolling();
+        }
       } catch (e) {
         debugLogger.error('Failed to fetch admin controls', e);
       }

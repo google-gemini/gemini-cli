@@ -16,6 +16,7 @@ import {
   type ContentGenerator,
   type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 
 // Mock dependencies
 vi.mock('../code_assist/codeAssist.js', () => ({
@@ -24,6 +25,10 @@ vi.mock('../code_assist/codeAssist.js', () => ({
 
 vi.mock('../code_assist/experiments/client_metadata.js', () => ({
   getClientMetadata: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('../code_assist/experiments/experiments.js', () => ({
+  getExperiments: vi.fn(),
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -51,7 +56,7 @@ describe('Config Admin Controls Polling', () => {
     fetchAdminControls: ReturnType<typeof vi.fn>;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
 
     // Setup mock server as a partial to match strict requirements safely
@@ -78,6 +83,16 @@ describe('Config Admin Controls Polling', () => {
       sessionId: 'test-session',
       targetDir: '/tmp',
     } as unknown as ConstructorParameters<typeof Config>[0]);
+
+    // Mock experiments to enable polling
+    // Mocking the module directly since refreshAuth calls it
+    const { getExperiments } = await import(
+      '../code_assist/experiments/experiments.js'
+    );
+    vi.mocked(getExperiments).mockResolvedValue({
+      flags: {},
+      experimentIds: [ExperimentFlags.ENABLE_ADMIN_CONTROLS],
+    });
   });
 
   afterEach(() => {
@@ -97,6 +112,9 @@ describe('Config Admin Controls Polling', () => {
     config.setRemoteAdminSettings(initialSettings);
 
     // Mock server response for polling
+    // First call (refreshAuth) returns initial settings
+    mockServer.fetchAdminControls.mockResolvedValueOnce(initialSettings);
+    // Second call (polling) returns new settings
     mockServer.fetchAdminControls.mockResolvedValue(newSettings);
 
     // Spy on event emission
@@ -154,7 +172,8 @@ describe('Config Admin Controls Polling', () => {
     // We can't verify private interval, but we can verify behavior
     // If it's running, it should call fetch
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-    expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    // 1 call from refreshAuth, 1 call from polling
+    expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
 
     // Mock getCodeAssistServer to return undefined (simulating auth switch)
     vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
@@ -162,8 +181,29 @@ describe('Config Admin Controls Polling', () => {
     // Call refreshAuth
     await config.refreshAuth(AuthType.USE_GEMINI);
 
-    // Should not call fetch again
+    // Should not call fetch again (calls remain 2)
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-    expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+  });
+
+  it('should not start polling if experiment flag is disabled', async () => {
+    // Override mock to disable experiment
+    const { getExperiments } = await import(
+      '../code_assist/experiments/experiments.js'
+    );
+    vi.mocked(getExperiments).mockResolvedValue({
+      flags: {},
+      experimentIds: [], // No flags
+    });
+
+    const emitSpy = vi.spyOn(coreEvents, 'emitAdminSettingsChanged');
+
+    // Trigger polling via public API
+    await config.refreshAuth(AuthType.USE_GEMINI);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+    // Should NOT have fetched
+    expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 });
