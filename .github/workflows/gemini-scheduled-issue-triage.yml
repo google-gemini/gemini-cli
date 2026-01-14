@@ -158,7 +158,8 @@ jobs:
               - Anything more than 6 versions older than the most recent should add the status/need-retesting label
             10. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
               - After identifying appropriate labels to an issue, add "status/need-triage" label to labels_to_remove in the output.
-            11. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate.
+            11. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
+            12. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
 
             ## Guidelines
 
@@ -175,16 +176,25 @@ jobs:
 
             Categorization Guidelines (Priority):
             P0 - Urgent Blocking Issues:
-              - Urgent, block a significant percentage of the user base, and prevent frequent use of the Gemini CLI.
+              - DO NOT APPLY THIS LABEL AUTOMATICALLY. Use status/manual-triage instead.
+              - Definition: Urgent, block a significant percentage of the user base, and prevent frequent use of the Gemini CLI.
               - This includes core stability blockers (e.g., authentication failures, broken upgrades), critical crashes, and P0 security vulnerabilities.
+              - Impact: Blocks development or testing for the entire team; Major security vulnerability; Causes data loss or corruption with no workaround; Crashes the application or makes a core feature completely unusable for all or most users.
+              - Qualifier: Is the main function of the software broken?
             P1 - High-Impact Issues:
-              - Affect a large number of users, blocking them from using parts of the Gemini CLI, or make the CLI frequently unusable even with workarounds available.
+              - Definition: Affect a large number of users, blocking them from using parts of the Gemini CLI, or make the CLI frequently unusable even with workarounds available.
+              - Impact: A core feature is broken or behaving incorrectly for a large number of users or use cases; Severe performance degradation; No straightforward workaround exists.
+              - Qualifier: Is a key feature unusable or giving very wrong results?
             P2 - Significant Issues:
-              - Affect some users significantly, such as preventing the use of certain features or authentication types.
+              - Definition: Affect some users significantly, such as preventing the use of certain features or authentication types.
               - Can also be issues that many users complain about, causing annoyance or hindering daily use.
+              - Impact: Affects a non-critical feature or a smaller, specific subset of users; An inconvenient but functional workaround is available; Noticeable UI/UX problems that look unprofessional.
+              - Qualifier: Is it an annoying but non-blocking problem?
             P3 - Low-Impact Issues:
-              - Typically usability issues that cause annoyance to a limited user base.
+              - Definition: Typically usability issues that cause annoyance to a limited user base.
               - Includes feature requests that could be addressed in the near future and may be suitable for community contributions.
+              - Impact: Minor cosmetic issues; An edge-case bug that is very difficult to reproduce and affects a tiny fraction of users.
+              - Qualifier: Is it a "nice-to-fix" issue?
 
             Categorization Guidelines (Area):
             area/agent: Core Agent, Tools, Memory, Sub-Agents, Hooks, Agent Quality
