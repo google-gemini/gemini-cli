@@ -198,7 +198,8 @@ export class HookSystem {
       }
 
       return { blocked: false };
-    } catch {
+    } catch (error) {
+      debugLogger.debug(`BeforeModelHookEvent failed:`, error);
       return { blocked: false };
     }
   }
@@ -243,7 +244,8 @@ export class HookSystem {
       }
 
       return { response: chunk };
-    } catch {
+    } catch (error) {
+      debugLogger.debug(`AfterModelHookEvent failed:`, error);
       return { response: chunk };
     }
   }
