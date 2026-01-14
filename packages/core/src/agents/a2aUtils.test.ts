@@ -124,7 +124,7 @@ describe('a2aUtils', () => {
   });
 
   describe('extractTaskText', () => {
-    it('should extract basic task info', () => {
+    it('should extract basic task info (clean)', () => {
       const task: Task = {
         id: 'task-1',
         contextId: 'ctx-1',
@@ -141,12 +141,12 @@ describe('a2aUtils', () => {
       };
 
       const result = extractTaskText(task);
-      expect(result).toContain('ID: task-1');
-      expect(result).toContain('State: working');
-      expect(result).toContain('Status Message: Processing...');
+      expect(result).not.toContain('ID: task-1');
+      expect(result).not.toContain('State: working');
+      expect(result).toBe('Processing...');
     });
 
-    it('should extract artifacts', () => {
+    it('should extract artifacts with headers', () => {
       const task: Task = {
         id: 'task-1',
         contextId: 'ctx-1',
@@ -162,10 +162,10 @@ describe('a2aUtils', () => {
       };
 
       const result = extractTaskText(task);
-      expect(result).toContain('Artifacts:');
-      expect(result).toContain('  - Name: Report');
-      expect(result).toContain('    Content:');
-      expect(result).toContain('    This is the report.');
+      expect(result).toContain('Artifact (Report):');
+      expect(result).toContain('This is the report.');
+      expect(result).not.toContain('Artifacts:');
+      expect(result).not.toContain('  - Name: Report');
     });
   });
 });

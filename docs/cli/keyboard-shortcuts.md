@@ -26,17 +26,17 @@ available combinations.
 
 #### Editing
 
-| Action                                           | Keys                                                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                                                   |
-| Delete from the cursor to the start of the line. | `Ctrl + U`                                                                                   |
-| Clear all text in the input field.               | `Ctrl + C`                                                                                   |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + ""`<br />`Cmd + ""`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                                                          |
-| Delete the character to the left.                | `Backspace`<br />`""`<br />`Ctrl + H`                                                       |
-| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                                                     |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                                                        |
-| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                                                           |
+| Action                                           | Keys                                                      |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
+| Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
+| Clear all text in the input field.               | `Ctrl + C`                                                |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
+| Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
+| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
+| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
+| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
 
 #### Screen Control
 
@@ -62,8 +62,9 @@ available combinations.
 | Show the previous entry in history.          | `Ctrl + P (no Shift)` |
 | Show the next entry in history.              | `Ctrl + N (no Shift)` |
 | Start reverse search through history.        | `Ctrl + R`            |
-| Insert the selected reverse-search match.    | `Enter (no Ctrl)`     |
+| Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
 | Accept a suggestion while reverse searching. | `Tab`                 |
+| Browse and rewind previous interactions.     | `Esc (×2)`            |
 
 #### Navigation
 
@@ -86,10 +87,10 @@ available combinations.
 
 #### Text Input
 
-| Action                               | Keys                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd, not Paste)`                                              |
-| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Paste + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Action                               | Keys                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
+| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 
 #### External Tools
 
@@ -100,18 +101,18 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys                                |
-| ----------------------------------------------------------------- | ----------------------------------- |
-| Toggle detailed error information.                                | `F12`                               |
-| Toggle the full TODO list.                                        | `Ctrl + T`                          |
-| Toggle IDE context details.                                       | `Ctrl + G`                          |
-| Toggle Markdown rendering.                                        | `Cmd + M`                           |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`                          |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`                          |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`                       |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`                          |
-| Toggle focus between the shell and Gemini input.                  | `Tab (no Shift)`                    |
-| Toggle focus out of the interactive shell and into Gemini input.  | `Tab (no Shift)`<br />`Shift + Tab` |
+| Action                                                            | Keys             |
+| ----------------------------------------------------------------- | ---------------- |
+| Toggle detailed error information.                                | `F12`            |
+| Toggle the full TODO list.                                        | `Ctrl + T`       |
+| Show IDE context details.                                         | `Ctrl + G`       |
+| Toggle Markdown rendering.                                        | `Cmd + M`        |
+| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
+| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
+| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
+| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
+| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
+| Focus the Gemini input from the shell input.                      | `Tab`            |
 
 #### Session Control
 
@@ -129,7 +130,7 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
-- `Esc` pressed twice quickly: Clear the current input buffer.
+- `Esc` pressed twice quickly: Browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to

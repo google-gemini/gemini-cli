@@ -6,15 +6,14 @@
 
 import { Storage } from '../config/storage.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import type { Config } from '../config/config.js';
-import type { AgentDefinition } from './types.js';
+import type { AgentOverride, Config } from '../config/config.js';
+import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
-import type { GenerateContentConfig } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -23,6 +22,10 @@ import {
   isPreviewModel,
   isAutoModel,
 } from '../config/models.js';
+import {
+  type ModelConfig,
+  ModelConfigService,
+} from '../services/modelConfigService.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -161,18 +164,26 @@ export class AgentRegistry {
         modelConfig: {
           ...CodebaseInvestigatorAgent.modelConfig,
           model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+          generateContentConfig: {
+            ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig,
+            thinkingConfig: {
+              ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig
+                ?.thinkingConfig,
+              thinkingBudget:
+                investigatorSettings.thinkingBudget ??
+                CodebaseInvestigatorAgent.modelConfig.generateContentConfig
+                  ?.thinkingConfig?.thinkingBudget,
+            },
+          },
         },
         runConfig: {
           ...CodebaseInvestigatorAgent.runConfig,
-          max_time_minutes:
+          maxTimeMinutes:
             investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
-          max_turns:
+            CodebaseInvestigatorAgent.runConfig.maxTimeMinutes,
+          maxTurns:
             investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.max_turns,
+            CodebaseInvestigatorAgent.runConfig.maxTurns,
         },
       };
       this.registerLocalAgent(agentDef);
@@ -226,52 +237,25 @@ export class AgentRegistry {
       return;
     }
 
+    const settingsOverrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+    if (settingsOverrides?.disabled) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
     if (this.agents.has(definition.name) && this.config.getDebugMode()) {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
-    this.agents.set(definition.name, definition);
+    const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
+    this.agents.set(mergedDefinition.name, mergedDefinition);
 
-    // Register model config. We always create a runtime alias. However,
-    // if the user is using `auto` as a model string then we also create
-    // runtime overrides to ensure the subagent generation settings are
-    // respected regardless of the final model string from routing.
-    // TODO(12916): Migrate sub-agents where possible to static configs.
-    const modelConfig = definition.modelConfig;
-    let model = modelConfig.model;
-    if (model === 'inherit') {
-      model = this.config.getModel();
-    }
-
-    const generateContentConfig: GenerateContentConfig = {
-      temperature: modelConfig.temp,
-      topP: modelConfig.top_p,
-      thinkingConfig: {
-        includeThoughts: true,
-        thinkingBudget: modelConfig.thinkingBudget ?? -1,
-      },
-    };
-
-    this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
-      {
-        modelConfig: {
-          model,
-          generateContentConfig,
-        },
-      },
-    );
-
-    if (isAutoModel(model)) {
-      this.config.modelConfigService.registerRuntimeModelOverride({
-        match: {
-          overrideScope: definition.name,
-        },
-        modelConfig: {
-          generateContentConfig,
-        },
-      });
-    }
+    this.registerModelConfigs(mergedDefinition);
   }
 
   /**
@@ -289,6 +273,17 @@ export class AgentRegistry {
       debugLogger.warn(
         `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
       );
+      return;
+    }
+
+    const overrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+    if (overrides?.disabled) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
+        );
+      }
       return;
     }
 
@@ -325,6 +320,60 @@ export class AgentRegistry {
         `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
         e,
       );
+    }
+  }
+
+  private applyOverrides<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): LocalAgentDefinition<TOutput> {
+    if (definition.kind !== 'local' || !overrides) {
+      return definition;
+    }
+
+    return {
+      ...definition,
+      runConfig: {
+        ...definition.runConfig,
+        ...overrides.runConfig,
+      },
+      modelConfig: ModelConfigService.merge(
+        definition.modelConfig,
+        overrides.modelConfig ?? {},
+      ),
+    };
+  }
+
+  private registerModelConfigs<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+  ): void {
+    const modelConfig = definition.modelConfig;
+    let model = modelConfig.model;
+    if (model === 'inherit') {
+      model = this.config.getModel();
+    }
+
+    const agentModelConfig: ModelConfig = {
+      ...modelConfig,
+      model,
+    };
+
+    this.config.modelConfigService.registerRuntimeModelConfig(
+      getModelConfigAlias(definition),
+      {
+        modelConfig: agentModelConfig,
+      },
+    );
+
+    if (agentModelConfig.model && isAutoModel(agentModelConfig.model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig: agentModelConfig.generateContentConfig,
+        },
+      });
     }
   }
 

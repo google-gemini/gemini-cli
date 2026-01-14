@@ -59,7 +59,7 @@ export enum Command {
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
   SHOW_FULL_TODOS = 'showFullTodos',
-  TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
+  SHOW_IDE_CONTEXT_DETAIL = 'showIDEContextDetail',
   TOGGLE_MARKDOWN = 'toggleMarkdown',
   TOGGLE_COPY_MODE = 'toggleCopyMode',
   TOGGLE_YOLO = 'toggleYolo',
@@ -76,13 +76,14 @@ export enum Command {
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
+  REWIND = 'rewind',
 
   // Shell commands
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
-  TOGGLE_SHELL_INPUT_FOCUS_IN = 'toggleShellInputFocus',
-  TOGGLE_SHELL_INPUT_FOCUS_OUT = 'toggleShellInputFocusOut',
+  FOCUS_SHELL_INPUT = 'focusShellInput',
+  UNFOCUS_SHELL_INPUT = 'unfocusShellInput',
 
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
@@ -103,8 +104,6 @@ export interface KeyBinding {
   shift?: boolean;
   /** Command/meta key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   command?: boolean;
-  /** Paste operation requirement: true=must be paste, false=must not be paste, undefined=ignore */
-  paste?: boolean;
 }
 
 /**
@@ -135,8 +134,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
     { key: 'backspace', command: true },
-    { sequence: '\x7f', ctrl: true },
-    { sequence: '\x7f', command: true },
     { key: 'w', ctrl: true },
   ],
   [Command.MOVE_LEFT]: [
@@ -157,11 +154,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', command: true },
     { key: 'f', command: true },
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    { key: 'backspace' },
-    { sequence: '\x7f' },
-    { key: 'h', ctrl: true },
-  ],
+  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
@@ -216,7 +209,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
       key: 'return',
       ctrl: false,
       command: false,
-      paste: false,
       shift: false,
     },
   ],
@@ -225,7 +217,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', command: true },
-    { key: 'return', paste: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
   ],
@@ -243,7 +234,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
-  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
+  [Command.SHOW_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
@@ -259,14 +250,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
-  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]: [{ key: 'tab', shift: false }],
-  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]: [
-    { key: 'tab', shift: false },
-    { key: 'tab', shift: true },
-  ],
+  [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
+  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
+  [Command.REWIND]: [{ key: 'Esc (×2)' }],
 };
 
 interface CommandCategory {
@@ -330,6 +319,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+      Command.REWIND,
     ],
   },
   {
@@ -364,14 +354,14 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [
       Command.SHOW_ERROR_DETAILS,
       Command.SHOW_FULL_TODOS,
-      Command.TOGGLE_IDE_CONTEXT_DETAIL,
+      Command.SHOW_IDE_CONTEXT_DETAIL,
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
       Command.TOGGLE_YOLO,
       Command.TOGGLE_AUTO_EDIT,
       Command.SHOW_MORE_LINES,
-      Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
-      Command.TOGGLE_SHELL_INPUT_FOCUS_OUT,
+      Command.FOCUS_SHELL_INPUT,
+      Command.UNFOCUS_SHELL_INPUT,
     ],
   },
   {
@@ -424,7 +414,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
-  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: 'Toggle IDE context details.',
+  [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]:
     'Toggle copy mode when the terminal is using the alternate buffer.',
@@ -435,13 +425,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines.',
   [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
-  [Command.SUBMIT_REVERSE_SEARCH]: 'Insert the selected reverse-search match.',
+  [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
-  [Command.TOGGLE_SHELL_INPUT_FOCUS_IN]:
-    'Toggle focus between the shell and Gemini input.',
-  [Command.TOGGLE_SHELL_INPUT_FOCUS_OUT]:
-    'Toggle focus out of the interactive shell and into Gemini input.',
+  [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
+  [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+  [Command.REWIND]: 'Browse and rewind previous interactions.',
 };
