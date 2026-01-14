@@ -154,11 +154,16 @@ const totalPassRate =
 
 console.log('### Evals Nightly Summary');
 console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
-console.log('See [evals/README.md](evals/README.md) for more details.\n');
+console.log(
+  'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
+);
+
+// Reverse history to show oldest first
+history.reverse();
 
 // Header
-let header = '| Test Name | Current |';
-let separator = '| :--- | :---: |';
+let header = '| Test Name |';
+let separator = '| :--- |';
 
 for (const item of history) {
   // Format date: MM-DD
@@ -167,6 +172,10 @@ for (const item of history) {
   header += ` [${dateStr}](${item.run.url}) |`;
   separator += ' :---: |';
 }
+
+// Add Current column last
+header += ' Current |';
+separator += ' :---: |';
 
 console.log(header);
 console.log(separator);
@@ -180,15 +189,6 @@ for (const item of history) {
 for (const name of Array.from(allTestNames).sort()) {
   let row = `| ${name} |`;
 
-  // Current
-  const curr = currentStats[name];
-  if (curr) {
-    const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
-    row += ` ${passRate} |`;
-  } else {
-    row += ' - |';
-  }
-
   // History
   for (const item of history) {
     const stat = item.stats[name];
@@ -198,6 +198,15 @@ for (const name of Array.from(allTestNames).sort()) {
     } else {
       row += ' - |';
     }
+  }
+
+  // Current
+  const curr = currentStats[name];
+  if (curr) {
+    const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
+    row += ` ${passRate} |`;
+  } else {
+    row += ' - |';
   }
 
   console.log(row);
