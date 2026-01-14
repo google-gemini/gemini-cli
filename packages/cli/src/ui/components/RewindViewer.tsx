@@ -19,9 +19,9 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
-import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
+import { ExpandablePrompt } from './shared/ExpandablePrompt.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -174,25 +174,14 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             return (
               <Box flexDirection="column" marginBottom={1}>
                 <Box>
-                  <MaxSizedBox
-                    maxWidth={terminalWidth - 4}
-                    maxHeight={isSelected ? undefined : MAX_LINES_PER_BOX + 1}
-                    overflowDirection="bottom"
-                  >
-                    {cleanedText.split('\n').map((line, i) => (
-                      <Box key={i}>
-                        <Text
-                          color={
-                            isSelected
-                              ? theme.status.success
-                              : theme.text.primary
-                          }
-                        >
-                          {line}
-                        </Text>
-                      </Box>
-                    ))}
-                  </MaxSizedBox>
+                  <ExpandablePrompt
+                    label={cleanedText}
+                    isExpanded={isSelected}
+                    textColor={
+                      isSelected ? theme.status.success : theme.text.primary
+                    }
+                    maxWidth={(terminalWidth - 4) * MAX_LINES_PER_BOX}
+                  />
                 </Box>
                 {stats ? (
                   <Box flexDirection="row">
