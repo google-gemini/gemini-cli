@@ -38,4 +38,4 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
-        run: 'npm run test:evals'
+        run: 'npm run test:all_evals'
