@@ -46,6 +46,12 @@ two arguments:
 
 #### Policies
 
+Policies control how strictly a test is validated. Tests should generally use
+the ALWAYS_PASSES policy to offer the strictest guarantees.
+
+USUALLY_PASSES exists to enable assertion of less consistent or aspirational
+behaviors.
+
 - `ALWAYS_PASSES`: Tests expected to pass 100% of the time. These are typically
   trivial and test basic functionality. These run in every CI.
 - `USUALLY_PASSES`: Tests expected to pass most of the time but may have some
