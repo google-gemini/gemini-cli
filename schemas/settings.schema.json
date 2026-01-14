@@ -569,6 +569,49 @@
           "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "seed": {
+          "title": "Seed",
+          "description": "The seed for the model (integer).",
+          "markdownDescription": "The seed for the model (integer).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "description": "The temperature for the model (0.0 - 2.0).",
+          "markdownDescription": "The temperature for the model (0.0 - 2.0).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
+        },
+        "topK": {
+          "title": "Top K",
+          "description": "The topK for the model (integer, 0 or positive).",
+          "markdownDescription": "The topK for the model (integer, 0 or positive).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
+        },
+        "topP": {
+          "title": "Top P",
+          "description": "The topP for the model (0.0 - 1.0).",
+          "markdownDescription": "The topP for the model (0.0 - 1.0).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
+        },
+        "thinkingLevel": {
+          "title": "Thinking Level",
+          "description": "The thinking level for the model (MINIMAL, LOW, MEDIUM, HIGH).",
+          "markdownDescription": "The thinking level for the model (MINIMAL, LOW, MEDIUM, HIGH).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "string",
+          "enum": ["MINIMAL", "LOW", "MEDIUM", "HIGH"]
+        },
+        "includeThoughts": {
+          "title": "Include Thoughts",
+          "description": "Indicates whether to include thoughts in the response. If true, thoughts are returned only when available.",
+          "markdownDescription": "Indicates whether to include thoughts in the response. If true, thoughts are returned only when available.\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "boolean"
+        },
+        "thinkingBudget": {
+          "title": "Thinking Budget",
+          "description": "The number of thoughts tokens that the model should generate (integer, 0 or positive).",
+          "markdownDescription": "The number of thoughts tokens that the model should generate (integer, 0 or positive).\n\n- Category: `Model`\n- Requires restart: `no`",
+          "type": "number"
         }
       },
       "additionalProperties": false

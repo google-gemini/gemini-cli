@@ -43,6 +43,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  type ModelThinkingLevel,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -71,6 +72,13 @@ import { runExitCleanup } from '../utils/cleanup.js';
 export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
+  modelSeed: number | undefined;
+  modelTemperature: number | undefined;
+  modelTopK: number | undefined;
+  modelTopP: number | undefined;
+  modelThinkingLevel: ModelThinkingLevel | undefined;
+  modelIncludeThoughts: boolean | undefined;
+  modelThinkingBudget: number | undefined;
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
@@ -127,6 +135,51 @@ export async function parseArguments(
           type: 'string',
           nargs: 1,
           description: `Model`,
+        })
+        .option('model-seed', {
+          type: 'number',
+          nargs: 1,
+          description: 'Seed for the model (integer).',
+        })
+        .option('model-temperature', {
+          type: 'number',
+          nargs: 1,
+          description: 'Temperature for the model (0.0 - 2.0).',
+        })
+        .option('model-top-k', {
+          type: 'number',
+          nargs: 1,
+          description: 'Top K for the model (integer).',
+        })
+        .option('model-top-p', {
+          type: 'number',
+          nargs: 1,
+          description: 'Top P for the model.',
+        })
+        .option('model-thinking-level', {
+          type: 'string',
+          nargs: 1,
+          choices: ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'],
+          description: 'Thinking level for the model.',
+        })
+        .option('model-include-thoughts', {
+          type: 'boolean',
+          description:
+            'Indicates whether to include thoughts in the response. If true, thoughts are returned only when available.',
+          coerce: (value: unknown) => {
+            if (value === 'false' || value === '0' || value === 0) {
+              return false;
+            }
+            if (value === 'true' || value === '1' || value === 1) {
+              return true;
+            }
+            return value;
+          },
+        })
+        .option('model-thinking-budget', {
+          type: 'number',
+          nargs: 1,
+          description: 'Thinking budget for the model (integer).',
         })
         .option('prompt', {
           alias: 'p',
@@ -323,6 +376,42 @@ export async function parseArguments(
         )
       ) {
         return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      if (
+        argv['model-temperature'] !== undefined &&
+        typeof argv['model-temperature'] === 'number' &&
+        (argv['model-temperature'] < 0 || argv['model-temperature'] > 2)
+      ) {
+        return 'model-temperature must be between 0.0 and 2.0';
+      }
+      if (
+        argv['model-top-p'] !== undefined &&
+        typeof argv['model-top-p'] === 'number' &&
+        (argv['model-top-p'] < 0 || argv['model-top-p'] > 1)
+      ) {
+        return 'model-top-p must be between 0.0 and 1.0';
+      }
+      if (
+        argv['model-seed'] !== undefined &&
+        typeof argv['model-seed'] === 'number' &&
+        !Number.isInteger(argv['model-seed'])
+      ) {
+        return 'model-seed must be an integer';
+      }
+      if (
+        argv['model-top-k'] !== undefined &&
+        typeof argv['model-top-k'] === 'number' &&
+        (!Number.isInteger(argv['model-top-k']) || argv['model-top-k'] < 0)
+      ) {
+        return 'model-top-k must be 0 or a positive integer';
+      }
+      if (
+        argv['model-thinking-budget'] !== undefined &&
+        typeof argv['model-thinking-budget'] === 'number' &&
+        (!Number.isInteger(argv['model-thinking-budget']) ||
+          argv['model-thinking-budget'] < 0)
+      ) {
+        return 'model-thinking-budget must be 0 or a positive integer';
       }
       return true;
     });
@@ -816,6 +905,16 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
+    modelSeed: argv.modelSeed ?? settings.model?.seed,
+    modelTemperature: argv.modelTemperature ?? settings.model?.temperature,
+    modelTopK: argv.modelTopK ?? settings.model?.topK,
+    modelTopP: argv.modelTopP ?? settings.model?.topP,
+    modelThinkingLevel: (argv.modelThinkingLevel ??
+      settings.model?.thinkingLevel) as ModelThinkingLevel | undefined,
+    modelIncludeThoughts:
+      argv.modelIncludeThoughts ?? settings.model?.includeThoughts,
+    modelThinkingBudget:
+      argv.modelThinkingBudget ?? settings.model?.thinkingBudget,
     maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,

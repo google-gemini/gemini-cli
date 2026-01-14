@@ -3465,3 +3465,323 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
   });
 });
+
+describe('model parameters', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js'];
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should parse --model-seed argument', async () => {
+    process.argv = ['node', 'script.js', '--model-seed', '123'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelSeed).toBe(123);
+  });
+
+  it('should parse --model-temperature argument', async () => {
+    process.argv = ['node', 'script.js', '--model-temperature', '0.5'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelTemperature).toBe(0.5);
+  });
+
+  it('should throw an error for invalid --model-temperature', async () => {
+    process.argv = ['node', 'script.js', '--model-temperature', '2.5'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('model-temperature must be between 0.0 and 2.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should parse --model-top-k argument', async () => {
+    process.argv = ['node', 'script.js', '--model-top-k', '40'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelTopK).toBe(40);
+  });
+
+  it('should throw an error for invalid --model-top-k', async () => {
+    process.argv = ['node', 'script.js', '--model-top-k', '-1'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('model-top-k must be 0 or a positive integer'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error for non-integer --model-top-k', async () => {
+    process.argv = ['node', 'script.js', '--model-top-k', '1.5'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('model-top-k must be 0 or a positive integer'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should parse --model-top-p argument', async () => {
+    process.argv = ['node', 'script.js', '--model-top-p', '0.9'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelTopP).toBe(0.9);
+  });
+
+  it('should throw an error for invalid --model-top-p', async () => {
+    process.argv = ['node', 'script.js', '--model-top-p', '1.5'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('model-top-p must be between 0.0 and 1.0'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error for non-integer --model-seed', async () => {
+    process.argv = ['node', 'script.js', '--model-seed', '123.5'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('model-seed must be an integer'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should parse --model-thinking-level argument', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-level', 'LOW'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelThinkingLevel).toBe('LOW');
+  });
+
+  it('should parse --model-thinking-level MINIMAL', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-level', 'MINIMAL'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelThinkingLevel).toBe('MINIMAL');
+  });
+
+  it('should parse --model-thinking-level MEDIUM', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-level', 'MEDIUM'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelThinkingLevel).toBe('MEDIUM');
+  });
+
+  it('should parse --model-include-thoughts argument', async () => {
+    process.argv = ['node', 'script.js', '--model-include-thoughts'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelIncludeThoughts).toBe(true);
+  });
+
+  it('should parse --model-include-thoughts=0 as false', async () => {
+    process.argv = ['node', 'script.js', '--model-include-thoughts=0'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelIncludeThoughts).toBe(false);
+  });
+
+  it('should parse --model-include-thoughts=false as false', async () => {
+    process.argv = ['node', 'script.js', '--model-include-thoughts=false'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelIncludeThoughts).toBe(false);
+  });
+
+  it('should parse --model-thinking-budget argument', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-budget', '1024'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.modelThinkingBudget).toBe(1024);
+  });
+
+  it('should throw an error for invalid --model-thinking-budget', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-budget', '-1'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'model-thinking-budget must be 0 or a positive integer',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should throw an error for non-integer --model-thinking-budget', async () => {
+    process.argv = ['node', 'script.js', '--model-thinking-budget', '1024.5'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'model-thinking-budget must be 0 or a positive integer',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should pass model parameters to Config', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--model-seed',
+      '456',
+      '--model-temperature',
+      '0.7',
+      '--model-top-k',
+      '50',
+      '--model-top-p',
+      '0.95',
+      '--model-thinking-level',
+      'HIGH',
+      '--model-include-thoughts',
+      '--model-thinking-budget',
+      '1024',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.getModelSeed()).toBe(456);
+    expect(config.getModelTemperature()).toBe(0.7);
+    expect(config.getModelTopK()).toBe(50);
+    expect(config.getModelTopP()).toBe(0.95);
+    expect(config.getModelThinkingLevel()).toBe('HIGH');
+    expect(config.getModelIncludeThoughts()).toBe(true);
+    expect(config.getModelThinkingBudget()).toBe(1024);
+  });
+
+  it('should not set model parameters if not provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.getModelSeed()).toBeUndefined();
+    expect(config.getModelTemperature()).toBeUndefined();
+    expect(config.getModelTopK()).toBeUndefined();
+    expect(config.getModelTopP()).toBeUndefined();
+    expect(config.getModelThinkingLevel()).toBeUndefined();
+    expect(config.getModelIncludeThoughts()).toBeUndefined();
+    expect(config.getModelThinkingBudget()).toBeUndefined();
+  });
+
+  it('should read model parameters from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      model: {
+        seed: 789,
+        temperature: 1.2,
+        topK: 30,
+        topP: 0.8,
+        thinkingLevel: 'MEDIUM',
+        includeThoughts: false,
+        thinkingBudget: 512,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.getModelSeed()).toBe(789);
+    expect(config.getModelTemperature()).toBe(1.2);
+    expect(config.getModelTopK()).toBe(30);
+    expect(config.getModelTopP()).toBe(0.8);
+    expect(config.getModelThinkingLevel()).toBe('MEDIUM');
+    expect(config.getModelIncludeThoughts()).toBe(false);
+    expect(config.getModelThinkingBudget()).toBe(512);
+  });
+});

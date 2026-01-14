@@ -390,6 +390,38 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
 
+- **`model.seed`** (number):
+  - **Description:** The seed for the model (integer).
+  - **Default:** `undefined`
+
+- **`model.temperature`** (number):
+  - **Description:** The temperature for the model (0.0 - 2.0).
+  - **Default:** `undefined`
+
+- **`model.topK`** (number):
+  - **Description:** The topK for the model (integer, 0 or positive).
+  - **Default:** `undefined`
+
+- **`model.topP`** (number):
+  - **Description:** The topP for the model (0.0 - 1.0).
+  - **Default:** `undefined`
+
+- **`model.thinkingLevel`** (enum):
+  - **Description:** The thinking level for the model (MINIMAL, LOW, MEDIUM,
+    HIGH).
+  - **Default:** `undefined`
+  - **Values:** `"MINIMAL"`, `"LOW"`, `"MEDIUM"`, `"HIGH"`
+
+- **`model.includeThoughts`** (boolean):
+  - **Description:** Indicates whether to include thoughts in the response. If
+    true, thoughts are returned only when available.
+  - **Default:** `undefined`
+
+- **`model.thinkingBudget`** (number):
+  - **Description:** The number of thoughts tokens that the model should
+    generate (integer, 0 or positive).
+  - **Default:** `undefined`
+
 #### `modelConfigs`
 
 - **`modelConfigs.aliases`** (object):
@@ -1465,6 +1497,31 @@ for that specific session.
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
+- **`--model-seed <number>`**:
+  - Specifies a seed for the model to ensure deterministic outputs.
+  - For true deterministic output requires --model set, because otherwise
+    different models can be called.
+  - Example: `gemini --model gemini-3-pro-preview --model-seed 123`
+- **`--model-temperature <number>`**:
+  - Sets the model temperature (0.0 to 2.0). Higher values produce more creative
+    responses.
+  - Example: `gemini --model-temperature 1.5`
+- **`--model-top-k <number>`**:
+  - Sets the model top-K parameter.
+  - Example: `gemini --model-top-k 40`
+- **`--model-top-p <number>`**:
+  - Sets the model top-P parameter (0.0 to 1.0).
+  - Example: `gemini --model-top-p 0.9`
+- **`--model-thinking-level <level>`**:
+  - Sets the thinking level for the model (MINIMAL, LOW, MEDIUM, HIGH).
+  - Example: `gemini --model-thinking-level HIGH`
+- **`--model-include-thoughts <boolean>`**:
+  - Indicates whether to include thoughts in the model response.
+  - Example: `gemini --model-include-thoughts` or
+    `gemini --model-include-thoughts=false`
+- **`--model-thinking-budget <number>`**:
+  - Sets the number of tokens the model should use for thoughts.
+  - Example: `gemini --model-thinking-budget 1024`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a

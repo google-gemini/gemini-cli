@@ -41,15 +41,13 @@ import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
-import type {
-  ModelConfigKey,
-  ResolvedModelConfig,
-} from '../services/modelConfigService.js';
+import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
+import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -256,16 +254,22 @@ describe('Gemini Client (client.ts)', () => {
         }),
       }),
       modelConfigService: {
-        getResolvedConfig(modelConfigKey: ModelConfigKey) {
-          return {
-            model: modelConfigKey.model,
-            generateContentConfig: {
+        getResolvedConfig: vi
+          .fn()
+          .mockImplementation((modelConfigKey: ModelConfigKey) =>
+            makeResolvedModelConfig(modelConfigKey.model, {
               temperature: 0,
               topP: 1,
-            } as unknown as ResolvedModelConfig,
-          };
-        },
+            }),
+          ),
       },
+      getModelSeed: vi.fn().mockReturnValue(undefined),
+      getModelTemperature: vi.fn().mockReturnValue(undefined),
+      getModelTopK: vi.fn().mockReturnValue(undefined),
+      getModelTopP: vi.fn().mockReturnValue(undefined),
+      getModelThinkingLevel: vi.fn().mockReturnValue(undefined),
+      getModelIncludeThoughts: vi.fn().mockReturnValue(undefined),
+      getModelThinkingBudget: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
       getActiveModel: vi.fn().mockReturnValue('test-model'),
@@ -3274,6 +3278,127 @@ ${JSON.stringify(
 
         resetChatSpy.mockRestore();
       });
+    });
+  });
+
+  describe('Global Config Parameters', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTemperature).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTopK).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTopP).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelThinkingLevel).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelIncludeThoughts).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelThinkingBudget).mockReturnValue(undefined);
+    });
+
+    it('should propagate global seed to generateContent API call', async () => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(54321);
+
+      const modelConfigKey = { model: 'gemini-pro' };
+      await client.generateContent(
+        modelConfigKey,
+        [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            seed: 54321,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should prioritize global seed over resolved config seed', async () => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(54321);
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockReturnValue(
+        makeResolvedModelConfig('gemini-pro', {
+          seed: 11111,
+          temperature: 0.5,
+        }),
+      );
+
+      const modelConfigKey = { model: 'gemini-pro' };
+      await client.generateContent(
+        modelConfigKey,
+        [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            seed: 54321,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should propagate global temperature, topK, and topP to generateContent API call', async () => {
+      vi.mocked(mockConfig.getModelTemperature).mockReturnValue(1.5);
+      vi.mocked(mockConfig.getModelTopK).mockReturnValue(42);
+      vi.mocked(mockConfig.getModelTopP).mockReturnValue(0.7);
+
+      const modelConfigKey = { model: 'gemini-pro' };
+      await client.generateContent(
+        modelConfigKey,
+        [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            temperature: 1.5,
+            topK: 42,
+            topP: 0.7,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should propagate global thinking parameters to generateContent API call', async () => {
+      const { ThinkingLevel } = await import('@google/genai');
+      vi.mocked(mockConfig.getModelThinkingLevel).mockReturnValue(
+        ThinkingLevel.MEDIUM,
+      );
+      vi.mocked(mockConfig.getModelIncludeThoughts).mockReturnValue(false);
+      vi.mocked(mockConfig.getModelThinkingBudget).mockReturnValue(100);
+
+      const modelConfigKey = { model: 'gemini-pro' };
+      await client.generateContent(
+        modelConfigKey,
+        [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            thinkingConfig: expect.objectContaining({
+              thinkingLevel: ThinkingLevel.MEDIUM,
+              includeThoughts: false,
+              thinkingBudget: 100,
+            }),
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
     });
   });
 });
