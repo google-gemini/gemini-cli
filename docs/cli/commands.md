@@ -215,6 +215,29 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Open a dialog that lets you change the visual theme of
     Gemini CLI.
 
+- **`/think`**
+  - **Description:** Control extended thinking mode to adjust the thinking
+    budget for deep reasoning tasks. This allows you to balance latency against
+    solution quality for complex software engineering workflows.
+  - **Usage:** `/think [off|low|medium|high]`
+  - **Sub-commands:**
+    - **`off`**:
+      - **Description:** Disable extended thinking (budget: 0 tokens). The model
+        will respond immediately without a planning phase.
+    - **`low`**:
+      - **Description:** Set low thinking budget (2048 tokens) for brief
+        planning before responding.
+    - **`medium`**:
+      - **Description:** Set medium thinking budget (8192 tokens) for moderate
+        planning. This is the default setting.
+    - **`high`**:
+      - **Description:** Set high thinking budget (24576 tokens) for extensive
+        planning on very complex reasoning tasks.
+  - **Note:** The thinking mode setting is session-scoped and resets when the
+    CLI restarts. During extended thinking, the LoadingIndicator will show
+    "Thinking: [subject]" to distinguish the planning phase from response
+    generation.
+
 - **`/auth`**
   - **Description:** Open a dialog that lets you change the authentication
     method.

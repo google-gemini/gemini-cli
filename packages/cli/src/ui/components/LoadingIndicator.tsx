@@ -39,10 +39,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
   // Prioritize the interactive shell waiting phrase over the thought subject
   // because it conveys an actionable state for the user (waiting for input).
+  const isThinking = !!thought?.subject;
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase;
+      : isThinking
+        ? `Thinking: ${thought.subject}`
+        : currentLoadingPhrase;
 
   const cancelAndTimerContent =
     streamingState !== StreamingState.WaitingForConfirmation

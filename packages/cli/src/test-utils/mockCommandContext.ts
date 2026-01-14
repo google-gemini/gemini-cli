@@ -75,6 +75,11 @@ export const createMockCommandContext = (
           },
         },
       } as SessionStatsState,
+      thinkingMode: {
+        level: 'medium' as const,
+        budget: 8192,
+        setLevel: vi.fn(),
+      },
     },
   };
 
