@@ -25,9 +25,20 @@ jobs:
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
-            await github.rest.issues.addLabels({
+            const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              labels: ['status/need-triage']
             });
+
+            const hasLabel = issue.labels.some(l => l.name === 'status/need-triage');
+            if (!hasLabel) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['status/need-triage']
+              });
+            } else {
+              core.info('Issue already has status/need-triage label. Skipping.');
+            }
