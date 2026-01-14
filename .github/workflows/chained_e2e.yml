@@ -306,7 +306,7 @@ jobs:
       - name: 'Run Evals (Always Pass)'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-        run: 'npm run test:evals'
+        run: 'npm run test:always_passing_evals'
 
   e2e:
     name: 'E2E'
