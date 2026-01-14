@@ -76,6 +76,7 @@ async function fetchIssueData(owner, repo, number) {
           id
           number
           state
+          title
           body
           labels(first: 20) {
             nodes { name }
@@ -152,7 +153,11 @@ async function getAllDescendants(roots) {
       if (current.repo === PUBLIC_REPO) {
         // Don't label the roots themselves
         if (!ROOT_ISSUES.some(r => r.number === issueData.number && r.repo === current.repo)) {
-          allDescendants.set(currentKey, current);
+          allDescendants.set(currentKey, {
+            ...current,
+            title: issueData.title,
+            labels: issueData.labels.nodes.map(l => l.name)
+          });
         }
       }
 
@@ -209,21 +214,14 @@ async function run() {
   for (const issueInfo of descendants) {
     const issueKey = `${issueInfo.owner}/${issueInfo.repo}#${issueInfo.number}`;
     try {
-      const { data: issue } = await octokit.rest.issues.get({
-        owner: issueInfo.owner,
-        repo: issueInfo.repo,
-        issue_number: issueInfo.number,
-      });
-
-      if (issue.pull_request || issue.state !== 'open') continue;
-
-      const hasLabel = issue.labels.some(l => l.name === TARGET_LABEL);
+      // Data is already available from the discovery phase
+      const hasLabel = issueInfo.labels.some(l => l === TARGET_LABEL);
 
       if (!hasLabel) {
         if (isDryRun) {
-          console.log(`[DRY RUN] Would label ${issueKey}: "${issue.title}"`);
+          console.log(`[DRY RUN] Would label ${issueKey}: "${issueInfo.title}"`);
         } else {
-          console.log(`Labeling ${issueKey}: "${issue.title}"...`);
+          console.log(`Labeling ${issueKey}: "${issueInfo.title}"...`);
           await octokit.rest.issues.addLabels({
             owner: issueInfo.owner,
             repo: issueInfo.repo,
