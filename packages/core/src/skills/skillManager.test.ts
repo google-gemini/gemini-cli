@@ -189,7 +189,7 @@ description: project-desc
 name: skill1
 description: desc1
 ---
-`,
+body1`,
     );
 
     const storage = new Storage('/dummy');
@@ -246,5 +246,21 @@ description: desc1
     const enabled = service.getSkills();
     expect(enabled).toHaveLength(2);
     expect(enabled.map((s) => s.name)).toContain('builtin-skill');
+  });
+
+  it('should maintain admin settings state', async () => {
+    const service = new SkillManager();
+
+    // Case 1: Enabled by admin
+
+    service.setAdminSettings(true);
+
+    expect(service.isAdminEnabled()).toBe(true);
+
+    // Case 2: Disabled by admin
+
+    service.setAdminSettings(false);
+
+    expect(service.isAdminEnabled()).toBe(false);
   });
 });

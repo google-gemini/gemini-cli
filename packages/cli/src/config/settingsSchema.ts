@@ -785,6 +785,32 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  agents: {
+    type: 'object',
+    label: 'Agents',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for subagents.',
+    showInDialog: false,
+    properties: {
+      overrides: {
+        type: 'object',
+        label: 'Agent Overrides',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description:
+          'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'AgentOverride',
+        },
+      },
+    },
+  },
+
   context: {
     type: 'object',
     label: 'Context',
@@ -1816,6 +1842,28 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      skills: {
+        type: 'object',
+        label: 'Skills Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'Agent Skills-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Skills Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description: 'If false, disallows agent skills from being used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
     },
   },
 } as const satisfies SettingsSchema;
@@ -1999,6 +2047,36 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'number',
         description:
           'Maximum number of tokens used when summarizing tool output.',
+      },
+    },
+  },
+  AgentOverride: {
+    type: 'object',
+    description: 'Override settings for a specific agent.',
+    additionalProperties: false,
+    properties: {
+      modelConfig: {
+        type: 'object',
+        additionalProperties: true,
+      },
+      runConfig: {
+        type: 'object',
+        description: 'Run configuration for an agent.',
+        additionalProperties: false,
+        properties: {
+          maxTimeMinutes: {
+            type: 'number',
+            description: 'The maximum execution time for the agent in minutes.',
+          },
+          maxTurns: {
+            type: 'number',
+            description: 'The maximum number of conversational turns.',
+          },
+        },
+      },
+      disabled: {
+        type: 'boolean',
+        description: 'Whether to disable the agent.',
       },
     },
   },

@@ -31,6 +31,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
+    loadAgentsFromDirectory: vi
+      .fn()
+      .mockImplementation(async () => ({ agents: [], errors: [] })),
+    loadSkillsFromDir: (
+      await importOriginal<typeof import('@google/gemini-cli-core')>()
+    ).loadSkillsFromDir,
   };
 });
 
