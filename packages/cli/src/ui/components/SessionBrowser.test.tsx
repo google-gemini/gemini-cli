@@ -111,7 +111,6 @@ const triggerKey = (
     ctrl: false,
     meta: false,
     shift: false,
-    paste: false,
     insertable: false,
     sequence: '',
     ...partialKey,

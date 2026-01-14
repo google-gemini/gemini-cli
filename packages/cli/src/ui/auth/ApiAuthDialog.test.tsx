@@ -112,7 +112,6 @@ describe('ApiAuthDialog', () => {
         ctrl: false,
         meta: false,
         shift: false,
-        paste: false,
       });
 
       expect(expectedCall).toHaveBeenCalledWith(...args);

@@ -52,7 +52,6 @@ describe('LoginWithGoogleRestartDialog', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -72,7 +71,6 @@ describe('LoginWithGoogleRestartDialog', () => {
         ctrl: false,
         meta: false,
         shift: false,
-        paste: false,
       });
 
       // Advance timers to trigger the setTimeout callback
