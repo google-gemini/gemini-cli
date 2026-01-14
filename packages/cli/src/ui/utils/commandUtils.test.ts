@@ -412,9 +412,13 @@ describe('commandUtils', () => {
 
       expect(mockFs.createWriteStream).toHaveBeenCalled();
       expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
     it('uses clipboardy in tmux when not in SSH/WSL', async () => {
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       const text = 'tmux-local';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
