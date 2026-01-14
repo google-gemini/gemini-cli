@@ -158,9 +158,41 @@ describe('Hooks Agent Flow', () => {
           import.meta.dirname,
           'hooks-system.after-agent.responses',
         ),
+      });
+
+      // BeforeModel hook to track message counts across LLM calls
+      const messageCountFile = join(rig.testDir!, 'message-counts.json');
+      const beforeModelScript = `
+        const fs = require('fs');
+        const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+        const messageCount = input.llm_request?.contents?.length || 0;
+        let counts = [];
+        try { counts = JSON.parse(fs.readFileSync('${messageCountFile}', 'utf-8')); } catch (e) {}
+        counts.push(messageCount);
+        fs.writeFileSync('${messageCountFile}', JSON.stringify(counts));
+        console.log(JSON.stringify({ decision: 'allow' }));
+      `;
+      const beforeModelScriptPath = join(
+        rig.testDir!,
+        'before_model_counter.cjs',
+      );
+      writeFileSync(beforeModelScriptPath, beforeModelScript);
+
+      await rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
           hooks: {
             enabled: true,
+            BeforeModel: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${beforeModelScriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
             AfterAgent: [
               {
                 hooks: [
@@ -178,7 +210,6 @@ describe('Hooks Agent Flow', () => {
 
       const result = await rig.run({ args: 'Hello test' });
 
-      // Verify the hook fired
       const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
       expect(hookTelemetryFound).toBeTruthy();
 
@@ -188,11 +219,15 @@ describe('Hooks Agent Flow', () => {
       );
 
       expect(afterAgentLog).toBeDefined();
-      // Verify hook output contains clearContext
       expect(afterAgentLog?.hookCall.stdout).toContain('clearContext');
       expect(afterAgentLog?.hookCall.stdout).toContain('true');
-      // Verify blocking reason is present
       expect(result).toContain('Security policy triggered');
+
+      // Verify context was cleared: second call should not have more messages than first
+      const countsRaw = rig.readFile('message-counts.json');
+      const counts = JSON.parse(countsRaw) as number[];
+      expect(counts.length).toBeGreaterThanOrEqual(2);
+      expect(counts[1]).toBeLessThanOrEqual(counts[0]);
     });
   });
 

@@ -2973,6 +2973,58 @@ ${JSON.stringify(
           expect.anything(),
         );
       });
+
+      it('should call resetChat when AfterAgent hook returns shouldClearContext: true', async () => {
+        const resetChatSpy = vi
+          .spyOn(client, 'resetChat')
+          .mockResolvedValue(undefined);
+
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            success: true,
+            finalOutput: {
+              shouldStopExecution: () => false,
+              isBlockingDecision: () => true,
+              getEffectiveReason: () => 'Blocked and clearing context',
+              shouldClearContext: () => true,
+              systemMessage: undefined,
+            },
+            allOutputs: [],
+            errors: [],
+            totalDuration: 0,
+          })
+          .mockResolvedValueOnce({
+            success: true,
+            finalOutput: {
+              shouldStopExecution: () => false,
+              isBlockingDecision: () => false,
+              shouldClearContext: () => false,
+              systemMessage: undefined,
+            },
+            allOutputs: [],
+            errors: [],
+            totalDuration: 0,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked and clearing context' },
+        });
+        expect(resetChatSpy).toHaveBeenCalledTimes(1);
+
+        resetChatSpy.mockRestore();
+      });
     });
   });
 });
