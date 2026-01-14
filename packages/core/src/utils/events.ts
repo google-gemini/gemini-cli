@@ -5,7 +5,6 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { LoadServerHierarchicalMemoryResponse } from './memoryDiscovery.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -32,16 +31,6 @@ export interface UserFeedbackPayload {
    * or verbose output, while keeping the 'message' field clean for end users.
    */
   error?: unknown;
-}
-
-/**
- * Payload for the 'fallback-mode-changed' event.
- */
-export interface FallbackModeChangedPayload {
-  /**
-   * Whether fallback mode is now active.
-   */
-  isInFallbackMode: boolean;
 }
 
 /**
@@ -74,26 +63,77 @@ export interface OutputPayload {
 /**
  * Payload for the 'memory-changed' event.
  */
-export type MemoryChangedPayload = LoadServerHierarchicalMemoryResponse;
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
+
+/**
+ * Base payload for hook-related events.
+ */
+export interface HookPayload {
+  hookName: string;
+  eventName: string;
+}
+
+/**
+ * Payload for the 'hook-start' event.
+ */
+export interface HookStartPayload extends HookPayload {
+  /**
+   * The 1-based index of the current hook in the execution sequence.
+   * Used for progress indication (e.g. "Hook 1/3").
+   */
+  hookIndex?: number;
+  /**
+   * The total number of hooks in the current execution sequence.
+   */
+  totalHooks?: number;
+}
+
+/**
+ * Payload for the 'hook-end' event.
+ */
+export interface HookEndPayload extends HookPayload {
+  success: boolean;
+}
+
+/**
+ * Payload for the 'retry-attempt' event.
+ */
+export interface RetryAttemptPayload {
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error?: string;
+  model: string;
+}
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
   ModelChanged = 'model-changed',
   ConsoleLog = 'console-log',
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
+  SettingsChanged = 'settings-changed',
+  HookStart = 'hook-start',
+  HookEnd = 'hook-end',
+  AgentsRefreshed = 'agents-refreshed',
+  RetryAttempt = 'retry-attempt',
 }
 
 export interface CoreEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
-  [CoreEvent.FallbackModeChanged]: [FallbackModeChangedPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.SettingsChanged]: never[];
+  [CoreEvent.HookStart]: [HookStartPayload];
+  [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.AgentsRefreshed]: never[];
+  [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
 }
 
 type EventBacklogItem = {
@@ -167,20 +207,46 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   }
 
   /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
-   */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
-  }
-
-  /**
    * Notifies subscribers that the model has changed.
    */
   emitModelChanged(model: string): void {
     const payload: ModelChangedPayload = { model };
     this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has started.
+   */
+  emitHookStart(payload: HookStartPayload): void {
+    this.emit(CoreEvent.HookStart, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has ended.
+   */
+  emitHookEnd(payload: HookEndPayload): void {
+    this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
+   * Notifies subscribers that agents have been refreshed.
+   */
+  emitAgentsRefreshed(): void {
+    this.emit(CoreEvent.AgentsRefreshed);
+  }
+
+  /**
+   * Notifies subscribers that a retry attempt is happening.
+   */
+  emitRetryAttempt(payload: RetryAttemptPayload): void {
+    this.emit(CoreEvent.RetryAttempt, payload);
   }
 
   /**

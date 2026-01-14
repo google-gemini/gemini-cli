@@ -8,6 +8,7 @@ import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -144,7 +145,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         );
       }
     } catch (e) {
-      console.error('Error parsing inline markdown part:', fullMatch, e);
+      debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
       renderedNode = null;
     }
 
@@ -178,7 +179,7 @@ export const RenderInline = React.memo(RenderInlineInternal);
 export const getPlainTextLength = (text: string): number => {
   const cleanText = text
     .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
     .replace(/_(.*?)_/g, '$1')
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')

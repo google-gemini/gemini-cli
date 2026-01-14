@@ -16,6 +16,7 @@ export { DEFAULT_TELEMETRY_TARGET, DEFAULT_OTLP_ENDPOINT };
 export {
   initializeTelemetry,
   shutdownTelemetry,
+  flushTelemetry,
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
@@ -137,3 +138,4 @@ export {
   GenAiTokenType,
 } from './metrics.js';
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
+export { startupProfiler, StartupProfiler } from './startupProfiler.js';

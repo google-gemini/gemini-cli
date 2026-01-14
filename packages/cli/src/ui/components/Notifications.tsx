@@ -12,13 +12,17 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
-import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  Storage,
+  debugLogger,
+  homedir,
+} from '@google/gemini-cli-core';
 
 import * as fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),
@@ -49,6 +53,7 @@ export const Notifications = () => {
     };
 
     if (isScreenReaderEnabled) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       checkScreenReader();
     }
   }, [isScreenReaderEnabled]);
@@ -65,10 +70,11 @@ export const Notifications = () => {
           });
           await fs.writeFile(screenReaderNudgeFilePath, 'true');
         } catch (error) {
-          console.error('Error storing screen reader nudge', error);
+          debugLogger.error('Error storing screen reader nudge', error);
         }
       }
     };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     writeScreenReaderNudgeFile();
   }, [showScreenReaderNudge]);
 

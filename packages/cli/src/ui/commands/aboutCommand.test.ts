@@ -8,9 +8,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
-import { IdeClient } from '@google/gemini-cli-core';
+import { IdeClient, getVersion } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -25,12 +24,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserAccountManager: vi.fn().mockImplementation(() => ({
       getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
     })),
+    getVersion: vi.fn(),
   };
 });
-
-vi.mock('../../utils/version.js', () => ({
-  getCliVersion: vi.fn(),
-}));
 
 describe('aboutCommand', () => {
   let mockContext: CommandContext;
@@ -59,7 +55,7 @@ describe('aboutCommand', () => {
       },
     } as unknown as CommandContext);
 
-    vi.mocked(versionUtils.getCliVersion).mockResolvedValue('test-version');
+    vi.mocked(getVersion).mockResolvedValue('test-version');
     vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
       'test-model',
     );
@@ -91,20 +87,17 @@ describe('aboutCommand', () => {
 
     await aboutCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ABOUT,
-        cliVersion: 'test-version',
-        osVersion: 'test-os',
-        sandboxEnv: 'no sandbox',
-        modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
-        gcpProject: 'test-gcp-project',
-        ideClient: 'test-ide',
-        userEmail: 'test-email@example.com',
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.ABOUT,
+      cliVersion: 'test-version',
+      osVersion: 'test-os',
+      sandboxEnv: 'no sandbox',
+      modelVersion: 'test-model',
+      selectedAuthType: 'test-auth',
+      gcpProject: 'test-gcp-project',
+      ideClient: 'test-ide',
+      userEmail: 'test-email@example.com',
+    });
   });
 
   it('should show the correct sandbox environment variable', async () => {
@@ -119,7 +112,6 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'gemini-sandbox',
       }),
-      expect.any(Number),
     );
   });
 
@@ -136,7 +128,6 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'sandbox-exec (test-profile)',
       }),
-      expect.any(Number),
     );
   });
 
@@ -163,7 +154,6 @@ describe('aboutCommand', () => {
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
-      expect.any(Number),
     );
   });
 });

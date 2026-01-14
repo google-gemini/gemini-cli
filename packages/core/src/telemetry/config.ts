@@ -61,7 +61,7 @@ export async function resolveTelemetrySettings(options: {
     settings.enabled;
 
   const rawTarget =
-    (argv.telemetryTarget as string | TelemetryTarget | undefined) ??
+    argv.telemetryTarget ??
     env['GEMINI_TELEMETRY_TARGET'] ??
     (settings.target as string | TelemetryTarget | undefined);
   const target = parseTelemetryTargetValue(rawTarget);
@@ -80,7 +80,7 @@ export async function resolveTelemetrySettings(options: {
     settings.otlpEndpoint;
 
   const rawProtocol =
-    (argv.telemetryOtlpProtocol as string | undefined) ??
+    argv.telemetryOtlpProtocol ??
     env['GEMINI_TELEMETRY_OTLP_PROTOCOL'] ??
     settings.otlpProtocol;
   const otlpProtocol = (['grpc', 'http'] as const).find(
@@ -116,5 +116,8 @@ export async function resolveTelemetrySettings(options: {
     logPrompts,
     outfile,
     useCollector,
+    useCliAuth:
+      parseBooleanEnvFlag(env['GEMINI_TELEMETRY_USE_CLI_AUTH']) ??
+      settings.useCliAuth,
   };
 }

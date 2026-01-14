@@ -11,3 +11,6 @@
 /.github/workflows/ @google-gemini/gemini-cli-askmode-approvers
 /packages/cli/package.json @google-gemini/gemini-cli-askmode-approvers
 /packages/core/package.json @google-gemini/gemini-cli-askmode-approvers
+
+# Docs have a dedicated approver group in addition to maintainers
+/docs/ @google-gemini/gemini-cli-maintainers @google-gemini/gemini-cli-docs

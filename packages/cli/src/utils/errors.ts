@@ -16,6 +16,8 @@ import {
   FatalCancellationError,
   FatalToolExecutionError,
   isFatalToolError,
+  debugLogger,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 
@@ -100,13 +102,13 @@ export function handleError(
     const formattedError = formatter.formatError(
       error instanceof Error ? error : new Error(getErrorMessage(error)),
       errorCode,
+      config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(getNumericExitCode(errorCode));
   } else {
-    console.error(errorMessage);
     throw error;
   }
 }
@@ -152,17 +154,18 @@ export function handleToolError(
       const formattedError = formatter.formatError(
         toolExecutionError,
         errorType ?? toolExecutionError.exitCode,
+        config.getSessionId(),
       );
-      console.error(formattedError);
+      coreEvents.emitFeedback('error', formattedError);
     } else {
-      console.error(errorMessage);
+      coreEvents.emitFeedback('error', errorMessage);
     }
     runSyncCleanup();
     process.exit(toolExecutionError.exitCode);
   }
 
   // Non-fatal: log and continue
-  console.error(errorMessage);
+  debugLogger.warn(errorMessage);
 }
 
 /**
@@ -191,13 +194,14 @@ export function handleCancellationError(config: Config): never {
     const formattedError = formatter.formatError(
       cancellationError,
       cancellationError.exitCode,
+      config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   } else {
-    console.error(cancellationError.message);
+    coreEvents.emitFeedback('error', cancellationError.message);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   }
@@ -231,13 +235,14 @@ export function handleMaxTurnsExceededError(config: Config): never {
     const formattedError = formatter.formatError(
       maxTurnsError,
       maxTurnsError.exitCode,
+      config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   } else {
-    console.error(maxTurnsError.message);
+    coreEvents.emitFeedback('error', maxTurnsError.message);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   }

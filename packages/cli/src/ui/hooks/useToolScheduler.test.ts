@@ -31,9 +31,11 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
-  MockTool,
   HookSystem,
+  PREVIEW_GEMINI_MODEL,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
+import { MockTool } from '@google/gemini-cli-core/src/test-utils/mock-tool.js';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { ToolCallStatus } from '../types.js';
 
@@ -71,22 +73,33 @@ const mockConfig = {
   getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   getAllowedTools: vi.fn(() => []),
+  getActiveModel: () => PREVIEW_GEMINI_MODEL,
   getContentGeneratorConfig: () => ({
     model: 'test-model',
     authType: 'oauth-personal',
   }),
-  getUseSmartEdit: () => false,
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
-  getEnableMessageBusIntegration: () => false,
   getMessageBus: () => null,
-  getPolicyEngine: () => null,
   isInteractive: () => false,
   getExperiments: () => {},
   getEnableHooks: () => false,
 } as unknown as Config;
 mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
 mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
+mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
+  check: async () => {
+    const mode = mockConfig.getApprovalMode();
+    if (mode === ApprovalMode.YOLO) {
+      return { decision: PolicyDecision.ALLOW };
+    }
+    return { decision: PolicyDecision.ASK_USER };
+  },
+});
+
+function createMockConfigOverride(overrides: Partial<Config> = {}): Config {
+  return { ...mockConfig, ...overrides } as Config;
+}
 
 const mockTool = new MockTool({
   name: 'mockTool',
@@ -262,13 +275,9 @@ describe('useReactToolScheduler', () => {
     vi.useRealTimers();
   });
 
-  const renderScheduler = () =>
+  const renderScheduler = (config: Config = mockConfig) =>
     renderHook(() =>
-      useReactToolScheduler(
-        onComplete,
-        mockConfig as unknown as Config,
-        () => undefined,
-      ),
+      useReactToolScheduler(onComplete, config, () => undefined),
     );
 
   it('initial state should be empty', () => {
@@ -494,13 +503,16 @@ describe('useReactToolScheduler', () => {
 
   it('should handle tool requiring confirmation - approved', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
+    const config = createMockConfigOverride({
+      isInteractive: () => true,
+    });
     const expectedOutput = 'Confirmed output';
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
     } as ToolResult);
 
-    const { result } = renderScheduler();
+    const { result } = renderScheduler(config);
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'callConfirm',
@@ -544,7 +556,10 @@ describe('useReactToolScheduler', () => {
 
   it('should handle tool requiring confirmation - cancelled by user', async () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
-    const { result } = renderScheduler();
+    const config = createMockConfigOverride({
+      isInteractive: () => true,
+    });
+    const { result } = renderScheduler(config);
     const schedule = result.current[1];
     const request: ToolCallRequestInfo = {
       callId: 'callConfirmCancel',

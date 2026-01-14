@@ -31,6 +31,7 @@ on:
 
 jobs:
   release:
+    if: "github.repository == 'google-gemini/gemini-cli'"
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     runs-on: 'ubuntu-latest'
     permissions:
@@ -157,4 +158,4 @@ jobs:
           gh issue create \
             --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
             --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
-            --label 'kind/bug,release-failure,priority/p0'
+            --label 'release-failure,priority/p0'

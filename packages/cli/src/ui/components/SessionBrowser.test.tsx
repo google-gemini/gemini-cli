@@ -111,7 +111,6 @@ const triggerKey = (
     ctrl: false,
     meta: false,
     shift: false,
-    paste: false,
     insertable: false,
     sequence: '',
     ...partialKey,
@@ -138,11 +137,14 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
 
 describe('SessionBrowser component', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-11-01T12:00:00Z'));
     keypressHandlers.length = 0;
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

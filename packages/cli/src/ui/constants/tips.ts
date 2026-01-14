@@ -75,7 +75,6 @@ export const INFORMATIVE_TIPS = [
   'Set the character threshold for truncating tool outputs (/settings)...',
   'Set the number of lines to keep when truncating outputs (/settings)...',
   'Enable policy-based tool confirmation via message bus (/settings)...',
-  'Enable smart-edit tool for more precise editing (/settings)...',
   'Enable write_todos_list tool to generate task lists (/settings)...',
   'Enable model routing based on complexity (/settings)...',
   'Enable experimental subagents for task delegation (/settings)...',
@@ -98,7 +97,6 @@ export const INFORMATIVE_TIPS = [
   'Navigate your prompt history with the Up and Down arrows...',
   'You can also use Ctrl+P (up) and Ctrl+N (down) for history...',
   'Search through command history with Ctrl+R...',
-  'Submit your prompt to Gemini with Enter...',
   'Accept an autocomplete suggestion with Tab or Enter...',
   'Move to the start of the line with Ctrl+A or Home...',
   'Move to the end of the line with Ctrl+E or End...',
@@ -114,7 +112,7 @@ export const INFORMATIVE_TIPS = [
   'Paste from your clipboard with Ctrl+V...',
   'Undo text edits in the input with Ctrl+Z...',
   'Redo undone text edits with Ctrl+Shift+Z...',
-  'Open the current prompt in an external editor with Ctrl+X or Meta+Enter...',
+  'Open the current prompt in an external editor with Ctrl+X...',
   'In menus, move up/down with k/j or the arrow keys...',
   'In menus, select an item by typing its number...',
   "If you're using an IDE, see the context with Ctrl+G...",
@@ -161,8 +159,6 @@ export const INFORMATIVE_TIPS = [
   'Set up GitHub Actions with /setup-github...',
   'Configure terminal keybindings for multiline input with /terminal-setup...',
   'Find relevant documentation with /find-docs...',
-  'Review a pull request with /oncall:pr-review...',
-  'Go back to main and clean up the branch with /github:cleanup-back-to-main...',
   'Execute any shell command with !<command>...',
   // Command tips end here
 ];

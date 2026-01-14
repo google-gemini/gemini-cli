@@ -15,6 +15,7 @@ export const resumeCommand: SlashCommand = {
   name: 'resume',
   description: 'Browse and resume auto-saved conversations',
   kind: CommandKind.BUILT_IN,
+  autoExecute: true,
   action: async (
     _context: CommandContext,
     _args: string,
