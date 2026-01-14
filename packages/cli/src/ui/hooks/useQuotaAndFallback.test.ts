@@ -37,6 +37,16 @@ import { MessageType } from '../types.js';
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
 
+// Mock fireActionRequiredHook to avoid hanging on message bus requests
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    fireActionRequiredHook: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
   let mockHistoryManager: UseHistoryManagerReturn;
@@ -139,8 +149,9 @@ describe('useQuotaAndFallback', () => {
           mockGoogleApiError,
           1000 * 60 * 5,
         ); // 5 minutes
-        act(() => {
+        await act(async () => {
           promise = handler('gemini-pro', 'gemini-flash', error);
+          await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
         // The hook should now have a pending request for the UI to handle
@@ -158,7 +169,7 @@ describe('useQuotaAndFallback', () => {
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
 
         // Simulate the user choosing to continue with the fallback model
-        act(() => {
+        await act(async () => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -190,12 +201,13 @@ describe('useQuotaAndFallback', () => {
           .calls[0][0] as FallbackModelHandler;
 
         let promise1: Promise<FallbackIntent | null>;
-        act(() => {
+        await act(async () => {
           promise1 = handler(
             'gemini-pro',
             'gemini-flash',
             new TerminalQuotaError('pro quota 1', mockGoogleApiError),
           );
+          await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
         const firstRequest = result.current.proQuotaRequest;
@@ -214,7 +226,7 @@ describe('useQuotaAndFallback', () => {
         expect(result2!).toBe('stop');
         expect(result.current.proQuotaRequest).toBe(firstRequest);
 
-        act(() => {
+        await act(async () => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -255,8 +267,9 @@ describe('useQuotaAndFallback', () => {
             .calls[0][0] as FallbackModelHandler;
 
           let promise: Promise<FallbackIntent | null>;
-          act(() => {
+          await act(async () => {
             promise = handler('model-A', 'model-B', error);
+            await new Promise((resolve) => setTimeout(resolve, 0));
           });
 
           // The hook should now have a pending request for the UI to handle
@@ -273,7 +286,7 @@ describe('useQuotaAndFallback', () => {
           );
 
           // Simulate the user choosing to continue with the fallback model
-          act(() => {
+          await act(async () => {
             result.current.handleProQuotaChoice('retry_always');
           });
 
@@ -316,8 +329,9 @@ describe('useQuotaAndFallback', () => {
         let promise: Promise<FallbackIntent | null>;
         const error = new ModelNotFoundError('model not found', 404);
 
-        act(() => {
+        await act(async () => {
           promise = handler('gemini-3-pro-preview', 'gemini-2.5-pro', error);
+          await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
         // The hook should now have a pending request for the UI to handle
@@ -335,7 +349,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         );
 
         // Simulate the user choosing to switch
-        act(() => {
+        await act(async () => {
           result.current.handleProQuotaChoice('retry_always');
         });
 
@@ -383,15 +397,16 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      act(() => {
+      await act(async () => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
           new TerminalQuotaError('pro quota', mockGoogleApiError),
         );
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      act(() => {
+      await act(async () => {
         result.current.handleProQuotaChoice('retry_later');
       });
 
@@ -414,15 +429,16 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
         .calls[0][0] as FallbackModelHandler;
 
       let promise: Promise<FallbackIntent | null>;
-      act(() => {
+      await act(async () => {
         promise = handler(
           'gemini-pro',
           'gemini-flash',
           new TerminalQuotaError('pro quota', mockGoogleApiError),
         );
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      act(() => {
+      await act(async () => {
         result.current.handleProQuotaChoice('retry_always');
       });
 
@@ -461,15 +477,16 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      act(() => {
+      await act(async () => {
         promise = handler(
           PREVIEW_GEMINI_MODEL,
           DEFAULT_GEMINI_MODEL,
           new Error('preview model failed'),
         );
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      act(() => {
+      await act(async () => {
         result.current.handleProQuotaChoice('retry_always');
       });
 
@@ -496,15 +513,16 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const handler = setFallbackHandlerSpy.mock
         .calls[0][0] as FallbackModelHandler;
       let promise: Promise<FallbackIntent | null>;
-      act(() => {
+      await act(async () => {
         promise = handler(
           PREVIEW_GEMINI_MODEL,
           DEFAULT_GEMINI_FLASH_MODEL,
           new Error('preview model failed'),
         );
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
-      act(() => {
+      await act(async () => {
         result.current.handleProQuotaChoice('retry_always');
       });
 

@@ -158,6 +158,66 @@ export async function fireToolNotificationHook(
 }
 
 /**
+ * Fires an ActionRequired notification hook.
+ *
+ * @param messageBus The message bus to use for hook communication
+ * @param message Description of the action required
+ * @param details Optional details about the action
+ */
+export async function fireActionRequiredHook(
+  messageBus: MessageBus,
+  message: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await messageBus.request<HookExecutionRequest, HookExecutionResponse>(
+      {
+        type: MessageBusType.HOOK_EXECUTION_REQUEST,
+        eventName: 'Notification',
+        input: {
+          notification_type: NotificationType.ActionRequired,
+          message,
+          details,
+        },
+      },
+      MessageBusType.HOOK_EXECUTION_RESPONSE,
+    );
+  } catch (error) {
+    debugLogger.debug(`ActionRequired notification hook failed:`, error);
+  }
+}
+
+/**
+ * Fires an OperationComplete notification hook.
+ *
+ * @param messageBus The message bus to use for hook communication
+ * @param message Description of the completed operation
+ * @param details Optional details about the operation
+ */
+export async function fireOperationCompleteHook(
+  messageBus: MessageBus,
+  message: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await messageBus.request<HookExecutionRequest, HookExecutionResponse>(
+      {
+        type: MessageBusType.HOOK_EXECUTION_REQUEST,
+        eventName: 'Notification',
+        input: {
+          notification_type: NotificationType.OperationComplete,
+          message,
+          details,
+        },
+      },
+      MessageBusType.HOOK_EXECUTION_RESPONSE,
+    );
+  } catch (error) {
+    debugLogger.debug(`OperationComplete notification hook failed:`, error);
+  }
+}
+
+/**
  * Extracts MCP context from a tool invocation if it's an MCP tool.
  *
  * @param invocation The tool invocation

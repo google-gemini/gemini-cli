@@ -23,6 +23,7 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settingsSchema.js';
+import type { Argv } from 'yargs';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
@@ -54,6 +55,44 @@ vi.mock('@google/gemini-cli-core', async () => {
     createToolRegistry: vi.fn().mockResolvedValue({}),
   };
 });
+
+// Mock command modules to avoid loading the full CLI entry point (gemini.tsx)
+// which can cause circular dependencies and timeouts during tests.
+vi.mock('../commands/mcp.js', () => ({
+  mcpCommand: {
+    command: 'mcp',
+    describe: 'Manage MCP servers',
+    builder: (yargs: Argv) => yargs,
+    handler: () => {},
+  },
+}));
+
+vi.mock('../commands/extensions.js', () => ({
+  extensionsCommand: {
+    command: 'extensions',
+    describe: 'Manage extensions',
+    builder: (yargs: Argv) => yargs,
+    handler: () => {},
+  },
+}));
+
+vi.mock('../commands/skills.js', () => ({
+  skillsCommand: {
+    command: 'skills',
+    describe: 'Manage skills',
+    builder: (yargs: Argv) => yargs,
+    handler: () => {},
+  },
+}));
+
+vi.mock('../commands/hooks.js', () => ({
+  hooksCommand: {
+    command: 'hooks',
+    describe: 'Manage hooks',
+    builder: (yargs: Argv) => yargs,
+    handler: () => {},
+  },
+}));
 
 describe('Configuration Integration Tests', () => {
   let tempDir: string;

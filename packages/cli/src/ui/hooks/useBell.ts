@@ -7,81 +7,77 @@
 import { useEffect, useRef } from 'react';
 import { useStdout } from 'ink';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { debugLogger } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import {
+  debugLogger,
+  MessageBusType,
+  NotificationType,
+  type HookExecutionRequest,
+} from '@google/gemini-cli-core';
 
 export const useBell = () => {
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
-  const { dialogsVisible, streamingState, history } = useUIState();
+  const config = useConfig();
 
-  // Track previous state to detect transitions
-  const prevDialogsVisible = useRef(dialogsVisible);
-  const prevStreamingState = useRef(streamingState);
-
-  // Track if it's the first render to avoid startup beep
-  const isMounted = useRef(false);
+  const bellEnabled = settings.ui?.bell;
+  const bellDurationThreshold = settings.ui?.bellDurationThreshold ?? 10;
 
   // Track start time of the current operation
   const startTime = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isMounted.current) {
-      isMounted.current = true;
-      prevDialogsVisible.current = dialogsVisible;
-      prevStreamingState.current = streamingState;
+    if (!bellEnabled) {
       return;
     }
 
-    // Start timer when transitioning from Idle
-    if (
-      prevStreamingState.current === StreamingState.Idle &&
-      streamingState !== StreamingState.Idle
-    ) {
-      startTime.current = Date.now();
-    }
+    const messageBus = config.getMessageBus();
 
-    const dialogBecameVisible = dialogsVisible && !prevDialogsVisible.current;
-    const actionCompleted =
-      streamingState === StreamingState.Idle &&
-      prevStreamingState.current !== StreamingState.Idle;
-    const waitingForConfirmation =
-      streamingState === StreamingState.WaitingForConfirmation &&
-      prevStreamingState.current !== StreamingState.WaitingForConfirmation;
+    const handler = (message: HookExecutionRequest) => {
+      const { eventName, input } = message;
 
-    const lastHistoryItem = history[history.length - 1];
-    const isCancelled =
-      lastHistoryItem?.text === 'Request cancelled.' ||
-      lastHistoryItem?.text === 'User cancelled the request.';
+      // Start timer on operation start
+      if (eventName === 'BeforeAgent' || eventName === 'BeforeTool') {
+        if (startTime.current === null) {
+          startTime.current = Date.now();
+        }
+        return;
+      }
 
-    if (
-      settings.ui?.bell &&
-      (dialogBecameVisible ||
-        (actionCompleted && !isCancelled) ||
-        waitingForConfirmation)
-    ) {
-      const duration = startTime.current
-        ? (Date.now() - startTime.current) / 1000
-        : 0;
-      const threshold = settings.ui?.bellDurationThreshold ?? 10;
+      // Check for notifications that might trigger a bell
+      if (eventName === 'Notification') {
+        const notificationType = input['notification_type'] as NotificationType;
 
-      if (duration >= threshold) {
-        try {
-          // Write bell character to stdout
-          stdout.write('\x07');
-        } catch (e) {
-          debugLogger.error('Failed to write bell character', e);
+        if (
+          notificationType === NotificationType.OperationComplete ||
+          notificationType === NotificationType.ActionRequired ||
+          notificationType === NotificationType.ToolPermission
+        ) {
+          const duration = startTime.current
+            ? (Date.now() - startTime.current) / 1000
+            : 0;
+
+          if (duration >= bellDurationThreshold) {
+            try {
+              // Write bell character to stdout
+              stdout.write('\x07');
+            } catch (e) {
+              debugLogger.error('Failed to write bell character', e);
+            }
+          }
+
+          // Reset timer after operation complete
+          if (notificationType === NotificationType.OperationComplete) {
+            startTime.current = null;
+          }
         }
       }
-    }
+    };
 
-    // Reset timer if back to idle
-    if (streamingState === StreamingState.Idle) {
-      startTime.current = null;
-    }
+    messageBus.subscribe(MessageBusType.HOOK_EXECUTION_REQUEST, handler);
 
-    prevDialogsVisible.current = dialogsVisible;
-    prevStreamingState.current = streamingState;
-  }, [dialogsVisible, streamingState, settings.ui, stdout, history]);
+    return () => {
+      messageBus.unsubscribe(MessageBusType.HOOK_EXECUTION_REQUEST, handler);
+    };
+  }, [bellEnabled, bellDurationThreshold, config, stdout]);
 };

@@ -24,7 +24,10 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { fireToolNotificationHook } from './coreToolHookTriggers.js';
+import {
+  fireToolNotificationHook,
+  fireActionRequiredHook,
+} from './coreToolHookTriggers.js';
 import {
   type ToolCall,
   type ValidatingToolCall,
@@ -701,6 +704,14 @@ export class CoreToolScheduler {
               signal,
               wrappedConfirmationDetails,
             );
+            if (hooksEnabled && messageBus) {
+              await fireActionRequiredHook(
+                messageBus,
+                `Tool ${
+                  toolCall.tool.displayName || toolCall.tool.name
+                } requires confirmation`,
+              );
+            }
           }
         }
       } catch (error) {

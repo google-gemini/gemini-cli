@@ -206,7 +206,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.bellDurationThreshold`** (number):
   - **Description:** Minimum duration in seconds the operation must take before
-    the bell rings. This helps reduce noise for short operations.
+    the bell rings. This helps reduce noise for short, quick operations.
   - **Default:** `10`
 
 - **`ui.hideBanner`** (boolean):

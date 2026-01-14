@@ -428,7 +428,7 @@ const SETTINGS_SCHEMA = {
         label: 'Bell Duration Threshold',
         category: 'UI',
         requiresRestart: false,
-        default: 10,
+        default: 10 as number,
         description:
           'Minimum duration in seconds the operation must take before the bell rings. This helps reduce noise for short, quick operations.',
         showInDialog: false,

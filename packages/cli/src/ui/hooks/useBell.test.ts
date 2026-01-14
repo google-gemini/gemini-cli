@@ -5,24 +5,41 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '../../test-utils/render.js';
+import { renderHookWithProviders } from '../../test-utils/render.js';
 import { useBell } from './useBell.js';
-import { StreamingState } from '../types.js';
+import {
+  MessageBusType,
+  NotificationType,
+  type Config,
+} from '@google/gemini-cli-core';
+import { LoadedSettings } from '../../config/settings.js';
 
 const mockWrite = vi.fn();
-vi.mock('ink', () => ({
-  useStdout: () => ({ stdout: { write: mockWrite } }),
-}));
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    useStdout: () => ({ stdout: { write: mockWrite } }),
+  };
+});
 
-const mockUseSettings = vi.fn();
-vi.mock('../contexts/SettingsContext.js', () => ({
-  useSettings: () => mockUseSettings(),
-}));
+const mockSubscribe = vi.fn();
+const mockUnsubscribe = vi.fn();
+const mockMessageBus = {
+  subscribe: mockSubscribe,
+  unsubscribe: mockUnsubscribe,
+};
 
-const mockUseUIState = vi.fn();
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: () => mockUseUIState(),
-}));
+const mockConfig = {
+  getMessageBus: () => mockMessageBus,
+  getModel: () => 'gemini-pro',
+  getTargetDir: () => '/tmp',
+  getDebugMode: () => false,
+  isTrustedFolder: () => true,
+  getIdeMode: () => false,
+  getEnableInteractiveShell: () => true,
+  getPreviewFeatures: () => false,
+} as unknown as Config;
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -38,222 +55,134 @@ describe('useBell', () => {
     vi.clearAllMocks();
   });
 
-  it('should not ring bell on mount even if conditions are met', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
-    });
-    mockUseUIState.mockReturnValue({
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      history: [],
+  const createSettings = (bell: boolean, threshold: number) =>
+    new LoadedSettings(
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      {
+        path: '',
+        settings: { ui: { bell, bellDurationThreshold: threshold } },
+        originalSettings: {},
+      },
+      { path: '', settings: {}, originalSettings: {} },
+      true,
+      [],
+    );
+
+  it('should subscribe to MessageBus on mount and unsubscribe on unmount', () => {
+    const settings = createSettings(true, 0);
+
+    const { unmount } = renderHookWithProviders(() => useBell(), {
+      settings,
+      config: mockConfig,
     });
 
-    renderHook(() => useBell());
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      MessageBusType.HOOK_EXECUTION_REQUEST,
+      expect.any(Function),
+    );
 
-    expect(mockWrite).not.toHaveBeenCalled();
+    unmount();
+
+    expect(mockUnsubscribe).toHaveBeenCalledWith(
+      MessageBusType.HOOK_EXECUTION_REQUEST,
+      expect.any(Function),
+    );
   });
 
-  it('should ring bell when streamingState becomes Idle (action completed)', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
+  it.each([
+    { type: NotificationType.OperationComplete, name: 'OperationComplete' },
+    { type: NotificationType.ActionRequired, name: 'ActionRequired' },
+    { type: NotificationType.ToolPermission, name: 'ToolPermission' },
+  ])(
+    'should ring bell when $name notification occurs and duration >= threshold',
+    ({ type }) => {
+      const settings = createSettings(true, 5);
+
+      renderHookWithProviders(() => useBell(), {
+        settings,
+        config: mockConfig,
+      });
+      const handler = mockSubscribe.mock.calls[0][1];
+
+      // Start operation
+      handler({ eventName: 'BeforeAgent', input: {} });
+
+      // Advance time by 6s
+      vi.useFakeTimers();
+      vi.advanceTimersByTime(6000);
+
+      // Fire notification
+      handler({
+        eventName: 'Notification',
+        input: { notification_type: type },
+      });
+
+      expect(mockWrite).toHaveBeenCalledWith('\x07');
+      vi.useRealTimers();
+    },
+  );
+
+  it('should not ring bell if duration < threshold', () => {
+    const settings = createSettings(true, 5);
+
+    renderHookWithProviders(() => useBell(), {
+      settings,
+      config: mockConfig,
     });
-    let uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
+    const handler = mockSubscribe.mock.calls[0][1];
 
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      history: [],
-    };
-    rerender();
-
-    expect(mockWrite).toHaveBeenCalledWith('\x07');
-  });
-
-  it('should ring bell when dialogsVisible becomes true', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: true,
-      history: [],
-    };
-    rerender();
-
-    expect(mockWrite).toHaveBeenCalledWith('\x07');
-  });
-
-  it('should ring bell when streamingState becomes WaitingForConfirmation', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.WaitingForConfirmation,
-      dialogsVisible: false,
-      history: [],
-    };
-    rerender();
-
-    expect(mockWrite).toHaveBeenCalledWith('\x07');
-  });
-
-  it('should not ring bell if action was cancelled', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [{ text: 'Request cancelled.' }] as any[],
-    };
-    rerender();
-
-    expect(mockWrite).not.toHaveBeenCalled();
-  });
-
-  it('should not ring bell if setting is disabled', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: false, bellDurationThreshold: 0 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      history: [],
-    };
-    rerender();
-
-    expect(mockWrite).not.toHaveBeenCalled();
-  });
-
-  it('should not ring bell if streamingState changes to Responding', () => {
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 0 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      history: [],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    uiState = {
-      streamingState: StreamingState.Responding,
-      dialogsVisible: false,
-      history: [],
-    };
-    rerender();
-
-    expect(mockWrite).not.toHaveBeenCalled();
-  });
-
-  it('should not ring bell if duration is less than threshold', () => {
-    vi.useFakeTimers();
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 5 } },
-    });
-    let uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
-
-    const { rerender } = renderHook(() => useBell());
-
-    // Transition to Responding (start timer)
-    uiState = { ...uiState, streamingState: StreamingState.Responding };
-    rerender();
+    // Start operation
+    handler({ eventName: 'BeforeAgent', input: {} });
 
     // Advance time by 4s
+    vi.useFakeTimers();
     vi.advanceTimersByTime(4000);
 
-    // Transition to Idle (finish)
-    uiState = { ...uiState, streamingState: StreamingState.Idle };
-    rerender();
+    // Fire notification
+    handler({
+      eventName: 'Notification',
+      input: { notification_type: NotificationType.OperationComplete },
+    });
 
     expect(mockWrite).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
-  it('should ring bell if duration is greater than threshold', () => {
-    vi.useFakeTimers();
-    mockUseSettings.mockReturnValue({
-      merged: { ui: { bell: true, bellDurationThreshold: 5 } },
+  it('should reset startTime after OperationComplete', () => {
+    const settings = createSettings(true, 0);
+
+    renderHookWithProviders(() => useBell(), {
+      settings,
+      config: mockConfig,
     });
-    let uiState = {
-      streamingState: StreamingState.Idle,
-      dialogsVisible: false,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history: [] as any[],
-    };
-    mockUseUIState.mockImplementation(() => uiState);
+    const handler = mockSubscribe.mock.calls[0][1];
 
-    const { rerender } = renderHook(() => useBell());
+    // Start 1st operation
+    handler({ eventName: 'BeforeAgent', input: {} });
+    handler({
+      eventName: 'Notification',
+      input: { notification_type: NotificationType.OperationComplete },
+    });
+    expect(mockWrite).toHaveBeenCalledTimes(1);
 
-    // Transition to Responding (start timer)
-    uiState = { ...uiState, streamingState: StreamingState.Responding };
-    rerender();
+    // Start 2nd operation
+    handler({ eventName: 'BeforeAgent', input: {} });
+    handler({
+      eventName: 'Notification',
+      input: { notification_type: NotificationType.OperationComplete },
+    });
+    expect(mockWrite).toHaveBeenCalledTimes(2);
+  });
 
-    // Advance time by 6s
-    vi.advanceTimersByTime(6000);
+  it('should not ring bell if disabled', () => {
+    const settings = createSettings(false, 0);
 
-    // Transition to Idle (finish)
-    uiState = { ...uiState, streamingState: StreamingState.Idle };
-    rerender();
+    renderHookWithProviders(() => useBell(), {
+      settings,
+      config: mockConfig,
+    });
 
-    expect(mockWrite).toHaveBeenCalledWith('\x07');
-    vi.useRealTimers();
+    expect(mockSubscribe).not.toHaveBeenCalled();
   });
 });

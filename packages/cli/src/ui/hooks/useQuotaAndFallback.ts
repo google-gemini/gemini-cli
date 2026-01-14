@@ -15,6 +15,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL,
   VALID_GEMINI_MODELS,
+  fireActionRequiredHook,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -100,6 +101,11 @@ export function useQuotaAndFallback({
         return 'stop'; // A dialog is already active, so just stop this request.
       }
       isDialogPending.current = true;
+
+      const messageBus = config.getMessageBus();
+      if (messageBus) {
+        await fireActionRequiredHook(messageBus, 'Quota limit reached');
+      }
 
       const intent: FallbackIntent = await new Promise<FallbackIntent>(
         (resolve) => {
