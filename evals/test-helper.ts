@@ -36,12 +36,10 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       const result = await rig.run({ args: evalCase.prompt });
       await evalCase.assert(rig, result);
     } finally {
-      if (evalCase.log) {
-        await logToFile(
-          evalCase.name,
-          JSON.stringify(rig.readToolLogs(), null, 2),
-        );
-      }
+      await logToFile(
+        evalCase.name,
+        JSON.stringify(rig.readToolLogs(), null, 2),
+      );
       await rig.cleanup();
     }
   };
@@ -58,7 +56,6 @@ export interface EvalCase {
   params?: Record<string, any>;
   prompt: string;
   assert: (rig: TestRig, result: string) => Promise<void>;
-  log?: boolean;
 }
 
 async function logToFile(name: string, content: string) {
