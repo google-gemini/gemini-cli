@@ -18,7 +18,7 @@ exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderM
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
-│ Test **bold** and \`code\` markdown                                            │"
+│ Test bold and code markdown                                                  │"
 `;
 
 exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=false '(default, regular buffer)' 1`] = `

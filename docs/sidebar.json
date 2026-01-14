@@ -81,12 +81,20 @@
         "slug": "docs/cli/model"
       },
       {
+        "label": "Rewind",
+        "slug": "docs/cli/rewind"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
       {
         "label": "Session Management",
         "slug": "docs/cli/session-management"
+      },
+      {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
       },
       {
         "label": "Settings",
