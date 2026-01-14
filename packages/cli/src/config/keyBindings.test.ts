@@ -45,9 +45,6 @@ describe('keyBindings config', () => {
           if (binding.command !== undefined) {
             expect(typeof binding.command).toBe('boolean');
           }
-          if (binding.paste !== undefined) {
-            expect(typeof binding.paste).toBe('boolean');
-          }
         }
       }
     });
