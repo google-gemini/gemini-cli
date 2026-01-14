@@ -32,19 +32,7 @@ export async function skillsConsentString(
   const output: string[] = [];
   output.push(`Installing agent skill(s) from "${source}".`);
   output.push('\nThe following agent skill(s) will be installed:\n');
-  for (const skill of skills) {
-    output.push(`  - ${chalk.bold(skill.name)}: ${skill.description}`);
-    const skillDir = path.dirname(skill.location);
-    let fileCountStr = '';
-    try {
-      const skillDirItems = await fs.readdir(skillDir);
-      fileCountStr = ` (${skillDirItems.length} items in directory)`;
-    } catch {
-      fileCountStr = ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
-    }
-    output.push(chalk.dim(`    (Source: ${skill.location})${fileCountStr}`));
-    output.push('');
-  }
+  output.push(...(await renderSkillsList(skills)));
 
   if (targetDir) {
     output.push(`Install Destination: ${targetDir}`);
@@ -182,19 +170,7 @@ async function extensionConsentString(
   if (skills.length > 0) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
     output.push('\nThis extension will install the following agent skills:\n');
-    for (const skill of skills) {
-      output.push(`  - ${chalk.bold(skill.name)}: ${skill.description}`);
-      const skillDir = path.dirname(skill.location);
-      let fileCountStr = '';
-      try {
-        const skillDirItems = await fs.readdir(skillDir);
-        fileCountStr = ` (${skillDirItems.length} items in directory)`;
-      } catch {
-        fileCountStr = ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
-      }
-      output.push(chalk.dim(`    (Source: ${skill.location})${fileCountStr}`));
-      output.push('');
-    }
+    output.push(...(await renderSkillsList(skills)));
   }
 
   output.push('\n' + INSTALL_WARNING_MESSAGE);
@@ -203,6 +179,27 @@ async function extensionConsentString(
   }
 
   return output.join('\n');
+}
+
+/**
+ * Shared logic for formatting a list of agent skills for a consent prompt.
+ */
+async function renderSkillsList(skills: SkillDefinition[]): Promise<string[]> {
+  const output: string[] = [];
+  for (const skill of skills) {
+    output.push(`  - ${chalk.bold(skill.name)}: ${skill.description}`);
+    const skillDir = path.dirname(skill.location);
+    let fileCountStr = '';
+    try {
+      const skillDirItems = await fs.readdir(skillDir);
+      fileCountStr = ` (${skillDirItems.length} items in directory)`;
+    } catch {
+      fileCountStr = ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
+    }
+    output.push(chalk.dim(`    (Source: ${skill.location})${fileCountStr}`));
+    output.push('');
+  }
+  return output;
 }
 
 /**
