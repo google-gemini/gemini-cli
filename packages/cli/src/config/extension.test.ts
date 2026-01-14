@@ -200,11 +200,13 @@ describe('extension tests', () => {
       source: undefined,
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+    const settings = loadSettings(tempWorkspaceDir).merged;
+    (settings.experimental ??= {}).extensionConfig = true;
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
-      settings: loadSettings(tempWorkspaceDir).merged,
+      settings,
     });
     resetTrustedFoldersForTesting();
   });
