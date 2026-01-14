@@ -39,13 +39,10 @@ async function listAction(
 
   const skillManager = context.services.config?.getSkillManager();
   if (!skillManager) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Could not retrieve skill manager.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve skill manager.',
+    });
     return;
   }
 
@@ -66,7 +63,7 @@ async function listAction(
     showDescriptions: useShowDescriptions,
   };
 
-  context.ui.addItem(skillsListItem, Date.now());
+  context.ui.addItem(skillsListItem);
 }
 
 async function disableAction(
@@ -75,16 +72,24 @@ async function disableAction(
 ): Promise<void | SlashCommandActionReturn> {
   const skillName = args.trim();
   if (!skillName) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Please provide a skill name to disable.',
+    });
+    return;
+  }
+  const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Please provide a skill name to disable.',
+        text: 'Agent skills are disabled by your admin.',
       },
       Date.now(),
     );
     return;
   }
-  const skillManager = context.services.config?.getSkillManager();
+
   const skill = skillManager?.getSkill(skillName);
   if (!skill) {
     context.ui.addItem(
@@ -111,13 +116,10 @@ async function disableAction(
     feedback += ' Use "/skills reload" for it to take effect.';
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: feedback,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: feedback,
+  });
 }
 
 async function enableAction(
@@ -126,10 +128,19 @@ async function enableAction(
 ): Promise<void | SlashCommandActionReturn> {
   const skillName = args.trim();
   if (!skillName) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Please provide a skill name to enable.',
+    });
+    return;
+  }
+
+  const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Please provide a skill name to enable.',
+        text: 'Agent skills are disabled by your admin.',
       },
       Date.now(),
     );
@@ -146,13 +157,10 @@ async function enableAction(
     feedback += ' Use "/skills reload" for it to take effect.';
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: feedback,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: feedback,
+  });
 }
 
 async function reloadAction(
@@ -160,13 +168,10 @@ async function reloadAction(
 ): Promise<void | SlashCommandActionReturn> {
   const config = context.services.config;
   if (!config) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Could not retrieve configuration.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve configuration.',
+    });
     return;
   }
 
@@ -226,27 +231,21 @@ async function reloadAction(
       successText += ` ${details.join(' and ')}.`;
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: successText,
-        icon: '✓ ',
-        color: 'green',
-      } as HistoryItemInfo,
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: 'info',
+      text: successText,
+      icon: '✓ ',
+      color: 'green',
+    } as HistoryItemInfo);
   } catch (error) {
     clearTimeout(pendingTimeout);
     if (pendingItemSet) {
       context.ui.setPendingItem(null);
     }
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
 }
 

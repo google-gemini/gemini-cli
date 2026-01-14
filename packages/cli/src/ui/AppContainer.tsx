@@ -81,7 +81,7 @@ import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
 import { basename } from 'node:path';
-import { computeWindowTitle } from '../utils/windowTitle.js';
+import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -125,8 +125,10 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
+  SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import { useInactivityTimer } from './hooks/useInactivityTimer.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -278,9 +280,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const mainControlsRef = useRef<DOMElement>(null);
   // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
-  const originalTitleRef = useRef(
-    computeWindowTitle(basename(config.getTargetDir())),
-  );
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
@@ -392,6 +391,11 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, []);
 
+  const getPreferredEditor = useCallback(
+    () => settings.merged.general?.preferredEditor as EditorType,
+    [settings.merged.general?.preferredEditor],
+  );
+
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height: 10, width: inputWidth },
@@ -399,6 +403,7 @@ export const AppContainer = (props: AppContainerProps) => {
     setRawMode,
     isValidPath,
     shellModeActive,
+    getPreferredEditor,
   });
 
   // Initialize input history from logger (past sessions)
@@ -759,11 +764,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => {},
   );
 
-  const getPreferredEditor = useCallback(
-    () => settings.merged.general?.preferredEditor as EditorType,
-    [settings.merged.general?.preferredEditor],
-  );
-
   const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
     if (shouldRestorePrompt) {
       setPendingRestorePrompt(true);
@@ -802,6 +802,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    retryStatus,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -827,6 +828,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     lastOutputTimeRef.current = lastOutputTime;
   }, [lastOutputTime]);
+
+  const isShellAwaitingFocus =
+    !!activePtyId &&
+    !embeddedShellFocused &&
+    config.isInteractiveShellEnabled();
+  const showShellActionRequired = useInactivityTimer(
+    isShellAwaitingFocus,
+    lastOutputTime,
+    SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
+  );
 
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
@@ -1213,6 +1224,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     settings.merged.ui?.customWittyPhrases,
     !!activePtyId && !embeddedShellFocused,
     lastOutputTime,
+    retryStatus,
   );
 
   const handleGlobalKeypress = useCallback(
@@ -1268,7 +1280,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           return newValue;
         });
       } else if (
-        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
+        keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
         ideContextState
       ) {
@@ -1280,7 +1292,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
       } else if (
-        keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS_OUT](key) &&
+        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) &&
         activePtyId &&
         embeddedShellFocused
       ) {
@@ -1338,37 +1350,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
-    // Respect both showStatusInTitle and hideWindowTitle settings
-    if (
-      !settings.merged.ui?.showStatusInTitle ||
-      settings.merged.ui?.hideWindowTitle
-    )
-      return;
+    // Respect hideWindowTitle settings
+    if (settings.merged.ui?.hideWindowTitle) return;
 
-    let title;
-    if (streamingState === StreamingState.Idle) {
-      title = originalTitleRef.current;
-    } else {
-      const statusText = thought?.subject
-        ?.replace(/[\r\n]+/g, ' ')
-        .substring(0, 80);
-      title = statusText || originalTitleRef.current;
-    }
-
-    // Pad the title to a fixed width to prevent taskbar icon resizing.
-    const paddedTitle = title.padEnd(80, ' ');
+    const paddedTitle = computeTerminalTitle({
+      streamingState,
+      thoughtSubject: thought?.subject,
+      isConfirming:
+        !!shellConfirmationRequest ||
+        !!confirmationRequest ||
+        showShellActionRequired,
+      folderName: basename(config.getTargetDir()),
+      showThoughts: !!settings.merged.ui?.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+    });
 
     // Only update the title if it's different from the last value we set
     if (lastTitleRef.current !== paddedTitle) {
       lastTitleRef.current = paddedTitle;
-      stdout.write(`\x1b]2;${paddedTitle}\x07`);
+      stdout.write(`\x1b]0;${paddedTitle}\x07`);
     }
     // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
   }, [
     streamingState,
     thought,
+    shellConfirmationRequest,
+    confirmationRequest,
+    showShellActionRequired,
     settings.merged.ui?.showStatusInTitle,
+    settings.merged.ui?.dynamicWindowTitle,
     settings.merged.ui?.hideWindowTitle,
+    config,
     stdout,
   ]);
 
