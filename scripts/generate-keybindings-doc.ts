@@ -157,14 +157,8 @@ function formatBinding(binding: KeyBinding): string {
   if (binding.ctrl) modifiers.push('Ctrl');
   if (binding.command) modifiers.push('Cmd');
   if (binding.shift) modifiers.push('Shift');
-  if (binding.paste) modifiers.push('Paste');
 
-  const keyName = binding.key
-    ? formatKeyName(binding.key)
-    : binding.sequence
-      ? formatSequence(binding.sequence)
-      : '';
-
+  const keyName = formatKeyName(binding.key);
   if (!keyName) {
     return '';
   }
@@ -176,7 +170,6 @@ function formatBinding(binding: KeyBinding): string {
   if (binding.ctrl === false) restrictions.push('no Ctrl');
   if (binding.shift === false) restrictions.push('no Shift');
   if (binding.command === false) restrictions.push('no Cmd');
-  if (binding.paste === false) restrictions.push('not Paste');
 
   if (restrictions.length > 0) {
     combo = `${combo} (${restrictions.join(', ')})`;
@@ -190,26 +183,7 @@ function formatKeyName(key: string): string {
   if (KEY_NAME_OVERRIDES[normalized]) {
     return KEY_NAME_OVERRIDES[normalized];
   }
-  if (key.length === 1) {
-    return key.toUpperCase();
-  }
-  return key;
-}
-
-function formatSequence(sequence: string): string {
-  if (sequence.length === 1) {
-    const code = sequence.charCodeAt(0);
-    if (code >= 1 && code <= 26) {
-      return String.fromCharCode(code + 64);
-    }
-    if (code === 10 || code === 13) {
-      return 'Enter';
-    }
-    if (code === 9) {
-      return 'Tab';
-    }
-  }
-  return JSON.stringify(sequence);
+  return key.length === 1 ? key.toUpperCase() : key;
 }
 
 if (process.argv[1]) {
