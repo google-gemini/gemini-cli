@@ -9,7 +9,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     testTimeout: 300000, // 5 minutes
-    reporters: ['default'],
+    reporters: ['default', 'json'],
+    outputFile: {
+      json: 'evals/logs/report.json',
+    },
     include: ['**/*.eval.ts'],
   },
 });
