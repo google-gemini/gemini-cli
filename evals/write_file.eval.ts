@@ -1,0 +1,72 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, expect, vi } from 'vitest';
+import {
+  evalTest,
+  createToolCallErrorMessage,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
+
+describe('write_file', () => {
+  evalTest('ALWAYS_PASSES', {
+    name: 'should be able to write a file with a joke',
+    params: {
+      settings: { tools: { core: ['write_file', 'read_file'] } },
+    },
+    prompt:
+      'show me an example of using the write tool. put a dad joke in dad.txt',
+    assert: async (rig, result) => {
+      const foundToolCall = await rig.waitForToolCall('write_file');
+
+      // Add debugging information
+      if (!foundToolCall) {
+        printDebugInfo(rig, result);
+      }
+
+      const allTools = rig.readToolLogs();
+      expect(
+        foundToolCall,
+        createToolCallErrorMessage(
+          'write_file',
+          allTools.map((t) => t.toolRequest.name),
+          result,
+        ),
+      ).toBeTruthy();
+
+      // Validate model output - will throw if no output, warn if missing expected content
+      validateModelOutput(result, 'dad.txt', 'Write file test');
+
+      const newFilePath = 'dad.txt';
+
+      const newFileContent = rig.readFile(newFilePath);
+
+      // Add debugging for file content
+      if (newFileContent === '') {
+        console.error('File was created but is empty');
+        console.error(
+          'Tool calls:',
+          rig.readToolLogs().map((t) => ({
+            name: t.toolRequest.name,
+            args: t.toolRequest.args,
+          })),
+        );
+      }
+
+      expect(newFileContent).not.toBe('');
+
+      // Log success info if verbose
+      vi.stubEnv('VERBOSE', 'true');
+      if (process.env['VERBOSE'] === 'true') {
+        console.log(
+          'File created successfully with content:',
+          newFileContent.substring(0, 100) + '...',
+        );
+      }
+    },
+  });
+});
