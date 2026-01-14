@@ -76,17 +76,6 @@ export const formatTimeAgo = (date: string | number | Date): string => {
   return `${formatDuration(diffMs)} ago`;
 };
 
-/**
- * Escapes characters that have special meaning in regular expressions.
- * Use this function when you want to insert a string into a regex pattern literally.
- *
- * @param string The string to escape.
- * @returns The escaped string with special characters preceded by backslashes.
- */
-export function escapeRegexSpecialCharacters(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
 const REFERENCE_CONTENT_END = '--- End of content ---';
 

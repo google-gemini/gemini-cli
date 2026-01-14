@@ -10,7 +10,6 @@ import {
   formatMemoryUsage,
   formatTimeAgo,
   stripReferenceContent,
-  escapeRegexSpecialCharacters,
 } from './formatters.js';
 
 describe('formatters', () => {
@@ -120,29 +119,6 @@ describe('formatters', () => {
     it('should handle invalid timestamps', () => {
       const past = 'hello';
       expect(formatTimeAgo(past)).toBe('invalid date');
-    });
-  });
-
-  describe('escapeRegexSpecialCharacters', () => {
-    it('should escape special regex characters', () => {
-      const input = '.*+?^${}()|[]\\';
-      const expected = '\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\';
-      expect(escapeRegexSpecialCharacters(input)).toBe(expected);
-    });
-
-    it('should return the string unchanged if no special characters are present', () => {
-      const input = 'Hello World';
-      expect(escapeRegexSpecialCharacters(input)).toBe(input);
-    });
-
-    it('should handle a mix of regular and special characters', () => {
-      const input = 'Hello (World) [123]';
-      const expected = 'Hello \\(World\\) \\[123\\]';
-      expect(escapeRegexSpecialCharacters(input)).toBe(expected);
-    });
-
-    it('should handle empty string', () => {
-      expect(escapeRegexSpecialCharacters('')).toBe('');
     });
   });
 
