@@ -1,12 +1,16 @@
 name: '📋 Gemini Scheduled Issue Triage'
 
 on:
+  issues:
+    types:
+      - 'opened'
+      - 'reopened'
   schedule:
     - cron: '0 * * * *' # Runs every hour
   workflow_dispatch:
 
 concurrency:
-  group: '${{ github.workflow }}'
+  group: '${{ github.workflow }}-${{ github.event.number || github.run_id }}'
   cancel-in-progress: true
 
 defaults:
@@ -35,7 +39,19 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
 
+      - name: 'Get issue from event'
+        if: "github.event_name == 'issues'"
+        id: 'get_issue_from_event'
+        env:
+          ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
+        run: |
+          set -euo pipefail
+          ISSUE_JSON=$(echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]')
+          echo "issues_to_triage=${ISSUE_JSON}" >> "${GITHUB_OUTPUT}"
+          echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
+
       - name: 'Find untriaged issues'
+        if: "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
         id: 'find_issues'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
@@ -77,12 +93,13 @@ jobs:
 
       - name: 'Run Gemini Issue Analysis'
         if: |-
-          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+          (steps.get_issue_from_event.outputs.issues_to_triage != '' && steps.get_issue_from_event.outputs.issues_to_triage != '[]') ||
+          (steps.find_issues.outputs.issues_to_triage != '' && steps.find_issues.outputs.issues_to_triage != '[]')
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
+          ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
@@ -116,12 +133,12 @@ jobs:
             1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
-            4. Identify the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*.
-            5. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
-               If an issue has area/core and kind/bug  you will only add a priority/ label.
-               Instead if an issue has no labels, you will could add one lable of each kind.
+            4. Identify the most relevant labels from the existing labels, focusing on kind/* and priority/*.
+            5. If the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
+               If an issue has kind/bug you will only add a priority/ label.
+               Instead if an issue has no labels, you could add one label of each kind.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
-            7. For area/* and kind/* limit yourself to only the single most applicable label in each case.
+            7. For kind/* limit yourself to only the single most applicable label.
             8. Give me a single short explanation about why you are selecting each label in the process.
             9. Output a JSON array of objects, each containing the issue number
                and the labels to add and remove, along with an explanation. For example:
@@ -147,7 +164,7 @@ jobs:
             11. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
               - After identifying appropriate labels to an issue, add "status/need-triage" label to labels_to_remove in the output.
             12. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
-            13. If you are uncertain and have not been able to apply one each of kind/, area/ and priority/ , apply the status/manual-triage label.
+            13. If you are uncertain and have not been able to apply one each of kind/ and priority/ , apply the status/manual-triage label.
 
             ## Guidelines
 
@@ -157,9 +174,8 @@ jobs:
               - Do not add comments or modify the issue content.
               - Do not remove the following labels maintainer, help wanted or good first issue.
               - Triage only the current issue.
-              - Identify only one area/ label
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
-              - Identify all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
+              - Identify all applicable priority/* labels based on the issue content. It's ok to have multiple of these.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
             Categorization Guidelines:
             P0: Critical / Blocker
@@ -206,51 +222,6 @@ jobs:
               - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
               - This product is designed to use different models eg.. using pro, downgrading to flash etc.
               - When users report that they dont expect the model to change those would be categorized as feature requests.
-            Definition of Areas
-            area/ux:
-              - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
-              - I am seeing my screen flicker when using Gemini CLI
-              - I am seeing the output malformed
-              - Theme changes aren't taking effect
-              - My keyboard inputs arent' being recognzied
-            area/platform:
-              - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
-            area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models:
-              - i am not getting a response that is reasonable or expected. this can include things like
-              - I am calling a tool and the tool is not performing as expected.
-              - i am expecting a tool to be called and it is not getting called ,
-              - Including experience when using
-              - built-in tools (e.g., web search, code interpreter, read file, writefile, etc..),
-              - Function calling issues should be under this area
-              - i am getting responses from the model that are malformed.
-              - Issues concerning Gemini quality of response and inference,
-              - Issues talking about unnecessary token consumption.
-              - Issues talking about Model getting stuck in a loop be watchful as this could be the root cause for issues that otherwise seem like model performance issues.
-              - Memory compression
-              - unexpected responses,
-              - poor quality of generated code
-            area/tools:
-              - These are primarily issues related to Model Context Protocol
-              - These are issues that mention MCP support
-              - feature requests asking for support for new tools.
-            area/core:
-              - Issues with fundamental components like command parsing, configuration management, session state, and the main API client logic. Introducing multi-modality
-            area/contribution:
-              - Issues related to improving the developer contribution experience, such as CI/CD pipelines, build scripts, and test automation infrastructure.
-            area/authentication:
-              -  Issues related to user identity, login flows, API key handling, credential storage, and access token management, unable to sign in selecting wrong authentication path etc..
-            area/security-privacy:
-              - Issues concerning vulnerability patching, dependency security, data sanitization, privacy controls, and preventing unauthorized data access.
-            area/extensibility:
-              - Issues related to the plugin system, extension APIs, or making the CLI's functionality available in other applications, github actions, ide support etc..
-            area/performance:
-              - Issues focused on model performance
-              - Issues with running out of capacity,
-              - 429 errors etc..
-              - could also pertain to latency,
-              - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
-              - Switching models from one to the other unexpectedly.
 
       - name: 'Apply Labels to Issues'
         if: |-
@@ -267,16 +238,23 @@ jobs:
             core.info(`Raw labels JSON: ${rawLabels}`);
             let parsedLabels;
             try {
+              // First, try to parse the raw output as JSON.
+              parsedLabels = JSON.parse(rawLabels.trim());
+            } catch (jsonError) {
+              // If that fails, check for a markdown code block.
+              core.info(`Direct JSON parsing failed: ${jsonError.message}. Trying to extract from a markdown block.`);
               const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-              if (!jsonMatch || !jsonMatch[1]) {
-                throw new Error("Could not find a ```json ... ``` block in the output.");
+              if (jsonMatch && jsonMatch[1]) {
+                try {
+                  parsedLabels = JSON.parse(jsonMatch[1].trim());
+                } catch (markdownError) {
+                  core.setFailed(`Failed to parse JSON even after extracting from markdown block: ${markdownError.message}\nRaw output: ${rawLabels}`);
+                  return;
+                }
+              } else {
+                core.setFailed(`Output is not valid JSON and does not contain a JSON markdown block.\nRaw output: ${rawLabels}`);
+                return;
               }
-              const jsonString = jsonMatch[1].trim();
-              parsedLabels = JSON.parse(jsonString);
-              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
-            } catch (err) {
-              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
-              return;
             }
 
             for (const entry of parsedLabels) {

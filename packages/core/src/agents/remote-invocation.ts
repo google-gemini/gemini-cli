@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ToolConfirmationOutcome } from '../tools/tools.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -114,8 +115,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     return {
       type: 'info',
       title: `Call Remote Agent: ${this.definition.displayName ?? this.definition.name}`,
-      prompt: `This will send a message to the external agent at ${this.definition.agentCardUrl}.`,
-      onConfirm: async () => {}, // No-op for now, just informational
+      prompt: `Calling remote agent: "${this.params.query}"`,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        await this.publishPolicyUpdate(outcome);
+      },
     };
   }
 
@@ -163,16 +166,16 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       });
 
       // Extract the output text
-      const resultData = response;
-      let outputText = '';
+      const outputText =
+        response.kind === 'task'
+          ? extractTaskText(response)
+          : response.kind === 'message'
+            ? extractMessageText(response)
+            : JSON.stringify(response);
 
-      if (resultData.kind === 'message') {
-        outputText = extractMessageText(resultData);
-      } else if (resultData.kind === 'task') {
-        outputText = extractTaskText(resultData);
-      } else {
-        outputText = JSON.stringify(resultData);
-      }
+      debugLogger.debug(
+        `[RemoteAgent] Response from ${this.definition.name}:\n${JSON.stringify(response, null, 2)}`,
+      );
 
       return {
         llmContent: [{ text: outputText }],
