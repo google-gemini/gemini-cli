@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -euo pipefail
 
 # Initialize a comma-separated string to hold PR numbers that need a comment
 PRS_NEEDING_COMMENT=""
