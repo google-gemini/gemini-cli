@@ -93,7 +93,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .option('debug', {
       alias: 'd',
       type: 'boolean',
-      description: 'Run in debug mode?',
+      description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
