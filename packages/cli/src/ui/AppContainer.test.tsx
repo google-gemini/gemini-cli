@@ -1858,7 +1858,6 @@ describe('AppContainer State Management', () => {
             ctrl: true,
             meta: false,
             shift: false,
-            paste: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -1885,7 +1884,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1900,7 +1898,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1921,7 +1918,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1937,7 +1933,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });

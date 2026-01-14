@@ -396,11 +396,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
       /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && !key.paste) {
+      if (!focus && key.name !== 'paste') {
         return;
       }
 
-      if (key.paste) {
+      if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());

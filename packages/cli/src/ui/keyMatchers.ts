@@ -46,10 +46,6 @@ function matchKeyBinding(keyBinding: KeyBinding, key: Key): boolean {
     return false;
   }
 
-  if (keyBinding.paste !== undefined && key.paste !== keyBinding.paste) {
-    return false;
-  }
-
   return true;
 }
 

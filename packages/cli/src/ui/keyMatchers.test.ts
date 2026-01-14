@@ -16,7 +16,6 @@ describe('keyMatchers', () => {
     ctrl: false,
     meta: false,
     shift: false,
-    paste: false,
     insertable: false,
     sequence: name,
     ...mods,
@@ -243,7 +242,6 @@ describe('keyMatchers', () => {
       negative: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
     },
     {
@@ -251,7 +249,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
       negative: [createKey('return'), createKey('n')],
     },

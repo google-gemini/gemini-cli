@@ -606,7 +606,7 @@ export function SettingsDialog({
           const definition = getSettingDefinition(editingKey);
           const type = definition?.type;
 
-          if (key.paste && key.sequence) {
+          if (key.name === 'paste' && key.sequence) {
             let pasted = key.sequence;
             if (type === 'number') {
               pasted = key.sequence.replace(/[^0-9\-+.]/g, '');

@@ -87,10 +87,10 @@ available combinations.
 
 #### Text Input
 
-| Action                               | Keys                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd, not Paste)`                                              |
-| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Paste + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Action                               | Keys                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
+| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 
 #### External Tools
 
