@@ -689,9 +689,6 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    const hasDeprecatedPromptArg = process.argv.some((arg) =>
-      arg.startsWith('--prompt'),
-    );
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
@@ -699,7 +696,6 @@ export async function main() {
       settings,
       input,
       prompt_id,
-      hasDeprecatedPromptArg,
       resumedSessionData,
     });
     // Call cleanup before process.exit, which causes cleanup to not run
