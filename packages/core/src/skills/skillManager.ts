@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
@@ -13,12 +15,27 @@ export { type SkillDefinition };
 export class SkillManager {
   private skills: SkillDefinition[] = [];
   private activeSkillNames: Set<string> = new Set();
+  private adminSkillsEnabled = true;
 
   /**
    * Clears all discovered skills.
    */
   clearSkills(): void {
     this.skills = [];
+  }
+
+  /**
+   * Sets administrative settings for skills.
+   */
+  setAdminSettings(enabled: boolean): void {
+    this.adminSkillsEnabled = enabled;
+  }
+
+  /**
+   * Returns true if skills are enabled by the admin.
+   */
+  isAdminEnabled(): boolean {
+    return this.adminSkillsEnabled;
   }
 
   /**
@@ -56,9 +73,16 @@ export class SkillManager {
    * Discovers built-in skills.
    */
   private async discoverBuiltinSkills(): Promise<void> {
-    // Built-in skills can be added here.
-    // For now, this is a placeholder for where built-in skills will be loaded from.
-    // They could be loaded from a specific directory within the package.
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const builtinDir = path.join(__dirname, 'builtin');
+
+    const builtinSkills = await loadSkillsFromDir(builtinDir);
+
+    for (const skill of builtinSkills) {
+      skill.isBuiltin = true;
+    }
+
+    this.addSkillsWithPrecedence(builtinSkills);
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
