@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { rewindCommand } from './rewindCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { waitFor } from '../../test-utils/async.js';
 import { MessageType } from '../types.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
 import {
@@ -127,18 +128,20 @@ describe('rewindCommand', () => {
 
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.RewindOnly);
 
-    expect(mockRevertFileChanges).not.toHaveBeenCalled();
-    expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
-    expect(mockSetHistory).toHaveBeenCalled();
-    expect(mockResetContext).toHaveBeenCalled();
-    expect(mockLoadHistory).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({ text: 'old user', id: 1 }),
-        expect.objectContaining({ text: 'old gemini', id: 2 }),
-      ],
-      'New Prompt',
-    );
-    expect(mockRemoveComponent).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRevertFileChanges).not.toHaveBeenCalled();
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
+      expect(mockSetHistory).toHaveBeenCalled();
+      expect(mockResetContext).toHaveBeenCalled();
+      expect(mockLoadHistory).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ text: 'old user', id: 1 }),
+          expect.objectContaining({ text: 'old gemini', id: 2 }),
+        ],
+        'New Prompt',
+      );
+      expect(mockRemoveComponent).toHaveBeenCalled();
+    });
 
     // Verify setInput was NOT called directly (it's handled via loadHistory now)
     expect(mockSetInput).not.toHaveBeenCalled();
@@ -154,16 +157,18 @@ describe('rewindCommand', () => {
 
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.RewindAndRevert);
 
-    expect(mockRevertFileChanges).toHaveBeenCalledWith(
-      mockGetConversation(),
-      'msg-id-123',
-    );
-    expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
+    await waitFor(() => {
+      expect(mockRevertFileChanges).toHaveBeenCalledWith(
+        mockGetConversation(),
+        'msg-id-123',
+      );
+      expect(mockRewindTo).toHaveBeenCalledWith('msg-id-123');
+      expect(mockLoadHistory).toHaveBeenCalledWith(
+        expect.any(Array),
+        'New Prompt',
+      );
+    });
     expect(mockSetInput).not.toHaveBeenCalled();
-    expect(mockLoadHistory).toHaveBeenCalledWith(
-      expect.any(Array),
-      'New Prompt',
-    );
   });
 
   it('should handle RevertOnly correctly', async () => {
@@ -176,19 +181,21 @@ describe('rewindCommand', () => {
 
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.RevertOnly);
 
-    expect(mockRevertFileChanges).toHaveBeenCalledWith(
-      mockGetConversation(),
-      'msg-id-123',
-    );
-    expect(mockRewindTo).not.toHaveBeenCalled();
-    expect(mockRemoveComponent).toHaveBeenCalled();
-    expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageType.INFO,
-        text: 'File changes reverted.',
-      }),
-      expect.any(Number),
-    );
+    await waitFor(() => {
+      expect(mockRevertFileChanges).toHaveBeenCalledWith(
+        mockGetConversation(),
+        'msg-id-123',
+      );
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(mockRemoveComponent).toHaveBeenCalled();
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'File changes reverted.',
+        }),
+        expect.any(Number),
+      );
+    });
     expect(mockSetInput).not.toHaveBeenCalled();
   });
 
@@ -202,9 +209,11 @@ describe('rewindCommand', () => {
 
     await onRewind('msg-id-123', 'New Prompt', RewindOutcome.Cancel);
 
-    expect(mockRevertFileChanges).not.toHaveBeenCalled();
-    expect(mockRewindTo).not.toHaveBeenCalled();
-    expect(mockRemoveComponent).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRevertFileChanges).not.toHaveBeenCalled();
+      expect(mockRewindTo).not.toHaveBeenCalled();
+      expect(mockRemoveComponent).toHaveBeenCalled();
+    });
     expect(mockSetInput).not.toHaveBeenCalled();
   });
 
@@ -222,13 +231,15 @@ describe('rewindCommand', () => {
 
     await onRewind('msg-1', 'Prompt', RewindOutcome.RewindOnly);
 
-    expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageType.ERROR,
-        text: 'Rewind Failed',
-      }),
-      expect.any(Number),
-    );
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Rewind Failed',
+        }),
+        expect.any(Number),
+      );
+    });
   });
 
   it('should fail if config is missing', () => {

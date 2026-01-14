@@ -10,6 +10,7 @@ import { MessageType, type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
+import { checkExhaustive } from '../../utils/checks.js';
 
 import type { Content } from '@google/genai';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -59,50 +60,49 @@ export const rewindCommand: SlashCommand = {
           onExit={() => context.ui.removeComponent()}
           onRewind={async (messageId, newText, outcome) => {
             try {
-              if (outcome === RewindOutcome.Cancel) {
-                context.ui.removeComponent();
-                return;
-              }
-
-              if (
-                outcome === RewindOutcome.RewindAndRevert ||
-                outcome === RewindOutcome.RevertOnly
-              ) {
-                const currentConversation = recordingService.getConversation();
-                if (currentConversation) {
-                  await revertFileChanges(currentConversation, messageId);
-                }
-              }
-
-              if (outcome === RewindOutcome.RevertOnly) {
-                context.ui.removeComponent();
-                context.ui.addItem(
-                  {
-                    type: MessageType.INFO,
-                    text: 'File changes reverted.',
-                  },
-                  Date.now(),
-                );
-                return;
-              }
-
-              let updatedConversation = conversation;
-              if (
-                outcome === RewindOutcome.RewindOnly ||
-                outcome === RewindOutcome.RewindAndRevert
-              ) {
-                const rewindedConvesation =
-                  recordingService.rewindTo(messageId);
-                if (rewindedConvesation) {
-                  updatedConversation = rewindedConvesation;
-                } else {
-                  debugLogger.error('Could not fetch conversation file');
+              switch (outcome) {
+                case RewindOutcome.Cancel:
+                  context.ui.removeComponent();
                   return;
-                }
+
+                case RewindOutcome.RevertOnly:
+                  if (conversation) {
+                    await revertFileChanges(conversation, messageId);
+                  }
+                  context.ui.removeComponent();
+                  context.ui.addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: 'File changes reverted.',
+                    },
+                    Date.now(),
+                  );
+                  return;
+
+                case RewindOutcome.RewindAndRevert:
+                  if (conversation) {
+                    await revertFileChanges(conversation, messageId);
+                  }
+                  // Proceed to rewind logic
+                  break;
+
+                case RewindOutcome.RewindOnly:
+                  // Proceed to rewind logic
+                  break;
+
+                default:
+                  checkExhaustive(outcome);
               }
+
+              const rewindedConvesation = recordingService.rewindTo(messageId);
+              if (!rewindedConvesation) {
+                debugLogger.error('Could not fetch conversation file');
+                return;
+              }
+
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
-                convertSessionToHistoryFormats(updatedConversation.messages);
+                convertSessionToHistoryFormats(rewindedConvesation.messages);
 
               // Reset the client's internal history to match the file
               client.setHistory(clientHistory as Content[]);
