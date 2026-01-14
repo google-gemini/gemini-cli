@@ -40,11 +40,13 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Get issue from event'
-        if: github.event_name == 'issues'
+        if: "github.event_name == 'issues'"
         id: 'get_issue_from_event'
+        env:
+          ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
         run: |
           set -euo pipefail
-          ISSUE_JSON=$(jq -n --argjson issue "$${{ toJSON(github.event.issue) }}" '[{number: $issue.number, title: $issue.title, body: $issue.body}]')
+          ISSUE_JSON=$(echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]')
           echo "issues_to_triage=${ISSUE_JSON}" >> "${GITHUB_OUTPUT}"
           echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
 
@@ -94,7 +96,9 @@ jobs:
             return labelNames;
 
       - name: 'Run Gemini Issue Analysis'
-        if: "steps.get_issue_from_event.outputs.issues_to_triage != '[]' || (steps.find_issues.outputs.issues_to_triage != '' && steps.find_issues.outputs.issues_to_triage != '[]')"
+        if: |-
+          (steps.get_issue_from_event.outputs.issues_to_triage != '' && steps.get_issue_from_event.outputs.issues_to_triage != '[]') ||
+          (steps.find_issues.outputs.issues_to_triage != '' && steps.find_issues.outputs.issues_to_triage != '[]')
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:

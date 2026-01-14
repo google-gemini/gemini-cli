@@ -67,7 +67,6 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
@@ -75,9 +74,10 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionSelector } from './utils/sessionUtils.js';
-import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
+import { StreamingState } from './ui/types.js';
+import { computeTerminalTitle } from './utils/windowTitle.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -466,6 +466,13 @@ export async function main() {
     });
     loadConfigHandle?.end();
 
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
+
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
     registerTelemetryConfig(config);
@@ -554,7 +561,6 @@ export async function main() {
 
     await setupTerminalAndTheme(config, settings);
 
-    setMaxSizedBoxDebugging(isDebugMode);
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
     initAppHandle?.end();
@@ -704,11 +710,18 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
-    const windowTitle = computeWindowTitle(title);
-    writeToStdout(`\x1b]2;${windowTitle}\x07`);
+    // Initial state before React loop starts
+    const windowTitle = computeTerminalTitle({
+      streamingState: StreamingState.Idle,
+      isConfirming: false,
+      folderName: title,
+      showThoughts: !!settings.merged.ui?.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+    });
+    writeToStdout(`\x1b]0;${windowTitle}\x07`);
 
     process.on('exit', () => {
-      writeToStdout(`\x1b]2;\x07`);
+      writeToStdout(`\x1b]0;\x07`);
     });
   }
 }
