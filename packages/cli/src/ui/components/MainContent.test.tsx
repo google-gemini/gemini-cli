@@ -34,6 +34,13 @@ vi.mock('../contexts/UIStateContext.js', () => ({
     activePtyId: undefined,
     embeddedShellFocused: false,
     historyRemountKey: 0,
+    settings: {
+      merged: {
+        output: {
+          verbosity: 'info',
+        },
+      },
+    },
   }),
 }));
 

@@ -153,6 +153,14 @@
           "default": "text",
           "type": "string",
           "enum": ["text", "json"]
+        },
+        "verbosity": {
+          "title": "Output Verbosity",
+          "description": "Controls the detail level of the conversation history. `Verbose` will include autonomous tool calls, additional logs, etc.",
+          "markdownDescription": "Controls the detail level of the conversation history. `Verbose` will include autonomous tool calls, additional logs, etc.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `info`",
+          "default": "info",
+          "type": "string",
+          "enum": ["info", "verbose"]
         }
       },
       "additionalProperties": false

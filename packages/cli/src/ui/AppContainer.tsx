@@ -166,7 +166,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
-    verbosity: settings.merged.output?.verbosity,
   });
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
@@ -1617,6 +1616,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      settings,
     }),
     [
       isThemeDialogOpen,
@@ -1711,6 +1711,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      settings,
     ],
   );
 

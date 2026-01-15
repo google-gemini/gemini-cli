@@ -31,8 +31,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -77,8 +77,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -123,8 +123,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                     false*  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -169,8 +169,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -215,8 +215,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -261,8 +261,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -307,8 +307,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                     false*  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -353,8 +353,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      false  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -399,8 +399,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                                                      true*  │
-│    Hide the window title bar                                                                     │
+│    Output Verbosity                                                                      Normal  │
+│    Controls the detail level of the conversation history. \`Verbose\` will include auto…           │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

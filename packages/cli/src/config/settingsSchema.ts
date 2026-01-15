@@ -341,7 +341,7 @@ const SETTINGS_SCHEMA = {
           'Controls the detail level of the conversation history. `Verbose` will include autonomous tool calls, additional logs, etc.',
         showInDialog: true,
         options: [
-          { value: 'info', label: 'Normal' },
+          { value: 'info', label: 'Standard' },
           { value: 'verbose', label: 'Verbose' },
         ],
       },

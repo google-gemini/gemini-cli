@@ -6,7 +6,6 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react';
 import type { HistoryItem } from '../types.js';
-import { VERBOSITY_MAPPING, Verbosity } from '../types.js';
 import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
 // Type for the updater function passed to updateHistoryItem
@@ -37,16 +36,15 @@ export interface UseHistoryManagerReturn {
  */
 export function useHistory({
   chatRecordingService,
-  verbosity = 'info',
 }: {
   chatRecordingService?: ChatRecordingService | null;
-  verbosity?: string;
 } = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
 
-  // Generates a unique message ID based on a timestamp and a counter.
-  const getNextMessageId = useCallback((baseTimestamp: number): number => {
+  const getNextMessageId = useCallback((baseTimestamp: number) => {
+    // Generate a unique ID using timestamp and a counter to handle
+    // multiple messages in the same millisecond
     messageIdCounterRef.current += 1;
     return baseTimestamp + messageIdCounterRef.current;
   }, []);
@@ -55,41 +53,32 @@ export function useHistory({
     setHistory(newHistory);
   }, []);
 
-  // Adds a new item to the history state with a unique ID.
+  /**
+   * Adds an item to the history.
+   * Returns the ID of the added item.
+   */
   const addItem = useCallback(
     (
       itemData: Omit<HistoryItem, 'id'>,
       baseTimestamp: number = Date.now(),
       isResuming: boolean = false,
     ): number => {
-      // Cast to string to safely index into VERBOSITY_MAPPING
-      const itemType = itemData.type as string;
-      const currentVerbosity =
-        VERBOSITY_MAPPING[verbosity ?? 'info'] ?? Verbosity.INFO;
-      const itemVerbosity =
-        itemData.verbosity ?? VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
-
-      if (itemVerbosity > currentVerbosity) {
-        // Skip adding the item to the UI history if it exceeds the current verbosity level
-        return -1;
-      }
-
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
-      setHistory((prevHistory) => {
-        if (prevHistory.length > 0) {
-          const lastItem = prevHistory[prevHistory.length - 1];
+      setHistory((prev) => {
+        if (prev.length > 0) {
+          const lastItem = prev[prev.length - 1];
           // Prevent adding duplicate consecutive user messages
           if (
             lastItem.type === 'user' &&
             newItem.type === 'user' &&
             lastItem.text === newItem.text
           ) {
-            return prevHistory; // Don't add the duplicate
+            return prev; // Don't add the duplicate
           }
         }
-        return [...prevHistory, newItem];
+        return [...prev, newItem];
       });
 
       // Record UI-specific messages, but don't do it if we're actually loading
@@ -123,19 +112,17 @@ export function useHistory({
             });
             break;
           case 'user':
-          case 'gemini':
-          case 'gemini_content':
-            // Core conversation recording handled by GeminiChat.
+            // User messages are recorded by the input handler
             break;
           default:
-            // Ignore the rest.
+            // Other types might not need recording or are recorded elsewhere
             break;
         }
       }
 
       return id; // Return the generated ID (even if not added, to keep signature)
     },
-    [getNextMessageId, chatRecordingService, verbosity],
+    [getNextMessageId, chatRecordingService],
   );
 
   /**
@@ -144,7 +131,6 @@ export function useHistory({
    * rendering all history items in <Static /> for performance reasons. Only use
    * if ABSOLUTELY NECESSARY
    */
-  //
   const updateItem = useCallback(
     (
       id: number,

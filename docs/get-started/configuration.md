@@ -163,6 +163,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"text"`
   - **Values:** `"text"`, `"json"`
 
+- **`output.verbosity`** (enum):
+  - **Description:** Controls the detail level of the conversation history.
+    `Verbose` will include autonomous tool calls, additional logs, etc.
+  - **Default:** `"info"`
+  - **Values:** `"info"`, `"verbose"`
+
 #### `ui`
 
 - **`ui.theme`** (string):

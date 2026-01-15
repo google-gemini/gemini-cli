@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useHistory } from './useHistoryManager.js';
-import type { HistoryItem } from '../types.js';
+import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 
 describe('useHistoryManager', () => {
   it('should initialize with an empty history', () => {
@@ -218,5 +218,27 @@ describe('useHistoryManager', () => {
     // ID should be >= before + 1 (since counter starts at 0 and increments to 1)
     expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
     expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
+  });
+
+  it('should store all items regardless of verbosity level (filtering is done at render time)', () => {
+    // @ts-expect-error - verbosity prop was removed, but we want to ensure it's ignored if passed by mistake
+    const { result } = renderHook(() => useHistory({ verbosity: 'info' }));
+    const timestamp = Date.now();
+    const verboseItem: HistoryItemWithoutId = {
+      type: 'verbose',
+      text: 'Hidden detail',
+      verbosity: 3, // Verbosity.VERBOSE
+    };
+
+    act(() => {
+      result.current.addItem(verboseItem, timestamp);
+    });
+
+    expect(result.current.history).toHaveLength(1);
+    expect(result.current.history[0]).toEqual(
+      expect.objectContaining({
+        text: 'Hidden detail',
+      }),
+    );
   });
 });
