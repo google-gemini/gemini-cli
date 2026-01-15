@@ -236,10 +236,24 @@ describe('useVim hook', () => {
       // Should be handled by vim hook (returned true) but NOT submitted
       expect(handled).toBe(true);
       expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
-      // Should pass through to buffer.handleInput
-      expect(testBuffer.handleInput).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'return', shift: true }),
+      // Should trigger newline
+      expect(testBuffer.newline).toHaveBeenCalled();
+    });
+
+    it('should treat "enter" key (Shift+Enter variant) as newline', () => {
+      // Some terminals (like iTerm2 or those with Kitty protocol) report
+      // Shift+Enter as name: 'enter' and sequence: '\n' instead of 'return' with shift modifier.
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      const handled = result.current.handleInput(
+        createKey({ name: 'enter', sequence: '\n' }),
       );
+
+      expect(handled).toBe(true);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+      expect(testBuffer.newline).toHaveBeenCalled();
     });
   });
 

@@ -61,6 +61,7 @@ describe('useTextBuffer - openInExternalEditor', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it.each([
@@ -105,10 +106,6 @@ describe('useTextBuffer - openInExternalEditor', () => {
         expectedArgs,
         expect.objectContaining({ stdio: 'inherit' }),
       );
-
-      if (env) {
-        vi.unstubAllEnvs();
-      }
     },
   );
 });

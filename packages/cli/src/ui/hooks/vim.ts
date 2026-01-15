@@ -257,9 +257,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true;
       }
 
-      // Handle Shift+Enter explicitly to ensure it inserts a newline
-      if (keyMatchers[Command.NEWLINE](normalizedKey)) {
-        buffer.handleInput(normalizedKey);
+      // Handle Shift+Enter explicitly to ensure it inserts a newline.
+      // Note: Some terminals report Shift+Enter as 'enter' (not 'return'),
+      // while others report it as 'return' with shift=true.
+      if (
+        keyMatchers[Command.NEWLINE](normalizedKey) ||
+        normalizedKey.name === 'enter'
+      ) {
+        buffer.newline();
         return true;
       }
 

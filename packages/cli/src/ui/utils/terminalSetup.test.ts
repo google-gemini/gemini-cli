@@ -58,7 +58,7 @@ vi.mock('./terminalCapabilityManager.js', () => ({
 }));
 
 describe('terminalSetup', () => {
-  const originalEnv = process.env;
+  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -78,7 +78,7 @@ describe('terminalSetup', () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    process.env = { ...originalEnv };
   });
 
   describe('detectTerminal', () => {
