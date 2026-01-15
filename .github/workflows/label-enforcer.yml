@@ -1,4 +1,4 @@
-name: '🏷️ Enforce help wanted Label Permissions'
+name: '🏷️ Enforce Restricted Label Permissions'
 
 on:
   issues:
@@ -8,9 +8,9 @@ on:
 
 jobs:
   enforce-label:
-    # Run this job only when the 'help wanted' label is changed
+    # Run this job only when restricted labels are changed
     if: |-
-      ${{ github.event.label.name == 'help wanted' &&
+      ${{ (github.event.label.name == 'help wanted' || github.event.label.name == 'status/need-triage') &&
           (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') }}
     runs-on: 'ubuntu-latest'
     permissions:
@@ -36,6 +36,7 @@ jobs:
             const username = context.payload.sender.login;
             const team_slug = 'gemini-cli-maintainers';
             const action = context.payload.action; // 'labeled' or 'unlabeled'
+            const labelName = context.payload.label.name;
 
             // Skip if the change was made by a bot to avoid infinite loops
             if (username === 'github-actions[bot]') {
@@ -58,7 +59,7 @@ jobs:
                 throw error;
               }
 
-              core.info(`${username} is not a member. Reverting '${action}' action for 'help wanted' label.`);
+              core.info(`${username} is not a member. Reverting '${action}' action for '${labelName}' label.`);
 
               if (action === 'labeled') {
                 // 1. Remove the label if added by a non-maintainer
@@ -66,14 +67,14 @@ jobs:
                   owner: org,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  name: 'help wanted'
+                  name: labelName
                 });
 
                 // 2. Post a polite comment
                 const comment = `
             Hi @${username}, thank you for your interest in helping triage issues!
 
-            The `help-wanted` label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
+            The \`${labelName}\` label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
 
             A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) for more details on our labeling process.
                 `.trim().replace(/^[ ]+/gm, '');
@@ -90,12 +91,12 @@ jobs:
                   owner: org,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  labels: ['help wanted']
+                  labels: [labelName]
                 });
 
                 // 2. Post a polite comment
                 const comment = `
-            Hi @${username}, it looks like the `help-wanted` label was removed.
+            Hi @${username}, it looks like the \`${labelName}\` label was removed.
 
             This label is managed by project maintainers. We've added it back to ensure the issue remains visible to potential contributors until a maintainer decides otherwise.
 
