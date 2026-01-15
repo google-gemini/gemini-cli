@@ -98,7 +98,9 @@ async function main() {
   let targetPrs = [];
   for (const pr of prs) {
     const author = pr.author.login;
-    const issueCount = pr.closingIssuesReferences ? pr.closingIssuesReferences.length : 0;
+    const issueCount = pr.closingIssuesReferences
+      ? pr.closingIssuesReferences.length
+      : 0;
 
     if (issueCount > 0) {
       // Skip if already linked to an issue
@@ -110,9 +112,12 @@ async function main() {
     }
   }
 
-  console.log(`✅ Found ${targetPrs.length} PRs from non-maintainers without associated issues.`);
+  console.log(
+    `✅ Found ${targetPrs.length} PRs from non-maintainers without associated issues.`,
+  );
 
-  const commentBody = "\nHi @{AUTHOR}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.\n\nWe're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](${DISCUSSION_URL}).\n\nKey Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.\n\nThank you for your understanding and for being a part of our community!\n  ".trim();
+  const commentBody =
+    "\nHi @{AUTHOR}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.\n\nWe're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](${DISCUSSION_URL}).\n\nKey Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.\n\nThank you for your understanding and for being a part of our community!\n  ".trim();
 
   let successCount = 0;
   let skipCount = 0;
@@ -141,7 +146,7 @@ async function main() {
 
     if (existingComments && existingComments.includes('true')) {
       console.log(
-        `⏭️  PR #${prNumber} already has the notification. Skipping.`, 
+        `⏭️  PR #${prNumber} already has the notification. Skipping.`,
       );
       skipCount++;
       continue;
