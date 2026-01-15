@@ -130,7 +130,8 @@ This is especially useful for scripting and automation.
 ## Debugging tips
 
 - **CLI debugging:**
-  - Use the `--debug` flag for more detailed output.
+  - Use the `--debug` flag for more detailed output. In interactive mode, press
+    F12 to view the debug console.
   - Check the CLI logs, often found in a user-specific configuration or cache
     directory.
 
