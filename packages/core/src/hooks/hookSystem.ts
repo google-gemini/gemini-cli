@@ -100,41 +100,28 @@ export class HookSystem {
 
   /**
    * Fire hook events directly
-   * Returns undefined if hooks are disabled
    */
   async fireSessionStartEvent(
     source: SessionStartSource,
   ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     return this.hookEventHandler.fireSessionStartEvent(source);
   }
 
   async fireSessionEndEvent(
     reason: SessionEndReason,
   ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     return this.hookEventHandler.fireSessionEndEvent(reason);
   }
 
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
   ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     return this.hookEventHandler.firePreCompressEvent(trigger);
   }
 
   async fireBeforeAgentEvent(
     prompt: string,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireBeforeAgentEvent(prompt);
     return result.finalOutput;
   }
@@ -144,9 +131,6 @@ export class HookSystem {
     response: string,
     stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireAfterAgentEvent(
       prompt,
       response,
@@ -158,9 +142,6 @@ export class HookSystem {
   async fireBeforeModelEvent(
     llmRequest: GenerateContentParameters,
   ): Promise<BeforeModelHookResult> {
-    if (!this.config.getEnableHooks()) {
-      return { blocked: false };
-    }
     try {
       const result =
         await this.hookEventHandler.fireBeforeModelEvent(llmRequest);
@@ -208,9 +189,6 @@ export class HookSystem {
     originalRequest: GenerateContentParameters,
     chunk: GenerateContentResponse,
   ): Promise<AfterModelHookResult> {
-    if (!this.config.getEnableHooks()) {
-      return { response: chunk };
-    }
     try {
       const result = await this.hookEventHandler.fireAfterModelEvent(
         originalRequest,
