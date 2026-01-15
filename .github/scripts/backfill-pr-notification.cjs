@@ -1,0 +1,163 @@
+/* eslint-disable */
+/* global require, console, process */
+
+/**
+ * Script to backfill a process change notification comment to all open PRs
+ * not created by members of the 'gemini-cli-maintainers' team.
+ */
+
+const { execFileSync } = require('child_process');
+
+const isDryRun = process.argv.includes('--dry-run');
+const REPO = 'google-gemini/gemini-cli';
+const ORG = 'google-gemini';
+const TEAM_SLUG = 'gemini-cli-maintainers';
+const DISCUSSION_URL = 'https://github.com/google-gemini/gemini-cli/discussions/16706';
+
+/**
+ * Executes a GitHub CLI command safely using an argument array.
+ */
+function runGh(args) {
+  try {
+    return execFileSync('gh', args, {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch (error) {
+    const stderr = error.stderr ? ` Stderr: ${error.stderr.trim()}` : '';
+    console.error(`❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`);
+    return null;
+  }
+}
+
+/**
+ * Checks if a user is a member of the maintainers team.
+ */
+const membershipCache = new Map();
+function isMaintainer(username) {
+  if (membershipCache.has(username)) return membershipCache.get(username);
+
+  const result = runGh([
+    'api',
+    `orgs/${ORG}/teams/${TEAM_SLUG}/memberships/${username}`,
+  ]);
+
+  const isMember = result !== null;
+  membershipCache.set(username, isMember);
+  return isMember;
+}
+
+async function main() {
+  console.log('🔐 GitHub CLI security check...');
+  if (runGh(['auth', 'status']) === null) {
+    console.error('❌ GitHub CLI (gh) is not authenticated.');
+    process.exit(1);
+  }
+
+  if (isDryRun) {
+    console.log('🧪 DRY RUN MODE ENABLED\n');
+  }
+
+  console.log(`📥 Fetching open PRs from ${REPO}...`);
+  const prsJson = runGh([
+    'pr',
+    'list',
+    '--repo',
+    REPO,
+    '--state',
+    'open',
+    '--limit',
+    '1000',
+    '--json',
+    'number,author',
+  ]);
+
+  if (prsJson === null) process.exit(1);
+  const prs = JSON.parse(prsJson);
+
+  console.log(`📊 Found ${prs.length} open PRs. Checking authors...`);
+
+  let targetPrs = [];
+  for (const pr of prs) {
+    const author = pr.author.login;
+    if (!isMaintainer(author)) {
+      targetPrs.push(pr);
+    }
+  }
+
+  console.log(`✅ Found ${targetPrs.length} PRs created by non-maintainers.`);
+
+  const commentBody = `
+Hi @{AUTHOR}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.
+
+We're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](${DISCUSSION_URL}).
+
+Key Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.
+
+Thank you for your understanding and for being a part of our community!
+  `
+
+  let successCount = 0;
+  let skipCount = 0;
+  let failCount = 0;
+
+  for (const pr of targetPrs) {
+    const prNumber = String(pr.number);
+    const author = pr.author.login;
+
+    // Check if we already commented (idempotency)
+    const existingComments = runGh([
+      'pr',
+      'view',
+      prNumber,
+      '--repo',
+      REPO,
+      '--json',
+      'comments',
+      '--jq',
+      `.comments[].body | contains("${DISCUSSION_URL}")`,
+    ]);
+
+    if (existingComments && existingComments.includes('true')) {
+      console.log(`⏭️  PR #${prNumber} already has the notification. Skipping.`);
+      skipCount++;
+      continue;
+    }
+
+    if (isDryRun) {
+      console.log(`[DRY RUN] Would notify @${author} on PR #${prNumber}`);
+      successCount++;
+    } else {
+      console.log(`💬 Notifying @${author} on PR #${prNumber}...`);
+      const personalizedComment = commentBody.replace('{AUTHOR}', author);
+      const result = runGh([
+        'pr',
+        'comment',
+        prNumber,
+        '--repo',
+        REPO,
+        '--body',
+        personalizedComment,
+      ]);
+
+      if (result !== null) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+  }
+
+  console.log(`\n📊 Summary:`);
+  console.log(`   - Notified: ${successCount}`);
+  console.log(`   - Skipped:  ${skipCount}`);
+  console.log(`   - Failed:   ${failCount}`);
+
+  if (failCount > 0) process.exit(1);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
