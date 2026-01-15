@@ -30,14 +30,14 @@ jobs:
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
       - name: 'Log in to GitHub Container Registry'
-        uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+        uses: 'docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef' # ratchet:docker/login-action@v3
         with:
           registry: 'ghcr.io'
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Run Gemini Issue Deduplication Refresh'
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@ba709f0578653f8a65869f9b862bd47455cd96d2' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_refresh_embeddings'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
