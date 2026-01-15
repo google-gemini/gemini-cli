@@ -4,7 +4,11 @@
     "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@google/gemini-cli-core": ["./index.ts"]
+    }
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
   "exclude": ["node_modules", "dist"]
