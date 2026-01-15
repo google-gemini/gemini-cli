@@ -19,27 +19,29 @@ import { debugLogger } from '../utils/debugLogger.js';
 function formatMessageForDebugLog(message: Message): string {
   if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
     const inputKeys = Object.keys(message.input ?? {});
-    return (
-      `[MESSAGE_BUS] publish: hook-execution-request ` +
-      `(eventName=${message.eventName}, correlationId=${message.correlationId}, ` +
-      `inputKeys=[${inputKeys.join(', ')}])`
-    );
+    return `[MESSAGE_BUS] publish: hook-execution-request (eventName=${message.eventName}, correlationId=${message.correlationId}, inputKeys=[${inputKeys.join(', ')}])`;
   }
 
   if (message.type === MessageBusType.HOOK_EXECUTION_RESPONSE) {
-    const outputKeys = message.output ? Object.keys(message.output) : [];
-    const errorMessage = message.error
-      ? message.error instanceof Error
-        ? message.error.message
-        : String(message.error)
-      : undefined;
+    const parts: string[] = [
+      `correlationId=${message.correlationId}`,
+      `success=${message.success}`,
+    ];
 
-    return (
-      `[MESSAGE_BUS] publish: hook-execution-response ` +
-      `(correlationId=${message.correlationId}, success=${message.success}` +
-      `${outputKeys.length ? `, outputKeys=[${outputKeys.join(', ')}]` : ''}` +
-      `${errorMessage ? `, error=${errorMessage}` : ''})`
-    );
+    const outputKeys = message.output ? Object.keys(message.output) : [];
+    if (outputKeys.length > 0) {
+      parts.push(`outputKeys=[${outputKeys.join(', ')}]`);
+    }
+
+    if (message.error) {
+      const errorMessage =
+        message.error instanceof Error
+          ? message.error.message
+          : String(message.error);
+      parts.push(`error=${errorMessage}`);
+    }
+
+    return `[MESSAGE_BUS] publish: hook-execution-response (${parts.join(', ')})`;
   }
 
   return `[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`;
