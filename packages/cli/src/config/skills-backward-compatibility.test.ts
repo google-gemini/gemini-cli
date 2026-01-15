@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadCliConfig, parseArguments } from './config.js';
 import * as trustedFolders from './trustedFolders.js';
 import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
-import { createTestMergedSettings } from './settings.js';
+import { type Settings, createTestMergedSettings } from './settings.js';
 
 vi.mock('./trustedFolders.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

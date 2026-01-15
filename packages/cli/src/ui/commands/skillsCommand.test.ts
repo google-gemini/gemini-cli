@@ -14,6 +14,7 @@ import {
   SettingScope,
   type LoadedSettings,
   createTestMergedSettings,
+  type MergedSettings,
 } from '../../config/settings.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
@@ -185,7 +186,9 @@ describe('skillsCommand', () => {
 
   describe('disable/enable', () => {
     beforeEach(() => {
-      context.services.settings.merged = createTestMergedSettings({
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
         skills: { enabled: true, disabled: [] },
       });
       (
@@ -240,7 +243,9 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      context.services.settings.merged = createTestMergedSettings({
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
         skills: {
           enabled: true,
           disabled: ['skill1'],
