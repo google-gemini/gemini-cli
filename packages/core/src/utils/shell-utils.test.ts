@@ -20,6 +20,7 @@ import {
   initializeShellParsers,
   stripShellWrapper,
   hasRedirection,
+  resolveExecutable,
 } from './shell-utils.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -31,6 +32,16 @@ vi.mock('os', () => ({
   },
   platform: mockPlatform,
   homedir: mockHomedir,
+}));
+
+const mockAccessSync = vi.hoisted(() => vi.fn());
+vi.mock('node:fs', () => ({
+  default: {
+    accessSync: mockAccessSync,
+    constants: { X_OK: 1 },
+  },
+  accessSync: mockAccessSync,
+  constants: { X_OK: 1 },
 }));
 
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -429,5 +440,66 @@ describe('hasRedirection (PowerShell via mock)', () => {
     });
     // Fallback regex sees '>' in arrow
     expect(hasRedirection('echo "-> arrow"')).toBe(true);
+  });
+});
+
+describe('resolveExecutable', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAccessSync.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return the absolute path if it exists and is executable', () => {
+    const absPath = '/usr/bin/git';
+    mockAccessSync.mockReturnValue(undefined); // success
+    expect(resolveExecutable(absPath)).toBe(absPath);
+    expect(mockAccessSync).toHaveBeenCalledWith(absPath, 1);
+  });
+
+  it('should return undefined for absolute path if it does not exist', () => {
+    const absPath = '/usr/bin/nonexistent';
+    mockAccessSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+    expect(resolveExecutable(absPath)).toBeUndefined();
+  });
+
+  it('should resolve executable in PATH', () => {
+    process.env.PATH = '/bin:/usr/bin';
+    mockPlatform.mockReturnValue('linux');
+    mockAccessSync.mockImplementation((p: string) => {
+      if (p === '/usr/bin/ls') return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(resolveExecutable('ls')).toBe('/usr/bin/ls');
+  });
+
+  it('should try extensions on Windows', () => {
+    process.env.PATH = 'C:\\Windows\\System32';
+    mockPlatform.mockReturnValue('win32');
+    mockAccessSync.mockImplementation((p: string) => {
+      // Use includes because on Windows path separators might differ
+      if (p.includes('cmd.exe')) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(resolveExecutable('cmd')).toContain('cmd.exe');
+  });
+
+  it('should return undefined if not found in PATH', () => {
+    process.env.PATH = '/bin';
+    mockPlatform.mockReturnValue('linux');
+    mockAccessSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    expect(resolveExecutable('unknown')).toBeUndefined();
   });
 });

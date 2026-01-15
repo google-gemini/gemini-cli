@@ -12,7 +12,11 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
+import {
+  getShellConfiguration,
+  resolveExecutable,
+  type ShellType,
+} from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -461,6 +465,12 @@ export class ShellExecutionService {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
+
+      const resolvedExecutable = resolveExecutable(executable);
+      if (!resolvedExecutable) {
+        throw new Error(`Shell executable not found: ${executable}`);
+      }
+
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
@@ -660,6 +670,12 @@ export class ShellExecutionService {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
+            // Attempt to destroy the PTY to ensure FD is closed
+            try {
+              (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
+            } catch {
+              // Ignore errors during cleanup
+            }
 
             const finalize = () => {
               render(true);
