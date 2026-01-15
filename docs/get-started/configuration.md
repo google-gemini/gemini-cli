@@ -1346,6 +1346,10 @@ for that specific session.
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
+    - `plan`: Read-only mode for tool calls (requires experimental planning to
+      be enabled).
+      > **Note:** This mode is currently under development and not yet fully
+      > functional.
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
