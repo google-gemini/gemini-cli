@@ -64,7 +64,7 @@ export class A2AClientManager {
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
-    if (this.clients.has(name)) {
+    if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 

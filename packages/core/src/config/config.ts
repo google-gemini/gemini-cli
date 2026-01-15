@@ -387,6 +387,7 @@ export interface ConfigParameters {
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
+    agents?: AgentSettings;
   }>;
 }
 
@@ -518,11 +519,12 @@ export class Config {
     | (() => Promise<{
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
       }>)
     | undefined;
 
   private readonly enableAgents: boolean;
-  private readonly agents: AgentSettings;
+  private agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
@@ -1632,6 +1634,18 @@ export class Config {
 
     // Notify the client that system instructions might need updating
     await this.updateSystemInstructionIfInitialized();
+  }
+
+  /**
+   * Reloads agent settings.
+   */
+  async reloadAgents(): Promise<void> {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.agents) {
+        this.agents = refreshed.agents;
+      }
+    }
   }
 
   isInteractive(): boolean {
