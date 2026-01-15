@@ -23,7 +23,7 @@ jobs:
       issues: 'write'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ github.event.inputs.ref || github.sha }}'
           fetch-depth: 0
