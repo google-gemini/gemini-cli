@@ -29,6 +29,7 @@ describe('ToolConfirmationMessage Redirection', () => {
       title: 'Confirm Shell Command',
       command: 'echo "hello" > test.txt',
       rootCommand: 'echo, redirection (>)',
+      rootCommands: ['echo'],
       onConfirm: vi.fn(),
     };
 
