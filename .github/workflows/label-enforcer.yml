@@ -58,7 +58,7 @@ jobs:
                 core.info(`${username} has '${permission}' permission. Allowed.`);
                 return;
               }
-              
+
               core.info(`${username} has '${permission}' permission (needs 'write' or 'admin'). Reverting '${action}' action for '${labelName}' label.`);
             } catch (error) {
               core.error(`Failed to check permissions for ${username}: ${error.message}`);
