@@ -11,7 +11,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
@@ -19,7 +18,8 @@ import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
-
+const GEMINI_DIR = '.gemini';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 // Get timeout based on environment
 export function getDefaultTimeout() {
   if (env['CI']) return 60000; // 1 minute in CI
