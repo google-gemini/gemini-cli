@@ -120,6 +120,7 @@ they appear in the UI.
 | Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                        | `10`    |
 | Use OSC 52 Paste                    | `experimental.useOSC52Paste`                            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                          | `true`  |
+| Plan                                | `experimental.plan`                                     | Enable planning features (Plan Mode and tools).                                     | `false` |
 
 ### Hooks
 

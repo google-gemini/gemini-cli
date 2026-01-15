@@ -157,7 +157,7 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
     if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
       keypressHandler({
         ...key,
-        name: '',
+        name: 'return',
         sequence: '\r',
         insertable: true,
       });
@@ -250,11 +250,10 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
 
       if (buffer.length > 0) {
         keypressHandler({
-          name: '',
+          name: 'paste',
           ctrl: false,
           meta: false,
           shift: false,
-          paste: true,
           insertable: true,
           sequence: buffer,
         });
@@ -357,7 +356,6 @@ function* emitKeys(
               ctrl: false,
               meta: false,
               shift: false,
-              paste: true,
               insertable: true,
               sequence: decoded,
             });
@@ -570,7 +568,6 @@ function* emitKeys(
         ctrl,
         meta,
         shift,
-        paste: false,
         insertable: false,
         sequence: ESC,
       });
@@ -592,7 +589,6 @@ function* emitKeys(
         ctrl,
         meta,
         shift,
-        paste: false,
         insertable,
         sequence,
       });
@@ -606,7 +602,6 @@ export interface Key {
   ctrl: boolean;
   meta: boolean;
   shift: boolean;
-  paste: boolean;
   insertable: boolean;
   sequence: string;
 }
