@@ -5,6 +5,9 @@
  */
 
 import fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { globSync } from 'glob';
+import { readFileWithEncoding } from '../utils/fileUtils.js';
 
 /**
  * Interface for file system operations that may be delegated to different implementations
@@ -25,6 +28,15 @@ export interface FileSystemService {
    * @param content - The content to write
    */
   writeTextFile(filePath: string, content: string): Promise<void>;
+
+  /**
+   * Finds files with a given name within specified search paths.
+   *
+   * @param fileName - The name of the file to find.
+   * @param searchPaths - An array of directory paths to search within.
+   * @returns An array of absolute paths to the found files.
+   */
+  findFiles(fileName: string, searchPaths: readonly string[]): string[];
 }
 
 /**
@@ -32,10 +44,21 @@ export interface FileSystemService {
  */
 export class StandardFileSystemService implements FileSystemService {
   async readTextFile(filePath: string): Promise<string> {
-    return fs.readFile(filePath, 'utf-8');
+    // Use BOM-aware reader to handle UTF-8/16/32 encodings
+    return readFileWithEncoding(filePath);
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
     await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  findFiles(fileName: string, searchPaths: readonly string[]): string[] {
+    return searchPaths.flatMap((searchPath) => {
+      const pattern = path.posix.join(searchPath, '**', fileName);
+      return globSync(pattern, {
+        nodir: true,
+        absolute: true,
+      });
+    });
   }
 }
