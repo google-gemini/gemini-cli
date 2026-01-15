@@ -11,7 +11,6 @@ import * as fs from 'node:fs';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from './storage.js';
-import type { Settings } from '../settings.js';
 import {
   KeychainTokenStorage,
   debugLogger,
@@ -21,6 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
+import { createTestMergedSettings } from '../settings.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -247,12 +247,10 @@ describe('extensionUpdates', () => {
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
 
-        settings: {
-          telemetry: {
-            enabled: false,
-          },
+        settings: createTestMergedSettings({
+          telemetry: { enabled: false },
           experimental: { extensionConfig: true },
-        } as unknown as Settings,
+        }),
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });

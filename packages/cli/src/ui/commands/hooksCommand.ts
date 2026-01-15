@@ -76,8 +76,7 @@ async function enableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
-
+  const disabledHooks = settings.merged.hooks.disabled;
   // Remove from disabled list if present
   const newDisabledHooks = disabledHooks.filter(
     (name: string) => name !== hookName,
@@ -143,8 +142,7 @@ async function disableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
-
+  const disabledHooks = settings.merged.hooks.disabled;
   // Add to disabled list if not already present
   if (!disabledHooks.includes(hookName)) {
     const newDisabledHooks = [...disabledHooks, hookName];

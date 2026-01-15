@@ -32,14 +32,14 @@ export async function setupTerminalAndTheme(
   }
 
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
+  themeManager.loadCustomThemes(settings.merged.ui.customThemes);
 
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
+  if (settings.merged.ui.theme) {
+    if (!themeManager.setActiveTheme(settings.merged.ui.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
       debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+        `Warning: Theme "${settings.merged.ui.theme}" not found.`,
       );
     }
   } else {
