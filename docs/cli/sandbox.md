@@ -54,11 +54,11 @@ from your organization's registry.
 
 ```bash
 # Enable sandboxing with command flag
-gemini -s -p "analyze the code structure"
+gemini -s "analyze the code structure"
 
 # Use environment variable
 export GEMINI_SANDBOX=true
-gemini -p "run the test suite"
+gemini "run the test suite"
 
 # Configure in settings.json
 {
@@ -140,7 +140,7 @@ export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
 ### Debug mode
 
 ```bash
-DEBUG=1 gemini -s -p "debug command"
+DEBUG=1 gemini -s "debug command"
 ```
 
 **Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect
@@ -151,10 +151,10 @@ specific debug settings.
 
 ```bash
 # Check environment
-gemini -s -p "run shell command: env | grep SANDBOX"
+gemini -s "run shell command: env | grep SANDBOX"
 
 # List mounts
-gemini -s -p "run shell command: mount | grep workspace"
+gemini -s "run shell command: mount | grep workspace"
 ```
 
 ## Security notes
