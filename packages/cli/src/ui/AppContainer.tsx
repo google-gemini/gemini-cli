@@ -284,16 +284,35 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [sessionManager, isSessionsViewOpen]);
 
-  // Poll for session updates if view is open
+  // Listen for session and workflow updates
   useEffect(() => {
-    if (!isSessionsViewOpen || !sessionManager) return;
+    if (!sessionManager) return;
 
-    const interval = setInterval(() => {
+    const handleSessionsUpdate = (sessions: ActiveSession[]) => {
+      if (isSessionsViewOpen) {
+        setActiveSessions(sessions);
+      }
+    };
+
+    const handleWorkflowUpdate = (tasks: WorkflowTask[]) => {
+      if (isSessionsViewOpen) {
+        setWorkflowTasks(tasks);
+      }
+    };
+
+    sessionManager.on('sessions_updated', handleSessionsUpdate);
+    sessionManager.on('workflow_updated', handleWorkflowUpdate);
+
+    // Initial sync
+    if (isSessionsViewOpen) {
       setActiveSessions(sessionManager.getSessions());
       setWorkflowTasks(sessionManager.getTasks());
-    }, 1000);
+    }
 
-    return () => clearInterval(interval);
+    return () => {
+      sessionManager.off('sessions_updated', handleSessionsUpdate);
+      sessionManager.off('workflow_updated', handleWorkflowUpdate);
+    };
   }, [isSessionsViewOpen, sessionManager]);
 
   const [currentModel, setCurrentModel] = useState(config.getModel());

@@ -73,6 +73,7 @@ export class SessionManager extends EventEmitter {
       });
     }
     this.updateTaskStatuses();
+    this.emit('workflow_updated', this.getTasks());
     await this.processQueue();
   }
 
@@ -118,6 +119,112 @@ export class SessionManager extends EventEmitter {
         }
       }
     }
+    this.emit('workflow_updated', this.getTasks());
+  }
+
+  private _spawnWorkerProcess(
+    sessionId: string,
+    branchName: string,
+    worktreePath: string,
+    taskDescription: string,
+    input?: string,
+  ): ChildProcess {
+    const geminiExecutable = process.argv[1];
+    const isNode = process.argv[0].endsWith('node');
+
+    let spawnCommand = geminiExecutable;
+    let spawnArgs: string[] = ['--approval-mode', 'yolo'];
+
+    if (this.useSandbox) {
+      spawnArgs.push('--sandbox');
+    }
+
+    if (input) {
+      // Case: Restarting with input
+      spawnArgs.push(input);
+    } else {
+      // Case: Starting new session with system note and task
+      const systemNote = `
+SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName}'.
+1. You MUST perform your task and COMMIT all changes to git.
+2. Do NOT push to remote.
+3. If you create new files, ensure you 'git add' them.
+4. When finished, print "WORK_COMPLETE".
+5. RUNTIME CONTEXT: You are running in a non-interactive background process managed by a Manager Agent.
+   - Do NOT ask the user questions via stdout expecting a reply, unless absolutely necessary.
+   - If you need confirmation, pause and ask, but prefer autonomy.
+   - You cannot run interactive TTY commands (like vim, nano, less). Use non-interactive tools only.
+`;
+      spawnArgs.push(`${systemNote}\n\nTask: ${taskDescription}`);
+    }
+
+    if (isNode) {
+      spawnCommand = process.argv[0];
+      spawnArgs = [geminiExecutable, ...spawnArgs];
+    }
+
+    const child = spawn(spawnCommand, spawnArgs, {
+      cwd: worktreePath,
+      env: {
+        ...process.env,
+        GEMINI_SESSION_ID: sessionId,
+        GEMINI_SANDBOX_CONTAINER_NAME: `gemini-worker-${sessionId}`,
+      },
+      stdio: 'pipe',
+      detached: false,
+    });
+
+    return child;
+  }
+
+  private _setupProcessListeners(session: ActiveSession, child: ChildProcess) {
+    const handleOutput = (data: Buffer) => {
+      const output = data.toString();
+      // Keep a larger buffer for tailing, e.g., 5000 chars
+      session.lastOutput = (session.lastOutput || '') + output;
+      if (session.lastOutput.length > 5000) {
+        session.lastOutput = session.lastOutput.slice(-5000);
+      }
+
+      const trimmed = output.trim();
+      if (
+        trimmed.endsWith('?') ||
+        trimmed.match(/\([yY]\/[nN]\)/) ||
+        trimmed.includes('Waiting for confirmation')
+      ) {
+        session.status = 'waiting_for_input';
+      } else {
+        session.status = 'running';
+      }
+      this.emit('sessions_updated', this.getSessions());
+    };
+
+    child.stdout?.on('data', handleOutput);
+    child.stderr?.on('data', handleOutput);
+
+    child.on('exit', (code) => {
+      session.status = code === 0 ? 'completed' : 'failed';
+      session.process = undefined;
+      session.pid = undefined;
+
+      this.emit('session_completed', session);
+      this.emit('sessions_updated', this.getSessions());
+
+      // Update associated task status
+      for (const [, task] of this.tasks) {
+        if (task.assignedSessionId === session.id) {
+          task.status = session.status === 'completed' ? 'completed' : 'failed';
+          break;
+        }
+      }
+      this.emit('workflow_updated', this.getTasks());
+
+      // Trigger next tasks
+      this.updateTaskStatuses();
+      this.processQueue().catch((e) =>
+        debugLogger.error('[SessionManager] Error in processQueue', e),
+      );
+    });
   }
 
   async startSession(
@@ -183,49 +290,12 @@ export class SessionManager extends EventEmitter {
         );
       }
 
-      // 2. Spawn Gemini CLI
-      const geminiExecutable = process.argv[1];
-      const isNode = process.argv[0].endsWith('node');
-
-      let spawnCommand = geminiExecutable;
-      // We use positional argument for the prompt as --prompt is deprecated.
-      // We explicitly DO NOT use -i (interactive) because we want to control it via stdio.
-      // We pass --approval-mode yolo to ensure tools like shell/edit are available and don't block.
-
-      const systemNote = `
-SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName}'.
-1. You MUST perform your task and COMMIT all changes to git.
-2. Do NOT push to remote.
-3. If you create new files, ensure you 'git add' them.
-4. When finished, print "WORK_COMPLETE".
-5. RUNTIME CONTEXT: You are running in a non-interactive background process managed by a Manager Agent.
-   - Do NOT ask the user questions via stdout expecting a reply, unless absolutely necessary.
-   - If you need confirmation, pause and ask, but prefer autonomy.
-   - You cannot run interactive TTY commands (like vim, nano, less). Use non-interactive tools only.
-`;
-      let spawnArgs: string[] = ['--approval-mode', 'yolo'];
-
-      if (this.useSandbox) {
-        spawnArgs.push('--sandbox');
-      }
-
-      spawnArgs.push(`${systemNote}\n\nTask: ${taskDescription}`);
-
-      if (isNode) {
-        spawnCommand = process.argv[0];
-        spawnArgs = [geminiExecutable, ...spawnArgs];
-      }
-
-      const child = spawn(spawnCommand, spawnArgs, {
-        cwd: worktreePath,
-        env: {
-          ...process.env,
-          GEMINI_SESSION_ID: sessionId,
-          GEMINI_SANDBOX_CONTAINER_NAME: `gemini-worker-${sessionId}`,
-        },
-        stdio: 'pipe',
-        detached: false,
-      });
+      const child = this._spawnWorkerProcess(
+        sessionId,
+        branchName,
+        worktreePath,
+        taskDescription,
+      );
 
       const session: ActiveSession = {
         id: sessionId,
@@ -238,53 +308,10 @@ SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName
         lastOutput: '',
       };
 
-      const handleOutput = (data: Buffer) => {
-        const output = data.toString();
-        // Keep a larger buffer for tailing, e.g., 2000 chars
-        session.lastOutput = (session.lastOutput || '') + output;
-        if (session.lastOutput.length > 5000) {
-          session.lastOutput = session.lastOutput.slice(-5000);
-        }
-
-        const trimmed = output.trim();
-        if (
-          trimmed.endsWith('?') ||
-          trimmed.match(/\([yY]\/[nN]\)/) ||
-          trimmed.includes('Waiting for confirmation')
-        ) {
-          session.status = 'waiting_for_input';
-        } else {
-          session.status = 'running';
-        }
-      };
-
-      child.stdout?.on('data', handleOutput);
-      child.stderr?.on('data', handleOutput);
-
-      child.on('exit', (code) => {
-        session.status = code === 0 ? 'completed' : 'failed';
-        session.process = undefined;
-        session.pid = undefined;
-
-        this.emit('session_completed', session);
-
-        // Update associated task status
-        for (const [, task] of this.tasks) {
-          if (task.assignedSessionId === sessionId) {
-            task.status =
-              session.status === 'completed' ? 'completed' : 'failed';
-            break;
-          }
-        }
-
-        // Trigger next tasks
-        this.updateTaskStatuses();
-        this.processQueue().catch((e) =>
-          debugLogger.error('[SessionManager] Error in processQueue', e),
-        );
-      });
-
+      this._setupProcessListeners(session, child);
       this.sessions.set(sessionId, session);
+      this.emit('sessions_updated', this.getSessions());
+
       return session;
     } catch (error) {
       debugLogger.error('[SessionManager] Failed to start session', error);
@@ -309,6 +336,7 @@ SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName
         const textToSend = input.endsWith('\n') ? input : `${input}\n`;
         session.process.stdin?.write(textToSend);
         session.status = 'running';
+        this.emit('sessions_updated', this.getSessions());
         return true;
       } catch (e) {
         debugLogger.error(
@@ -326,33 +354,13 @@ SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName
         `[SessionManager] Restarting session ${sessionId} with new input`,
       );
 
-      const geminiExecutable = process.argv[1];
-      const isNode = process.argv[0].endsWith('node');
-
-      let spawnCommand = geminiExecutable;
-      let spawnArgs: string[] = ['--approval-mode', 'yolo'];
-
-      if (this.useSandbox) {
-        spawnArgs.push('--sandbox');
-      }
-
-      spawnArgs.push(input);
-
-      if (isNode) {
-        spawnCommand = process.argv[0];
-        spawnArgs = [geminiExecutable, ...spawnArgs];
-      }
-
-      const child = spawn(spawnCommand, spawnArgs, {
-        cwd: session.worktreePath,
-        env: {
-          ...process.env,
-          GEMINI_SESSION_ID: sessionId,
-          GEMINI_SANDBOX_CONTAINER_NAME: `gemini-worker-${sessionId}`,
-        },
-        stdio: 'pipe',
-        detached: false,
-      });
+      const child = this._spawnWorkerProcess(
+        sessionId,
+        session.branchName,
+        session.worktreePath,
+        session.taskDescription,
+        input,
+      );
 
       session.process = child;
       session.pid = child.pid;
@@ -360,51 +368,8 @@ SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName
       // Append input to output for context history in UI
       session.lastOutput = (session.lastOutput || '') + `\n> ${input}\n`;
 
-      const handleOutput = (data: Buffer) => {
-        const output = data.toString();
-        // Keep a larger buffer for tailing, e.g., 5000 chars
-        session.lastOutput = (session.lastOutput || '') + output;
-        if (session.lastOutput.length > 5000) {
-          session.lastOutput = session.lastOutput.slice(-5000);
-        }
-
-        const trimmed = output.trim();
-        if (
-          trimmed.endsWith('?') ||
-          trimmed.match(/\([yY]\/[nN]\)/) ||
-          trimmed.includes('Waiting for confirmation')
-        ) {
-          session.status = 'waiting_for_input';
-        } else {
-          session.status = 'running';
-        }
-      };
-
-      child.stdout?.on('data', handleOutput);
-      child.stderr?.on('data', handleOutput);
-
-      child.on('exit', (code) => {
-        session.status = code === 0 ? 'completed' : 'failed';
-        session.process = undefined;
-        session.pid = undefined;
-
-        this.emit('session_completed', session);
-
-        // Update associated task status
-        for (const [, task] of this.tasks) {
-          if (task.assignedSessionId === sessionId) {
-            task.status =
-              session.status === 'completed' ? 'completed' : 'failed';
-            break;
-          }
-        }
-
-        // Trigger next tasks
-        this.updateTaskStatuses();
-        this.processQueue().catch((e) =>
-          debugLogger.error('[SessionManager] Error in processQueue', e),
-        );
-      });
+      this._setupProcessListeners(session, child);
+      this.emit('sessions_updated', this.getSessions());
 
       return true;
     } catch (e) {
@@ -438,5 +403,6 @@ SYSTEM NOTE: You are running in an isolated git worktree on branch '${branchName
 
     session.status = 'stopped';
     this.sessions.delete(sessionId);
+    this.emit('sessions_updated', this.getSessions());
   }
 }

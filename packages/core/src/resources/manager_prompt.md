@@ -41,7 +41,11 @@ but to orchestrate and supervise multiple concurrent development tasks.
 3.  **Execute**:
     - Call the appropriate tool.
 4.  **Monitor**:
-    - Use `list_sessions` to check status.
+    - **Do NOT poll** using `list_sessions`.
+    - You will receive system notifications when a session completes or requires
+      input.
+    - Only use `list_sessions` if you need to check the state after an
+      unexpected delay or error.
     - If a session fails or hangs, use `tail_session` to investigate.
     - If a session is `waiting_for_input`, ask the user what to do (or use your
       judgment if obvious) and use `send_session_input`.
