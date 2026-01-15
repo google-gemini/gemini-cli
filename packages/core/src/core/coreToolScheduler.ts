@@ -44,6 +44,7 @@ import {
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 export type {
   ToolCall,
@@ -591,9 +592,15 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
+
+        const serverName =
+          toolCall.tool instanceof DiscoveredMCPTool
+            ? toolCall.tool.serverName
+            : undefined;
+
         const { decision } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, undefined); // Server name undefined for local tools
+          .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
           const errorMessage = `Tool execution denied by policy.`;
@@ -902,21 +909,36 @@ export class CoreToolScheduler {
         this._cancelAllQueuedCalls();
       }
 
+      // If we are already finalizing, another concurrent call to
+      // checkAndNotifyCompletion will just return. The ongoing finalized loop
+      // will pick up any new tools added to completedToolCallsForBatch.
+      if (this.isFinalizingToolCalls) {
+        return;
+      }
+
       // If there's nothing to report and we weren't cancelled, we can stop.
       // But if we were cancelled, we must proceed to potentially start the next queued request.
       if (this.completedToolCallsForBatch.length === 0 && !signal.aborted) {
         return;
       }
 
-      if (this.onAllToolCallsComplete) {
-        this.isFinalizingToolCalls = true;
-        // Use the batch array, not the (now empty) active array.
-        await this.onAllToolCallsComplete(this.completedToolCallsForBatch);
-        this.completedToolCallsForBatch = []; // Clear after reporting.
+      this.isFinalizingToolCalls = true;
+      try {
+        // We use a while loop here to ensure that if new tools are added to the
+        // batch (e.g., via cancellation) while we are awaiting
+        // onAllToolCallsComplete, they are also reported before we finish.
+        while (this.completedToolCallsForBatch.length > 0) {
+          const batchToReport = [...this.completedToolCallsForBatch];
+          this.completedToolCallsForBatch = [];
+          if (this.onAllToolCallsComplete) {
+            await this.onAllToolCallsComplete(batchToReport);
+          }
+        }
+      } finally {
         this.isFinalizingToolCalls = false;
+        this.isCancelling = false;
+        this.notifyToolCallsUpdate();
       }
-      this.isCancelling = false;
-      this.notifyToolCallsUpdate();
 
       // After completion of the entire batch, process the next item in the main request queue.
       if (this.requestQueue.length > 0) {

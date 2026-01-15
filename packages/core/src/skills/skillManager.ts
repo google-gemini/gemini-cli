@@ -4,15 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 export { type SkillDefinition };
 
 export class SkillManager {
   private skills: SkillDefinition[] = [];
   private activeSkillNames: Set<string> = new Set();
+  private adminSkillsEnabled = true;
 
   /**
    * Clears all discovered skills.
@@ -22,8 +27,22 @@ export class SkillManager {
   }
 
   /**
-   * Discovers skills from standard user and project locations, as well as extensions.
-   * Precedence: Extensions (lowest) -> User -> Project (highest).
+   * Sets administrative settings for skills.
+   */
+  setAdminSettings(enabled: boolean): void {
+    this.adminSkillsEnabled = enabled;
+  }
+
+  /**
+   * Returns true if skills are enabled by the admin.
+   */
+  isAdminEnabled(): boolean {
+    return this.adminSkillsEnabled;
+  }
+
+  /**
+   * Discovers skills from standard user and workspace locations, as well as extensions.
+   * Precedence: Extensions (lowest) -> User -> Workspace (highest).
    */
   async discoverSkills(
     storage: Storage,
@@ -45,7 +64,7 @@ export class SkillManager {
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
-    // 4. Project skills (highest precedence)
+    // 4. Workspace skills (highest precedence)
     const projectSkills = await loadSkillsFromDir(
       storage.getProjectSkillsDir(),
     );
@@ -56,16 +75,40 @@ export class SkillManager {
    * Discovers built-in skills.
    */
   private async discoverBuiltinSkills(): Promise<void> {
-    // Built-in skills can be added here.
-    // For now, this is a placeholder for where built-in skills will be loaded from.
-    // They could be loaded from a specific directory within the package.
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const builtinDir = path.join(__dirname, 'builtin');
+
+    const builtinSkills = await loadSkillsFromDir(builtinDir);
+
+    for (const skill of builtinSkills) {
+      skill.isBuiltin = true;
+    }
+
+    this.addSkillsWithPrecedence(builtinSkills);
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
-    const skillMap = new Map<string, SkillDefinition>();
-    for (const skill of [...this.skills, ...newSkills]) {
-      skillMap.set(skill.name, skill);
+    const skillMap = new Map<string, SkillDefinition>(
+      this.skills.map((s) => [s.name, s]),
+    );
+
+    for (const newSkill of newSkills) {
+      const existingSkill = skillMap.get(newSkill.name);
+      if (existingSkill && existingSkill.location !== newSkill.location) {
+        if (existingSkill.isBuiltin) {
+          debugLogger.warn(
+            `Skill "${newSkill.name}" from "${newSkill.location}" is overriding the built-in skill.`,
+          );
+        } else {
+          coreEvents.emitFeedback(
+            'warning',
+            `Skill conflict detected: "${newSkill.name}" from "${newSkill.location}" is overriding the same skill from "${existingSkill.location}".`,
+          );
+        }
+      }
+      skillMap.set(newSkill.name, newSkill);
     }
+
     this.skills = Array.from(skillMap.values());
   }
 

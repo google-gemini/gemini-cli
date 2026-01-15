@@ -1,162 +1,180 @@
 #!/usr/bin/env bash
+# @license
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+
 set -euo pipefail
 
 # Initialize a comma-separated string to hold PR numbers that need a comment
 PRS_NEEDING_COMMENT=""
 
-# Function to process a single PR
-process_pr() {
-    if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
-        echo "‼️ Missing \$GITHUB_REPOSITORY - this must be run from GitHub Actions"
-        return 1
+# Global cache for issue labels (compatible with Bash 3.2)
+# Stores "ISSUE_NUM:LABELS" pairs separated by spaces
+ISSUE_LABELS_CACHE_FLAT=""
+
+# Function to get area and priority labels from an issue (with caching)
+get_issue_labels() {
+    local ISSUE_NUM="${1}"
+    if [[ -z "${ISSUE_NUM}" || "${ISSUE_NUM}" == "null" || "${ISSUE_NUM}" == "" ]]; then
+        return
     fi
 
-    if [[ -z "${GITHUB_OUTPUT:-}" ]]; then
-        echo "‼️ Missing \$GITHUB_OUTPUT - this must be run from GitHub Actions"
-        return 1
+    # Check cache
+    case " ${ISSUE_LABELS_CACHE_FLAT} " in
+        *" ${ISSUE_NUM}:"*) 
+            local suffix="${ISSUE_LABELS_CACHE_FLAT#* " ${ISSUE_NUM}:"}"
+            echo "${suffix%% *}"
+            return
+            ;; 
+        *)
+            # Cache miss, proceed to fetch
+            ;;
+    esac
+
+    echo "   📥 Fetching area and priority labels from issue #${ISSUE_NUM}" >&2
+    local gh_output
+    if ! gh_output=$(gh issue view "${ISSUE_NUM}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null); then
+        echo "      ⚠️ Could not fetch issue #${ISSUE_NUM}" >&2
+        ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT} ${ISSUE_NUM}:"
+        return
     fi
 
-    local PR_NUMBER=$1
+    local labels
+    labels=$(echo "${gh_output}" | grep -E '^(area|priority)/' | tr '\n' ',' | sed 's/,$//' || echo "")
+    
+    # Save to flat cache
+    ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT} ${ISSUE_NUM}:${labels}"
+    echo "${labels}"
+}
+
+# Function to process a single PR with pre-fetched data
+process_pr_optimized() {
+    local PR_NUMBER="${1}"
+    local IS_DRAFT="${2}"
+    local ISSUE_NUMBER="${3}"
+    local CURRENT_LABELS="${4}" # Comma-separated labels
+
     echo "🔄 Processing PR #${PR_NUMBER}"
 
-    # Get PR details: closing issue, draft status, body and labels
-    local PR_DATA
-    if ! PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences,isDraft,body,labels 2>/dev/null); then
-        echo "   ⚠️ Could not fetch data for PR #${PR_NUMBER}"
-        return 0
-    fi
+    local LABELS_TO_ADD=""
+    local LABELS_TO_REMOVE=""
 
-    local ISSUE_NUMBER
-    ISSUE_NUMBER=$(echo "${PR_DATA}" | jq -r '.closingIssuesReferences[0].number // empty')
-
-    # If no closing issue found, check body for references (e.g. #123)
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
-        local REFERENCED_ISSUE
-        # Search for # followed by digits, not preceded by alphanumeric chars
-        REFERENCED_ISSUE=$(echo "${PR_DATA}" | jq -r '.body // empty' | grep -oE '(^|[^a-zA-Z0-9])#[0-9]+([^a-zA-Z0-9]|$)' | head -n 1 | grep -oE '[0-9]+' || echo "")
-        if [[ -n "${REFERENCED_ISSUE}" ]]; then
-            ISSUE_NUMBER="${REFERENCED_ISSUE}"
-            echo "🔗 Found referenced issue #${ISSUE_NUMBER} in PR body"
-        fi
-    fi
-
-    local IS_DRAFT
-    IS_DRAFT=$(echo "${PR_DATA}" | jq -r '.isDraft')
-
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
+    if [[ -z "${ISSUE_NUMBER}" || "${ISSUE_NUMBER}" == "null" || "${ISSUE_NUMBER}" == "" ]]; then
         if [[ "${IS_DRAFT}" == "true" ]]; then
-            echo "📝 PR #${PR_NUMBER} is a draft and has no linked issue, skipping status/need-issue label"
-            # Remove status/need-issue label if it was previously added
-            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --remove-label "status/need-issue" 2>/dev/null; then
-                echo "   status/need-issue label not present or could not be removed"
+            echo "   📝 PR #${PR_NUMBER} is a draft and has no linked issue"
+            if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
+                echo "      ➖ Removing status/need-issue label"
+                LABELS_TO_REMOVE="status/need-issue"
             fi
-            echo "needs_comment=false" >> "${GITHUB_OUTPUT}"
         else
-            echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
-            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
-                echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
+            echo "   ⚠️  No linked issue found for PR #${PR_NUMBER}"
+            if [[ ",${CURRENT_LABELS}," != *",status/need-issue,"* ]]; then
+                echo "      ➕ Adding status/need-issue label"
+                LABELS_TO_ADD="status/need-issue"
             fi
-            # Add PR number to the list
+            
             if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
                 PRS_NEEDING_COMMENT="${PR_NUMBER}"
             else
                 PRS_NEEDING_COMMENT="${PRS_NEEDING_COMMENT},${PR_NUMBER}"
             fi
-            echo "needs_comment=true" >> "${GITHUB_OUTPUT}"
         fi
     else
-        echo "🔗 Found linked issue #${ISSUE_NUMBER}"
+        echo "   🔗 Found linked issue #${ISSUE_NUMBER}"
 
-        # Remove status/need-issue label if present
-        if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --remove-label "status/need-issue" 2>/dev/null; then
-            echo "   status/need-issue label not present or could not be removed"
+        if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
+            echo "      ➖ Removing status/need-issue label"
+            LABELS_TO_REMOVE="status/need-issue"
         fi
 
-        # Get issue labels
-        echo "📥 Fetching area and priority labels from issue #${ISSUE_NUMBER}"
-        local ISSUE_LABELS=""
-        local gh_output
-        if ! gh_output=$(gh issue view "${ISSUE_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null); then
-            echo "   ⚠️ Could not fetch issue #${ISSUE_NUMBER} (may not exist or be in different repo)"
-            ISSUE_LABELS=""
-        else
-            # If grep finds no matches, it exits with 1, which pipefail would treat as an error.
-            # `|| echo ""` ensures the command succeeds with an empty string in that case.
-            ISSUE_LABELS=$(echo "${gh_output}" | grep -E "^(area|priority)/" | tr '\n' ',' | sed 's/,$//' || echo "")
-        fi
+        local ISSUE_LABELS
+        ISSUE_LABELS=$(get_issue_labels "${ISSUE_NUMBER}")
 
-        # Get PR labels from already fetched PR_DATA
-        echo "📥 Extracting labels from PR #${PR_NUMBER}"
-        local PR_LABELS=""
-        PR_LABELS=$(echo "${PR_DATA}" | jq -r '.labels[].name // empty' | tr '\n' ',' | sed 's/,$//' || echo "")
-
-        echo "   Issue labels (area/priority): ${ISSUE_LABELS}"
-        echo "   PR labels: ${PR_LABELS}"
-
-        # Convert comma-separated strings to arrays
-        local ISSUE_LABEL_ARRAY PR_LABEL_ARRAY
-        IFS=',' read -ra ISSUE_LABEL_ARRAY <<< "${ISSUE_LABELS}"
-        IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS:-}"
-
-        # Find labels to add (on issue but not on PR)
-        local LABELS_TO_ADD=""
-        for label in "${ISSUE_LABEL_ARRAY[@]}"; do
-            if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]:-}" != *" ${label} "* ]]; then
-                if [[ -z "${LABELS_TO_ADD}" ]]; then
-                    LABELS_TO_ADD="${label}"
-                else
-                    LABELS_TO_ADD="${LABELS_TO_ADD},${label}"
+        if [[ -n "${ISSUE_LABELS}" ]]; then
+            local IFS_OLD="${IFS}"
+            IFS=','
+            for label in ${ISSUE_LABELS}; do
+                if [[ -n "${label}" ]] && [[ ",${CURRENT_LABELS}," != *",${label},"* ]]; then
+                    if [[ -z "${LABELS_TO_ADD}" ]]; then
+                        LABELS_TO_ADD="${label}"
+                    else
+                        LABELS_TO_ADD="${LABELS_TO_ADD},${label}"
+                    fi
                 fi
-            fi
-        done
+done
+            IFS="${IFS_OLD}"
+        fi
 
-        # Apply label changes
+        if [[ -z "${LABELS_TO_ADD}" && -z "${LABELS_TO_REMOVE}" ]]; then
+            echo "   ✅ Labels already synchronized"
+        fi
+    fi
+
+    if [[ -n "${LABELS_TO_ADD}" || -n "${LABELS_TO_REMOVE}" ]]; then
+        local EDIT_CMD=("gh" "pr" "edit" "${PR_NUMBER}" "--repo" "${GITHUB_REPOSITORY}")
         if [[ -n "${LABELS_TO_ADD}" ]]; then
-            echo "➕ Adding labels: ${LABELS_TO_ADD}"
-            if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "${LABELS_TO_ADD}" 2>/dev/null; then
-                echo "   ⚠️ Failed to add some labels"
-            fi
+            echo "      ➕ Syncing labels to add: ${LABELS_TO_ADD}"
+            EDIT_CMD+=("--add-label" "${LABELS_TO_ADD}")
         fi
-
-        if [[ -z "${LABELS_TO_ADD}" ]]; then
-            echo "✅ Labels already synchronized"
+        if [[ -n "${LABELS_TO_REMOVE}" ]]; then
+            echo "      ➖ Syncing labels to remove: ${LABELS_TO_REMOVE}"
+            EDIT_CMD+=("--remove-label" "${LABELS_TO_REMOVE}")
         fi
-        echo "needs_comment=false" >> "${GITHUB_OUTPUT}"
+        
+        ("${EDIT_CMD[@]}" 2>/dev/null || true)
     fi
 }
 
-# If PR_NUMBER is set, process only that PR
-if [[ -n "${PR_NUMBER:-}" ]]; then
-    if ! process_pr "${PR_NUMBER}"; then
-        echo "❌ Failed to process PR #${PR_NUMBER}"
-        exit 1
-    fi
-else
-    # Otherwise, get all open PRs and process them
-    # The script logic will determine which ones need issue linking or label sync
-    echo "📥 Getting all open pull requests..."
-    if ! PR_NUMBERS=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number -q '.[].number' 2>/dev/null); then
-        echo "❌ Failed to fetch PR list"
-        exit 1
-    fi
-
-    if [[ -z "${PR_NUMBERS}" ]]; then
-        echo "✅ No open PRs found"
-    else
-        # Count the number of PRs
-        PR_COUNT=$(echo "${PR_NUMBERS}" | wc -w | tr -d ' ')
-        echo "📊 Found ${PR_COUNT} open PRs to process"
-
-        for pr_number in ${PR_NUMBERS}; do
-            if ! process_pr "${pr_number}"; then
-                echo "⚠️ Failed to process PR #${pr_number}, continuing with next PR..."
-                continue
-            fi
-        done
-    fi
+if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
+    echo "‼️ Missing \$GITHUB_REPOSITORY - this must be run from GitHub Actions"
+    exit 1
 fi
 
-# Ensure output is always set, even if empty
+if [[ -z "${GITHUB_OUTPUT:-}" ]]; then
+    echo "‼️ Missing \$GITHUB_OUTPUT - this must be run from GitHub Actions"
+    exit 1
+fi
+
+JQ_EXTRACT_FIELDS='{
+    number: .number,
+    isDraft: .isDraft,
+    issue: (.closingIssuesReferences[0].number // (.body // "" | capture("(^|[^a-zA-Z0-9])#(?<num>[0-9]+)([^a-zA-Z0-9]|$)")? | .num) // "null"),
+    labels: [.labels[].name] | join(",")
+}'
+
+JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // \"null\") | tostring)\t\(.labels)"' # Corrected escaping for quotes within the string literal
+
+if [[ -n "${PR_NUMBER:-}" ]]; then
+    echo "🔄 Processing single PR #${PR_NUMBER}"
+    PR_DATA=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json number,closingIssuesReferences,isDraft,body,labels 2>/dev/null) || {
+        echo "❌ Failed to fetch data for PR #${PR_NUMBER}"
+        exit 1
+    }
+    
+    line=$(echo "${PR_DATA}" | jq -r "${JQ_EXTRACT_FIELDS} | ${JQ_TSV_FORMAT}")
+    IFS=$'\t' read -r pr_num is_draft issue_num current_labels <<< "${line}"
+    process_pr_optimized "${pr_num}" "${is_draft}" "${issue_num}" "${current_labels}"
+else
+    echo "📥 Getting all open pull requests..."
+    PR_DATA_ALL=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number,closingIssuesReferences,isDraft,body,labels 2>/dev/null) || {
+        echo "❌ Failed to fetch PR list"
+        exit 1
+    }
+
+    PR_COUNT=$(echo "${PR_DATA_ALL}" | jq '. | length')
+    echo "📊 Found ${PR_COUNT} open PRs to process"
+
+    # Use a temporary file to avoid masking exit codes in process substitution
+    tmp_file=$(mktemp)
+    echo "${PR_DATA_ALL}" | jq -r ".[] | ${JQ_EXTRACT_FIELDS} | ${JQ_TSV_FORMAT}" > "${tmp_file}"
+    while read -r line; do
+        [[ -z "${line}" ]] && continue
+        IFS=$'\t' read -r pr_num is_draft issue_num current_labels <<< "${line}"
+        process_pr_optimized "${pr_num}" "${is_draft}" "${issue_num}" "${current_labels}"
+    done < "${tmp_file}"
+    rm -f "${tmp_file}"
+fi
+
 if [[ -z "${PRS_NEEDING_COMMENT}" ]]; then
     echo "prs_needing_comment=[]" >> "${GITHUB_OUTPUT}"
 else
