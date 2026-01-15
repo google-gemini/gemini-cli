@@ -38,6 +38,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   loadSkillsFromDir,
+  loadAgentsFromDirectory,
   homedir,
   type ExtensionEvents,
   type MCPServerConfig,
@@ -59,9 +60,12 @@ import {
 } from './extensions/variables.js';
 import {
   getEnvContents,
+  getEnvFilePath,
   maybePromptForSettings,
   getMissingSettings,
   type ExtensionSetting,
+  getScopedEnvContents,
+  ExtensionSettingScope,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { getEnableHooks } from './settingsSchema.js';
@@ -277,12 +281,16 @@ Would you like to attempt to install via "git clone" instead?`,
           previousSettings = await getEnvContents(
             previousExtensionConfig,
             extensionId,
+            this.workspaceDir,
           );
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
-        if (this.requestSetting) {
+        if (
+          this.requestSetting &&
+          (this.settings.experimental?.extensionConfig ?? false)
+        ) {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
@@ -300,10 +308,14 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         }
 
-        const missingSettings = await getMissingSettings(
-          newExtensionConfig,
-          extensionId,
-        );
+        const missingSettings =
+          (this.settings.experimental?.extensionConfig ?? false)
+            ? await getMissingSettings(
+                newExtensionConfig,
+                extensionId,
+                this.workspaceDir,
+              )
+            : [];
         if (missingSettings.length > 0) {
           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
             .map((s) => s.name)
@@ -518,16 +530,59 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
-      const customEnv = await getEnvContents(
-        config,
-        getExtensionId(config, installMetadata),
-      );
+      const extensionId = getExtensionId(config, installMetadata);
+
+      let userSettings: Record<string, string> = {};
+      let workspaceSettings: Record<string, string> = {};
+
+      if (this.settings.experimental?.extensionConfig ?? false) {
+        userSettings = await getScopedEnvContents(
+          config,
+          extensionId,
+          ExtensionSettingScope.USER,
+        );
+        workspaceSettings = await getScopedEnvContents(
+          config,
+          extensionId,
+          ExtensionSettingScope.WORKSPACE,
+          this.workspaceDir,
+        );
+      }
+
+      const customEnv = { ...userSettings, ...workspaceSettings };
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
-      if (config.settings) {
+      if (
+        config.settings &&
+        (this.settings.experimental?.extensionConfig ?? false)
+      ) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
+          let scope: 'user' | 'workspace' | undefined;
+          let source: string | undefined;
+
+          // Note: strict check for undefined, as empty string is a valid value
+          if (workspaceSettings[setting.envVar] !== undefined) {
+            scope = 'workspace';
+            if (setting.sensitive) {
+              source = 'Keychain';
+            } else {
+              source = getEnvFilePath(
+                config.name,
+                ExtensionSettingScope.WORKSPACE,
+                this.workspaceDir,
+              );
+            }
+          } else if (userSettings[setting.envVar] !== undefined) {
+            scope = 'user';
+            if (setting.sensitive) {
+              source = 'Keychain';
+            } else {
+              source = getEnvFilePath(config.name, ExtensionSettingScope.USER);
+            }
+          }
+
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
@@ -538,6 +593,8 @@ Would you like to attempt to install via "git clone" instead?`,
                   ? '***'
                   : value,
             sensitive: setting.sensitive ?? false,
+            scope,
+            source,
           });
         }
       }
@@ -573,6 +630,17 @@ Would you like to attempt to install via "git clone" instead?`,
         path.join(effectiveExtensionPath, 'skills'),
       );
 
+      const agentLoadResult = await loadAgentsFromDirectory(
+        path.join(effectiveExtensionPath, 'agents'),
+      );
+
+      // Log errors but don't fail the entire extension load
+      for (const error of agentLoadResult.errors) {
+        debugLogger.warn(
+          `[ExtensionManager] Error loading agent from ${config.name}: ${error.message}`,
+        );
+      }
+
       const extension: GeminiCLIExtension = {
         name: config.name,
         version: config.version,
@@ -590,6 +658,7 @@ Would you like to attempt to install via "git clone" instead?`,
         settings: config.settings,
         resolvedSettings,
         skills,
+        agents: agentLoadResult.agents,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -754,7 +823,15 @@ Would you like to attempt to install via "git clone" instead?`,
     if (resolvedSettings && resolvedSettings.length > 0) {
       output += `\n Settings:`;
       resolvedSettings.forEach((setting) => {
-        output += `\n  ${setting.name}: ${setting.value}`;
+        let scope = '';
+        if (setting.scope) {
+          scope = setting.scope === 'workspace' ? '(Workspace' : '(User';
+          if (setting.source) {
+            scope += ` - ${setting.source}`;
+          }
+          scope += ')';
+        }
+        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
       });
     }
     return output;

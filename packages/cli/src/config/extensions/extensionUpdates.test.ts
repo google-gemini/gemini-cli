@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from './storage.js';
+import type { Settings } from '../settings.js';
 import {
   KeychainTokenStorage,
   debugLogger,
@@ -154,7 +155,11 @@ describe('extensionUpdates', () => {
       );
       await userKeychain.setSecret('VAR2', 'val2');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
 
@@ -166,7 +171,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s1');
     });
@@ -181,7 +190,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s2');
     });
@@ -201,7 +214,11 @@ describe('extensionUpdates', () => {
       );
       fs.writeFileSync(workspaceEnvPath, 'VAR1=val1');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
   });
@@ -229,8 +246,13 @@ describe('extensionUpdates', () => {
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        settings: { telemetry: {} } as any,
+
+        settings: {
+          telemetry: {
+            enabled: false,
+          },
+          experimental: { extensionConfig: true },
+        } as unknown as Settings,
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });

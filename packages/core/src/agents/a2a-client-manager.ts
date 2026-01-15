@@ -64,7 +64,7 @@ export class A2AClientManager {
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
-    if (this.clients.has(name)) {
+    if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
@@ -102,6 +102,15 @@ export class A2AClientManager {
     );
 
     return agentCard;
+  }
+
+  /**
+   * Invalidates all cached clients and agent cards.
+   */
+  clearCache(): void {
+    this.clients.clear();
+    this.agentCards.clear();
+    debugLogger.debug('[A2AClientManager] Cache cleared.');
   }
 
   /**

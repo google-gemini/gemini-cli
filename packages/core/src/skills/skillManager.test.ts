@@ -11,6 +11,15 @@ import * as path from 'node:path';
 import { SkillManager } from './skillManager.js';
 import { Storage } from '../config/storage.js';
 import { type GeminiCLIExtension } from '../config/config.js';
+import { loadSkillsFromDir, type SkillDefinition } from './skillLoader.js';
+
+vi.mock('./skillLoader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./skillLoader.js')>();
+  return {
+    ...actual,
+    loadSkillsFromDir: vi.fn(actual.loadSkillsFromDir),
+  };
+});
 
 describe('SkillManager', () => {
   let testRootDir: string;
@@ -26,9 +35,9 @@ describe('SkillManager', () => {
     vi.restoreAllMocks();
   });
 
-  it('should discover skills from extensions, user, and project with precedence', async () => {
+  it('should discover skills from extensions, user, and workspace with precedence', async () => {
     const userDir = path.join(testRootDir, 'user');
-    const projectDir = path.join(testRootDir, 'project');
+    const projectDir = path.join(testRootDir, 'workspace');
     await fs.mkdir(path.join(userDir, 'skill-a'), { recursive: true });
     await fs.mkdir(path.join(projectDir, 'skill-b'), { recursive: true });
 
@@ -71,6 +80,8 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage, [mockExtension]);
 
     const skills = service.getSkills();
@@ -81,9 +92,9 @@ description: project-desc
     expect(names).toContain('skill-project');
   });
 
-  it('should respect precedence: Project > User > Extension', async () => {
+  it('should respect precedence: Workspace > User > Extension', async () => {
     const userDir = path.join(testRootDir, 'user');
-    const projectDir = path.join(testRootDir, 'project');
+    const projectDir = path.join(testRootDir, 'workspace');
     await fs.mkdir(path.join(userDir, 'skill'), { recursive: true });
     await fs.mkdir(path.join(projectDir, 'skill'), { recursive: true });
 
@@ -126,6 +137,8 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage, [mockExtension]);
 
     const skills = service.getSkills();
@@ -138,6 +151,34 @@ description: project-desc
     expect(service.getSkills()[0].description).toBe('user-desc');
   });
 
+  it('should discover built-in skills', async () => {
+    const service = new SkillManager();
+    const mockBuiltinSkill: SkillDefinition = {
+      name: 'builtin-skill',
+      description: 'builtin-desc',
+      location: 'builtin-loc',
+      body: 'builtin-body',
+    };
+
+    vi.mocked(loadSkillsFromDir).mockImplementation(async (dir) => {
+      if (dir.endsWith('builtin')) {
+        return [{ ...mockBuiltinSkill }];
+      }
+      return [];
+    });
+
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+
+    await service.discoverSkills(storage);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('builtin-skill');
+    expect(skills[0].isBuiltin).toBe(true);
+  });
+
   it('should filter disabled skills in getSkills but not in getAllSkills', async () => {
     const skillDir = path.join(testRootDir, 'skill1');
     await fs.mkdir(skillDir, { recursive: true });
@@ -148,7 +189,7 @@ description: project-desc
 name: skill1
 description: desc1
 ---
-`,
+body1`,
     );
 
     const storage = new Storage('/dummy');
@@ -156,11 +197,70 @@ description: desc1
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
 
     const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
     await service.discoverSkills(storage);
     service.setDisabledSkills(['skill1']);
 
     expect(service.getSkills()).toHaveLength(0);
     expect(service.getAllSkills()).toHaveLength(1);
     expect(service.getAllSkills()[0].disabled).toBe(true);
+  });
+
+  it('should filter built-in skills in getDisplayableSkills', async () => {
+    const service = new SkillManager();
+
+    // @ts-expect-error accessing private property for testing
+    service.skills = [
+      {
+        name: 'regular-skill',
+        description: 'regular',
+        location: 'loc1',
+        body: 'body',
+        isBuiltin: false,
+      },
+      {
+        name: 'builtin-skill',
+        description: 'builtin',
+        location: 'loc2',
+        body: 'body',
+        isBuiltin: true,
+      },
+      {
+        name: 'disabled-builtin',
+        description: 'disabled builtin',
+        location: 'loc3',
+        body: 'body',
+        isBuiltin: true,
+        disabled: true,
+      },
+    ];
+
+    const displayable = service.getDisplayableSkills();
+    expect(displayable).toHaveLength(1);
+    expect(displayable[0].name).toBe('regular-skill');
+
+    const all = service.getAllSkills();
+    expect(all).toHaveLength(3);
+
+    const enabled = service.getSkills();
+    expect(enabled).toHaveLength(2);
+    expect(enabled.map((s) => s.name)).toContain('builtin-skill');
+  });
+
+  it('should maintain admin settings state', async () => {
+    const service = new SkillManager();
+
+    // Case 1: Enabled by admin
+
+    service.setAdminSettings(true);
+
+    expect(service.isAdminEnabled()).toBe(true);
+
+    // Case 2: Disabled by admin
+
+    service.setAdminSettings(false);
+
+    expect(service.isAdminEnabled()).toBe(false);
   });
 });
