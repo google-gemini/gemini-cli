@@ -26,6 +26,17 @@
     "moduleResolution": "nodenext",
     "target": "es2022",
     "types": ["node", "vitest/globals"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@google/gemini-cli-core": ["./packages/core/index.ts"],
+      "@google/gemini-cli-core/*": ["./packages/core/*"],
+      "@google/gemini-cli-a2a-server": ["./packages/a2a-server/index.ts"],
+      "@google/gemini-cli-a2a-server/*": ["./packages/a2a-server/*"],
+      "@google/gemini-cli": ["./packages/cli/index.ts"],
+      "@google/gemini-cli/*": ["./packages/cli/*"],
+      "@google/gemini-cli-test-utils": ["./packages/test-utils/src/index.ts"],
+      "@google/gemini-cli-test-utils/*": ["./packages/test-utils/src/*"]
+    }
   }
 }

@@ -8,6 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import * as crypto from 'node:crypto';
 
+export const homedir = os.homedir;
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 
