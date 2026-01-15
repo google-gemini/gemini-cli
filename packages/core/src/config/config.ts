@@ -355,6 +355,7 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
+  geminiApiKey?: string;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
