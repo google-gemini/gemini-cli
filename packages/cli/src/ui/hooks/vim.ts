@@ -257,6 +257,12 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true;
       }
 
+      // Handle Shift+Enter explicitly to ensure it inserts a newline
+      if (keyMatchers[Command.NEWLINE](normalizedKey)) {
+        buffer.handleInput(normalizedKey);
+        return true;
+      }
+
       // In INSERT mode, let InputPrompt handle completion keys and special commands
       if (
         normalizedKey.name === 'tab' ||
@@ -282,7 +288,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       if (
         normalizedKey.name === 'return' &&
         !normalizedKey.ctrl &&
-        !normalizedKey.meta
+        !normalizedKey.meta &&
+        !normalizedKey.shift
       ) {
         if (buffer.text.trim() && onSubmit) {
           // Handle command submission directly

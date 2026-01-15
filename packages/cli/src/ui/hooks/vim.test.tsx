@@ -208,6 +208,41 @@ describe('useVim hook', () => {
     mockVimContext.setVimMode.mockClear();
   });
 
+  describe('Input handling in INSERT mode', () => {
+    it('should delegate plain Enter to InputPrompt (return false)', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      // Verify we are in INSERT mode
+      expect(result.current.mode).toBe('INSERT');
+
+      const handled = result.current.handleInput(createKey({ name: 'return' }));
+
+      // Should return false to let InputPrompt handle completion or submit
+      expect(handled).toBe(false);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+    });
+
+    it('should NOT submit on Shift+Enter (pass through for newline)', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      const handled = result.current.handleInput(
+        createKey({ name: 'return', shift: true }),
+      );
+
+      // Should be handled by vim hook (returned true) but NOT submitted
+      expect(handled).toBe(true);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+      // Should pass through to buffer.handleInput
+      expect(testBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'return', shift: true }),
+      );
+    });
+  });
+
   describe('Mode switching', () => {
     it('should start in NORMAL mode', () => {
       const { result } = renderVimHook();
