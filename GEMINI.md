@@ -79,7 +79,7 @@ tests, aim to follow existing patterns. Key conventions include:
 
 ## Git Repo
 
-The main branch for this project is called "main"
+The main branch for this project is called "main". For instructions on how to contribute, please see our [Contributing Guide](./CONTRIBUTING.md).
 
 ## JavaScript/TypeScript
 
