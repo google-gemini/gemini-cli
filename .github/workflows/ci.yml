@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'workflow'
       - 'release/**'
   pull_request:
     branches:
@@ -19,7 +20,7 @@ on:
         type: 'string'
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  group: 'ci-${{ github.head_ref || github.ref }}'
   cancel-in-progress: |-
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
@@ -36,7 +37,7 @@ jobs:
   merge_queue_skipper:
     permissions: 'read-all'
     name: 'Merge Queue Skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     outputs:
       skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
     steps:
@@ -47,7 +48,7 @@ jobs:
 
   lint:
     name: 'Lint'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     env:
@@ -126,7 +127,7 @@ jobs:
           fail: true
   test_linux:
     name: 'Test (Linux) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     needs:
       - 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
@@ -182,7 +183,7 @@ jobs:
 
       - name: 'Publish Test Report (for non-forks)'
         if: |-
-          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+          ${{ always() }}
         uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
           name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
@@ -192,7 +193,7 @@ jobs:
 
       - name: 'Upload Test Results Artifact (for forks)'
         if: |-
-          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          ${{ always() }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'test-results-fork-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
@@ -257,7 +258,7 @@ jobs:
 
       - name: 'Publish Test Report (for non-forks)'
         if: |-
-          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+          ${{ always() }}
         uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
           name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
@@ -267,7 +268,7 @@ jobs:
 
       - name: 'Upload Test Results Artifact (for forks)'
         if: |-
-          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          ${{ always() }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'test-results-fork-${{ runner.os }}-${{ matrix.node-version }}-${{ matrix.shard }}'
@@ -283,7 +284,7 @@ jobs:
 
   codeql:
     name: 'CodeQL'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
@@ -309,7 +310,7 @@ jobs:
     name: 'Check Bundle Size'
     needs: 'merge_queue_skipper'
     if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read' # For checkout
       pull-requests: 'write' # For commenting
@@ -331,7 +332,7 @@ jobs:
 
   test_windows:
     name: 'Slow Test - Win'
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: 'windows-latest'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     continue-on-error: true
@@ -406,7 +407,7 @@ jobs:
       - 'test_mac'
       - 'codeql'
       - 'bundle_size'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Check all job results'
         run: |
