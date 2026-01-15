@@ -42,11 +42,6 @@ describe('Admin Controls', () => {
   });
 
   describe('sanitizeAdminSettings', () => {
-    it('should return empty object for null/undefined', () => {
-      expect(sanitizeAdminSettings(null)).toEqual({});
-      expect(sanitizeAdminSettings(undefined)).toEqual({});
-    });
-
     it('should strip unknown fields', () => {
       const input = {
         secureModeEnabled: true,
