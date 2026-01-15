@@ -17,7 +17,8 @@ const DISCUSSION_URL = 'https://github.com/google-gemini/gemini-cli/discussions/
 /**
  * Executes a GitHub CLI command safely using an argument array.
  */
-function runGh(args) {
+function runGh(args, options = {}) {
+  const { silent = false } = options;
   try {
     return execFileSync('gh', args, {
       encoding: 'utf8',
@@ -25,8 +26,10 @@ function runGh(args) {
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
   } catch (error) {
-    const stderr = error.stderr ? ` Stderr: ${error.stderr.trim()}` : '';
-    console.error(`❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`);
+    if (!silent) {
+      const stderr = error.stderr ? ` Stderr: ${error.stderr.trim()}` : '';
+      console.error(`❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`);
+    }
     return null;
   }
 }
@@ -38,10 +41,12 @@ const membershipCache = new Map();
 function isMaintainer(username) {
   if (membershipCache.has(username)) return membershipCache.get(username);
 
+  // GitHub returns 404 if user is not a member. 
+  // We use silent: true to avoid logging 404s as errors.
   const result = runGh([
     'api',
     `orgs/${ORG}/teams/${TEAM_SLUG}/memberships/${username}`,
-  ]);
+  ], { silent: true });
 
   const isMember = result !== null;
   membershipCache.set(username, isMember);
@@ -96,7 +101,7 @@ We're making some updates to our contribution process to improve how we track an
 Key Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.
 
 Thank you for your understanding and for being a part of our community!
-  `
+  `.trim();
 
   let successCount = 0;
   let skipCount = 0;
@@ -107,6 +112,7 @@ Thank you for your understanding and for being a part of our community!
     const author = pr.author.login;
 
     // Check if we already commented (idempotency)
+    // We use silent: true here because view might fail if PR is deleted mid-run
     const existingComments = runGh([
       'pr',
       'view',
@@ -117,7 +123,7 @@ Thank you for your understanding and for being a part of our community!
       'comments',
       '--jq',
       `.comments[].body | contains("${DISCUSSION_URL}")`,
-    ]);
+    ], { silent: true });
 
     if (existingComments && existingComments.includes('true')) {
       console.log(`⏭️  PR #${prNumber} already has the notification. Skipping.`);
