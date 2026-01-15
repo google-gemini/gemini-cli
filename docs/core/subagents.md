@@ -146,7 +146,7 @@ it yourself; just report it.
 
 ## Remote agents (Agent2Agent)
 
-Gemini CLI can also delegate tasks to remote agents via the Model Context
+Gemini CLI can also delegate tasks to remote agents using the Model Context
 Protocol (MCP) or compatible Agent2Agent interfaces.
 
 To define a remote agent, use `kind: remote` and provide the `agent_card_url`.
