@@ -199,6 +199,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   const fileSearch = useRef<FileSearch | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
+  const abortTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setSuggestions(state.suggestions);
@@ -278,6 +279,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
       }
+      if (abortTimer.current) {
+        clearTimeout(abortTimer.current);
+      }
 
       const controller = new AbortController();
       searchAbortController.current = controller;
@@ -288,7 +292,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
       const timeoutMs =
         config?.getFileFilteringOptions()?.searchTimeout ?? 5000;
-      const abortTimer = setTimeout(() => {
+      abortTimer.current = setTimeout(() => {
         controller.abort();
       }, timeoutMs);
 
@@ -298,7 +302,6 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
         });
 
-        clearTimeout(abortTimer);
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
         }
@@ -340,6 +343,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         if (!(error instanceof Error && error.name === 'AbortError')) {
           dispatch({ type: 'ERROR' });
         }
+      } finally {
+        if (abortTimer.current) {
+          clearTimeout(abortTimer.current);
+        }
       }
     };
 
@@ -355,6 +362,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       searchAbortController.current?.abort();
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
+      }
+      if (abortTimer.current) {
+        clearTimeout(abortTimer.current);
       }
     };
   }, [state.status, state.pattern, config, cwd]);

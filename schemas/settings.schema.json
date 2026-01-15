@@ -1023,20 +1023,6 @@
               "markdownDescription": "Disable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
-            },
-            "maxFileCount": {
-              "title": "Max File Count",
-              "description": "Maximum number of files to traverse when searching.",
-              "markdownDescription": "Maximum number of files to traverse when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `20000`",
-              "default": 20000,
-              "type": "number"
-            },
-            "searchTimeout": {
-              "title": "Search Timeout",
-              "description": "Timeout in milliseconds for file search operations.",
-              "markdownDescription": "Timeout in milliseconds for file search operations.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `5000`",
-              "default": 5000,
-              "type": "number"
             }
           },
           "additionalProperties": false
