@@ -12,6 +12,8 @@ import { SkillManager } from './skillManager.js';
 import { Storage } from '../config/storage.js';
 import { type GeminiCLIExtension } from '../config/config.js';
 import { loadSkillsFromDir, type SkillDefinition } from './skillLoader.js';
+import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('./skillLoader.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./skillLoader.js')>();
@@ -262,5 +264,114 @@ body1`,
     service.setAdminSettings(false);
 
     expect(service.isAdminEnabled()).toBe(false);
+  });
+
+  describe('Conflict Detection', () => {
+    it('should emit UI warning when a non-built-in skill is overridden', async () => {
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      const userDir = path.join(testRootDir, 'user');
+      const projectDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(userDir, { recursive: true });
+      await fs.mkdir(projectDir, { recursive: true });
+
+      const skillName = 'conflicting-skill';
+      const userSkillPath = path.join(userDir, 'SKILL.md');
+      const projectSkillPath = path.join(projectDir, 'SKILL.md');
+
+      vi.mocked(loadSkillsFromDir).mockImplementation(async (dir) => {
+        if (dir === userDir) {
+          return [
+            {
+              name: skillName,
+              description: 'user-desc',
+              location: userSkillPath,
+              body: '',
+            },
+          ];
+        }
+        if (dir === projectDir) {
+          return [
+            {
+              name: skillName,
+              description: 'project-desc',
+              location: projectSkillPath,
+              body: '',
+            },
+          ];
+        }
+        return [];
+      });
+
+      vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      const storage = new Storage('/dummy');
+      vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+
+      const service = new SkillManager();
+      // @ts-expect-error accessing private method for testing
+      vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+      await service.discoverSkills(storage, []);
+
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          `Skill conflict detected: "${skillName}" from "${projectSkillPath}" is overriding the same skill from "${userSkillPath}".`,
+        ),
+      );
+    });
+
+    it('should log warning but NOT emit UI warning when a built-in skill is overridden', async () => {
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      const debugWarnSpy = vi.spyOn(debugLogger, 'warn');
+      const userDir = path.join(testRootDir, 'user');
+      await fs.mkdir(userDir, { recursive: true });
+
+      const skillName = 'builtin-skill';
+      const userSkillPath = path.join(userDir, 'SKILL.md');
+      const builtinSkillPath = 'builtin/loc';
+
+      vi.mocked(loadSkillsFromDir).mockImplementation(async (dir) => {
+        if (dir.endsWith('builtin')) {
+          return [
+            {
+              name: skillName,
+              description: 'builtin-desc',
+              location: builtinSkillPath,
+              body: '',
+              isBuiltin: true,
+            },
+          ];
+        }
+        if (dir === userDir) {
+          return [
+            {
+              name: skillName,
+              description: 'user-desc',
+              location: userSkillPath,
+              body: '',
+            },
+          ];
+        }
+        return [];
+      });
+
+      vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      const storage = new Storage('/dummy');
+      vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+
+      const service = new SkillManager();
+
+      await service.discoverSkills(storage, []);
+
+      // UI warning should not be called
+      expect(emitFeedbackSpy).not.toHaveBeenCalled();
+
+      // Debug warning should be called
+      expect(debugWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Skill "${skillName}" from "${userSkillPath}" is overriding the built-in skill.`,
+        ),
+      );
+    });
   });
 });
