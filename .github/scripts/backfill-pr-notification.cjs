@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 /* eslint-disable */
 /* global require, console, process */
 
@@ -12,7 +18,8 @@ const isDryRun = process.argv.includes('--dry-run');
 const REPO = 'google-gemini/gemini-cli';
 const ORG = 'google-gemini';
 const TEAM_SLUG = 'gemini-cli-maintainers';
-const DISCUSSION_URL = 'https://github.com/google-gemini/gemini-cli/discussions/16706';
+const DISCUSSION_URL =
+  'https://github.com/google-gemini/gemini-cli/discussions/16706';
 
 /**
  * Executes a GitHub CLI command safely using an argument array.
@@ -28,7 +35,9 @@ function runGh(args, options = {}) {
   } catch (error) {
     if (!silent) {
       const stderr = error.stderr ? ` Stderr: ${error.stderr.trim()}` : '';
-      console.error(`❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`);
+      console.error(
+        `❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`,
+      );
     }
     return null;
   }
@@ -41,12 +50,12 @@ const membershipCache = new Map();
 function isMaintainer(username) {
   if (membershipCache.has(username)) return membershipCache.get(username);
 
-  // GitHub returns 404 if user is not a member. 
+  // GitHub returns 404 if user is not a member.
   // We use silent: true to avoid logging 404s as errors.
-  const result = runGh([
-    'api',
-    `orgs/${ORG}/teams/${TEAM_SLUG}/memberships/${username}`,
-  ], { silent: true });
+  const result = runGh(
+    ['api', `orgs/${ORG}/teams/${TEAM_SLUG}/memberships/${username}`],
+    { silent: true },
+  );
 
   const isMember = result !== null;
   membershipCache.set(username, isMember);
@@ -113,20 +122,25 @@ Thank you for your understanding and for being a part of our community!
 
     // Check if we already commented (idempotency)
     // We use silent: true here because view might fail if PR is deleted mid-run
-    const existingComments = runGh([
-      'pr',
-      'view',
-      prNumber,
-      '--repo',
-      REPO,
-      '--json',
-      'comments',
-      '--jq',
-      `.comments[].body | contains("${DISCUSSION_URL}")`,
-    ], { silent: true });
+    const existingComments = runGh(
+      [
+        'pr',
+        'view',
+        prNumber,
+        '--repo',
+        REPO,
+        '--json',
+        'comments',
+        '--jq',
+        `.comments[].body | contains("${DISCUSSION_URL}")`,
+      ],
+      { silent: true },
+    );
 
     if (existingComments && existingComments.includes('true')) {
-      console.log(`⏭️  PR #${prNumber} already has the notification. Skipping.`);
+      console.log(
+        `⏭️  PR #${prNumber} already has the notification. Skipping.`,
+      );
       skipCount++;
       continue;
     }
