@@ -174,6 +174,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.DENY,
         priority: 2.9,
+        source: 'Settings (MCP Excluded)',
       });
     }
   }
@@ -186,6 +187,7 @@ export async function createPolicyEngineConfig(
         toolName: tool,
         decision: PolicyDecision.DENY,
         priority: 2.4,
+        source: 'Settings (Tools Excluded)',
       });
     }
   }
@@ -213,6 +215,7 @@ export async function createPolicyEngineConfig(
                 decision: PolicyDecision.ALLOW,
                 priority: 2.3,
                 argsPattern: new RegExp(pattern),
+                source: 'Settings (Tools Allowed)',
               });
             }
           }
@@ -223,6 +226,7 @@ export async function createPolicyEngineConfig(
             toolName,
             decision: PolicyDecision.ALLOW,
             priority: 2.3,
+            source: 'Settings (Tools Allowed)',
           });
         }
       } else {
@@ -234,6 +238,7 @@ export async function createPolicyEngineConfig(
           toolName,
           decision: PolicyDecision.ALLOW,
           priority: 2.3,
+          source: 'Settings (Tools Allowed)',
         });
       }
     }
@@ -252,6 +257,7 @@ export async function createPolicyEngineConfig(
           toolName: `${serverName}__*`,
           decision: PolicyDecision.ALLOW,
           priority: 2.2,
+          source: 'Settings (MCP Trusted)',
         });
       }
     }
@@ -265,6 +271,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.ALLOW,
         priority: 2.1,
+        source: 'Settings (MCP Allowed)',
       });
     }
   }
@@ -310,6 +317,7 @@ export function createPolicyUpdater(
               // but still lose to admin policies (3.xxx) and settings excludes (200)
               priority: 2.95,
               argsPattern: new RegExp(pattern),
+              source: 'Dynamic (Confirmed)',
             });
           }
         }
@@ -326,6 +334,7 @@ export function createPolicyUpdater(
           // but still lose to admin policies (3.xxx) and settings excludes (200)
           priority: 2.95,
           argsPattern,
+          source: 'Dynamic (Confirmed)',
         });
       }
 
