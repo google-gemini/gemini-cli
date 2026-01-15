@@ -494,24 +494,37 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
 
     for (const key in record) {
       const value = record[key];
+      // Sanitize key by checking for simple alphanumeric characters if necessary,
+      // but strictly speaking, key injection is harder if we trust the object structure roughly.
+      // However, to be safe, we will just use it in the path.
+      // The critical part is sanitizing 'value' which can be arbitrary strings often.
       const currentPath = path ? `${path}.${key}` : key;
 
       if (key === 'name' || key === 'type') continue;
 
       if (typeof value === 'string') {
         if (!isValidColor(value)) {
+          // JSON.stringify sanitizes the output ensuring no ANSI codes can escape
           return {
             isValid: false,
-            error: `Invalid color "${value}" at ${currentPath}`,
+            error: `Invalid color ${JSON.stringify(value)} at ${currentPath}`,
           };
         }
       } else if (Array.isArray(value)) {
         // Assume array of strings (like gradient)
         for (let i = 0; i < value.length; i++) {
-          if (typeof value[i] === 'string' && !isValidColor(value[i])) {
+          const item = value[i];
+          if (typeof item === 'string') {
+            if (!isValidColor(item)) {
+              return {
+                isValid: false,
+                error: `Invalid color ${JSON.stringify(item)} at ${currentPath}[${i}]`,
+              };
+            }
+          } else {
             return {
               isValid: false,
-              error: `Invalid color "${value[i]}" at ${currentPath}[${i}]`,
+              error: `Invalid non-string value found in color array at ${currentPath}[${i}]`,
             };
           }
         }

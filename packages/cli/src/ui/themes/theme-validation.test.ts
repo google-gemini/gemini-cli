@@ -97,4 +97,35 @@ describe('validateCustomTheme', () => {
     expect(result.isValid).toBe(false);
     expect(result.error).toContain('Invalid theme name');
   });
+
+  it('should escape ANSI characters in error messages', () => {
+    const invalidTheme: CustomTheme = {
+      name: 'ANSI Injection',
+      type: 'custom',
+      text: {
+        primary: '\x1b[31;1mINJECTED\x1b[0m',
+      },
+    };
+
+    const result = validateCustomTheme(invalidTheme);
+    expect(result.isValid).toBe(false);
+    // The error message should contain the escaped string, not the raw ANSI codes
+    expect(result.error).toContain('"\\u001b[31;1mINJECTED\\u001b[0m"');
+  });
+
+  it('should fail on non-string value in gradient array', () => {
+    const invalidTheme = {
+      name: 'Invalid Gradient Array',
+      type: 'custom',
+      ui: {
+        gradient: ['red', 123],
+      },
+    } as unknown as CustomTheme;
+
+    const result = validateCustomTheme(invalidTheme);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain(
+      'Invalid non-string value found in color array',
+    );
+  });
 });
