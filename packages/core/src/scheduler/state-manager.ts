@@ -35,11 +35,11 @@ import {
  * Publishes state changes to the MessageBus via TOOL_CALLS_UPDATE events.
  */
 export class SchedulerStateManager {
-  private activeCalls = new Map<string, ToolCall>();
-  private queue: ToolCall[] = [];
-  private completedBatch: CompletedToolCall[] = [];
+  private readonly activeCalls = new Map<string, ToolCall>();
+  private readonly queue: ToolCall[] = [];
+  private _completedBatch: CompletedToolCall[] = [];
 
-  constructor(private messageBus: MessageBus) {}
+  constructor(private readonly messageBus: MessageBus) {}
 
   addToolCalls(calls: ToolCall[]): void {
     this.enqueue(calls);
@@ -49,7 +49,7 @@ export class SchedulerStateManager {
     return (
       this.activeCalls.get(callId) ||
       this.queue.find((c) => c.request.callId === callId) ||
-      this.completedBatch.find((c) => c.request.callId === callId)
+      this._completedBatch.find((c) => c.request.callId === callId)
     );
   }
 
@@ -67,22 +67,52 @@ export class SchedulerStateManager {
     return next;
   }
 
-  hasActiveCalls(): boolean {
+  get isActive(): boolean {
     return this.activeCalls.size > 0;
   }
 
-  getActiveCallCount(): number {
+  get activeCallCount(): number {
     return this.activeCalls.size;
   }
 
-  getQueueLength(): number {
+  get queueLength(): number {
     return this.queue.length;
   }
 
-  getFirstActiveCall(): ToolCall | undefined {
+  get firstActiveCall(): ToolCall | undefined {
     return this.activeCalls.values().next().value;
   }
 
+  /**
+   * Updates the status of a tool call with specific auxiliary data required for certain states.
+   */
+  updateStatus(
+    callId: string,
+    status: 'success',
+    data: ToolCallResponseInfo,
+  ): void;
+  updateStatus(
+    callId: string,
+    status: 'error',
+    data: ToolCallResponseInfo,
+  ): void;
+  updateStatus(
+    callId: string,
+    status: 'awaiting_approval',
+    data:
+      | ToolCallConfirmationDetails
+      | {
+          correlationId: string;
+          confirmationDetails: SerializableConfirmationDetails;
+        },
+  ): void;
+  updateStatus(callId: string, status: 'cancelled', data: string): void;
+  updateStatus(
+    callId: string,
+    status: 'executing',
+    data?: Partial<ExecutingToolCall>,
+  ): void;
+  updateStatus(callId: string, status: 'scheduled' | 'validating'): void;
   updateStatus(callId: string, status: Status, auxiliaryData?: unknown): void {
     const call = this.activeCalls.get(callId);
     if (!call) return;
@@ -97,8 +127,8 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call) return;
 
-    if (this.isTerminal(call.status)) {
-      this.completedBatch.push(call as CompletedToolCall);
+    if (this.isTerminalCall(call)) {
+      this._completedBatch.push(call);
       this.activeCalls.delete(callId);
     }
   }
@@ -111,11 +141,13 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call || call.status === 'error') return;
 
-    this.activeCalls.set(callId, {
-      ...call,
-      request: { ...call.request, args: newArgs },
-      invocation: newInvocation,
-    } as ToolCall);
+    this.activeCalls.set(
+      callId,
+      this.patchCall(call, {
+        request: { ...call.request, args: newArgs },
+        invocation: newInvocation,
+      }),
+    );
     this.emitUpdate();
   }
 
@@ -123,10 +155,7 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call) return;
 
-    this.activeCalls.set(callId, {
-      ...call,
-      outcome,
-    } as ToolCall);
+    this.activeCalls.set(callId, this.patchCall(call, { outcome }));
     this.emitUpdate();
   }
 
@@ -134,30 +163,30 @@ export class SchedulerStateManager {
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
       if (queuedCall.status === 'error') {
-        this.completedBatch.push(queuedCall);
+        this._completedBatch.push(queuedCall);
         continue;
       }
-      this.completedBatch.push(this.toCancelled(queuedCall, reason));
+      this._completedBatch.push(this.toCancelled(queuedCall, reason));
     }
     this.emitUpdate();
   }
 
   getSnapshot(): ToolCall[] {
     return [
-      ...this.completedBatch,
+      ...this._completedBatch,
       ...Array.from(this.activeCalls.values()),
       ...this.queue,
     ];
   }
 
   clearBatch(): void {
-    if (this.completedBatch.length === 0) return;
-    this.completedBatch = [];
+    if (this._completedBatch.length === 0) return;
+    this._completedBatch = [];
     this.emitUpdate();
   }
 
-  getCompletedBatch(): CompletedToolCall[] {
-    return [...this.completedBatch];
+  get completedBatch(): CompletedToolCall[] {
+    return [...this._completedBatch];
   }
 
   private emitUpdate() {
@@ -170,7 +199,8 @@ export class SchedulerStateManager {
     });
   }
 
-  private isTerminal(status: Status): boolean {
+  private isTerminalCall(call: ToolCall): call is CompletedToolCall {
+    const { status } = call;
     return status === 'success' || status === 'error' || status === 'cancelled';
   }
 
@@ -180,25 +210,74 @@ export class SchedulerStateManager {
     auxiliaryData?: unknown,
   ): ToolCall {
     switch (newStatus) {
-      case 'success':
-        return this.toSuccess(call, auxiliaryData as ToolCallResponseInfo);
-      case 'error':
-        return this.toError(call, auxiliaryData as ToolCallResponseInfo);
-      case 'awaiting_approval':
+      case 'success': {
+        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+          throw new Error(
+            `Invalid data for 'success' transition (callId: ${call.request.callId})`,
+          );
+        }
+        return this.toSuccess(call, auxiliaryData);
+      }
+      case 'error': {
+        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+          throw new Error(
+            `Invalid data for 'error' transition (callId: ${call.request.callId})`,
+          );
+        }
+        return this.toError(call, auxiliaryData);
+      }
+      case 'awaiting_approval': {
+        if (!auxiliaryData) {
+          throw new Error(
+            `Missing data for 'awaiting_approval' transition (callId: ${call.request.callId})`,
+          );
+        }
         return this.toAwaitingApproval(call, auxiliaryData);
+      }
       case 'scheduled':
         return this.toScheduled(call);
-      case 'cancelled':
-        return this.toCancelled(call, auxiliaryData as string);
+      case 'cancelled': {
+        if (typeof auxiliaryData !== 'string') {
+          throw new Error(
+            `Invalid reason (string) for 'cancelled' transition (callId: ${call.request.callId})`,
+          );
+        }
+        return this.toCancelled(call, auxiliaryData);
+      }
       case 'validating':
         return this.toValidating(call);
-      case 'executing':
+      case 'executing': {
+        if (
+          auxiliaryData !== undefined &&
+          !this.isExecutingToolCallPatch(auxiliaryData)
+        ) {
+          throw new Error(
+            `Invalid patch for 'executing' transition (callId: ${call.request.callId})`,
+          );
+        }
         return this.toExecuting(call, auxiliaryData);
+      }
       default: {
         const exhaustiveCheck: never = newStatus;
         return exhaustiveCheck;
       }
     }
+  }
+
+  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'callId' in data &&
+      'responseParts' in data
+    );
+  }
+
+  private isExecutingToolCallPatch(
+    data: unknown,
+  ): data is Partial<ExecutingToolCall> {
+    // A partial can be an empty object, but it must be a non-null object.
+    return typeof data === 'object' && data !== null;
   }
 
   // --- Transition Helpers ---
@@ -258,20 +337,14 @@ export class SchedulerStateManager {
   private toAwaitingApproval(call: ToolCall, data: unknown): WaitingToolCall {
     this.validateHasToolAndInvocation(call, 'awaiting_approval');
 
-    // Handle both Legacy and New data shapes safely
     let confirmationDetails:
       | ToolCallConfirmationDetails
       | SerializableConfirmationDetails;
     let correlationId: string | undefined;
 
-    if (data && typeof data === 'object' && 'correlationId' in data) {
-      // New Event-Driven Shape
-      const typedData = data as {
-        correlationId: string;
-        confirmationDetails: SerializableConfirmationDetails;
-      };
-      correlationId = typedData.correlationId;
-      confirmationDetails = typedData.confirmationDetails;
+    if (this.isEventDrivenApprovalData(data)) {
+      correlationId = data.correlationId;
+      confirmationDetails = data.confirmationDetails;
     } else {
       // TODO: Remove legacy callback shape once event-driven migration is complete
       confirmationDetails = data as ToolCallConfirmationDetails;
@@ -287,6 +360,18 @@ export class SchedulerStateManager {
       outcome: call.outcome,
       invocation: call.invocation,
     };
+  }
+
+  private isEventDrivenApprovalData(data: unknown): data is {
+    correlationId: string;
+    confirmationDetails: SerializableConfirmationDetails;
+  } {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'correlationId' in data &&
+      'confirmationDetails' in data
+    );
   }
 
   private toScheduled(call: ToolCall): ScheduledToolCall {
@@ -305,9 +390,10 @@ export class SchedulerStateManager {
     this.validateHasToolAndInvocation(call, 'cancelled');
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
-    // Preserve diff for cancelled edit operations
+    // TODO: Refactor this tool-specific logic into the confirmation details payload.
+    // See: https://github.com/google-gemini/gemini-cli/issues/16716
     let resultDisplay: ToolResultDisplay | undefined = undefined;
-    if (call.status === 'awaiting_approval') {
+    if (this.isWaitingToolCall(call)) {
       const details = call.confirmationDetails;
       if (
         details.type === 'edit' &&
@@ -352,6 +438,14 @@ export class SchedulerStateManager {
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
     };
+  }
+
+  private isWaitingToolCall(call: ToolCall): call is WaitingToolCall {
+    return call.status === 'awaiting_approval';
+  }
+
+  private patchCall<T extends ToolCall>(call: T, patch: Partial<T>): T {
+    return { ...call, ...patch };
   }
 
   private toValidating(call: ToolCall): ValidatingToolCall {
