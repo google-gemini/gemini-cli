@@ -257,6 +257,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             config?.getEnableRecursiveFileSearch() ?? true,
           disableFuzzySearch:
             config?.getFileFilteringDisableFuzzySearch() ?? false,
+          maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
         });
         await searcher.initialize();
         fileSearch.current = searcher;
@@ -285,12 +286,19 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         dispatch({ type: 'SET_LOADING', payload: true });
       }, 200);
 
+      const timeoutMs =
+        config?.getFileFilteringOptions()?.searchTimeout ?? 5000;
+      const abortTimer = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
       try {
         const results = await fileSearch.current.search(state.pattern, {
           signal: controller.signal,
           maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
         });
 
+        clearTimeout(abortTimer);
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
         }
