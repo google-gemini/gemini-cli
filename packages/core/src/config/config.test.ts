@@ -1924,6 +1924,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
     });
   });
+
+  describe('isPlanEnabled', () => {
+    it('should return false by default', () => {
+      const config = new Config(baseParams);
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+
+    it('should return true when plan is enabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: true,
+      });
+      expect(config.isPlanEnabled()).toBe(true);
+    });
+
+    it('should return false when plan is explicitly disabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: false,
+      });
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
@@ -2090,6 +2113,31 @@ describe('Config JIT Initialization', () => {
       await config.reloadSkills();
 
       expect(skillManager.setDisabledSkills).toHaveBeenCalledWith([]);
+    });
+
+    it('should update admin settings from onReload', async () => {
+      const mockOnReload = vi.fn().mockResolvedValue({
+        adminSkillsEnabled: false,
+      });
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+        onReload: mockOnReload,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      vi.spyOn(skillManager, 'setAdminSettings');
+
+      await config.reloadSkills();
+
+      expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
     });
   });
 });

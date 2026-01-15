@@ -208,6 +208,7 @@ describe('<HistoryItemDisplay />', () => {
             title: 'Run Shell Command',
             command: 'echo "\u001b[31mhello\u001b[0m"',
             rootCommand: 'echo',
+            rootCommands: ['echo'],
             onConfirm: async () => {},
           },
         },
