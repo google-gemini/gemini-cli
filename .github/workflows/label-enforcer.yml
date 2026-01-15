@@ -4,10 +4,11 @@ on:
   issues:
     types:
       - 'labeled'
+      - 'unlabeled'
 
 jobs:
   enforce-label:
-    # Run this job only when the 'help wanted' label is added
+    # Run this job only when the 'help wanted' label is changed
     if: |-
       ${{ github.event.label.name == 'help wanted' &&
           (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') }}
@@ -34,11 +35,18 @@ jobs:
             const org = context.repo.owner;
             const username = context.payload.sender.login;
             const team_slug = 'gemini-cli-maintainers';
+            const action = context.payload.action; // 'labeled' or 'unlabeled'
+
+            // Skip if the change was made by a bot to avoid infinite loops
+            if (username === 'github-actions[bot]') {
+              core.info('Change made by a bot. Skipping.');
+              return;
+            }
 
             try {
               // This will succeed with a 204 status if the user is a member,
               // and fail with a 404 error if they are not.
-              await github.rest.teams.getMembershipForUserInOrg({
+              await github.rest.teams.getMembershipForUserInOrg ({
                 org,
                 team_slug,
                 username,
@@ -50,31 +58,55 @@ jobs:
                 throw error;
               }
 
-              // User is not in the team, so remove the label and comment.
-              core.info(`${username} is not a member. Removing 'help wanted' label.`);
+              core.info(`${username} is not a member. Reverting '${action}' action for 'help wanted' label.`);
 
-              // 1. Remove the label
-              await github.rest.issues.removeLabel({
-                owner: org,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                name: 'help wanted'
-              });
+              if (action === 'labeled') {
+                // 1. Remove the label if added by a non-maintainer
+                await github.rest.issues.removeLabel ({
+                  owner: org,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: 'help wanted'
+                });
 
-              // 2. Post a polite comment
-              const comment = `
-                Hi @${username}, thank you for your interest in helping triage issues!
+                // 2. Post a polite comment
+                const comment = `
+            Hi @${username}, thank you for your interest in helping triage issues!
 
-                The
-                help-wanted
-                 label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
+            The `help-wanted` label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
 
-                A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) for more details on our labeling process.
-              `;
-              await github.rest.issues.createComment({
-                owner: org,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment
-              });
+            A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) for more details on our labeling process.
+                `.trim().replace(/^[ ]+/gm, '');
+
+                await github.rest.issues.createComment ({
+                  owner: org,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment
+                });
+              } else if (action === 'unlabeled') {
+                // 1. Add the label back if removed by a non-maintainer
+                await github.rest.issues.addLabels ({
+                  owner: org,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: ['help wanted']
+                });
+
+                // 2. Post a polite comment
+                const comment = `
+            Hi @${username}, it looks like the `help-wanted` label was removed.
+
+            This label is managed by project maintainers. We've added it back to ensure the issue remains visible to potential contributors until a maintainer decides otherwise.
+
+            Thank you for your understanding!
+                `.trim().replace(/^[ ]+/gm, '');
+
+                await github.rest.issues.createComment ({
+                  owner: org,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment
+                });
+              }
             }
