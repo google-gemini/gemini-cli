@@ -30,25 +30,49 @@ jobs:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
             const org = context.repo.owner;
+            const repo = context.repo.repo;
             const username = context.payload.pull_request.user.login;
+            const pr_number = context.payload.pull_request.number;
             const team_slug = 'gemini-cli-maintainers';
 
+            // 1. Check if the PR author is a maintainer
             try {
-              // Check if the PR author is a member of the maintainers team
               await github.rest.teams.getMembershipForUserInOrg({
                 org,
                 team_slug,
                 username,
               });
               core.info(`${username} is a maintainer. No notification needed.`);
+              return;
             } catch (error) {
-              if (error.status !== 404) {
-                throw error;
+              if (error.status !== 404) throw error;
+            }
+
+            // 2. Check if the PR is already associated with an issue
+            const query = `
+              query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    closingIssuesReferences(first: 1) {
+                      totalCount
+                    }
+                  }
+                }
               }
+            `;
+            const variables = { owner: org, repo: repo, number: pr_number };
+            const result = await github.graphql(query, variables);
+            const issueCount = result.repository.pullRequest.closingIssuesReferences.totalCount;
 
-              core.info(`${username} is not a maintainer. Posting process update notification.`);
+            if (issueCount > 0) {
+              core.info(`PR #${pr_number} is already associated with an issue. No notification needed.`);
+              return;
+            }
 
-              const comment = `
+            // 3. Post the notification comment
+            core.info(`${username} is not a maintainer and PR #${pr_number} has no linked issue. Posting notification.`);
+
+            const comment = `
             Hi @${username}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.
 
             We're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](https://github.com/google-gemini/gemini-cli/discussions/16706).
@@ -56,12 +80,11 @@ jobs:
             Key Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.
 
             Thank you for your understanding and for being a part of our community!
-              `.trim().replace(/^[ ]+/gm, '');
+            `.trim().replace(/^[ ]+/gm, '');
 
-              await github.rest.issues.createComment({
-                owner: org,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment
-              });
-            }
+            await github.rest.issues.createComment({
+              owner: org,
+              repo: repo,
+              issue_number: pr_number,
+              body: comment
+            });

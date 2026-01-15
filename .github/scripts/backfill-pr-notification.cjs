@@ -10,6 +10,8 @@
 /**
  * Script to backfill a process change notification comment to all open PRs
  * not created by members of the 'gemini-cli-maintainers' team.
+ *
+ * Skip PRs that are already associated with an issue.
  */
 
 const { execFileSync } = require('child_process');
@@ -74,6 +76,7 @@ async function main() {
   }
 
   console.log(`📥 Fetching open PRs from ${REPO}...`);
+  // Fetch number, author, and closingIssuesReferences to check if linked to an issue
   const prsJson = runGh([
     'pr',
     'list',
@@ -84,33 +87,32 @@ async function main() {
     '--limit',
     '1000',
     '--json',
-    'number,author',
+    'number,author,closingIssuesReferences',
   ]);
 
   if (prsJson === null) process.exit(1);
   const prs = JSON.parse(prsJson);
 
-  console.log(`📊 Found ${prs.length} open PRs. Checking authors...`);
+  console.log(`📊 Found ${prs.length} open PRs. Filtering...`);
 
   let targetPrs = [];
   for (const pr of prs) {
     const author = pr.author.login;
+    const issueCount = pr.closingIssuesReferences ? pr.closingIssuesReferences.length : 0;
+
+    if (issueCount > 0) {
+      // Skip if already linked to an issue
+      continue;
+    }
+
     if (!isMaintainer(author)) {
       targetPrs.push(pr);
     }
   }
 
-  console.log(`✅ Found ${targetPrs.length} PRs created by non-maintainers.`);
+  console.log(`✅ Found ${targetPrs.length} PRs from non-maintainers without associated issues.`);
 
-  const commentBody = `
-Hi @{AUTHOR}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.
-
-We're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](${DISCUSSION_URL}).
-
-Key Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.
-
-Thank you for your understanding and for being a part of our community!
-  `.trim();
+  const commentBody = "\nHi @{AUTHOR}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.\n\nWe're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](${DISCUSSION_URL}).\n\nKey Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.\n\nThank you for your understanding and for being a part of our community!\n  ".trim();
 
   let successCount = 0;
   let skipCount = 0;
@@ -139,7 +141,7 @@ Thank you for your understanding and for being a part of our community!
 
     if (existingComments && existingComments.includes('true')) {
       console.log(
-        `⏭️  PR #${prNumber} already has the notification. Skipping.`,
+        `⏭️  PR #${prNumber} already has the notification. Skipping.`, 
       );
       skipCount++;
       continue;
