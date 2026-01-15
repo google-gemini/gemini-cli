@@ -181,7 +181,7 @@ describe('skillsCommand', () => {
 
   describe('disable/enable', () => {
     beforeEach(() => {
-      context.services.settings.merged.skills = { disabled: [] };
+      context.services.settings.merged.skills = { enabled: true, disabled: [] };
       (
         context.services.settings as unknown as { workspace: { path: string } }
       ).workspace = {
@@ -234,7 +234,7 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      context.services.settings.merged.skills = { disabled: ['skill1'] };
+      context.services.settings.merged.skills = { enabled: true, disabled: ['skill1'] };
       (
         context.services.settings as unknown as {
           workspace: { settings: { skills: { disabled: string[] } } };

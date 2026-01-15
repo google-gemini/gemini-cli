@@ -357,6 +357,17 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have skills setting enabled by default', () => {
+      const setting = getSettingsSchema().skills.properties.enabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Agent Skills.');
+    });
+
     it('should have plan setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.plan;
       expect(setting).toBeDefined();
