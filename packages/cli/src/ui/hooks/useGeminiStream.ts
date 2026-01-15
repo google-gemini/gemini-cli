@@ -30,6 +30,7 @@ import {
   ToolErrorType,
   coreEvents,
   CoreEvent,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -951,6 +952,21 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
+
+          if (
+            !options?.isContinuation &&
+            typeof query === 'string' &&
+            !isSlashCommand(query.trim()) &&
+            config.getMcpClientManager()?.getDiscoveryState() !==
+              MCPDiscoveryState.COMPLETED
+          ) {
+            coreEvents.emitFeedback(
+              'info',
+              'Waiting for MCP servers to initialize... Slash commands are still available.',
+            );
+            return;
+          }
+
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
           if (

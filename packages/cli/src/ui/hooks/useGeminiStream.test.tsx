@@ -36,6 +36,7 @@ import {
   debugLogger,
   coreEvents,
   CoreEvent,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -178,6 +179,10 @@ describe('useGeminiStream', () => {
       return clientInstance;
     });
 
+    const mockMcpClientManager = {
+      getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+    };
+
     const contentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
@@ -211,6 +216,7 @@ describe('useGeminiStream', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
+      getMcpClientManager: () => mockMcpClientManager as any,
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -254,6 +260,7 @@ describe('useGeminiStream', () => {
       .mockClear()
       .mockReturnValue((async function* () {})());
     handleAtCommandSpy = vi.spyOn(atCommandProcessor, 'handleAtCommand');
+    vi.spyOn(coreEvents, 'emitFeedback');
   });
 
   const mockLoadedSettings: LoadedSettings = {
@@ -3013,6 +3020,67 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
+    });
+  });
+
+  describe('MCP Server Initialization', () => {
+    it('should allow slash commands to run while MCP servers are initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/help');
+      });
+
+      // Slash command should be handled, and no Gemini call should be made.
+      expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+
+    it('should block normal prompts and provide feedback while MCP servers are initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('a normal prompt');
+      });
+
+      // No slash command, no Gemini call, but feedback should be emitted.
+      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+    });
+
+    it('should allow normal prompts to run when MCP servers are finished initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('a normal prompt');
+      });
+
+      // Prompt should be sent to Gemini.
+      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
