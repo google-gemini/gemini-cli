@@ -1313,6 +1313,20 @@ describe('loadCliConfig model selection', () => {
 
     expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
+
+  it('selects the default auto model if provided via auto alias', async () => {
+    process.argv = ['node', 'script.js', '--model', 'auto'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        // No model provided via settings.
+      },
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('auto-gemini-2.5');
+  });
 });
 
 describe('loadCliConfig folderTrust', () => {
