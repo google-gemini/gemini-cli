@@ -1,0 +1,65 @@
+name: Enforce 'help wanted' Label Permissions
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  enforce-label:
+    # Run this job only when the 'help wanted' label is added
+    if: github.event.label.name == 'help wanted'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      organization: read
+    steps:
+      - name: Check if user is in the maintainers team
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const org = context.repo.owner;
+            const username = context.payload.sender.login;
+            const team_slug = 'gemini-cli-maintainers'; // Updated with the correct team slug
+
+            try {
+              // This will succeed with a 204 status if the user is a member,
+              // and fail with a 404 error if they are not.
+              await github.rest.teams.getMembershipForUserInOrg({
+                org,
+                team_slug,
+                username,
+              });
+              console.log(`${username} is a member of the ${team_slug} team. No action needed.`);
+            } catch (error) {
+              // If the error is not 404, rethrow it to fail the action
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              // User is not in the team, so remove the label and comment.
+              console.log(`${username} is not a member. Removing 'help wanted' label.`);
+
+              // 1. Remove the label
+              await github.rest.issues.removeLabel({
+                owner: org,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'help wanted'
+              });
+
+              // 2. Post a polite comment
+              const comment = `
+                Hi @${username}, thank you for your interest in helping triage issues!
+
+                The \`help-wanted\` label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
+
+                A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](link-to-your-contributing-file) for more details on our labeling process.
+              `;
+              await github.rest.issues.createComment({
+                owner: org,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
