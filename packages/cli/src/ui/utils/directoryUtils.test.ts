@@ -36,14 +36,22 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-  statSync: vi.fn(),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    statSync: vi.fn(),
+  };
+});
 
-vi.mock('node:fs/promises', () => ({
-  opendir: vi.fn(),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    opendir: vi.fn(),
+  };
+});
 
 interface MockDirent {
   name: string;
