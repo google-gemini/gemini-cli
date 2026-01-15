@@ -95,7 +95,8 @@ jobs:
         id: 'generate_token'
         env:
           APP_ID: '${{ secrets.APP_ID }}'
-        if: "${{ env.APP_ID != '' }}"
+        if: |-
+          ${{ env.APP_ID != '' }}
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'

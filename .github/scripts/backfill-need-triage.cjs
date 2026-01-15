@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable */
 /* global require, console, process */
 
 /**
@@ -27,7 +27,9 @@ function runGh(args) {
     }).trim();
   } catch (error) {
     const stderr = error.stderr ? ` Stderr: ${error.stderr.trim()}` : '';
-    console.error(`❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`);
+    console.error(
+      `❌ Error running gh ${args.join(' ')}: ${error.message}${stderr}`,
+    );
     return null;
   }
 }
@@ -48,7 +50,7 @@ async function main() {
 
   // We use the /issues endpoint with pagination to bypass the 1000-result limit.
   // The jq filter ensures we exclude PRs, maintainer-only, help-wanted, and existing status/need-triage.
-  const jqFilter = 
+  const jqFilter =
     '.[] | select(.pull_request == null) | select([.labels[].name] as $l | (any($l[]; . == "🔒 maintainer only") | not) and (any($l[]; . == "help wanted") | not) and (any($l[]; . == "status/need-triage") | not)) | {number: .number, title: .title}';
 
   const output = runGh([
@@ -69,7 +71,7 @@ async function main() {
     .map((line) => {
       try {
         return JSON.parse(line);
-      } catch {
+      } catch (_e) {
         console.error(`⚠️ Failed to parse line: ${line}`);
         return null;
       }
@@ -88,7 +90,9 @@ async function main() {
 
   if (isDryRun) {
     for (const issue of issues) {
-      console.log(`[DRY RUN] Would label issue #${issue.number}: ${issue.title}`);
+      console.log(
+        `[DRY RUN] Would label issue #${issue.number}: ${issue.title}`,
+      );
     }
     successCount = issues.length;
   } else {
