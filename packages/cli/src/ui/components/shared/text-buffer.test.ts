@@ -58,6 +58,10 @@ const initialState: TextBufferState = {
 };
 
 describe('textBufferReducer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should return the initial state if state is undefined', () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
@@ -2378,6 +2382,10 @@ describe('Unicode helper functions', () => {
 });
 
 describe('Transformation Utilities', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('getTransformedImagePath', () => {
     it('should transform a simple image path', () => {
       expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
