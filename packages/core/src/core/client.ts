@@ -133,10 +133,9 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireBeforeAgentEvent(partToString(request));
-    const hookOutput = hookResult?.finalOutput;
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -187,10 +186,9 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
-    const hookOutput = hookResult?.finalOutput;
 
     return hookOutput;
   }
@@ -629,8 +627,9 @@ export class GeminiClient {
     modelToUse = finalModel;
 
     this.currentSequenceModel = modelToUse;
-    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
-
+    if (!signal.aborted) {
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    }
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     let isError = false;
     let isInvalidStream = false;

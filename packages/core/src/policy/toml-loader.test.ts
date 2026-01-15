@@ -53,6 +53,7 @@ priority = 100
         toolName: 'glob',
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
+        source: 'Default: test.toml',
       });
       expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
@@ -190,6 +191,7 @@ modes = ["autoEdit"]
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('tier2-tool');
       expect(result.rules[0].modes).toEqual(['autoEdit']);
+      expect(result.rules[0].source).toBe('User: tier2.toml');
       expect(result.errors).toHaveLength(0);
     });
 
