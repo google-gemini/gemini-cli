@@ -812,28 +812,55 @@ describe('DiscoveredMCPTool', () => {
         description: 'add server to allowlist on ProceedAlwaysServer',
         shouldAddServer: true,
         shouldAddTool: false,
+        expectPolicyUpdate: true,
       },
       {
         outcome: ToolConfirmationOutcome.ProceedAlwaysTool,
         description: 'add tool to allowlist on ProceedAlwaysTool',
         shouldAddServer: false,
         shouldAddTool: true,
+        expectPolicyUpdate: true,
+      },
+      {
+        outcome: ToolConfirmationOutcome.ProceedAlways,
+        description: 'add tool to allowlist on ProceedAlways',
+        shouldAddServer: false,
+        shouldAddTool: true,
+        expectPolicyUpdate: true,
+      },
+      {
+        outcome: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        description: 'add tool to allowlist on ProceedAlwaysAndSave',
+        shouldAddServer: false,
+        shouldAddTool: true,
+        expectPolicyUpdate: true,
+        expectPersist: true,
       },
       {
         outcome: ToolConfirmationOutcome.Cancel,
         description: 'handle Cancel confirmation outcome',
         shouldAddServer: false,
         shouldAddTool: false,
+        expectPolicyUpdate: false,
       },
       {
         outcome: ToolConfirmationOutcome.ProceedOnce,
         description: 'handle ProceedOnce confirmation outcome',
         shouldAddServer: false,
         shouldAddTool: false,
+        expectPolicyUpdate: false,
       },
     ])(
       'should $description',
-      async ({ outcome, shouldAddServer, shouldAddTool }) => {
+      async ({
+        outcome,
+        shouldAddServer,
+        shouldAddTool,
+        expectPolicyUpdate,
+        expectPersist,
+      }) => {
+        const bus = (tool as any).messageBus;
+        const publishSpy = vi.spyOn(bus, 'publish');
         const toolAllowlistKey = `${serverName}.${serverToolName}`;
         const invocation = tool.build({ param: 'mock' }) as any;
         const confirmation = await invocation.shouldConfirmExecute(
@@ -854,6 +881,24 @@ describe('DiscoveredMCPTool', () => {
           expect(invocation.constructor.allowlist.has(toolAllowlistKey)).toBe(
             shouldAddTool,
           );
+
+          if (expectPolicyUpdate) {
+            expect(publishSpy).toHaveBeenCalledWith(
+              expect.objectContaining({
+                type: 'update-policy',
+                toolName: expect.any(String),
+                persist: !!expectPersist,
+                mcpName: serverName,
+              }),
+            );
+          } else {
+            // Should NOT have called update-policy
+            const calls = publishSpy.mock.calls;
+            const updatePolicyCalls = calls.filter(
+              (call) => call[0].type === 'update-policy',
+            );
+            expect(updatePolicyCalls.length).toBe(0);
+          }
         } else {
           throw new Error(
             'Confirmation details or onConfirm not in expected format',

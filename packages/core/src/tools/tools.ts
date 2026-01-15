@@ -139,7 +139,9 @@ export abstract class BaseToolInvocation<
   ): Promise<void> {
     if (
       outcome === ToolConfirmationOutcome.ProceedAlways ||
-      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysTool ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysServer
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);

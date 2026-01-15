@@ -120,8 +120,13 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
-        } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
+          await this.publishPolicyUpdate(outcome);
+        } else if (
+          outcome === ToolConfirmationOutcome.ProceedAlwaysTool ||
+          outcome === ToolConfirmationOutcome.ProceedAlways
+        ) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          await this.publishPolicyUpdate(outcome);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
           await this.publishPolicyUpdate(outcome);
