@@ -136,7 +136,7 @@ describe('App', () => {
       pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
     } as UIState;
 
-    mockLoadedSettings.merged.ui = { useAlternateBuffer: true };
+    mockLoadedSettings.merged.ui.useAlternateBuffer = true;
 
     const { lastFrame } = renderWithProviders(<App />, quittingUIState);
 
@@ -144,7 +144,7 @@ describe('App', () => {
     expect(lastFrame()).toContain('Quitting...');
 
     // Reset settings
-    mockLoadedSettings.merged.ui = { useAlternateBuffer: false };
+    mockLoadedSettings.merged.ui.useAlternateBuffer = false;
   });
 
   it('should render dialog manager when dialogs are visible', () => {

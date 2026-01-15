@@ -12,7 +12,6 @@ import type {
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
-import type { AgentOverride } from '@google/gemini-cli-core';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';
 import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
 
@@ -84,10 +83,7 @@ async function enableAction(
   }
 
   const allAgents = agentRegistry.getAllAgentNames();
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
     (name) => overrides[name]?.disabled === true,
   );
@@ -157,10 +153,7 @@ async function disableAction(
   }
 
   const allAgents = agentRegistry.getAllAgentNames();
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
     (name) => overrides[name]?.disabled === true,
   );
@@ -211,10 +204,7 @@ function completeAgentsToEnable(context: CommandContext, partialArg: string) {
   const { config, settings } = context.services;
   if (!config) return [];
 
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.entries(overrides)
     .filter(([_, override]) => override?.disabled === true)
     .map(([name]) => name);

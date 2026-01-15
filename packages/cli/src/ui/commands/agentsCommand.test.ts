@@ -7,7 +7,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { Config, AgentOverride } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { enableAgent, disableAgent } from '../../utils/agentSettings.js';
@@ -148,12 +148,9 @@ describe('agentsCommand', () => {
       reload: reloadSpy,
     });
     // Add agent to disabled overrides so validation passes
-    (
-      mockContext.services.settings.merged.agents!.overrides as Record<
-        string,
-        AgentOverride
-      >
-    )['test-agent'] = { disabled: true };
+    mockContext.services.settings.merged.agents.overrides['test-agent'] = {
+      disabled: true,
+    };
 
     vi.mocked(enableAgent).mockReturnValue({
       status: 'success',
@@ -266,12 +263,9 @@ describe('agentsCommand', () => {
 
   it('should show info message if agent is already disabled', async () => {
     mockConfig.getAgentRegistry().getAllAgentNames.mockReturnValue([]);
-    (
-      mockContext.services.settings.merged.agents!.overrides as Record<
-        string,
-        AgentOverride
-      >
-    )['test-agent'] = { disabled: true };
+    mockContext.services.settings.merged.agents.overrides['test-agent'] = {
+      disabled: true,
+    };
 
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',

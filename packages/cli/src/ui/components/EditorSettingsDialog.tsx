@@ -124,12 +124,12 @@ export function EditorSettingsDialog({
 
   let mergedEditorName = 'None';
   if (
-    settings.merged.general?.preferredEditor &&
-    isEditorAvailable(settings.merged.general?.preferredEditor)
+    settings.merged.general.preferredEditor &&
+    isEditorAvailable(settings.merged.general.preferredEditor)
   ) {
     mergedEditorName =
       EDITOR_DISPLAY_NAMES[
-        settings.merged.general?.preferredEditor as EditorType
+        settings.merged.general.preferredEditor as EditorType
       ];
   }
 

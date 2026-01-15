@@ -85,7 +85,7 @@ export const usePermissionsModifyTrust = (
   );
   const [needsRestart, setNeedsRestart] = useState(false);
 
-  const isFolderTrustEnabled = !!settings.merged.security?.folderTrust?.enabled;
+  const isFolderTrustEnabled = !!settings.merged.security.folderTrust.enabled;
 
   const updateTrustLevel = useCallback(
     (trustLevel: TrustLevel) => {
