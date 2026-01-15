@@ -22,7 +22,7 @@ the main agent's context or toolset.
 > Proceed with caution when defining agents with powerful tools like
 > `run_shell_command` or `write_file`.
 
-## What are Sub-Agents?
+## What are sub-agents?
 
 Think of sub-agents as "specialists" that the main Gemini agent can hire for a
 specific job.
