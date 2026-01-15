@@ -71,16 +71,22 @@ function parseSimpleFrontmatter(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (line.startsWith('name:')) {
-      name = line.substring(5).trim();
+    // Match "name:" at the start of the line (optional whitespace)
+    const nameMatch = line.match(/^\s*name:\s*(.*)$/);
+    if (nameMatch) {
+      name = nameMatch[1].trim();
       continue;
     }
 
-    if (line.startsWith('description:')) {
-      const descLines = [line.substring(12).trim()];
+    // Match "description:" at the start of the line (optional whitespace)
+    const descMatch = line.match(/^\s*description:\s*(.*)$/);
+    if (descMatch) {
+      const descLines = [descMatch[1].trim()];
 
+      // Check for multi-line description (indented continuation lines)
       while (i + 1 < lines.length) {
         const nextLine = lines[i + 1];
+        // If next line is indented, it's a continuation of the description
         if (nextLine.match(/^[ \t]+\S/)) {
           descLines.push(nextLine.trim());
           i++;
@@ -169,7 +175,7 @@ export async function loadSkillFromFile(
       name: frontmatter.name,
       description: frontmatter.description,
       location: filePath,
-      body: match[2].trim(),
+      body: match[2]?.trim() ?? '',
     };
   } catch (error) {
     debugLogger.log(`Error parsing skill file ${filePath}:`, error);
