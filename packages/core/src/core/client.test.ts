@@ -2939,29 +2939,17 @@ ${JSON.stringify(
 
         mockHookSystem.fireAfterAgentEvent
           .mockResolvedValueOnce({
-            success: true,
-            finalOutput: {
-              shouldStopExecution: () => false,
-              isBlockingDecision: () => true,
-              getEffectiveReason: () => 'Blocked and clearing context',
-              shouldClearContext: () => true,
-              systemMessage: undefined,
-            },
-            allOutputs: [],
-            errors: [],
-            totalDuration: 0,
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Blocked and clearing context',
+            shouldClearContext: () => true,
+            systemMessage: undefined,
           })
           .mockResolvedValueOnce({
-            success: true,
-            finalOutput: {
-              shouldStopExecution: () => false,
-              isBlockingDecision: () => false,
-              shouldClearContext: () => false,
-              systemMessage: undefined,
-            },
-            allOutputs: [],
-            errors: [],
-            totalDuration: 0,
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            systemMessage: undefined,
           });
 
         mockTurnRunFn.mockImplementation(async function* () {
