@@ -109,6 +109,9 @@ describe('ExtensionManager Settings Scope', () => {
         telemetry: {
           enabled: false,
         },
+        experimental: {
+          extensionConfig: true,
+        },
       } as Settings,
     });
 
@@ -148,6 +151,9 @@ describe('ExtensionManager Settings Scope', () => {
         telemetry: {
           enabled: false,
         },
+        experimental: {
+          extensionConfig: true,
+        },
       } as Settings,
     });
 
@@ -184,6 +190,9 @@ describe('ExtensionManager Settings Scope', () => {
       settings: {
         telemetry: {
           enabled: false,
+        },
+        experimental: {
+          extensionConfig: true,
         },
       } as Settings,
     });
