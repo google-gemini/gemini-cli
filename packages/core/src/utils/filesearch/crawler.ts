@@ -47,6 +47,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
   const posixCrawlDirectory = toPosixPath(options.crawlDirectory);
   const maxFiles = options.maxFiles ?? Infinity;
   let fileCount = 0;
+  let truncated = false;
 
   let results: string[];
   try {
@@ -58,12 +59,16 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
       .filter((path, isDirectory) => {
         if (!isDirectory) {
           fileCount++;
-          return fileCount <= maxFiles;
+          if (fileCount > maxFiles) {
+            truncated = true;
+            return false;
+          }
         }
         return true;
       })
       .exclude((_, dirPath) => {
         if (fileCount > maxFiles) {
+          truncated = true;
           return true;
         }
         const relativePath = path.posix.relative(posixCrawlDirectory, dirPath);
@@ -86,7 +91,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     path.posix.join(relativeToCrawlDir, p),
   );
 
-  if (options.cache) {
+  if (options.cache && !truncated) {
     const cacheKey = cache.getCacheKey(
       options.crawlDirectory,
       options.ignore.getFingerprint(),
