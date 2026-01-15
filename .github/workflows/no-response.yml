@@ -18,7 +18,7 @@ jobs:
       group: '${{ github.workflow }}-no-response'
       cancel-in-progress: true
     steps:
-      - uses: 'actions/stale@5bef64f19d7facfb25b37b414482c7164d639639' # ratchet:actions/stale@v9
+      - uses: 'actions/stale@997185467fa4f803885201cee163a9f38240193d' # ratchet:actions/stale@v9
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           days-before-stale: -1
