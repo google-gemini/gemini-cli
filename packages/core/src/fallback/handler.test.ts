@@ -36,11 +36,14 @@ import {
   RetryableQuotaError,
   TerminalQuotaError,
 } from '../utils/googleQuotaErrors.js';
+import { logFallback } from '../telemetry/index.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
   logFlashFallback: vi.fn(),
   FlashFallbackEvent: class {},
+  logFallback: vi.fn(),
+  FallbackEvent: class {},
 }));
 vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
@@ -392,7 +395,7 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.setActiveModel).toHaveBeenCalledWith(FALLBACK_MODEL);
-      // TODO: add logging expect statement
+      expect(logFallback).toHaveBeenCalled();
     });
 
     it('does NOT call setActiveModel when handler returns "stop"', async () => {
@@ -406,7 +409,7 @@ describe('handleFallback', () => {
 
       expect(result).toBe(false);
       expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
-      // TODO: add logging expect statement
+      expect(logFallback).not.toHaveBeenCalled();
     });
 
     it('does NOT call setActiveModel when handler returns "retry_once"', async () => {
