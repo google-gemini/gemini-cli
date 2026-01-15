@@ -89,7 +89,10 @@ describe('Admin Controls', () => {
     });
 
     it('should return empty object if project ID is missing', async () => {
-      mockServer.projectId = undefined;
+      mockServer = {
+        fetchAdminControls: vi.fn(),
+      } as unknown as CodeAssistServer;
+
       const result = await fetchAdminControls(
         mockServer,
         undefined,
