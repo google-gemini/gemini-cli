@@ -19,6 +19,8 @@ available combinations.
 | ------------------------------------------- | ------------------------------------------------------------ |
 | Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home`                                       |
 | Move the cursor to the end of the line.     | `Ctrl + E`<br />`End`                                        |
+| Move the cursor up one line.                | `Up Arrow (no Ctrl, no Cmd)`                                 |
+| Move the cursor down one line.              | `Down Arrow (no Ctrl, no Cmd)`                               |
 | Move the cursor one character to the left.  | `Left Arrow (no Ctrl, no Cmd)`<br />`Ctrl + B`               |
 | Move the cursor one character to the right. | `Right Arrow (no Ctrl, no Cmd)`<br />`Ctrl + F`              |
 | Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Cmd + Left Arrow`<br />`Cmd + B`   |

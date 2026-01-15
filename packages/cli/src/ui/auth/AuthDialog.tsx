@@ -78,9 +78,9 @@ export function AuthDialog({
     },
   ];
 
-  if (settings.merged.security?.auth?.enforcedType) {
+  if (settings.merged.security.auth.enforcedType) {
     items = items.filter(
-      (item) => item.value === settings.merged.security?.auth?.enforcedType,
+      (item) => item.value === settings.merged.security.auth.enforcedType,
     );
   }
 
@@ -94,7 +94,7 @@ export function AuthDialog({
   }
 
   let initialAuthIndex = items.findIndex((item) => {
-    if (settings.merged.security?.auth?.selectedType) {
+    if (settings.merged.security.auth.selectedType) {
       return item.value === settings.merged.security.auth.selectedType;
     }
 
@@ -108,7 +108,7 @@ export function AuthDialog({
 
     return item.value === AuthType.LOGIN_WITH_GOOGLE;
   });
-  if (settings.merged.security?.auth?.enforcedType) {
+  if (settings.merged.security.auth.enforcedType) {
     initialAuthIndex = 0;
   }
 
@@ -171,7 +171,7 @@ export function AuthDialog({
         if (authError) {
           return;
         }
-        if (settings.merged.security?.auth?.selectedType === undefined) {
+        if (settings.merged.security.auth.selectedType === undefined) {
           // Prevent exiting if no auth method is set
           onAuthError(
             'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
