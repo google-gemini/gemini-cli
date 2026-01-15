@@ -953,12 +953,17 @@ export const useGeminiStream = (
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
+          const discoveryState = config
+            .getMcpClientManager()
+            ?.getDiscoveryState();
+          const mcpServerCount =
+            config.getMcpClientManager()?.getMcpServerCount() ?? 0;
           if (
             !options?.isContinuation &&
             typeof query === 'string' &&
             !isSlashCommand(query.trim()) &&
-            config.getMcpClientManager()?.getDiscoveryState() !==
-              MCPDiscoveryState.COMPLETED
+            mcpServerCount > 0 &&
+            discoveryState !== MCPDiscoveryState.COMPLETED
           ) {
             coreEvents.emitFeedback(
               'info',

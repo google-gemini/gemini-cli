@@ -1961,6 +1961,73 @@ describe('useGeminiStream', () => {
     });
   });
 
+  describe('MCP Discovery State', () => {
+    it('should block non-slash command queries when discovery is in progress and servers exist', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+
+    it('should NOT block queries when discovery is NOT_STARTED but there are no servers', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.NOT_STARTED),
+        getMcpServerCount: vi.fn().mockReturnValue(0),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+      expect(mockSendMessageStream).toHaveBeenCalled();
+    });
+
+    it('should NOT block slash commands even when discovery is in progress', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/help');
+      });
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+    });
+  });
+
   describe('handleFinishedEvent', () => {
     it('should add info message for MAX_TOKENS finish reason', async () => {
       // Setup mock to return a stream with MAX_TOKENS finish reason
