@@ -28,10 +28,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
+  const mocks = {
     existsSync: vi.fn(),
     writeFileSync: vi.fn(),
+  };
+  return {
+    ...actual,
+    ...mocks,
+    default: {
+      ...actual.default,
+      ...mocks,
+    },
   };
 });
 

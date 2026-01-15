@@ -14,13 +14,20 @@ import type { ClientMetadata } from '../types.js';
 // Mock dependencies
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
+  const mocks = {
     promises: {
       ...actual.promises,
       readFile: vi.fn(),
     },
     readFileSync: vi.fn(),
+  };
+  return {
+    ...actual,
+    ...mocks,
+    default: {
+      ...actual.default,
+      ...mocks,
+    },
   };
 });
 vi.mock('node:os');

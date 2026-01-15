@@ -18,19 +18,7 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 // Mock fs module
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    default: {
-      ...actual,
-      mkdirSync: vi.fn(),
-      writeFileSync: vi.fn(),
-      readFileSync: vi.fn(() => {
-        const error = new Error('ENOENT');
-        (error as NodeJS.ErrnoException).code = 'ENOENT';
-        throw error;
-      }),
-      existsSync: vi.fn(() => false),
-    },
+  const mocks = {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
     readFileSync: vi.fn(() => {
@@ -39,6 +27,14 @@ vi.mock('node:fs', async (importOriginal) => {
       throw error;
     }),
     existsSync: vi.fn(() => false),
+  };
+  return {
+    ...actual,
+    ...mocks,
+    default: {
+      ...actual.default,
+      ...mocks,
+    },
   };
 });
 

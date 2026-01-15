@@ -40,7 +40,7 @@ vi.mock('node:fs', async (importOriginal) => {
     ...actual,
     ...mockFs,
     default: {
-      ...actual,
+      ...actual.default,
       ...mockFs,
     },
   };
