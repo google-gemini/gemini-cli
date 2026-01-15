@@ -36,9 +36,14 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
-import { saveModelChange, loadSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  saveModelChange,
+  loadSettings,
+} from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -53,7 +58,6 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -81,7 +85,9 @@ export interface CliArgs {
   recordResponses: string | undefined;
 }
 
-export async function parseArguments(settings: Settings): Promise<CliArgs> {
+export async function parseArguments(
+  settings: MergedSettings,
+): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
   const yargsInstance = yargs(rawArgv)
     .locale('en')
@@ -93,7 +99,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .option('debug', {
       alias: 'd',
       type: 'boolean',
-      description: 'Run in debug mode?',
+      description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -242,11 +248,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
-        })
-        .deprecateOption(
-          'prompt',
-          'Use the positional prompt instead. This flag will be removed in a future version.',
-        ),
+        }),
     )
     // Register MCP subcommands
     .command(mcpCommand)
@@ -283,16 +285,16 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       return true;
     });
 
-  if (settings?.experimental?.extensionManagement ?? true) {
+  if (settings.experimental.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings?.experimental?.skills ?? false) {
+  if (settings.experimental.skills) {
     yargsInstance.command(skillsCommand);
   }
 
   // Register hooks command if hooks are enabled
-  if (getEnableHooksUI(settings)) {
+  if (settings.tools.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -395,7 +397,7 @@ export interface LoadCliConfigOptions {
 }
 
 export async function loadCliConfig(
-  settings: Settings,
+  settings: MergedSettings,
   sessionId: string,
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
@@ -593,10 +595,7 @@ export async function loadCliConfig(
     }
   }
 
-  const excludeTools = mergeExcludeTools(
-    settings,
-    extraExcludes.length > 0 ? extraExcludes : undefined,
-  );
+  const excludeTools = mergeExcludeTools(settings, extraExcludes);
 
   // Create a settings object that includes CLI overrides for policy generation
   const effectiveSettings: Settings = {
@@ -621,12 +620,13 @@ export async function loadCliConfig(
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL_AUTO;
-  const resolvedModel: string =
-    argv.model ||
-    process.env['GEMINI_MODEL'] ||
-    settings.model?.name ||
-    defaultModel;
+  const specifiedModel =
+    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
+  const resolvedModel =
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
@@ -637,6 +637,7 @@ export async function loadCliConfig(
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
+  const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -661,6 +662,7 @@ export async function loadCliConfig(
     mcpEnabled,
     extensionsEnabled,
     agents: settings.agents,
+    adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -706,6 +708,7 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
+    plan: settings.experimental?.plan,
     skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
@@ -741,27 +744,30 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: getEnableHooks(settings),
-    enableHooksUI: getEnableHooksUI(settings),
+    enableHooks:
+      (settings.tools?.enableHooks ?? true) &&
+      (settings.hooks?.enabled ?? false),
+    enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
-        disabledSkills: refreshedSettings.merged.skills?.disabled,
+        disabledSkills: refreshedSettings.merged.skills.disabled,
+        agents: refreshedSettings.merged.agents,
       };
     },
   });
 }
 
 function mergeExcludeTools(
-  settings: Settings,
-  extraExcludes?: string[] | undefined,
+  settings: MergedSettings,
+  extraExcludes: string[] = [],
 ): string[] {
   const allExcludeTools = new Set([
-    ...(settings.tools?.exclude || []),
-    ...(extraExcludes || []),
+    ...(settings.tools.exclude || []),
+    ...extraExcludes,
   ]);
-  return [...allExcludeTools];
+  return Array.from(allExcludeTools);
 }
