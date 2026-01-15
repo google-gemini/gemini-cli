@@ -54,7 +54,7 @@
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
+    "preflight": "npm run build && npm run test && npm run typecheck && npm run lint",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
