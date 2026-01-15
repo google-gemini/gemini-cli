@@ -15,7 +15,7 @@ project. While you can run the individual steps (`build`, `test`, `typecheck`,
 `lint`) separately, it is highly recommended to use `npm run preflight` to
 ensure a comprehensive validation.
 
-- **Running Tests in Workspaces**: To run a specific test file within a
+## Running Tests in Workspaces**: To run a specific test file within a
   workspace, use the command:
   `npm test -w <workspace-name> -- <path/to/test-file.test.ts>`. **CRITICAL**:
   The `<path/to/test-file.test.ts>` MUST be relative to the workspace directory
