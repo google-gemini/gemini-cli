@@ -9,8 +9,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false                                    │
 │                                                                                                  │
@@ -26,10 +26,10 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -47,8 +47,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             true*                                    │
 │                                                                                                  │
@@ -64,10 +64,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -85,8 +85,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false*                                   │
 │                                                                                                  │
@@ -102,10 +102,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -123,8 +123,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false                                    │
 │                                                                                                  │
@@ -140,10 +140,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -161,8 +161,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false                                    │
 │                                                                                                  │
@@ -178,10 +178,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -199,7 +199,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
+│  ▴                                                                                               │
 │    Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false                                    │
@@ -216,10 +216,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │  > Apply To                                                                                      │
-│  ● 1. User Settings                                                                              │
+│  • 1. User Settings                                                                              │
 │    2. Workspace Settings                                                                         │
 │    3. System Settings                                                                            │
 │                                                                                                  │
@@ -237,8 +237,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false*                                   │
 │                                                                                                  │
@@ -254,10 +254,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Hide Window Title                                    false*                                   │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -275,8 +275,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             false                                    │
 │                                                                                                  │
@@ -292,10 +292,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Hide Window Title                                    false                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
@@ -313,8 +313,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ▴                                                                                               │
+│  • Preview Features (e.g., models)                      false                                    │
 │                                                                                                  │
 │    Vim Mode                                             true*                                    │
 │                                                                                                  │
@@ -330,10 +330,10 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Hide Window Title                                    true*                                    │
 │                                                                                                  │
-│  ▼                                                                                               │
+│  ▾                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
+│  • User Settings                                                                                 │
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │

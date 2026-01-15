@@ -93,7 +93,7 @@ export const Composer = () => {
       >
         <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
+            <Text color={theme.status.error}>|⌐▪_▪| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
             <Text color={theme.status.warning}>

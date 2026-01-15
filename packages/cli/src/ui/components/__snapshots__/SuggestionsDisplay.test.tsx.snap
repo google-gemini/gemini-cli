@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`SuggestionsDisplay > handles scrolling 1`] = `
-" ▲
+" ▴
  Cmd 5   Description 5
  Cmd 6   Description 6
  Cmd 7   Description 7
@@ -10,7 +10,7 @@ exports[`SuggestionsDisplay > handles scrolling 1`] = `
  Cmd 10   Description 10
  Cmd 11   Description 11
  Cmd 12   Description 12
- ▼
+ ▾
  (11/20)"
 `;
 
