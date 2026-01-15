@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { on } from 'node:events';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
@@ -21,6 +22,15 @@ export interface ConfirmationResult {
 
 /**
  * Waits for a confirmation response with the matching correlationId.
+ *
+ * NOTE: It is the caller's responsibility to manage the lifecycle of this wait
+ * via the provided AbortSignal. To prevent memory leaks and "zombie" listeners
+ * in the event of a lost connection (e.g. IDE crash), it is strongly recommended
+ * to use a signal with a timeout (e.g. AbortSignal.timeout(ms)).
+ *
+ * @param messageBus The MessageBus to listen on.
+ * @param correlationId The correlationId to match.
+ * @param signal An AbortSignal to cancel the wait and cleanup listeners.
  */
 export async function awaitConfirmation(
   messageBus: MessageBus,
@@ -31,44 +41,33 @@ export async function awaitConfirmation(
     throw new Error('Operation cancelled');
   }
 
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      messageBus.unsubscribe(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        onResponse,
-      );
-      signal.removeEventListener('abort', onAbort);
-    };
-
-    const onAbort = () => {
-      cleanup();
-      reject(new Error('Operation cancelled'));
-    };
-
-    const onResponse = (msg: ToolConfirmationResponse) => {
-      if (msg.correlationId === correlationId) {
-        cleanup();
-        resolve({
+  try {
+    for await (const [msg] of on(
+      messageBus,
+      MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      { signal },
+    )) {
+      const response = msg as ToolConfirmationResponse;
+      if (response.correlationId === correlationId) {
+        return {
           outcome:
-            msg.outcome ??
+            response.outcome ??
             // TODO: Remove legacy confirmed boolean fallback once migration complete
-            (msg.confirmed
+            (response.confirmed
               ? ToolConfirmationOutcome.ProceedOnce
               : ToolConfirmationOutcome.Cancel),
-          payload: msg.payload,
-        });
+          payload: response.payload,
+        };
       }
-    };
-
-    try {
-      messageBus.subscribe(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        onResponse,
-      );
-      signal.addEventListener('abort', onAbort);
-    } catch (error) {
-      cleanup();
-      reject(error);
     }
-  });
+  } catch (error) {
+    if (signal.aborted || (error as Error).name === 'AbortError') {
+      throw new Error('Operation cancelled');
+    }
+    throw error;
+  }
+
+  // This point should only be reached if the iterator closes without resolving,
+  // which generally means the signal was aborted.
+  throw new Error('Operation cancelled');
 }

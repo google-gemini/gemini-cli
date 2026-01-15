@@ -5,35 +5,28 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { awaitConfirmation } from './confirmation.js';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
-  type Message,
 } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
 
 describe('awaitConfirmation', () => {
   let mockMessageBus: MessageBus;
-  let listeners: Record<string, (message: Message) => void> = {};
 
   beforeEach(() => {
-    listeners = {};
-    mockMessageBus = {
-      publish: vi.fn().mockResolvedValue(undefined),
-      subscribe: vi.fn((type, listener) => {
-        listeners[type] = listener as (message: Message) => void;
-      }),
-      unsubscribe: vi.fn(),
-    } as unknown as MessageBus;
+    mockMessageBus = new EventEmitter() as unknown as MessageBus;
+    mockMessageBus.publish = vi.fn().mockResolvedValue(undefined);
+    // on() from node:events uses addListener/removeListener or on/off internally.
+    vi.spyOn(mockMessageBus, 'on');
+    vi.spyOn(mockMessageBus, 'removeListener');
   });
 
   const emitResponse = (response: ToolConfirmationResponse) => {
-    const listener = listeners[MessageBusType.TOOL_CONFIRMATION_RESPONSE];
-    if (listener) {
-      listener(response);
-    }
+    mockMessageBus.emit(MessageBusType.TOOL_CONFIRMATION_RESPONSE, response);
   };
 
   it('should resolve when confirmed response matches correlationId', async () => {
@@ -46,7 +39,7 @@ describe('awaitConfirmation', () => {
       abortController.signal,
     );
 
-    expect(mockMessageBus.subscribe).toHaveBeenCalledWith(
+    expect(mockMessageBus.on).toHaveBeenCalledWith(
       MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       expect.any(Function),
     );
@@ -63,7 +56,7 @@ describe('awaitConfirmation', () => {
       outcome: ToolConfirmationOutcome.ProceedOnce,
       payload: undefined,
     });
-    expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
+    expect(mockMessageBus.removeListener).toHaveBeenCalled();
   });
 
   it('should resolve with mapped outcome when confirmed is false', async () => {
@@ -178,7 +171,21 @@ describe('awaitConfirmation', () => {
     abortController.abort();
 
     await expect(promise).rejects.toThrow('Operation cancelled');
-    expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
+    expect(mockMessageBus.removeListener).toHaveBeenCalled();
+  });
+
+  it('should reject when abort signal timeout is triggered', async () => {
+    vi.useFakeTimers();
+    const correlationId = 'timeout-id';
+    const signal = AbortSignal.timeout(100);
+
+    const promise = awaitConfirmation(mockMessageBus, correlationId, signal);
+
+    vi.advanceTimersByTime(101);
+
+    await expect(promise).rejects.toThrow('Operation cancelled');
+    expect(mockMessageBus.removeListener).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('should reject immediately if signal is already aborted', async () => {
@@ -193,12 +200,12 @@ describe('awaitConfirmation', () => {
     );
 
     await expect(promise).rejects.toThrow('Operation cancelled');
-    expect(mockMessageBus.subscribe).not.toHaveBeenCalled();
+    expect(mockMessageBus.on).not.toHaveBeenCalled();
   });
 
   it('should cleanup and reject if subscribe throws', async () => {
     const error = new Error('Subscribe failed');
-    vi.mocked(mockMessageBus.subscribe).mockImplementationOnce(() => {
+    vi.mocked(mockMessageBus.on).mockImplementationOnce(() => {
       throw error;
     });
 
@@ -210,6 +217,6 @@ describe('awaitConfirmation', () => {
     );
 
     await expect(promise).rejects.toThrow(error);
-    expect(mockMessageBus.unsubscribe).toHaveBeenCalled();
+    expect(mockMessageBus.removeListener).not.toHaveBeenCalled();
   });
 });
