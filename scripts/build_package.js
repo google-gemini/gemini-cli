@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { writeFileSync, existsSync, cpSync } from 'node:fs';
+import { writeFileSync, existsSync, cpSync, rmSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
@@ -27,6 +27,9 @@ if (!process.cwd().includes('packages')) {
 }
 
 const packageName = basename(process.cwd());
+
+// Clean the dist directory to prevent TS5055 overwrite errors during consecutive builds
+rmSync(join(process.cwd(), 'dist'), { recursive: true, force: true });
 
 // build typescript files
 execSync('tsc --build', { stdio: 'inherit' });
