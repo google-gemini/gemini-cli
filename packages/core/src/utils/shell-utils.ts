@@ -11,7 +11,7 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-import type { Node } from 'web-tree-sitter';
+import type { Node, Tree } from 'web-tree-sitter';
 import { Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
@@ -119,6 +119,7 @@ interface CommandParseResult {
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
+const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
 
 // Encode the parser script as UTF-16LE base64 so we can pass it via PowerShell's -EncodedCommand flag;
 // this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
@@ -179,14 +180,35 @@ function createParser(): Parser | null {
   }
 }
 
-function parseCommandTree(command: string) {
+function parseCommandTree(
+  command: string,
+  timeoutMicros: number = PARSE_TIMEOUT_MICROS,
+): Tree | null {
   const parser = createParser();
   if (!parser || !command.trim()) {
     return null;
   }
 
+  const deadline = performance.now() + timeoutMicros / 1000;
+  let timedOut = false;
+
   try {
-    return parser.parse(command);
+    const tree = parser.parse(command, null, {
+      progressCallback: () => {
+        if (performance.now() > deadline) {
+          timedOut = true;
+          return true as unknown as void; // Returning true cancels parsing, but type says void
+        }
+      },
+    });
+
+    if (timedOut) {
+      debugLogger.error('Bash command parsing timed out for command:', command);
+      // Returning a partial tree could be risky so we return null to be safe.
+      return null;
+    }
+
+    return tree;
   } catch {
     return null;
   }

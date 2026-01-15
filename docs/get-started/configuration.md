@@ -830,6 +830,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.extensionConfig`** (boolean):
+  - **Description:** Enable requesting and fetching of extension settings.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
@@ -880,6 +885,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.cliHelpAgentSettings.enabled`** (boolean):
   - **Description:** Enable the CLI Help Agent.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.plan`** (boolean):
+  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `skills`

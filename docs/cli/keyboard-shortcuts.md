@@ -19,6 +19,8 @@ available combinations.
 | ------------------------------------------- | ------------------------------------------------------------ |
 | Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home`                                       |
 | Move the cursor to the end of the line.     | `Ctrl + E`<br />`End`                                        |
+| Move the cursor up one line.                | `Up Arrow (no Ctrl, no Cmd)`                                 |
+| Move the cursor down one line.              | `Down Arrow (no Ctrl, no Cmd)`                               |
 | Move the cursor one character to the left.  | `Left Arrow (no Ctrl, no Cmd)`<br />`Ctrl + B`               |
 | Move the cursor one character to the right. | `Right Arrow (no Ctrl, no Cmd)`<br />`Ctrl + F`              |
 | Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Cmd + Left Arrow`<br />`Cmd + B`   |
@@ -26,17 +28,17 @@ available combinations.
 
 #### Editing
 
-| Action                                           | Keys                                                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                                                   |
-| Delete from the cursor to the start of the line. | `Ctrl + U`                                                                                   |
-| Clear all text in the input field.               | `Ctrl + C`                                                                                   |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + ""`<br />`Cmd + ""`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                                                          |
-| Delete the character to the left.                | `Backspace`<br />`""`<br />`Ctrl + H`                                                       |
-| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                                                     |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                                                        |
-| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                                                           |
+| Action                                           | Keys                                                      |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
+| Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
+| Clear all text in the input field.               | `Ctrl + C`                                                |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
+| Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
+| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
+| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
+| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
 
 #### Screen Control
 
@@ -86,10 +88,10 @@ available combinations.
 
 #### Text Input
 
-| Action                               | Keys                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd, not Paste)`                                              |
-| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Paste + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Action                               | Keys                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
+| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 
 #### External Tools
 
@@ -129,7 +131,7 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
-- `Esc` pressed twice quickly: Clear the current input buffer.
+- `Esc` pressed twice quickly: Browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
