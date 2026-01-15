@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
 import {
@@ -382,6 +382,10 @@ describe('useTextBuffer', () => {
 
   beforeEach(() => {
     viewport = { width: 10, height: 3 }; // Default viewport for tests
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('Initialization', () => {
@@ -2552,25 +2556,41 @@ describe('Transformation Utilities', () => {
   });
 
   describe('Layout Caching and Invalidation', () => {
-    it('should invalidate cache when line content changes', () => {
-      const viewport = { width: 80, height: 24 };
-      const { result } = renderHookWithProviders(() =>
-        useTextBuffer({
-          initialText: 'original line',
-          viewport,
-          isValidPath: () => true,
-        }),
-      );
+    it.each([
+      {
+        desc: 'via setText',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.setText('changed line'),
+        expected: 'changed line',
+      },
+      {
+        desc: 'via replaceRange',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.replaceRange(0, 0, 0, 13, 'changed line'),
+        expected: 'changed line',
+      },
+    ])(
+      'should invalidate cache when line content changes $desc',
+      ({ actFn, expected }) => {
+        const viewport = { width: 80, height: 24 };
+        const { result } = renderHookWithProviders(() =>
+          useTextBuffer({
+            initialText: 'original line',
+            viewport,
+            isValidPath: () => true,
+          }),
+        );
 
-      const originalLayout = result.current.visualLayout;
+        const originalLayout = result.current.visualLayout;
 
-      act(() => {
-        result.current.setText('changed line');
-      });
+        act(() => {
+          actFn(result);
+        });
 
-      expect(result.current.visualLayout).not.toBe(originalLayout);
-      expect(result.current.allVisualLines[0]).toBe('changed line');
-    });
+        expect(result.current.visualLayout).not.toBe(originalLayout);
+        expect(result.current.allVisualLines[0]).toBe(expected);
+      },
+    );
 
     it('should invalidate cache when viewport width changes', () => {
       const viewport = { width: 80, height: 24 };

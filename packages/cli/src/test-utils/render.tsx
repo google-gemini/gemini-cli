@@ -303,9 +303,6 @@ export function renderHook<Result, Props>(
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
 
-  // Execute once before render to ensure result.current is set
-  result.current = renderCallback(currentProps);
-
   act(() => {
     const renderResult = render(
       <Wrapper>

@@ -3,13 +3,17 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../../test-utils/render.js';
 import { useTextBuffer } from './text-buffer.js';
 import { parseInputForHighlighting } from '../../utils/highlight.js';
 
 describe('text-buffer performance', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should handle pasting large amounts of text efficiently', () => {
     const viewport = { width: 80, height: 24 };
     const { result } = renderHook(() =>
