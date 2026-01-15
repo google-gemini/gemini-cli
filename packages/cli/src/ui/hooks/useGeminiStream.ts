@@ -842,6 +842,7 @@ export const useGeminiStream = (
       signal: AbortSignal,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
+      let suppressContentAfterToolCall = false;
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         switch (event.type) {
@@ -851,6 +852,9 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
+            if (suppressContentAfterToolCall) {
+              break;
+            }
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -858,6 +862,9 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            // Avoid streaming content past tool-call boundaries while waiting
+            // for user confirmation.
+            suppressContentAfterToolCall = true;
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:

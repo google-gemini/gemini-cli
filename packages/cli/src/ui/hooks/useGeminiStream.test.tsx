@@ -1954,6 +1954,60 @@ describe('useGeminiStream', () => {
     });
   });
 
+  describe('processGeminiStreamEvents', () => {
+    it('should stop streaming content after a tool call request', async () => {
+      const toolCallRequest = {
+        callId: 'call-1',
+        name: 'write_file',
+        args: { path: '/test/file.txt', content: 'content' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-1',
+      };
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'I am editing the documentation now.',
+          };
+          yield {
+            type: ServerGeminiEventType.ToolCallRequest,
+            value: toolCallRequest,
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'This should not appear before confirmation.',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      await act(async () => {
+        await result.current.submitQuery('Test tool call stream');
+      });
+
+      await waitFor(() => {
+        const geminiMessages = mockAddItem.mock.calls.filter(
+          (call) => call[0].type === 'gemini',
+        );
+
+        expect(geminiMessages).toHaveLength(1);
+        expect(geminiMessages[0][0].text).toBe(
+          'I am editing the documentation now.',
+        );
+        expect(mockScheduleToolCalls).toHaveBeenCalledWith(
+          [toolCallRequest],
+          expect.any(Object),
+        );
+      });
+    });
+  });
+
   describe('handleFinishedEvent', () => {
     it('should add info message for MAX_TOKENS finish reason', async () => {
       // Setup mock to return a stream with MAX_TOKENS finish reason
