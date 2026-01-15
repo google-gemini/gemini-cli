@@ -51,6 +51,19 @@ export interface OAuthProtectedResourceMetadata {
 export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
 /**
+ * Options for OAuth discovery.
+ */
+export interface OAuthDiscoveryOptions {
+  /**
+   * Whether to enforce strict resource matching (RFC 9728 Section 7.3).
+   * Defaults to true for security.
+   * If set to false, allows parent resource matching (e.g., resource "https://example.com"
+   * matches expected "https://example.com/mcp").
+   */
+  strictResourceMatching?: boolean;
+}
+
+/**
  * Utility class for common OAuth operations.
  */
 export class OAuthUtils {
@@ -225,32 +238,86 @@ export class OAuthUtils {
   }
 
   /**
+   * Validate that the discovered resource matches the expected resource.
+   *
+   * @param expectedResource The expected resource URL
+   * @param actualResource The actual resource URL from metadata
+   * @param strict Whether to enforce exact matching (RFC 9728 Section 7.3). Defaults to true.
+   *
+   * @throws ResourceMismatchError if validation fails
+   *
+   * @security
+   * RFC 9728 Section 7.3 mandates strict equality check (`actual === expected`).
+   * This implementation normalizes trailing slashes before comparison.
+   * Disabling strict mode allows `actual` to be a parent path of `expected`.
+   * This is necessary for some servers (e.g., Notion) but theoretically increases
+   * the risk of Confused Deputy attacks if multiple tenants share the same parent resource.
+   * Only disable strict mode if absolutely necessary for compatibility.
+   *
+   * @example
+   * // Strict match (default) - Success
+   * validateResourceMatch('https://example.com/mcp', 'https://example.com/mcp');
+   *
+   * // Strict match - Fails because actual is parent
+   * validateResourceMatch('https://example.com/mcp', 'https://example.com'); // throws
+   *
+   * // Relaxed match - Success for parent resource (e.g. Notion)
+   * validateResourceMatch('https://example.com/mcp', 'https://example.com', false);
+   */
+  static validateResourceMatch(
+    expectedResource: string,
+    actualResource: string,
+    strict = true,
+  ): void {
+    const normalizedExpected = expectedResource.replace(/\/$/, '');
+    const normalizedActual = actualResource.replace(/\/$/, '');
+
+    if (normalizedActual === normalizedExpected) {
+      return;
+    }
+
+    if (!strict && normalizedExpected.startsWith(normalizedActual + '/')) {
+      // Allow parent resource matching if strict mode is explicitly disabled.
+      return;
+    }
+
+    const message = strict
+      ? `Protected resource ${actualResource} does not match expected ${expectedResource} (strict mode enabled by default)`
+      : `Protected resource ${actualResource} does not match expected ${expectedResource}`;
+
+    throw new ResourceMismatchError(message);
+  }
+
+  /**
    * Discover OAuth configuration using the standard well-known endpoints.
    *
    * @param serverUrl The base URL of the server
+   * @param options Discovery options
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthConfig(
     serverUrl: string,
+    options?: OAuthDiscoveryOptions,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      // First try standard root-based discovery
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
+      let resourceMetadata: OAuthProtectedResourceMetadata | null = null;
+      const url = new URL(serverUrl);
+      const hasPath = url.pathname && url.pathname !== '/';
 
-      // Try to get the protected resource metadata at root
-      let resourceMetadata = await this.fetchProtectedResourceMetadata(
-        wellKnownUrls.protectedResource,
-      );
+      if (hasPath) {
+        // Try path-based discovery first
+        const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
+        resourceMetadata = await this.fetchProtectedResourceMetadata(
+          pathBasedUrls.protectedResource,
+        );
+      }
 
-      // If root discovery fails and we have a path, try path-based discovery
       if (!resourceMetadata) {
-        const url = new URL(serverUrl);
-        if (url.pathname && url.pathname !== '/') {
-          const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
-          resourceMetadata = await this.fetchProtectedResourceMetadata(
-            pathBasedUrls.protectedResource,
-          );
-        }
+        // Try standard root-based discovery (fallback or first attempt if no path)
+        const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
+        resourceMetadata = await this.fetchProtectedResourceMetadata(
+          wellKnownUrls.protectedResource,
+        );
       }
 
       if (resourceMetadata) {
@@ -258,11 +325,11 @@ export class OAuthUtils {
         // it is using as the prefix for the metadata request exactly matches the value
         // of the resource metadata parameter in the protected resource metadata document.
         const expectedResource = this.buildResourceParameter(serverUrl);
-        if (resourceMetadata.resource !== expectedResource) {
-          throw new ResourceMismatchError(
-            `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
-          );
-        }
+        this.validateResourceMatch(
+          expectedResource,
+          resourceMetadata.resource,
+          options?.strictResourceMatching ?? true,
+        );
       }
 
       if (resourceMetadata?.authorization_servers?.length) {
@@ -331,11 +398,13 @@ export class OAuthUtils {
    *
    * @param wwwAuthenticate The WWW-Authenticate header value
    * @param mcpServerUrl Optional MCP server URL to validate against the resource metadata
+   * @param options Discovery options
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
     mcpServerUrl?: string,
+    options?: OAuthDiscoveryOptions,
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -349,11 +418,11 @@ export class OAuthUtils {
     if (resourceMetadata && mcpServerUrl) {
       // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
-      if (resourceMetadata.resource !== expectedResource) {
-        throw new ResourceMismatchError(
-          `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
-        );
-      }
+      this.validateResourceMatch(
+        expectedResource,
+        resourceMetadata.resource,
+        options?.strictResourceMatching ?? true,
+      );
     }
 
     if (!resourceMetadata?.authorization_servers?.length) {

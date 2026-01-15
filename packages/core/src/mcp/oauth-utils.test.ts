@@ -142,6 +142,71 @@ describe('OAuthUtils', () => {
     });
   });
 
+  describe('validateResourceMatch', () => {
+    it('should pass for exact match', () => {
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp',
+          'https://example.com/mcp',
+        ),
+      ).not.toThrow();
+    });
+
+    it('should fail for parent resource match by default (strict mode)', () => {
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp',
+          'https://example.com',
+        ),
+      ).toThrow(/strict mode enabled by default/);
+    });
+
+    it('should pass for parent resource match when strict mode is explicitly disabled', () => {
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp',
+          'https://example.com',
+          false, // Explicitly disable strict mode
+        ),
+      ).not.toThrow();
+    });
+
+    it('should fail for sibling path match', () => {
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp',
+          'https://example.com/other',
+        ),
+      ).toThrow(/does not match expected/);
+    });
+
+    it('should handle trailing slashes correctly', () => {
+      // Expected has slash, actual does not
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp/',
+          'https://example.com/mcp',
+        ),
+      ).not.toThrow();
+
+      // Expected does not have slash, actual does
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp',
+          'https://example.com/mcp/',
+        ),
+      ).not.toThrow();
+
+      // Both have slashes
+      expect(() =>
+        OAuthUtils.validateResourceMatch(
+          'https://example.com/mcp/',
+          'https://example.com/mcp/',
+        ),
+      ).not.toThrow();
+    });
+  });
+
   describe('discoverAuthorizationServerMetadata', () => {
     const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
       issuer: 'https://auth.example.com',
@@ -224,14 +289,16 @@ describe('OAuthUtils', () => {
       scopes_supported: ['read', 'write'],
     };
 
-    it('should succeed when resource metadata matches server URL', async () => {
+    it('should try path-based discovery first when path is present', async () => {
       mockFetch
-        // fetchProtectedResourceMetadata
+        // Path-based fail
+        .mockResolvedValueOnce({ ok: false })
+        // Root-based success
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockResourceMetadata),
         })
-        // discoverAuthorizationServerMetadata
+        // Authorization server metadata discovery
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockAuthServerMetadata),
@@ -239,6 +306,153 @@ describe('OAuthUtils', () => {
 
       const config = await OAuthUtils.discoverOAuthConfig(
         'https://example.com/mcp',
+      );
+
+      expect(config).toBeDefined();
+      // First call should be path-based
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      // Second call should be root-based
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+    });
+
+    it('should succeed when resource metadata matches server URL', async () => {
+      mockFetch
+        // Fetch protected resource metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResourceMetadata),
+        })
+        // Discover authorization server metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
+
+    it('should use incomplete path-based metadata and fallback to auth server discovery', async () => {
+      mockFetch
+        // 1. Path-based protected resource -> Success (but incomplete)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ resource: 'https://example.com/mcp' }),
+        })
+        // 2. Auth server discovery starts (discoverAuthorizationServerMetadata)
+        // It will try path-based auth server URL first
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+      );
+
+      expect(config).toBeDefined();
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      // It should NOT call root-based protected resource
+      expect(mockFetch).not.toHaveBeenCalledWith(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      // It should proceed to auth server discovery
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        'https://example.com/.well-known/oauth-authorization-server/mcp',
+      );
+    });
+
+    it('should only try root-based discovery if no path is present', async () => {
+      mockFetch
+        // Root-based success
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...mockResourceMetadata,
+              resource: 'https://example.com',
+            }),
+        })
+        // Authorization server metadata discovery
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/',
+      );
+
+      expect(config).toBeDefined();
+      // Should only call root-based
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      expect(mockFetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('oauth-protected-resource/'),
+      );
+    });
+
+    it('should fail for parent resource metadata by default (strict mode)', async () => {
+      mockFetch
+        // Fetch protected resource metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...mockResourceMetadata,
+              resource: 'https://example.com', // Parent resource
+            }),
+        })
+        // Discover authorization server metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
+      ).rejects.toThrow(/strict mode enabled by default/);
+    });
+
+    it('should pass for parent resource metadata when strict mode is disabled (relaxed mode)', async () => {
+      mockFetch
+        // Fetch protected resource metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...mockResourceMetadata,
+              resource: 'https://example.com', // Parent resource
+            }),
+        })
+        // Discover authorization server metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+        { strictResourceMatching: false },
       );
 
       expect(config).toEqual({
@@ -261,6 +475,100 @@ describe('OAuthUtils', () => {
       await expect(
         OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
       ).rejects.toThrow(/does not match expected/);
+    });
+  });
+
+  describe('discoverOAuthFromWWWAuthenticate', () => {
+    const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+      resource: 'https://example.com/mcp',
+      authorization_servers: ['https://auth.example.com'],
+      bearer_methods_supported: ['header'],
+    };
+
+    const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'https://auth.example.com',
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      scopes_supported: ['read', 'write'],
+    };
+
+    it('should discover config from WWW-Authenticate header', async () => {
+      mockFetch
+        // Fetch protected resource metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResourceMetadata),
+        })
+        // Discover authorization server metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const header =
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"';
+      const config = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        header,
+        'https://example.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
+    });
+
+    it('should fail validation by default if resource does not match exactly (strict mode)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockResourceMetadata,
+            resource: 'https://example.com', // Parent resource
+          }),
+      });
+
+      const header =
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"';
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          header,
+          'https://example.com/mcp',
+        ),
+      ).rejects.toThrow(/strict mode enabled by default/);
+    });
+
+    it('should pass validation if strictResourceMatching is disabled (relaxed mode)', async () => {
+      mockFetch
+        // Fetch protected resource metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...mockResourceMetadata,
+              resource: 'https://example.com', // Parent resource
+            }),
+        })
+        // Discover authorization server metadata
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const header =
+        'Bearer realm="example", resource_metadata="https://example.com/.well-known/oauth-protected-resource"';
+      const config = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        header,
+        'https://example.com/mcp',
+        { strictResourceMatching: false },
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
     });
   });
 

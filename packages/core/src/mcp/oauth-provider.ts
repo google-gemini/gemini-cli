@@ -33,6 +33,7 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
+  strictResourceMatching?: boolean; // Whether to enforce exact RFC 9728 matching
 }
 
 /**
@@ -150,13 +151,17 @@ export class MCPOAuthProvider {
    * Discover OAuth configuration from an MCP server URL.
    *
    * @param mcpServerUrl The MCP server URL
+   * @param config The current OAuth configuration (containing options)
    * @returns OAuth configuration if discovered, null otherwise
    */
   private async discoverOAuthFromMCPServer(
     mcpServerUrl: string,
+    config?: MCPOAuthConfig,
   ): Promise<MCPOAuthConfig | null> {
     // Use the full URL with path preserved for OAuth discovery
-    return OAuthUtils.discoverOAuthConfig(mcpServerUrl);
+    return OAuthUtils.discoverOAuthConfig(mcpServerUrl, {
+      strictResourceMatching: config?.strictResourceMatching,
+    });
   }
 
   private async discoverAuthServerMetadataForRegistration(
@@ -745,6 +750,7 @@ export class MCPOAuthProvider {
               await OAuthUtils.discoverOAuthFromWWWAuthenticate(
                 wwwAuthenticate,
                 mcpServerUrl,
+                { strictResourceMatching: config.strictResourceMatching },
               );
             if (discoveredConfig) {
               // Merge discovered config with existing config, preserving clientId and clientSecret
@@ -773,8 +779,10 @@ export class MCPOAuthProvider {
 
       // If we still don't have OAuth config, try the standard discovery
       if (!config.authorizationUrl) {
-        const discoveredConfig =
-          await this.discoverOAuthFromMCPServer(mcpServerUrl);
+        const discoveredConfig = await this.discoverOAuthFromMCPServer(
+          mcpServerUrl,
+          config,
+        );
         if (discoveredConfig) {
           // Merge discovered config with existing config, preserving clientId and clientSecret
           config = {
