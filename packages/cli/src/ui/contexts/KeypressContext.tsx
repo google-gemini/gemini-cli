@@ -19,6 +19,7 @@ import { ESC } from '../utils/input.js';
 import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
@@ -144,6 +145,30 @@ function nonKeyboardEventFilter(
 }
 
 /**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accommodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: 'return',
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
+  };
+}
+
+/**
  * Buffers "/" keys to see if they are followed return.
  * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
  * or when a null key is received.
@@ -225,11 +250,10 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
 
       if (buffer.length > 0) {
         keypressHandler({
-          name: '',
+          name: 'paste',
           ctrl: false,
           meta: false,
           shift: false,
-          paste: true,
           insertable: true,
           sequence: buffer,
         });
@@ -332,7 +356,6 @@ function* emitKeys(
               ctrl: false,
               meta: false,
               shift: false,
-              paste: true,
               insertable: true,
               sequence: decoded,
             });
@@ -545,7 +568,6 @@ function* emitKeys(
         ctrl,
         meta,
         shift,
-        paste: false,
         insertable: false,
         sequence: ESC,
       });
@@ -567,7 +589,6 @@ function* emitKeys(
         ctrl,
         meta,
         shift,
-        paste: false,
         insertable,
         sequence,
       });
@@ -581,7 +602,6 @@ export interface Key {
   ctrl: boolean;
   meta: boolean;
   shift: boolean;
-  paste: boolean;
   insertable: boolean;
   sequence: string;
 }
@@ -641,6 +661,9 @@ export function KeypressProvider({
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
+    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+      processor = bufferFastReturn(processor);
+    }
     processor = bufferBackslashEnter(processor);
     processor = bufferPaste(processor);
     let dataListener = createDataListener(processor);

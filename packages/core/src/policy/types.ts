@@ -96,6 +96,11 @@ export type SafetyCheckerConfig =
 
 export interface PolicyRule {
   /**
+   * A unique name for the policy rule, useful for identification and debugging.
+   */
+  name?: string;
+
+  /**
    * The name of the tool this rule applies to.
    * If undefined, the rule applies to all tools.
    */
@@ -130,6 +135,12 @@ export interface PolicyRule {
    * Only applies when decision is ALLOW.
    */
   allowRedirection?: boolean;
+
+  /**
+   * Effect of the rule's source.
+   * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
+   */
+  source?: string;
 }
 
 export interface SafetyCheckerRule {
