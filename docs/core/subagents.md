@@ -144,7 +144,7 @@ it yourself; just report it.
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return.                                         |
 | `timeout_mins` | number | No       | Maximum execution time in minutes.                                                                                         |
 
-## Remote Agents (Agent2Agent)
+## Remote agents (Agent2Agent)
 
 Gemini CLI can also delegate tasks to remote agents via the Model Context
 Protocol (MCP) or compatible Agent2Agent interfaces.
