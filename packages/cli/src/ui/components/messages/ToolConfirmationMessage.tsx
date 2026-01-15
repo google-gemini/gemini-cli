@@ -20,7 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
-import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -50,6 +50,14 @@ export const ToolConfirmationMessage: React.FC<
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+
+  // Constants for warnings to ensure accurate height calculation
+  const WARNING_NOTE_LABEL = 'Note: ';
+  const WARNING_NOTE_TEXT =
+    'Command contains redirection which can be undesirable.';
+  const WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
+  const WARNING_TIP_TEXT =
+    'Toggle auto-edit (Shift+Tab) to allow redirection in the future.';
 
   useEffect(() => {
     let isMounted = true;
@@ -284,49 +292,65 @@ export const ToolConfirmationMessage: React.FC<
       );
 
       let bodyContentHeight = availableBodyContentHeight();
+      let warnings: React.ReactNode = null;
+
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
-        if (containsRedirection) {
-          bodyContentHeight -= 3; // Account for Spacer + Note/Tip lines
-        }
       }
 
-      const commandBoxChildren = (
-        <>
-          <Box flexDirection="column">
-            {commandsToDisplay.map((cmd, idx) => (
-              <Text key={idx} color={theme.text.link}>
-                {cmd}
+      if (containsRedirection) {
+        // Calculate lines needed for Note and Tip
+        const safeWidth = Math.max(terminalWidth, 1);
+        const noteLength = WARNING_NOTE_LABEL.length + WARNING_NOTE_TEXT.length;
+        const tipLength = WARNING_TIP_LABEL.length + WARNING_TIP_TEXT.length;
+
+        const noteLines = Math.ceil(noteLength / safeWidth);
+        const tipLines = Math.ceil(tipLength / safeWidth);
+        const spacerLines = 1;
+        const warningHeight = noteLines + tipLines + spacerLines;
+
+        if (bodyContentHeight !== undefined) {
+          bodyContentHeight = Math.max(
+            bodyContentHeight - warningHeight,
+            MINIMUM_MAX_HEIGHT,
+          );
+        }
+
+        warnings = (
+          <>
+            <Box height={1} />
+            <Box>
+              <Text color={theme.text.primary}>
+                <Text bold>{WARNING_NOTE_LABEL}</Text>
+                {WARNING_NOTE_TEXT}
               </Text>
-            ))}
-          </Box>
-          {containsRedirection && (
-            <>
-              <Box />
-              <Box>
-                <Text color={theme.text.primary}>
-                  <Text bold>Note:</Text> Command contains redirection which can
-                  be undesirable.
-                </Text>
-              </Box>
-              <Box>
-                <Text color={theme.border.default}>
-                  Tip: Toggle auto-edit (Shift+Tab) to allow redirection in the
-                  future.
-                </Text>
-              </Box>
-            </>
-          )}
-        </>
-      );
+            </Box>
+            <Box>
+              <Text color={theme.border.default}>
+                <Text bold>{WARNING_TIP_LABEL}</Text>
+                {WARNING_TIP_TEXT}
+              </Text>
+            </Box>
+          </>
+        );
+      }
 
       bodyContent = (
-        <MaxSizedBox
-          maxHeight={bodyContentHeight}
-          maxWidth={Math.max(terminalWidth, 1)}
-        >
-          {commandBoxChildren}
-        </MaxSizedBox>
+        <Box flexDirection="column">
+          <MaxSizedBox
+            maxHeight={bodyContentHeight}
+            maxWidth={Math.max(terminalWidth, 1)}
+          >
+            <Box flexDirection="column">
+              {commandsToDisplay.map((cmd, idx) => (
+                <Text key={idx} color={theme.text.link}>
+                  {cmd}
+                </Text>
+              ))}
+            </Box>
+          </MaxSizedBox>
+          {warnings}
+        </Box>
       );
     } else if (confirmationDetails.type === 'info') {
       const infoProps = confirmationDetails;

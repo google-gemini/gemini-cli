@@ -269,5 +269,4 @@ export interface PolicySettings {
 export interface CheckResult {
   decision: PolicyDecision;
   rule?: PolicyRule;
-  reason?: string;
 }

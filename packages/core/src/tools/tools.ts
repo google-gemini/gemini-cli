@@ -52,7 +52,6 @@ export interface ToolInvocation<
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
-    reason?: string,
   ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
@@ -100,7 +99,6 @@ export abstract class BaseToolInvocation<
 
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
-    reason?: string,
   ): Promise<ToolCallConfirmationDetails | false> {
     const decision = await this.getMessageBusDecision(abortSignal);
     if (decision === 'ALLOW') {
@@ -116,11 +114,11 @@ export abstract class BaseToolInvocation<
     }
 
     if (decision === 'ASK_USER') {
-      return this.getConfirmationDetails(abortSignal, reason);
+      return this.getConfirmationDetails(abortSignal);
     }
 
     // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
-    return this.getConfirmationDetails(abortSignal, reason);
+    return this.getConfirmationDetails(abortSignal);
   }
 
   /**
@@ -164,7 +162,6 @@ export abstract class BaseToolInvocation<
    */
   protected async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _reason?: string,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (!this.messageBus) {
       return false;

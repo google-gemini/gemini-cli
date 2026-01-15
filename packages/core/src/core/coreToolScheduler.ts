@@ -600,7 +600,7 @@ export class CoreToolScheduler {
             ? toolCall.tool.serverName
             : undefined;
 
-        const { decision, reason } = await this.config
+        const { decision } = await this.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName);
 
@@ -632,10 +632,8 @@ export class CoreToolScheduler {
           // PolicyDecision.ASK_USER
 
           // We need confirmation details to show to the user
-          const confirmationDetails = await invocation.shouldConfirmExecute(
-            signal,
-            reason,
-          );
+          const confirmationDetails =
+            await invocation.shouldConfirmExecute(signal);
 
           if (!confirmationDetails) {
             this.setToolCallOutcome(

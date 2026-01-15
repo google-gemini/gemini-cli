@@ -445,7 +445,6 @@ export class PolicyEngine {
     return {
       decision: this.applyNonInteractiveMode(decision),
       rule: matchedRule,
-      reason: undefined, // Redirection reason is implicit in the command list
     };
   }
 

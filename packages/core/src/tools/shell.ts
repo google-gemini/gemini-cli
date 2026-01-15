@@ -101,7 +101,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _reason?: string,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
 
