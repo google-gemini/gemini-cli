@@ -179,7 +179,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: '',
+          name: 'return',
           sequence: '\r',
           insertable: true,
         }),
