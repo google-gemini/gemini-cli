@@ -72,6 +72,7 @@ describe('policiesCommand', () => {
         {
           decision: PolicyDecision.ALLOW,
           argsPattern: /safe/,
+          source: 'test.toml',
         },
         {
           decision: PolicyDecision.ASK_USER,

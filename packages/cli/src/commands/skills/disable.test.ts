@@ -84,6 +84,34 @@ describe('skills disable command', () => {
       );
     });
 
+    it('should disable an enabled skill in workspace scope', async () => {
+      const mockSettings = {
+        forScope: vi.fn().mockReturnValue({
+          settings: { skills: { disabled: [] } },
+          path: '/workspace/.gemini/settings.json',
+        }),
+        setValue: vi.fn(),
+      };
+      mockLoadSettings.mockReturnValue(
+        mockSettings as unknown as LoadedSettings,
+      );
+
+      await handleDisable({
+        name: 'skill1',
+        scope: SettingScope.Workspace as LoadableSettingScope,
+      });
+
+      expect(mockSettings.setValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'skills.disabled',
+        ['skill1'],
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Skill "skill1" disabled by adding it to the disabled list in workspace (/workspace/.gemini/settings.json) settings.',
+      );
+    });
+
     it('should log a message if the skill is already disabled', async () => {
       const mockSettings = {
         forScope: vi.fn().mockReturnValue({

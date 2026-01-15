@@ -271,9 +271,10 @@ describe('hooksCommand', () => {
 
     it('should enable a hook and update settings', async () => {
       // Update the context's settings with disabled hooks
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook', 'other-hook'],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [
+        'test-hook',
+        'other-hook',
+      ];
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
@@ -401,9 +402,7 @@ describe('hooksCommand', () => {
     });
 
     it('should disable a hook and update settings', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -432,9 +431,7 @@ describe('hooksCommand', () => {
 
     it('should return info when hook is already disabled', async () => {
       // Update the context's settings with the hook already disabled
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook'],
-      };
+      mockContext.services.settings.merged.hooks.disabled = ['test-hook'];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -455,9 +452,7 @@ describe('hooksCommand', () => {
     });
 
     it('should handle error when disabling hook fails', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [];
       mockSettings.setValue.mockImplementationOnce(() => {
         throw new Error('Failed to save settings');
       });

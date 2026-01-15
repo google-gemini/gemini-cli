@@ -149,7 +149,7 @@ export function colorizeCode({
   const activeTheme = theme || themeManager.getActiveTheme();
   const showLineNumbers = hideLineNumbers
     ? false
-    : (settings?.merged.ui?.showLineNumbers ?? true);
+    : settings.merged.ui.showLineNumbers;
 
   const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {

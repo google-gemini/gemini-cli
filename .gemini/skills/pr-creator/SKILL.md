@@ -35,9 +35,15 @@ Follow these steps to create a Pull Request:
     - **Related Issues**: Link any issues fixed or related to this PR (e.g.,
       "Fixes #123").
 
-4.  **Create PR**: Use the `gh` CLI to create the PR.
+4.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
+    issues with multi-line Markdown, write the description to a temporary file
+    first.
     ```bash
-    gh pr create --title "type(scope): succinct description" --body "..."
+    # 1. Write the drafted description to a temporary file
+    # 2. Create the PR using the --body-file flag
+    gh pr create --title "type(scope): succinct description" --body-file <temp_file_path>
+    # 3. Remove the temporary file
+    rm <temp_file_path>
     ```
     - **Title**: Ensure the title follows the
       [Conventional Commits](https://www.conventionalcommits.org/) format if the

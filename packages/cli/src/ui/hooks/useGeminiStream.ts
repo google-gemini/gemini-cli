@@ -43,6 +43,7 @@ import type {
   ToolCallRequestInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
+  ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -82,7 +83,7 @@ enum StreamProcessingStatus {
 }
 
 function showCitations(settings: LoadedSettings): boolean {
-  const enabled = settings?.merged?.ui?.showCitations;
+  const enabled = settings.merged.ui.showCitations;
   if (enabled !== undefined) {
     return enabled;
   }
@@ -781,7 +782,7 @@ export const useGeminiStream = (
 
   const handleChatModelEvent = useCallback(
     (eventValue: string, userMessageTimestamp: number) => {
-      if (!settings?.merged?.ui?.showModelInfoInChat) {
+      if (!settings.merged.ui.showModelInfoInChat) {
         return;
       }
       if (pendingHistoryItemRef.current) {
@@ -1132,11 +1133,13 @@ export const useGeminiStream = (
 
         // Process pending tool calls sequentially to reduce UI chaos
         for (const call of awaitingApprovalCalls) {
-          if (call.confirmationDetails?.onConfirm) {
+          if (
+            (call.confirmationDetails as ToolCallConfirmationDetails)?.onConfirm
+          ) {
             try {
-              await call.confirmationDetails.onConfirm(
-                ToolConfirmationOutcome.ProceedOnce,
-              );
+              await (
+                call.confirmationDetails as ToolCallConfirmationDetails
+              ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
             } catch (error) {
               debugLogger.warn(
                 `Failed to auto-approve tool call ${call.request.callId}:`,
