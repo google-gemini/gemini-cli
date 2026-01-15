@@ -78,4 +78,33 @@ describe('skillUtils', () => {
     const installedExists = await fs.stat(installedPath).catch(() => null);
     expect(installedExists?.isDirectory()).toBe(true);
   });
+
+  it('should abort installation if consent is rejected', async () => {
+    const mockSkillDir = path.join(tempDir, 'mock-skill-source');
+    const skillSubDir = path.join(mockSkillDir, 'test-skill');
+    await fs.mkdir(skillSubDir, { recursive: true });
+    await fs.writeFile(
+      path.join(skillSubDir, 'SKILL.md'),
+      '---\nname: test-skill\ndescription: test\n---\nbody',
+    );
+
+    const requestConsent = vi.fn().mockResolvedValue(false);
+
+    await expect(
+      installSkill(
+        mockSkillDir,
+        'workspace',
+        undefined,
+        () => {},
+        requestConsent,
+      ),
+    ).rejects.toThrow('Skill installation cancelled by user.');
+
+    expect(requestConsent).toHaveBeenCalled();
+
+    // Verify it was NOT copied
+    const installedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+    const installedExists = await fs.stat(installedPath).catch(() => null);
+    expect(installedExists).toBeNull();
+  });
 });
