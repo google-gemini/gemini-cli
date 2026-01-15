@@ -15,7 +15,6 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  GEMINI_MODEL_ALIAS_AUTO,
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
@@ -142,13 +141,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   // Calculate the initial index based on the preferred model.
   const initialIndex = useMemo(() => {
-    let targetModel = preferredModel;
-    if (targetModel === GEMINI_MODEL_ALIAS_AUTO) {
-      targetModel = shouldShowPreviewModels
-        ? PREVIEW_GEMINI_MODEL_AUTO
-        : DEFAULT_GEMINI_MODEL_AUTO;
-    }
-    const idx = options.findIndex((option) => option.value === targetModel);
+    const idx = options.findIndex((option) => option.value === preferredModel);
     if (idx !== -1) {
       return idx;
     }
@@ -157,7 +150,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       return manualIdx !== -1 ? manualIdx : 0;
     }
     return 0;
-  }, [preferredModel, options, view, shouldShowPreviewModels]);
+  }, [preferredModel, options, view]);
 
   // Handle selection internally (Autonomous Dialog).
   const handleSelect = useCallback(

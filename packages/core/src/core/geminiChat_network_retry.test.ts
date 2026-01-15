@@ -16,22 +16,8 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 
 // Mock fs module
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    default: {
-      ...actual, // or actual.default if it exists, but usually for fs mock we want to override specific methods
-      mkdirSync: vi.fn(),
-      writeFileSync: vi.fn(),
-      readFileSync: vi.fn(() => {
-        const error = new Error('ENOENT');
-        (error as NodeJS.ErrnoException).code = 'ENOENT';
-        throw error;
-      }),
-      existsSync: vi.fn(() => false),
-    },
-    // We also need to mock named exports if they are used directly
+vi.mock('node:fs', () => ({
+  default: {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
     readFileSync: vi.fn(() => {
@@ -40,8 +26,8 @@ vi.mock('node:fs', async (importOriginal) => {
       throw error;
     }),
     existsSync: vi.fn(() => false),
-  };
-});
+  },
+}));
 
 const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
