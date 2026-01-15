@@ -1540,6 +1540,15 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'boolean',
+        label: 'Plan',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
     },
   },
 
