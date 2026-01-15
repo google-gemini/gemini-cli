@@ -156,3 +156,58 @@ from becoming too large and expensive.
   - **Interactive Mode:** The CLI shows an informational message and stops
     sending requests to the model. You must manually start a new session.
   - **Non-Interactive Mode:** The CLI exits with an error.
+
+## Manager Mode
+
+Manager Mode is an advanced feature that allows Gemini CLI to orchestrate
+multiple concurrent worker sessions. In this mode, the main agent acts as a
+"Manager" that delegates tasks to "Worker" sessions.
+
+### Features
+
+- **Parallel Execution:** Run multiple tasks simultaneously in separate isolated
+  environments.
+- **Git Worktree Isolation:** Each worker runs in its own git worktree and
+  branch, preventing file conflicts in your current working directory.
+- **Workflow Orchestration:** The Manager can plan dependencies between tasks
+  (e.g., "Task B must wait for Task A").
+- **Visual Dashboard:** Monitor the status of all active sessions and tasks in
+  real-time.
+
+### Starting Manager Mode
+
+To start Gemini CLI in Manager Mode, use the `--manager` flag:
+
+```bash
+gemini --manager
+```
+
+You can also force all worker sessions to run in a sandbox for added security,
+even if the manager itself is not sandboxed:
+
+```bash
+gemini --manager --sandbox-workers
+```
+
+### The Sessions Dashboard
+
+When in Manager Mode (or even in normal mode if sessions are active), you can
+toggle the **Sessions Dashboard** by pressing `Ctrl + O`.
+
+This dashboard displays:
+
+- **Pending/Blocked Tasks:** Tasks waiting for dependencies or a free worker.
+- **In Progress:** Currently running sessions and their assigned tasks.
+- **Done:** Completed or failed tasks.
+
+### How it Works
+
+1.  **Delegation:** You ask the Manager to do something complex (e.g., "Refactor
+    these 3 files" or "Implement feature X and then feature Y").
+2.  **Planning:** The Manager breaks this down into tasks.
+3.  **Execution:** The Manager uses its `start_session` or `plan_workflow` tools
+    to spawn worker processes.
+4.  **Isolation:** Each worker spins up in `.gemini/worktrees/<session-id>/`.
+    They act autonomously to complete their assigned task.
+5.  **Completion:** Once a worker is done, the Manager is notified. It can then
+    review the work (via git) and merge the worker's branch if approved.

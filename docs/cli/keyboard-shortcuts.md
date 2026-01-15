@@ -104,6 +104,7 @@ available combinations.
 | ----------------------------------------------------------------- | ----------------------------------- |
 | Toggle detailed error information.                                | `F12`                               |
 | Toggle the full TODO list.                                        | `Ctrl + T`                          |
+| Toggle the sessions dashboard.                                    | `Ctrl + O`                          |
 | Toggle IDE context details.                                       | `Ctrl + G`                          |
 | Toggle Markdown rendering.                                        | `Cmd + M`                           |
 | Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`                          |
