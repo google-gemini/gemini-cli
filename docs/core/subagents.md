@@ -1,4 +1,4 @@
-# Sub-Agents (Experimental)
+# Sub-agents (experimental)
 
 Sub-agents are specialized agents that operate within your main Gemini CLI
 session. They are designed to handle specific, complex tasks—like deep codebase
