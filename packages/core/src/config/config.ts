@@ -381,6 +381,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -388,6 +389,7 @@ export interface ConfigParameters {
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
+    agents?: AgentSettings;
   }>;
 }
 
@@ -519,17 +521,19 @@ export class Config {
     | (() => Promise<{
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
       }>)
     | undefined;
 
   private readonly enableAgents: boolean;
-  private readonly agents: AgentSettings;
+  private agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: FetchAdminControlsResponse | undefined;
@@ -601,6 +605,7 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.planEnabled = params.plan ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -1484,6 +1489,10 @@ export class Config {
     return this.disableLLMCorrection;
   }
 
+  isPlanEnabled(): boolean {
+    return this.planEnabled;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -1649,6 +1658,18 @@ export class Config {
 
     // Notify the client that system instructions might need updating
     await this.updateSystemInstructionIfInitialized();
+  }
+
+  /**
+   * Reloads agent settings.
+   */
+  async reloadAgents(): Promise<void> {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.agents) {
+        this.agents = refreshed.agents;
+      }
+    }
   }
 
   isInteractive(): boolean {
