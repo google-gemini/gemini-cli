@@ -504,6 +504,7 @@ export enum SessionEndReason {
   Clear = 'clear',
   Logout = 'logout',
   PromptInputExit = 'prompt_input_exit',
+  Restart = 'restart',
   Other = 'other',
 }
 
