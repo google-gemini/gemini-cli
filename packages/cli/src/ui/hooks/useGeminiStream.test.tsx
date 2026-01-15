@@ -181,6 +181,7 @@ describe('useGeminiStream', () => {
 
     const mockMcpClientManager = {
       getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+      getMcpServerCount: vi.fn().mockReturnValue(0),
     };
 
     const contentGeneratorConfig = {
@@ -3096,6 +3097,7 @@ describe('useGeminiStream', () => {
         getDiscoveryState: vi
           .fn()
           .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
       };
       mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
 
@@ -3115,6 +3117,7 @@ describe('useGeminiStream', () => {
         getDiscoveryState: vi
           .fn()
           .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
       };
       mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
       const { result } = renderTestHook();
@@ -3135,6 +3138,7 @@ describe('useGeminiStream', () => {
     it('should allow normal prompts to run when MCP servers are finished initializing', async () => {
       const mockMcpClientManager = {
         getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
       };
       mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
 
