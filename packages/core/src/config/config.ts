@@ -382,6 +382,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -535,6 +536,7 @@ export class Config {
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
@@ -614,6 +616,7 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.planEnabled = params.plan ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -1481,6 +1484,10 @@ export class Config {
 
   getDisableLLMCorrection(): boolean {
     return this.disableLLMCorrection;
+  }
+
+  isPlanEnabled(): boolean {
+    return this.planEnabled;
   }
 
   isAgentsEnabled(): boolean {
