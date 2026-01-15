@@ -217,7 +217,6 @@ ${textContent}
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _reason?: string,
   ): Promise<ToolCallConfirmationDetails | false> {
     // Check for AUTO_EDIT approval mode. This tool has a specific behavior
     // where ProceedAlways switches the entire session to AUTO_EDIT.
