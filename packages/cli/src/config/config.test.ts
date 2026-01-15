@@ -1011,6 +1011,30 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
   });
 
+  it('should exclude all interactive tools in non-interactive mode with plan approval mode', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--approval-mode',
+      'plan',
+      '-p',
+      'test',
+    ];
+    const settings = createTestMergedSettings({
+      experimental: {
+        plan: true,
+      },
+    });
+    const argv = await parseArguments(createTestMergedSettings());
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const excludedTools = config.getExcludeTools();
+    expect(excludedTools).toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+  });
+
   it('should exclude no interactive tools in non-interactive mode with legacy yolo flag', async () => {
     process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -1099,7 +1123,7 @@ describe('Approval mode tool exclusion logic', () => {
     await expect(
       loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
-      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, default',
+      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
     );
   });
 });
@@ -2050,6 +2074,42 @@ describe('loadCliConfig approval mode', () => {
       argv,
     );
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should set Plan approval mode when --approval-mode=plan is used and experimental.plan is enabled', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        plan: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+  });
+
+  it('should throw error when --approval-mode=plan is used but experimental.plan is disabled', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        plan: false,
+      },
+    });
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Approval mode "plan" is only available when experimental.plan is enabled.',
+    );
+  });
+
+  it('should throw error when --approval-mode=plan is used but experimental.plan setting is missing', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({});
+
+    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
+      'Approval mode "plan" is only available when experimental.plan is enabled.',
+    );
   });
 
   // --- Untrusted Folder Scenarios ---
