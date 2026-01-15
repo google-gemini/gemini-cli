@@ -7,7 +7,7 @@ requests sent from `packages/cli`. For a general overview of Gemini CLI, see the
 
 ## Navigating this section
 
-- **[Sub-Agents (Experimental)](./subagents.md):** Learn how to use and create
+- **[Sub-agents (experimental)](./subagents.md):** Learn how to create and use
   specialized sub-agents for complex tasks.
 - **[Core tools API](./tools-api.md):** Information on how tools are defined,
   registered, and used by the core.
