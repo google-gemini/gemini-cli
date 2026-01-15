@@ -54,7 +54,7 @@ const listPoliciesCommand: SlashCommand = {
         content += ` [Priority: ${rule.priority}]`;
       }
       if (rule.source) {
-        content += ` [Source: ${rule.source}]`;
+        content += ` [Source: \`${rule.source}\`]`;
       }
       content += '\n';
     });
