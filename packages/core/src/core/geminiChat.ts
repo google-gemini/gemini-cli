@@ -503,49 +503,44 @@ export class GeminiChat {
         ? contentsForPreviewModel
         : requestContents;
 
-      const beforeModelResult = (await this.config
-        .getHookSystem()
-        ?.fireBeforeModelEvent({
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem) {
+        const beforeModelResult = await hookSystem.fireBeforeModelEvent({
           model: modelToUse,
           config,
           contents: contentsToUse,
-        })) ?? { blocked: false };
+        });
 
-      if (beforeModelResult.stopped) {
-        throw new AgentExecutionStoppedError(
-          beforeModelResult.reason || 'Agent execution stopped by hook',
-        );
-      }
-
-      if (beforeModelResult.blocked) {
-        const syntheticResponse = beforeModelResult.syntheticResponse;
-        if (syntheticResponse) {
-          if (
-            syntheticResponse.candidates &&
-            syntheticResponse.candidates.length > 0
-          ) {
-            for (const candidate of syntheticResponse.candidates) {
-              if (!candidate.finishReason) {
-                candidate.finishReason = FinishReason.STOP;
-              }
-            }
-          }
+        if (beforeModelResult.stopped) {
+          throw new AgentExecutionStoppedError(
+            beforeModelResult.reason || 'Agent execution stopped by hook',
+          );
         }
 
-        throw new AgentExecutionBlockedError(
-          beforeModelResult.reason || 'Model call blocked by hook',
-          syntheticResponse,
-        );
-      }
+        if (beforeModelResult.blocked) {
+          const syntheticResponse = beforeModelResult.syntheticResponse;
 
-      if (beforeModelResult.modifiedConfig) {
-        Object.assign(config, beforeModelResult.modifiedConfig);
-      }
-      if (
-        beforeModelResult.modifiedContents &&
-        Array.isArray(beforeModelResult.modifiedContents)
-      ) {
-        contentsToUse = beforeModelResult.modifiedContents as Content[];
+          for (const candidate of syntheticResponse?.candidates ?? []) {
+            if (!candidate.finishReason) {
+              candidate.finishReason = FinishReason.STOP;
+            }
+          }
+
+          throw new AgentExecutionBlockedError(
+            beforeModelResult.reason || 'Model call blocked by hook',
+            syntheticResponse,
+          );
+        }
+
+        if (beforeModelResult.modifiedConfig) {
+          Object.assign(config, beforeModelResult.modifiedConfig);
+        }
+        if (
+          beforeModelResult.modifiedContents &&
+          Array.isArray(beforeModelResult.modifiedContents)
+        ) {
+          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        }
       }
 
       const hooksEnabled = this.config.getEnableHooks();
@@ -815,10 +810,12 @@ export class GeminiChat {
         }
       }
 
-      if (originalRequest && chunk) {
-        const hookResult = (await this.config
-          .getHookSystem()
-          ?.fireAfterModelEvent(originalRequest, chunk)) ?? { response: chunk };
+      const hookSystem = this.config.getHookSystem();
+      if (originalRequest && chunk && hookSystem) {
+        const hookResult = await hookSystem.fireAfterModelEvent(
+          originalRequest,
+          chunk,
+        );
 
         if (hookResult.stopped) {
           throw new AgentExecutionStoppedError(

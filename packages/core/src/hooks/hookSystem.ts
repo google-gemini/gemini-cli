@@ -35,7 +35,6 @@ import type {
  * Main hook system that coordinates all hook-related functionality
  */
 export class HookSystem {
-  private readonly config: Config;
   private readonly hookRegistry: HookRegistry;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
@@ -43,7 +42,6 @@ export class HookSystem {
   private readonly hookEventHandler: HookEventHandler;
 
   constructor(config: Config) {
-    this.config = config;
     const logger: Logger = logs.getLogger(SERVICE_NAME);
     const messageBus = config.getMessageBus();
 

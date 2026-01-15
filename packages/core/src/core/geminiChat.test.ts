@@ -28,16 +28,12 @@ import type { ModelAvailabilityService } from '../availability/modelAvailability
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
 import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
+import type { HookSystem } from '../hooks/hookSystem.js';
 
 // Mock hook triggers
 vi.mock('./geminiChatHookTriggers.js', () => ({
   fireBeforeToolSelectionHook: vi.fn().mockResolvedValue({}),
 }));
-
-const mockHookSystem = {
-  fireBeforeModelEvent: vi.fn().mockResolvedValue({ blocked: false }),
-  fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
-};
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -202,7 +198,7 @@ describe('GeminiChat', () => {
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
-    mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -2279,15 +2275,16 @@ describe('GeminiChat', () => {
   });
 
   describe('Hook execution control', () => {
+    let mockHookSystem: HookSystem;
     beforeEach(() => {
       vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
-      // Default to allowing execution
-      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
-        blocked: false,
-      });
-      vi.mocked(mockHookSystem.fireAfterModelEvent).mockResolvedValue({
-        response: {} as GenerateContentResponse,
-      });
+
+      mockHookSystem = {
+        fireBeforeModelEvent: vi.fn().mockResolvedValue({ blocked: false }),
+        fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
+      } as unknown as HookSystem;
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+
       vi.mocked(fireBeforeToolSelectionHook).mockResolvedValue({});
     });
 
