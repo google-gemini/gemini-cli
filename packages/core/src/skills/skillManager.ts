@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import { type SkillDefinition, loadSkillsFromDir } from './skillLoader.js';
 import type { GeminiCLIExtension } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 export { type SkillDefinition };
 
@@ -86,10 +88,27 @@ export class SkillManager {
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
-    const skillMap = new Map<string, SkillDefinition>();
-    for (const skill of [...this.skills, ...newSkills]) {
-      skillMap.set(skill.name, skill);
+    const skillMap = new Map<string, SkillDefinition>(
+      this.skills.map((s) => [s.name, s]),
+    );
+
+    for (const newSkill of newSkills) {
+      const existingSkill = skillMap.get(newSkill.name);
+      if (existingSkill && existingSkill.location !== newSkill.location) {
+        if (existingSkill.isBuiltin) {
+          debugLogger.warn(
+            `Skill "${newSkill.name}" from "${newSkill.location}" is overriding the built-in skill.`,
+          );
+        } else {
+          coreEvents.emitFeedback(
+            'warning',
+            `Skill conflict detected: "${newSkill.name}" from "${newSkill.location}" is overriding the same skill from "${existingSkill.location}".`,
+          );
+        }
+      }
+      skillMap.set(newSkill.name, newSkill);
     }
+
     this.skills = Array.from(skillMap.values());
   }
 
