@@ -14,11 +14,13 @@ import type { RenewSessionConfirmationResult } from '../types.js';
 interface RenewSessionDialogProps {
   onComplete: (result: RenewSessionConfirmationResult) => void;
   maxSessionTurns: number;
+  reason?: 'turn_limit' | 'topic_change';
 }
 
 export function RenewSessionDialog({
   onComplete,
   maxSessionTurns,
+  reason = 'turn_limit',
 }: RenewSessionDialogProps) {
   useKeypress(
     (key) => {
@@ -31,9 +33,13 @@ export function RenewSessionDialog({
     { isActive: true },
   );
 
+  const isTopicChange = reason === 'topic_change';
+
   const OPTIONS: Array<RadioSelectItem<RenewSessionConfirmationResult>> = [
     {
-      label: 'Compress session',
+      label: isTopicChange
+        ? 'Continue with current context'
+        : 'Compress session',
       value: {
         userSelection: 'compress_session',
       } as RenewSessionConfirmationResult,
@@ -70,20 +76,24 @@ export function RenewSessionDialog({
             <Box>
               <Text wrap="truncate-end">
                 <Text color={theme.text.primary} bold>
-                  Turn limit reached
+                  {isTopicChange
+                    ? 'Topic change detected'
+                    : 'Turn limit reached'}
                 </Text>{' '}
-                <Text color={theme.text.secondary}>
-                  (current threshold: {maxSessionTurns} turns)
-                </Text>
+                {reason === 'turn_limit' && (
+                  <Text color={theme.text.secondary}>
+                    (current threshold: {maxSessionTurns} turns)
+                  </Text>
+                )}
               </Text>
             </Box>
           </Box>
           <Box marginTop={1}>
             <Box flexDirection="column">
               <Text color={theme.text.secondary}>
-                You&apos;ve reached the configured maximum number of turns for
-                this session. Choose whether to compress the conversation or
-                start a new session.
+                {isTopicChange
+                  ? 'Your query appears to be about a new topic. Would you like to start a new session?'
+                  : "You've reached the configured maximum number of turns for this session. Choose whether to compress the conversation or start a new session."}
               </Text>
               <Box marginTop={1}>
                 <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />

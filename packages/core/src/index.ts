@@ -106,6 +106,7 @@ export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
+export * from './services/topicDetectionService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';

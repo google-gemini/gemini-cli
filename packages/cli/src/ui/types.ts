@@ -45,6 +45,7 @@ export enum StreamingState {
 export enum GeminiEventType {
   Content = 'content',
   ToolCallRequest = 'tool_call_request',
+  RenewSession = 'renew_session',
   // Add other event types if the UI hook needs to handle them
 }
 
@@ -457,4 +458,5 @@ export interface RenewSessionConfirmationResult {
 
 export interface RenewSessionConfirmationRequest {
   onComplete: (result: RenewSessionConfirmationResult) => void;
+  reason?: 'turn_limit' | 'topic_change';
 }

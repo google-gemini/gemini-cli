@@ -133,13 +133,14 @@ export const DialogManager = ({
       <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
     );
   }
-  if (uiState.RenewSessionConfirmationRequest) {
+  if (uiState.renewSessionConfirmationRequest) {
     return (
       <RenewSessionDialog
         maxSessionTurns={
           settings.merged.model?.renewSessionTurnsThreshold ?? -1
         }
-        onComplete={uiState.RenewSessionConfirmationRequest.onComplete}
+        reason={uiState.renewSessionConfirmationRequest.reason}
+        onComplete={uiState.renewSessionConfirmationRequest.onComplete}
       />
     );
   }

@@ -189,6 +189,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
+    'topic-detection': {
+      extends: 'gemini-2.5-flash-base',
+      modelConfig: {},
+    },
     'chat-compression-3-pro': {
       modelConfig: {
         model: 'gemini-3-pro-preview',
