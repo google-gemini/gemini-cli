@@ -42,11 +42,11 @@ locations for these files:
 > `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`.
 
 - **System defaults file:**
-  - **Location:** `/etc/gemini-cli/system-defaults.json` (Linux),
-    `C:\ProgramData\gemini-cli\system-defaults.json` (Windows) or
-    `/Library/Application Support/GeminiCli/system-defaults.json` (macOS). The
-    path can be overridden using the `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`
-    environment variable.
+  - **Locations:**
+    - **Linux:** `/etc/gemini-cli/system-defaults.json`
+    - **macOS:** `/Library/Application Support/GeminiCli/system-defaults.json`
+    - **Windows:** `C:\ProgramData\gemini-cli\system-defaults.json`
+  - The path can be overridden using the `GEMINI_CLI_SYSTEM_DEFAULTS_PATH` environment variable.
   - **Scope:** Provides a base layer of system-wide default settings. These
     settings have the lowest precedence and are intended to be overridden by
     user, project, or system override settings.
