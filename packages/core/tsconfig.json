@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "rootDir": ".",
     "outDir": "dist",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
