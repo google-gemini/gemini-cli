@@ -1,25 +1,39 @@
-name: Enforce 'help wanted' Label Permissions
+name: '🏷️ Enforce help wanted Label Permissions'
 
 on:
   issues:
-    types: [labeled]
+    types:
+      - 'labeled'
 
 jobs:
   enforce-label:
     # Run this job only when the 'help wanted' label is added
-    if: github.event.label.name == 'help wanted'
-    runs-on: ubuntu-latest
+    if: |-
+      ${{ github.event.label.name == 'help wanted' &&
+          (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') }}
+    runs-on: 'ubuntu-latest'
     permissions:
-      issues: write
-      organization: read
+      issues: 'write'
     steps:
-      - name: Check if user is in the maintainers team
-        uses: actions/github-script@v7
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        env:
+          APP_ID: '${{ secrets.APP_ID }}'
+        if: |-
+          ${{ env.APP_ID != '' }}
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
-          script: |
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Check if user is in the maintainers team'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
             const org = context.repo.owner;
             const username = context.payload.sender.login;
-            const team_slug = 'gemini-cli-maintainers'; // Updated with the correct team slug
+            const team_slug = 'gemini-cli-maintainers';
 
             try {
               // This will succeed with a 204 status if the user is a member,
@@ -29,7 +43,7 @@ jobs:
                 team_slug,
                 username,
               });
-              console.log(`${username} is a member of the ${team_slug} team. No action needed.`);
+              core.info(`${username} is a member of the ${team_slug} team. No action needed.`);
             } catch (error) {
               // If the error is not 404, rethrow it to fail the action
               if (error.status !== 404) {
@@ -37,7 +51,7 @@ jobs:
               }
 
               // User is not in the team, so remove the label and comment.
-              console.log(`${username} is not a member. Removing 'help wanted' label.`);
+              core.info(`${username} is not a member. Removing 'help wanted' label.`);
 
               // 1. Remove the label
               await github.rest.issues.removeLabel({
@@ -51,9 +65,11 @@ jobs:
               const comment = `
                 Hi @${username}, thank you for your interest in helping triage issues!
 
-                The \`help-wanted\` label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
+                The
+                help-wanted
+                 label is reserved for project maintainers to apply. This helps us ensure that an issue is ready and properly vetted for community contribution.
 
-                A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](link-to-your-contributing-file) for more details on our labeling process.
+                A maintainer will review this issue soon. Please see our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) for more details on our labeling process.
               `;
               await github.rest.issues.createComment({
                 owner: org,
@@ -62,4 +78,3 @@ jobs:
                 body: comment
               });
             }
-
