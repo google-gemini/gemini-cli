@@ -60,12 +60,11 @@ export const Footer: React.FC = () => {
 
   const showMemoryUsage =
     config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
-  const hideCWD = settings.merged.ui?.footer?.hideCWD || false;
-  const hideSandboxStatus =
-    settings.merged.ui?.footer?.hideSandboxStatus || false;
-  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
+  const hideCWD = settings.merged.ui?.footer?.hideCWD;
+  const hideSandboxStatus = settings.merged.ui?.footer?.hideSandboxStatus;
+  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo;
   const hideContextPercentage =
-    settings.merged.ui?.footer?.hideContextPercentage ?? true;
+    settings.merged.ui?.footer?.hideContextPercentage;
 
   const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);

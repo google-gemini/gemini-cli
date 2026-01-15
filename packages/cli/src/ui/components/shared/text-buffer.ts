@@ -10,7 +10,15 @@ import os from 'node:os';
 import pathMod from 'node:path';
 import * as path from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { coreEvents, CoreEvent, unescapePath } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  CoreEvent,
+  debugLogger,
+  unescapePath,
+  type EditorType,
+  getEditorCommand,
+  isGuiEditor,
+} from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
@@ -20,6 +28,7 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
@@ -560,6 +569,7 @@ interface UseTextBufferProps {
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
+  getPreferredEditor?: () => EditorType | undefined;
 }
 
 interface UndoHistoryEntry {
@@ -1411,7 +1421,7 @@ function textBufferReducerLogic(
             break;
           default: {
             const exhaustiveCheck: never = dir;
-            console.error(
+            debugLogger.error(
               `Unknown visual movement direction: ${exhaustiveCheck}`,
             );
             return state;
@@ -1751,7 +1761,7 @@ function textBufferReducerLogic(
 
     default: {
       const exhaustiveCheck: never = action;
-      console.error(`Unknown action encountered: ${exhaustiveCheck}`);
+      debugLogger.error(`Unknown action encountered: ${exhaustiveCheck}`);
       return state;
     }
   }
@@ -1820,6 +1830,7 @@ export function useTextBuffer({
   shellModeActive = false,
   inputFilter,
   singleLine = false,
+  getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -2146,106 +2157,89 @@ export function useTextBuffer({
     dispatch({ type: 'vim_escape_insert_mode' });
   }, []);
 
-  const openInExternalEditor = useCallback(
-    async (opts: { editor?: string } = {}): Promise<void> => {
-      const editor =
-        opts.editor ??
-        process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        (process.platform === 'win32' ? 'notepad' : 'vi');
-      const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
-      const filePath = pathMod.join(tmpDir, 'buffer.txt');
-      fs.writeFileSync(filePath, text, 'utf8');
+  const openInExternalEditor = useCallback(async (): Promise<void> => {
+    const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
+    const filePath = pathMod.join(tmpDir, 'buffer.txt');
+    fs.writeFileSync(filePath, text, 'utf8');
 
-      dispatch({ type: 'create_undo_snapshot' });
+    let command: string | undefined = undefined;
+    const args = [filePath];
 
-      const wasRaw = stdin?.isRaw ?? false;
-      try {
-        setRawMode?.(false);
-        const { status, error } = spawnSync(editor, [filePath], {
-          stdio: 'inherit',
-        });
-        if (error) throw error;
-        if (typeof status === 'number' && status !== 0)
-          throw new Error(`External editor exited with status ${status}`);
-
-        let newText = fs.readFileSync(filePath, 'utf8');
-        newText = newText.replace(/\r\n?/g, '\n');
-        dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
-      } catch (err) {
-        console.error('[useTextBuffer] external editor error', err);
-      } finally {
-        coreEvents.emit(CoreEvent.ExternalEditorClosed);
-        if (wasRaw) setRawMode?.(true);
-        try {
-          fs.unlinkSync(filePath);
-        } catch {
-          /* ignore */
-        }
-        try {
-          fs.rmdirSync(tmpDir);
-        } catch {
-          /* ignore */
-        }
+    const preferredEditorType = getPreferredEditor?.();
+    if (!command && preferredEditorType) {
+      command = getEditorCommand(preferredEditorType);
+      if (isGuiEditor(preferredEditorType)) {
+        args.unshift('--wait');
       }
-    },
-    [text, stdin, setRawMode],
-  );
+    }
+
+    if (!command) {
+      command =
+        (process.env['VISUAL'] ??
+        process.env['EDITOR'] ??
+        process.platform === 'win32')
+          ? 'notepad'
+          : 'vi';
+    }
+
+    dispatch({ type: 'create_undo_snapshot' });
+
+    const wasRaw = stdin?.isRaw ?? false;
+    try {
+      setRawMode?.(false);
+      const { status, error } = spawnSync(command, args, {
+        stdio: 'inherit',
+      });
+      if (error) throw error;
+      if (typeof status === 'number' && status !== 0)
+        throw new Error(`External editor exited with status ${status}`);
+
+      let newText = fs.readFileSync(filePath, 'utf8');
+      newText = newText.replace(/\r\n?/g, '\n');
+      dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'error',
+        '[useTextBuffer] external editor error',
+        err,
+      );
+    } finally {
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
+      if (wasRaw) setRawMode?.(true);
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        /* ignore */
+      }
+      try {
+        fs.rmdirSync(tmpDir);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [text, stdin, setRawMode, getPreferredEditor]);
 
   const handleInput = useCallback(
     (key: Key): void => {
       const { sequence: input } = key;
 
-      if (key.paste) {
-        // Do not do any other processing on pastes so ensure we handle them
-        // before all other cases.
-        insert(input, { paste: key.paste });
-        return;
-      }
-
-      if (
-        !singleLine &&
-        (key.name === 'return' ||
-          input === '\r' ||
-          input === '\n' ||
-          input === '\\r') // VSCode terminal represents shift + enter this way
-      )
-        newline();
-      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
-      else if (key.ctrl && key.name === 'b') move('left');
-      else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
-      else if (key.ctrl && key.name === 'f') move('right');
-      else if (key.name === 'up') move('up');
-      else if (key.name === 'down') move('down');
-      else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
-      else if (key.meta && key.name === 'b') move('wordLeft');
-      else if ((key.ctrl || key.meta) && key.name === 'right')
-        move('wordRight');
-      else if (key.meta && key.name === 'f') move('wordRight');
-      else if (key.name === 'home') move('home');
-      else if (key.ctrl && key.name === 'a') move('home');
-      else if (key.name === 'end') move('end');
-      else if (key.ctrl && key.name === 'e') move('end');
-      else if (key.ctrl && key.name === 'w') deleteWordLeft();
-      else if (
-        (key.meta || key.ctrl) &&
-        (key.name === 'backspace' || input === '\x7f')
-      )
-        deleteWordLeft();
-      else if ((key.meta || key.ctrl) && key.name === 'delete')
-        deleteWordRight();
-      else if (
-        key.name === 'backspace' ||
-        input === '\x7f' ||
-        (key.ctrl && key.name === 'h')
-      )
-        backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
-      else if (key.ctrl && !key.shift && key.name === 'z') undo();
-      else if (key.ctrl && key.shift && key.name === 'z') redo();
-      else if (key.insertable) {
-        insert(input, { paste: key.paste });
-      }
+      if (key.name === 'paste') insert(input, { paste: true });
+      else if (keyMatchers[Command.RETURN](key)) newline();
+      else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
+      else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
+      else if (keyMatchers[Command.MOVE_UP](key)) move('up');
+      else if (keyMatchers[Command.MOVE_DOWN](key)) move('down');
+      else if (keyMatchers[Command.MOVE_WORD_LEFT](key)) move('wordLeft');
+      else if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) move('wordRight');
+      else if (keyMatchers[Command.HOME](key)) move('home');
+      else if (keyMatchers[Command.END](key)) move('end');
+      else if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) deleteWordLeft();
+      else if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) deleteWordRight();
+      else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) backspace();
+      else if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) del();
+      else if (keyMatchers[Command.UNDO](key)) undo();
+      else if (keyMatchers[Command.REDO](key)) redo();
+      else if (key.insertable) insert(input, { paste: false });
     },
     [
       newline,
@@ -2257,7 +2251,6 @@ export function useTextBuffer({
       insert,
       undo,
       redo,
-      singleLine,
     ],
   );
 
@@ -2624,7 +2617,7 @@ export interface TextBuffer {
    * continuing.  This mirrors Git's behaviour and simplifies downstream
    * control‑flow (callers can simply `await` the Promise).
    */
-  openInExternalEditor: (opts?: { editor?: string }) => Promise<void>;
+  openInExternalEditor: () => Promise<void>;
 
   replaceRangeByOffset: (
     startOffset: number,

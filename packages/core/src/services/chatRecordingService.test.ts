@@ -401,4 +401,57 @@ describe('ChatRecordingService', () => {
       );
     });
   });
+
+  describe('rewindTo', () => {
+    it('should rewind the conversation to a specific message ID', () => {
+      chatRecordingService.initialize();
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          { id: '1', type: 'user', content: 'msg1' },
+          { id: '2', type: 'gemini', content: 'msg2' },
+          { id: '3', type: 'user', content: 'msg3' },
+        ],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+
+      const result = chatRecordingService.rewindTo('2');
+
+      if (!result) throw new Error('Result should not be null');
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0].id).toBe('1');
+      expect(writeFileSyncSpy).toHaveBeenCalled();
+      const savedConversation = JSON.parse(
+        writeFileSyncSpy.mock.calls[0][1] as string,
+      ) as ConversationRecord;
+      expect(savedConversation.messages).toHaveLength(1);
+    });
+
+    it('should return the original conversation if the message ID is not found', () => {
+      chatRecordingService.initialize();
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [{ id: '1', type: 'user', content: 'msg1' }],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+
+      const result = chatRecordingService.rewindTo('non-existent');
+
+      if (!result) throw new Error('Result should not be null');
+      expect(result.messages).toHaveLength(1);
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+    });
+  });
 });

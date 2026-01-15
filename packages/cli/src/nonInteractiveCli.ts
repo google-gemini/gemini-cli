@@ -28,6 +28,7 @@ import {
   CoreEvent,
   createWorkingStdio,
   recordToolCallInteractions,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -50,7 +51,6 @@ interface RunNonInteractiveParams {
   settings: LoadedSettings;
   input: string;
   prompt_id: string;
-  hasDeprecatedPromptArg?: boolean;
   resumedSessionData?: ResumedSessionData;
 }
 
@@ -59,7 +59,6 @@ export async function runNonInteractive({
   settings,
   input,
   prompt_id,
-  hasDeprecatedPromptArg,
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
@@ -263,21 +262,6 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
-      const deprecateText =
-        'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
-      if (hasDeprecatedPromptArg) {
-        if (streamFormatter) {
-          streamFormatter.emitEvent({
-            type: JsonStreamEventType.MESSAGE,
-            timestamp: new Date().toISOString(),
-            role: 'assistant',
-            content: deprecateText,
-            delta: true,
-          });
-        } else {
-          process.stderr.write(deprecateText);
-        }
-      }
       while (true) {
         turnCount++;
         if (
@@ -347,6 +331,31 @@ export async function runNonInteractive({
             }
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
+          } else if (event.type === GeminiEventType.AgentExecutionStopped) {
+            const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`${stopMessage}\n`);
+            }
+            // Emit final result event for streaming JSON if needed
+            if (streamFormatter) {
+              const metrics = uiTelemetryService.getMetrics();
+              const durationMs = Date.now() - startTime;
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.RESULT,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+                stats: streamFormatter.convertToStreamStats(
+                  metrics,
+                  durationMs,
+                ),
+              });
+            }
+            return;
+          } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
+            const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[WARNING] ${blockMessage}\n`);
+            }
           }
         }
 
@@ -414,6 +423,43 @@ export async function runNonInteractive({
             debugLogger.error(
               `Error recording completed tool call information: ${error}`,
             );
+          }
+
+          // Check if any tool requested to stop execution immediately
+          const stopExecutionTool = completedToolCalls.find(
+            (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
+          );
+
+          if (stopExecutionTool && stopExecutionTool.response.error) {
+            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
+
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`${stopMessage}\n`);
+            }
+
+            // Emit final result event for streaming JSON
+            if (streamFormatter) {
+              const metrics = uiTelemetryService.getMetrics();
+              const durationMs = Date.now() - startTime;
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.RESULT,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+                stats: streamFormatter.convertToStreamStats(
+                  metrics,
+                  durationMs,
+                ),
+              });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(config.getSessionId(), responseText, stats),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
+            }
+            return;
           }
 
           currentMessages = [{ role: 'user', parts: toolResponseParts }];

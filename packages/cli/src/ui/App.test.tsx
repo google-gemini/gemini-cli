@@ -14,11 +14,7 @@ import { StreamingState } from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
 import { AppContext, type AppState } from './contexts/AppContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import {
-  type SettingScope,
-  LoadedSettings,
-  type SettingsFile,
-} from '../config/settings.js';
+import { LoadedSettings, type SettingsFile } from '../config/settings.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -92,7 +88,7 @@ describe('App', () => {
     mockSettingsFile,
     mockSettingsFile,
     true,
-    new Set<SettingScope>(),
+    [],
   );
 
   const mockAppState: AppState = {
