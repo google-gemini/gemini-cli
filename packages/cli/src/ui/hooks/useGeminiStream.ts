@@ -54,6 +54,7 @@ import type {
   HistoryItemToolGroup,
   SlashCommandProcessorResult,
   HistoryItemModel,
+  RenewSessionConfirmationResult,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
@@ -129,6 +130,7 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const lastUserQueryTextRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -237,21 +239,22 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
-  const [RenewSessionConfirmationRequest, setRenewSessionConfirmationRequest] =
+  const [renewSessionConfirmationRequest, setRenewSessionConfirmationRequest] =
     useState<{
       onComplete: (result: {
         userSelection: 'compress_session' | 'new_session';
       }) => void;
+      reason?: 'turn_limit' | 'topic_change';
     } | null>(null);
 
   const renewSessionConfirmationRequestRef = useRef(
-    RenewSessionConfirmationRequest,
+    renewSessionConfirmationRequest,
   );
 
   useEffect(() => {
     renewSessionConfirmationRequestRef.current =
-      RenewSessionConfirmationRequest;
-  }, [RenewSessionConfirmationRequest]);
+      renewSessionConfirmationRequest;
+  }, [renewSessionConfirmationRequest]);
 
   // Flag to prevent showing the dialog multiple times if
   // the RenewSession event is triggered repeatedly
@@ -824,6 +827,7 @@ export const useGeminiStream = (
             // For clear, execute the command FIRST while the dialog is still open.
             // This ensures the heavy DOM destruction (clearing history) happens
             // in a separate render cycle from the Dialog unmounting.
+            lastUserQueryTextRef.current = null;
             if (executeClearCommand) {
               await executeClearCommand();
             }
@@ -1121,7 +1125,73 @@ export const useGeminiStream = (
             }
 
             if (!options?.isContinuation) {
-              if (typeof queryToSend === 'string') {
+              if (
+                typeof queryToSend === 'string' &&
+                config.getApprovalMode() !== ApprovalMode.YOLO
+              ) {
+                // Topic Detection
+                debugLogger.log(
+                  `useGeminiStream: Topic Detection Check starting. lastUserQueryTextRef: "${lastUserQueryTextRef.current}", queryToSend: "${queryToSend}"`,
+                );
+                if (lastUserQueryTextRef.current) {
+                  debugLogger.log(
+                    'useGeminiStream: Calling TopicDetectionService...',
+                  );
+                  const { topic_changed, reasoning } = await geminiClient
+                    .getTopicDetectionService()
+                    .isTopicChanged(
+                      lastUserQueryTextRef.current,
+                      queryToSend,
+                      prompt_id!,
+                      abortSignal,
+                    );
+
+                  debugLogger.log(
+                    `useGeminiStream: Topic detection result: ${topic_changed} (${reasoning})`,
+                  );
+
+                  if (topic_changed) {
+                    debugLogger.log(
+                      'useGeminiStream: Topic change detected! Setting request state...',
+                    );
+                    const selection = await new Promise<
+                      RenewSessionConfirmationResult['userSelection']
+                    >((resolve) => {
+                      setRenewSessionConfirmationRequest({
+                        reason: 'topic_change',
+                        onComplete: (result) => {
+                          setRenewSessionConfirmationRequest(null);
+                          resolve(result.userSelection);
+                        },
+                      });
+                    });
+
+                    if (selection === 'new_session') {
+                      queueMicrotask(async () => {
+                        if (executeClearCommand) {
+                          await executeClearCommand();
+                        } else {
+                          await geminiClient.resetChat();
+                        }
+                        lastUserQueryTextRef.current = null;
+
+                        addItem(
+                          {
+                            type: MessageType.INFO,
+                            text: 'Topic change detected. Starting a new session.',
+                          },
+                          Date.now(),
+                        );
+
+                        // A short delay ensures React processes the history clearing first.
+                        setTimeout(() => {
+                          setRenewSessionConfirmationRequest(null);
+                        }, 50);
+                      });
+                    }
+                  }
+                }
+
                 // logging the text prompts only for now
                 const promptText = queryToSend;
                 logUserPrompt(
@@ -1136,6 +1206,9 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
+
+              lastUserQueryTextRef.current =
+                typeof queryToSend === 'string' ? queryToSend : null;
             }
 
             setIsResponding(true);
@@ -1248,6 +1321,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      executeClearCommand,
     ],
   );
 
@@ -1526,7 +1600,7 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
-    RenewSessionConfirmationRequest,
+    renewSessionConfirmationRequest,
     lastOutputTime,
     retryStatus,
   };
