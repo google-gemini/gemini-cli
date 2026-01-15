@@ -442,6 +442,9 @@ export interface BeforeAgentOutput extends HookOutput {
  */
 export enum NotificationType {
   ToolPermission = 'ToolPermission',
+  OperationComplete = 'OperationComplete',
+  ActionRequired = 'ActionRequired',
+  OperationCancelled = 'OperationCancelled',
 }
 
 /**

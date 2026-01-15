@@ -199,6 +199,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.bell`** (boolean):
+  - **Description:** Enable terminal bell sound when requesting user input. See
+    also `bellDurationThreshold`.
+  - **Default:** `false`
+
+- **`ui.bellDurationThreshold`** (number):
+  - **Description:** Minimum duration in seconds the operation must take before
+    the bell rings. This helps reduce noise for short, quick operations.
+  - **Default:** `10`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`

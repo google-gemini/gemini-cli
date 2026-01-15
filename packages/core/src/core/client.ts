@@ -58,6 +58,10 @@ import {
 import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
+import {
+  fireOperationCompleteHook,
+  fireOperationCancelledHook,
+} from './coreToolHookTriggers.js';
 
 const MAX_TURNS = 100;
 
@@ -185,6 +189,11 @@ export class GeminiClient {
       turn?.getResponseText() ||
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
+
+    const messageBus = this.config.getMessageBus();
+    if (messageBus) {
+      await fireOperationCompleteHook(messageBus, 'Agent execution completed');
+    }
 
     const hookOutput = await this.config
       .getHookSystem()
@@ -838,6 +847,13 @@ export class GeminiClient {
         if (hookState.activeCalls <= 0) {
           if (!isPendingTools || isAborted) {
             this.hookStateMap.delete(prompt_id);
+            if (isAborted && hooksEnabled && messageBus) {
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              fireOperationCancelledHook(
+                messageBus,
+                'Agent execution cancelled',
+              );
+            }
           }
         }
       }

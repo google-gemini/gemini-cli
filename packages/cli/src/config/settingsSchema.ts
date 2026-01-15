@@ -413,6 +413,26 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      bell: {
+        type: 'boolean',
+        label: 'Bell',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable terminal bell sound when requesting user input. See also `bellDurationThreshold`.',
+        showInDialog: true,
+      },
+      bellDurationThreshold: {
+        type: 'number',
+        label: 'Bell Duration Threshold',
+        category: 'UI',
+        requiresRestart: false,
+        default: 10 as number,
+        description:
+          'Minimum duration in seconds the operation must take before the bell rings. This helps reduce noise for short, quick operations.',
+        showInDialog: false,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',

@@ -12,11 +12,14 @@ import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
 import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 import { AlternateBufferQuittingDisplay } from './components/AlternateBufferQuittingDisplay.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
+import { useBell } from './hooks/useBell.js';
 
 export const App = () => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
+  useBell();
 
   if (uiState.quittingMessages) {
     if (isAlternateBuffer) {
