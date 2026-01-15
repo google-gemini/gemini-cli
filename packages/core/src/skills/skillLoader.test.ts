@@ -194,4 +194,64 @@ Do something.
     expect(skills[0].description).toContain('Expertise in reviewing code');
     expect(skills[0].description).toContain('check');
   });
+
+  it('should handle empty name or description', async () => {
+    const skillDir = path.join(testRootDir, 'empty-skill');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: 
+description: 
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('');
+    expect(skills[0].description).toBe('');
+  });
+
+  it('should handle indented name and description fields', async () => {
+    const skillDir = path.join(testRootDir, 'indented-fields');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+  name: indented-name
+  description: indented-desc
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('indented-name');
+    expect(skills[0].description).toBe('indented-desc');
+  });
+
+  it('should handle missing space after colon', async () => {
+    const skillDir = path.join(testRootDir, 'no-space');
+    await fs.mkdir(skillDir, { recursive: true });
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name:no-space-name
+description:no-space-desc
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('no-space-name');
+    expect(skills[0].description).toBe('no-space-desc');
+  });
 });
