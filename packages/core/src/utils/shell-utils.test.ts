@@ -503,7 +503,7 @@ describe('resolveExecutable', () => {
   });
 
   it('should resolve executable in PATH', () => {
-    process.env.PATH = '/bin:/usr/bin';
+    process.env['PATH'] = '/bin:/usr/bin';
     mockPlatform.mockReturnValue('linux');
     mockAccessSync.mockImplementation((p: string) => {
       if (p === '/usr/bin/ls') return undefined;
@@ -514,7 +514,7 @@ describe('resolveExecutable', () => {
   });
 
   it('should try extensions on Windows', () => {
-    process.env.PATH = 'C:\\Windows\\System32';
+    process.env['PATH'] = 'C:\\Windows\\System32';
     mockPlatform.mockReturnValue('win32');
     mockAccessSync.mockImplementation((p: string) => {
       // Use includes because on Windows path separators might differ
@@ -526,7 +526,7 @@ describe('resolveExecutable', () => {
   });
 
   it('should return undefined if not found in PATH', () => {
-    process.env.PATH = '/bin';
+    process.env['PATH'] = '/bin';
     mockPlatform.mockReturnValue('linux');
     mockAccessSync.mockImplementation(() => {
       throw new Error('ENOENT');
