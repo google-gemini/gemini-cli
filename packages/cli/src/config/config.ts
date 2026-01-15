@@ -36,6 +36,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import { saveModelChange, loadSettings } from './settings.js';
@@ -617,12 +618,13 @@ export async function loadCliConfig(
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL_AUTO;
-  const resolvedModel: string =
-    argv.model ||
-    process.env['GEMINI_MODEL'] ||
-    settings.model?.name ||
-    defaultModel;
+  const specifiedModel =
+    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
+  const resolvedModel =
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
