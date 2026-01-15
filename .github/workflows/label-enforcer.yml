@@ -39,7 +39,7 @@ jobs:
             const labelName = context.payload.label.name;
 
             // Skip if the change was made by a bot to avoid infinite loops
-            if (username === 'github-actions[bot]') {
+            if (username === 'github-actions[bot]' || username === 'gemini-cli[bot]' || username.endsWith('[bot]')) {
               core.info('Change made by a bot. Skipping.');
               return;
             }
