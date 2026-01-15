@@ -174,4 +174,36 @@ describe('EditorSettingsDialog', () => {
     }
     expect(frame).toContain('(Also modified');
   });
+
+  it('clears user scoped preferredEditor when invalid editor is provided', async () => {
+    const settingsWithInvalidEditor = {
+      forScope: (_scope: string) => ({
+        settings: {
+          general: {
+            preferredEditor: 'invalid-editor',
+          },
+        },
+      }),
+      merged: {
+        general: {
+          preferredEditor: null,
+        },
+      },
+    } as unknown as LoadedSettings;
+
+    const onSelect = vi.fn();
+    const { lastFrame } = renderWithProvider(
+      <EditorSettingsDialog
+        onSelect={onSelect}
+        settings={settingsWithInvalidEditor}
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(lastFrame()).toContain('Your preferred editor is: None');
+
+    await waitFor(() => {
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(undefined, 'User');
+    });
+  });
 });
