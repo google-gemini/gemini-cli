@@ -362,4 +362,8 @@ export class McpClientManager {
     }
     return instructions.join('\n\n');
   }
+
+  getMcpServerCount(): number {
+    return this.clients.size;
+  }
 }
