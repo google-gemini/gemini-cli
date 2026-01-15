@@ -7,17 +7,15 @@
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 export const AdminSettingsChangedDialog = () => {
+  const { handleRestart } = useUIActions();
+
   useKeypress(
     (key) => {
       if (key.name === 'r' || key.name === 'R') {
-        setTimeout(async () => {
-          await runExitCleanup();
-          process.exit(RELAUNCH_EXIT_CODE);
-        }, 100);
+        handleRestart();
       }
     },
     { isActive: true },

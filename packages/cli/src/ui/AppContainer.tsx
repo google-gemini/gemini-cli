@@ -1765,6 +1765,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
+      handleRestart: async () => {
+        await runExitCleanup();
+        process.exit(RELAUNCH_EXIT_CODE);
+      },
     }),
     [
       handleThemeSelect,
@@ -1815,10 +1819,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     );
   }
 
-  if (adminSettingsChanged) {
-    return <AdminSettingsChangedDialog />;
-  }
-
   return (
     <UIStateContext.Provider value={uiState}>
       <UIActionsContext.Provider value={uiActions}>
@@ -1830,7 +1830,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           >
             <ShellFocusContext.Provider value={isFocused}>
-              <App />
+              {adminSettingsChanged ? <AdminSettingsChangedDialog /> : <App />}
             </ShellFocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>

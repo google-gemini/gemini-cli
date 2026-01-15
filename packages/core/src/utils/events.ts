@@ -250,7 +250,7 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAdminSettingsChanged(): void {
     this.emit(CoreEvent.AdminSettingsChanged);
   }
-  
+
   /**
    * Notifies subscribers that a retry attempt is happening.
    */
