@@ -160,7 +160,7 @@ agent_card_url: https://agent.example.com/cards/bigquery-analyst
 ---
 ```
 
-## Extension Sub-Agents
+## Extension sub-agents
 
 Extensions can bundle and distribute sub-agents. See the
 [Extensions documentation](../extensions/index.md#sub-agents) for details on how
