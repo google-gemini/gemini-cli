@@ -32,6 +32,7 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { TopicDetectionService } from '../services/topicDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
@@ -67,6 +68,7 @@ export class GeminiClient {
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
+  private readonly topicDetector: TopicDetectionService;
   private readonly compressionService: ChatCompressionService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -81,6 +83,7 @@ export class GeminiClient {
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
+    this.topicDetector = new TopicDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
   }
@@ -158,6 +161,10 @@ export class GeminiClient {
 
   getLoopDetectionService(): LoopDetectionService {
     return this.loopDetector;
+  }
+
+  getTopicDetectionService(): TopicDetectionService {
+    return this.topicDetector;
   }
 
   getCurrentSequenceModel(): string | null {

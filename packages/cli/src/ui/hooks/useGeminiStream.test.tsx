@@ -64,6 +64,13 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getTopicDetectionService = vi.fn().mockReturnValue({
+      isTopicChanged: vi
+        .fn()
+        .mockResolvedValue({ topic_changed: false, reasoning: 'test' }),
+    });
+    this.resetChat = vi.fn().mockResolvedValue(undefined);
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue('gemini-pro');
   }),
 );
 
@@ -280,6 +287,7 @@ describe('useGeminiStream', () => {
       shellModeActive: false,
       loadedSettings: mockLoadedSettings,
       toolCalls: initialToolCalls,
+      executeClearCommand: undefined as (() => Promise<void>) | undefined,
     };
 
     const { result, rerender } = renderHook(
@@ -349,6 +357,8 @@ describe('useGeminiStream', () => {
           () => {},
           80,
           24,
+          false,
+          props.executeClearCommand,
         );
       },
       {
@@ -2704,6 +2714,131 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+
+    describe('Topic Change Detection', () => {
+      it('should trigger renewSessionConfirmationRequest on topic change and reset chat if confirmed', async () => {
+        const client = new MockedGeminiClientClass(mockConfig);
+        const topicDetector = {
+          isTopicChanged: vi
+            .fn()
+            .mockResolvedValue({ topic_changed: true, reasoning: 'test' }),
+        };
+        client.getTopicDetectionService.mockReturnValue(topicDetector);
+
+        const executeClearCommand = vi.fn().mockResolvedValue(undefined);
+        const { result, rerender } = renderTestHook([], client);
+        rerender({
+          client,
+          history: [],
+          addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
+          config: mockConfig,
+          onDebugMessage: mockOnDebugMessage,
+          handleSlashCommand: mockHandleSlashCommand as unknown as (
+            cmd: PartListUnion,
+          ) => Promise<SlashCommandProcessorResult | false>,
+          shellModeActive: false,
+          loadedSettings: mockLoadedSettings,
+          toolCalls: [],
+          executeClearCommand,
+        });
+
+        // First query to set lastUserQueryTextRef
+        await act(async () => {
+          await result.current.submitQuery('Query 1');
+        });
+
+        // Clear mock calls from first query
+        mockSendMessageStream.mockClear();
+
+        // Second query should trigger topic detection
+        let submitResolved = false;
+        void result.current.submitQuery('Query 2').then(() => {
+          submitResolved = true;
+        });
+
+        // Wait for dialog to appear
+        await waitFor(() => {
+          expect(result.current.renewSessionConfirmationRequest).not.toBeNull();
+          expect(result.current.renewSessionConfirmationRequest?.reason).toBe(
+            'topic_change',
+          );
+        });
+
+        const capturedOnComplete =
+          result.current.renewSessionConfirmationRequest!.onComplete;
+
+        // Simulate user choosing "New Session"
+        await act(async () => {
+          capturedOnComplete({ userSelection: 'new_session' });
+        });
+
+        // Use a small delay for the setTimeout in the implementation
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+        });
+
+        await waitFor(() => expect(submitResolved).toBe(true));
+
+        expect(executeClearCommand).toHaveBeenCalled();
+        expect(client.resetChat).not.toHaveBeenCalled();
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: 'Topic change detected. Starting a new session.',
+            type: MessageType.INFO,
+          }),
+          expect.any(Number),
+        );
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'Query 2',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+
+      it('should trigger renewSessionConfirmationRequest on topic change and NOT reset chat if cancelled', async () => {
+        const client = new MockedGeminiClientClass(mockConfig);
+        const topicDetector = {
+          isTopicChanged: vi
+            .fn()
+            .mockResolvedValue({ topic_changed: true, reasoning: 'test' }),
+        };
+        client.getTopicDetectionService.mockReturnValue(topicDetector);
+
+        const { result } = renderTestHook([], client);
+
+        await act(async () => {
+          await result.current.submitQuery('Query 1');
+        });
+
+        mockSendMessageStream.mockClear();
+
+        let submitResolved = false;
+        void result.current.submitQuery('Query 2').then(() => {
+          submitResolved = true;
+        });
+
+        await waitFor(() => {
+          expect(result.current.renewSessionConfirmationRequest).not.toBeNull();
+        });
+
+        const capturedOnComplete =
+          result.current.renewSessionConfirmationRequest!.onComplete;
+
+        // Simulate user choosing "Continue" (compress_session)
+        await act(async () => {
+          capturedOnComplete({ userSelection: 'compress_session' });
+        });
+
+        await waitFor(() => expect(submitResolved).toBe(true));
+
+        expect(client.resetChat).not.toHaveBeenCalled();
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'Query 2',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
       });
     });
 
