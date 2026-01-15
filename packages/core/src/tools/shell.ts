@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
+import { parse } from 'shell-quote';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
@@ -464,15 +465,103 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
+    const workspaceContext = this.config.getWorkspaceContext();
+
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
+
       if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
+        const directories = workspaceContext.getDirectories();
+        return `Path must be within one of the workspace directories: ${directories.join(
+          ', ',
+        )}`;
       }
+    }
+
+    // Validate command arguments
+    try {
+      const parsed = parse(params.command, process.env);
+      const cwd = params.dir_path
+        ? path.resolve(this.config.getTargetDir(), params.dir_path)
+        : this.config.getTargetDir();
+
+      let commandExecutableFound = false;
+
+      for (const arg of parsed) {
+        if (typeof arg !== 'string') {
+          // If it's a control operator, the next string might be a new command executable
+          if (arg && typeof arg === 'object' && 'op' in arg) {
+            const op = arg.op as string;
+            if ([';', '&&', '||', '|'].includes(op)) {
+              commandExecutableFound = false;
+            }
+          }
+          continue;
+        }
+
+        // Identify if this is the command executable or an assignment
+        let isCommandExecutable = false;
+        const isAssignment = /^[a-zA-Z_][a-zA-Z0-9_]*=/.test(arg);
+
+        if (!commandExecutableFound && !isAssignment) {
+          isCommandExecutable = true;
+          commandExecutableFound = true;
+        }
+
+        // Extract value to check (handles both assignments and flags)
+        let valueToCheck = arg;
+        if (isAssignment || (arg.startsWith('-') && arg.includes('='))) {
+          const index = arg.indexOf('=');
+          valueToCheck = arg.slice(index + 1);
+        }
+
+        // Heuristic: Only treat as a path if it is absolute, explicitly relative, or relative to home.
+        // This avoids flagging random strings with slashes (e.g. sed 's/foo/bar/') as paths.
+        // We also check for '..' anywhere in the string to prevent traversal.
+        const isPath =
+          path.isAbsolute(valueToCheck) ||
+          valueToCheck.startsWith('~') ||
+          valueToCheck.startsWith(`.${path.sep}`) ||
+          valueToCheck.startsWith(`..${path.sep}`) ||
+          valueToCheck.startsWith('./') ||
+          valueToCheck.startsWith('../') ||
+          valueToCheck === '.' ||
+          valueToCheck === '..' ||
+          valueToCheck.split(/[/\\]/).includes('..');
+
+        if (isPath) {
+          // If any component of the path is too long (typically > 255 bytes),
+          // it's likely not a valid path.
+          const components = valueToCheck.split(/[/\\]/);
+          if (components.some((c) => c.length > 255)) {
+            continue;
+          }
+
+          // Handle ~ expansion for validation
+          let argPath = valueToCheck;
+          if (argPath.startsWith('~')) {
+            argPath = path.join(os.homedir(), argPath.slice(1));
+          }
+
+          const resolvedArg = path.resolve(cwd, argPath);
+
+          if (isCommandExecutable) {
+            continue;
+          }
+
+          if (!workspaceContext.isPathWithinWorkspace(resolvedArg)) {
+            const directories = workspaceContext.getDirectories();
+            return `Path must be within one of the workspace directories: ${directories.join(
+              ', ',
+            )}`;
+          }
+        }
+      }
+    } catch (_e) {
+      // If parsing fails, we assume valid shell syntax and rely on system permissions/sandboxing.
     }
     return null;
   }
