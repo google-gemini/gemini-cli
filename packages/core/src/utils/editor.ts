@@ -5,6 +5,7 @@
  */
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent } from './events.js';
 
@@ -123,6 +124,36 @@ export function getEditorCommand(editor: EditorType): string {
     commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
     commands[commands.length - 1]
   );
+}
+
+function normalizeEditorCommand(command: string): string | null {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const commandToken = trimmed.split(/\s+/)[0];
+  if (!commandToken) {
+    return null;
+  }
+  return path.basename(commandToken).toLowerCase();
+}
+
+export function getEditorTypeFromCommand(command: string): EditorType | null {
+  const normalized = normalizeEditorCommand(command);
+  if (!normalized) {
+    return null;
+  }
+  const entries = Object.entries(editorCommands) as Array<
+    [EditorType, { win32: string[]; default: string[] }]
+  >;
+  for (const [editor, config] of entries) {
+    const commands =
+      process.platform === 'win32' ? config.win32 : config.default;
+    if (commands.some((cmd) => cmd.toLowerCase() === normalized)) {
+      return editor;
+    }
+  }
+  return null;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {

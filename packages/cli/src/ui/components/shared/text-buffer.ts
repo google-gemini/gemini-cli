@@ -15,7 +15,9 @@ import {
   CoreEvent,
   debugLogger,
   unescapePath,
+  type EditorType,
   getEditorCommand,
+  getEditorTypeFromCommand,
   isGuiEditor,
   isValidEditorType,
 } from '@google/gemini-cli-core';
@@ -2165,20 +2167,44 @@ export function useTextBuffer({
     let command: string | undefined = undefined;
     const args = [filePath];
 
+    const resolveEditor = (
+      candidate: string | undefined,
+    ): { command: string; editorType: EditorType | null } | null => {
+      if (!candidate) {
+        return null;
+      }
+      if (isValidEditorType(candidate)) {
+        return {
+          command: getEditorCommand(candidate),
+          editorType: candidate,
+        };
+      }
+      return {
+        command: candidate,
+        editorType: getEditorTypeFromCommand(candidate),
+      };
+    };
+
     const preferredEditor = getPreferredEditor?.();
     if (preferredEditor) {
-      if (isValidEditorType(preferredEditor)) {
-        command = getEditorCommand(preferredEditor);
-        if (isGuiEditor(preferredEditor)) {
+      const resolved = resolveEditor(preferredEditor);
+      if (resolved) {
+        command = resolved.command;
+        if (resolved.editorType && isGuiEditor(resolved.editorType)) {
           args.unshift('--wait');
         }
-      } else {
-        command = preferredEditor;
       }
     }
 
     if (!command) {
-      command = process.env['VISUAL'] ?? process.env['EDITOR'];
+      const envCommand = process.env['VISUAL'] ?? process.env['EDITOR'];
+      const resolved = resolveEditor(envCommand);
+      if (resolved) {
+        command = resolved.command;
+        if (resolved.editorType && isGuiEditor(resolved.editorType)) {
+          args.unshift('--wait');
+        }
+      }
     }
 
     if (!command) {
