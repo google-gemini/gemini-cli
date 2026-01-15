@@ -31,7 +31,9 @@ export const restartCommand: SlashCommand = {
     // Fire SessionEnd hook before restarting
     await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Restart);
 
-    // Give the event loop a chance to process any pending telemetry operations
+    // Give the event loop a chance to process any pending telemetry operations.
+    // This ensures logger.emit() calls have fully propagated to the BatchLogRecordProcessor.
+    // This is critical for tests and environments with I/O latency.
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     // Flush telemetry to ensure hooks are written to disk immediately
