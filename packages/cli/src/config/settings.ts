@@ -24,12 +24,24 @@ import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
+  type MergedSettings,
   type MemoryImportFormat,
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
 } from './settingsSchema.js';
+
+export {
+  type Settings,
+  type MergedSettings,
+  type MemoryImportFormat,
+  type MergeStrategy,
+  type SettingsSchema,
+  type SettingDefinition,
+  getSettingsSchema,
+};
+
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -58,8 +70,6 @@ function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
 
   return current?.mergeStrategy;
 }
-
-export type { Settings, MemoryImportFormat };
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
@@ -201,10 +211,7 @@ export function getDefaultsFromSchema(
   for (const key in schema) {
     const definition = schema[key];
     if (definition.properties) {
-      const childDefaults = getDefaultsFromSchema(definition.properties);
-      if (Object.keys(childDefaults).length > 0) {
-        defaults[key] = childDefaults;
-      }
+      defaults[key] = getDefaultsFromSchema(definition.properties);
     } else if (definition.default !== undefined) {
       defaults[key] = definition.default;
     }
@@ -212,13 +219,13 @@ export function getDefaultsFromSchema(
   return defaults as Settings;
 }
 
-function mergeSettings(
+export function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
-): Settings {
+): MergedSettings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
   const schemaDefaults = getDefaultsFromSchema();
 
@@ -236,7 +243,24 @@ function mergeSettings(
     user,
     safeWorkspace,
     system,
-  ) as Settings;
+  ) as MergedSettings;
+}
+
+/**
+ * Creates a fully populated MergedSettings object for testing purposes.
+ * It merges the provided overrides with the default settings from the schema.
+ *
+ * @param overrides Partial settings to override the defaults.
+ * @returns A complete MergedSettings object.
+ */
+export function createTestMergedSettings(
+  overrides: Partial<Settings> = {},
+): MergedSettings {
+  return customDeepMerge(
+    getMergeStrategyForPath,
+    getDefaultsFromSchema(),
+    overrides,
+  ) as MergedSettings;
 }
 
 export class LoadedSettings {
@@ -264,14 +288,14 @@ export class LoadedSettings {
   readonly isTrusted: boolean;
   readonly errors: SettingsError[];
 
-  private _merged: Settings;
+  private _merged: MergedSettings;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
-  get merged(): Settings {
+  get merged(): MergedSettings {
     return this._merged;
   }
 
-  private computeMergedSettings(): Settings {
+  private computeMergedSettings(): MergedSettings {
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
@@ -293,7 +317,7 @@ export class LoadedSettings {
         (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
         adminDefaults,
         this._remoteAdminSettings?.admin ?? {},
-      ) as Settings['admin'];
+      ) as MergedSettings['admin'];
     }
     return merged;
   }
