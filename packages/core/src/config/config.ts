@@ -892,15 +892,19 @@ export class Config {
     }
 
     // Fetch admin controls
+    await this.ensureExperimentsLoaded();
+    const adminControlsEnabled =
+      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+        ?.boolValue ?? false;
     const adminControls = await fetchAdminControls(
       codeAssistServer,
+      this.getRemoteAdminSettings(),
+      adminControlsEnabled,
       (newSettings: FetchAdminControlsResponse) => {
         this.setRemoteAdminSettings(newSettings);
         coreEvents.emitAdminSettingsChanged();
       },
-      this.getRemoteAdminSettings(),
     );
-
     this.setRemoteAdminSettings(adminControls);
   }
 

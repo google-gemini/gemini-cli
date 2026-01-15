@@ -19,11 +19,6 @@ import {
   stopAdminControlsPolling,
 } from './admin_controls.js';
 import type { CodeAssistServer } from '../server.js';
-import { ExperimentFlags } from '../experiments/flagNames.js';
-import * as experiments from '../experiments/experiments.js';
-
-// Mock dependencies
-vi.mock('../experiments/experiments.js');
 
 describe('Admin Controls', () => {
   let mockServer: CodeAssistServer;
@@ -87,81 +82,94 @@ describe('Admin Controls', () => {
   });
 
   describe('fetchAdminControls', () => {
-    beforeEach(() => {
-      // Default: Experiment enabled
-      vi.mocked(experiments.getExperiments).mockResolvedValue({
-        experimentIds: [ExperimentFlags.ENABLE_ADMIN_CONTROLS],
-        flags: {},
-      });
-    });
-
-    it('should return fallback settings immediately if server is missing', async () => {
-      const fallback = { secureModeEnabled: true };
+    it('should return empty object and not poll if server is missing', async () => {
       const result = await fetchAdminControls(
         undefined,
-        mockOnSettingsChanged,
-        fallback,
-      );
-      expect(result).toEqual(fallback);
-    });
-
-    it('should use fallback settings and skip initial fetch if fallback is provided (IPC case)', async () => {
-      const fallback = { secureModeEnabled: true };
-      const result = await fetchAdminControls(
-        mockServer,
-        mockOnSettingsChanged,
-        fallback,
-      );
-
-      expect(result).toEqual(fallback);
-      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
-
-      // Should still start polling
-      // Fast forward to first poll interval
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: false,
-      });
-      await vi.advanceTimersByTimeAsync(30 * 60 * 1000); // 30 min default
-
-      expect(mockServer.fetchAdminControls).toHaveBeenCalled();
-    });
-
-    it('should return empty object if experiment is disabled', async () => {
-      vi.mocked(experiments.getExperiments).mockResolvedValue({
-        experimentIds: [],
-        flags: {},
-      });
-      const result = await fetchAdminControls(
-        mockServer,
+        undefined,
+        true,
         mockOnSettingsChanged,
       );
       expect(result).toEqual({});
       expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
     });
 
-    it('should fetch from server if no fallback provided', async () => {
+    it('should return empty object if project ID is missing', async () => {
+      mockServer.projectId = undefined;
+      const result = await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    });
+
+    it('should use cachedSettings and start polling if provided', async () => {
+      const cachedSettings = { secureModeEnabled: true };
+      const result = await fetchAdminControls(
+        mockServer,
+        cachedSettings,
+        true,
+        mockOnSettingsChanged,
+      );
+
+      expect(result).toEqual(cachedSettings);
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+
+      // Should still start polling
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: false,
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty object if admin controls are disabled', async () => {
+      const result = await fetchAdminControls(
+        mockServer,
+        undefined,
+        false,
+        mockOnSettingsChanged,
+      );
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    });
+
+    it('should fetch from server if no cachedSettings provided', async () => {
       const serverResponse = { secureModeEnabled: true };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
       const result = await fetchAdminControls(
         mockServer,
+        undefined,
+        true,
         mockOnSettingsChanged,
       );
       expect(result).toEqual(serverResponse);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
-    it('should return fallback on fetch error', async () => {
+    it('should return empty object on fetch error and still start polling', async () => {
       (mockServer.fetchAdminControls as Mock).mockRejectedValue(
         new Error('Network error'),
       );
       const result = await fetchAdminControls(
         mockServer,
+        undefined,
+        true,
         mockOnSettingsChanged,
-        { secureModeEnabled: false },
       );
 
-      expect(result).toEqual({ secureModeEnabled: false });
+      expect(result).toEqual({});
+
+      // Polling should have been started and should retry
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: true,
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // Initial + poll
     });
 
     it('should sanitize server response', async () => {
@@ -172,6 +180,8 @@ describe('Admin Controls', () => {
 
       const result = await fetchAdminControls(
         mockServer,
+        undefined,
+        true,
         mockOnSettingsChanged,
       );
       expect(result).toEqual({ secureModeEnabled: true });
@@ -179,19 +189,53 @@ describe('Admin Controls', () => {
         (result as Record<string, unknown>)['unknownField'],
       ).toBeUndefined();
     });
+
+    it('should reset polling interval if called again', async () => {
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+
+      // First call
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Advance time, but not enough to trigger the poll
+      await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+
+      // Second call, should reset the timer
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+
+      // Advance time by 3 mins. If timer wasn't reset, it would have fired (2+3=5)
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // No new poll
+
+      // Advance time by another 2 mins. Now it should fire.
+      await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3); // Poll fires
+    });
   });
 
   describe('polling', () => {
     it('should poll and emit changes', async () => {
-      vi.mocked(experiments.getExperiments).mockResolvedValue({
-        experimentIds: [ExperimentFlags.ENABLE_ADMIN_CONTROLS],
-        flags: {},
-      });
       // Initial fetch
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         secureModeEnabled: false,
       });
-      await fetchAdminControls(mockServer, mockOnSettingsChanged);
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
 
       // Update for next poll
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
@@ -199,27 +243,90 @@ describe('Admin Controls', () => {
       });
 
       // Fast forward
-      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         secureModeEnabled: true,
       });
     });
 
-    it('should NOT emit if settings are identical', async () => {
-      vi.mocked(experiments.getExperiments).mockResolvedValue({
-        experimentIds: [ExperimentFlags.ENABLE_ADMIN_CONTROLS],
-        flags: {},
-      });
+    it('should NOT emit if settings are deeply equal but not the same instance', async () => {
       const settings = { secureModeEnabled: true };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(settings);
 
-      await fetchAdminControls(mockServer, mockOnSettingsChanged);
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+      mockOnSettingsChanged.mockClear();
 
-      // Next poll returns same
-      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+      // Next poll returns a different object with the same values
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: true,
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
       expect(mockOnSettingsChanged).not.toHaveBeenCalled();
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+    });
+
+    it('should continue polling after a fetch error', async () => {
+      // Initial fetch is successful
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: false,
+      });
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Next poll fails
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
+        new Error('Poll failed'),
+      );
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+      expect(mockOnSettingsChanged).not.toHaveBeenCalled(); // No changes on error
+
+      // Subsequent poll succeeds with new data
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: true,
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
+      expect(mockOnSettingsChanged).toHaveBeenCalledWith({
+        secureModeEnabled: true,
+      });
+    });
+  });
+
+  describe('stopAdminControlsPolling', () => {
+    it('should stop polling after it has started', async () => {
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+
+      // Start polling
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Stop polling
+      stopAdminControlsPolling();
+
+      // Advance timer well beyond the polling interval
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+      // The poll should not have fired again
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
   });
 });
