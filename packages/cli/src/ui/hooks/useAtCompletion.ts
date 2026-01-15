@@ -5,12 +5,15 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
+import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
 import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
+
+const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -199,7 +202,6 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   const fileSearch = useRef<FileSearch | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
-  const abortTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setSuggestions(state.suggestions);
@@ -279,9 +281,6 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
       }
-      if (abortTimer.current) {
-        clearTimeout(abortTimer.current);
-      }
 
       const controller = new AbortController();
       searchAbortController.current = controller;
@@ -291,10 +290,20 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       }, 200);
 
       const timeoutMs =
-        config?.getFileFilteringOptions()?.searchTimeout ?? 5000;
-      abortTimer.current = setTimeout(() => {
-        controller.abort();
-      }, timeoutMs);
+        config?.getFileFilteringOptions()?.searchTimeout ??
+        DEFAULT_SEARCH_TIMEOUT_MS;
+
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      (async () => {
+        try {
+          await setTimeoutPromise(timeoutMs, undefined, {
+            signal: controller.signal,
+          });
+          controller.abort();
+        } catch {
+          // ignore
+        }
+      })();
 
       try {
         const results = await fileSearch.current.search(state.pattern, {
@@ -344,9 +353,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           dispatch({ type: 'ERROR' });
         }
       } finally {
-        if (abortTimer.current) {
-          clearTimeout(abortTimer.current);
-        }
+        controller.abort();
       }
     };
 
@@ -362,9 +369,6 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       searchAbortController.current?.abort();
       if (slowSearchTimer.current) {
         clearTimeout(slowSearchTimer.current);
-      }
-      if (abortTimer.current) {
-        clearTimeout(abortTimer.current);
       }
     };
   }, [state.status, state.pattern, config, cwd]);
