@@ -360,7 +360,7 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
+See the [Uninstall Guide](./docs/cli/uninstall.md) for removal instructions.
 
 ## 📄 Legal
 
