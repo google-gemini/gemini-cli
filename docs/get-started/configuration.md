@@ -733,6 +733,23 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`mcp.autoRestart.enabled`** (boolean):
+  - **Description:** Enable auto-restarting of MCP servers.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`mcp.autoRestart.healthCheckIntervalMs`** (number):
+  - **Description:** The interval in milliseconds to check the health of MCP
+    servers.
+  - **Default:** `15000`
+  - **Requires restart:** Yes
+
+- **`mcp.autoRestart.unhealthyTimeoutMs`** (number):
+  - **Description:** The timeout in milliseconds to consider an MCP server
+    unhealthy.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):

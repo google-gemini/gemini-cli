@@ -1182,6 +1182,46 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         items: { type: 'string' },
       },
+      autoRestart: {
+        type: 'object',
+        label: 'MCP Auto Restart',
+        category: 'MCP',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings for auto-restarting MCP servers.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Auto Restart',
+            category: 'MCP',
+            requiresRestart: true,
+            default: true,
+            description: 'Enable auto-restarting of MCP servers.',
+            showInDialog: true,
+          },
+          healthCheckIntervalMs: {
+            type: 'number',
+            label: 'Health Check Interval (ms)',
+            category: 'MCP',
+            requiresRestart: true,
+            default: 15000,
+            description:
+              'The interval in milliseconds to check the health of MCP servers.',
+            showInDialog: true,
+          },
+          unhealthyTimeoutMs: {
+            type: 'number',
+            label: 'Unhealthy Timeout (ms)',
+            category: 'MCP',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'The timeout in milliseconds to consider an MCP server unhealthy.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
   useWriteTodos: {

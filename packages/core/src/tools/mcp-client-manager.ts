@@ -37,6 +37,8 @@ export class McpClientManager {
     name: string;
     extensionName: string;
   }> = [];
+  private serverHealth: Map<string, number> = new Map();
+  private healthCheckInterval?: NodeJS.Timeout;
 
   constructor(
     toolRegistry: ToolRegistry,
@@ -46,6 +48,7 @@ export class McpClientManager {
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
+    this.startHealthChecker();
   }
 
   getBlockedMcpServers() {
@@ -196,6 +199,7 @@ export class McpClientManager {
           try {
             await client.connect();
             await client.discover(this.cliConfig);
+            this.updateServerHealth(name);
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
@@ -361,5 +365,56 @@ export class McpClientManager {
       }
     }
     return instructions.join('\n\n');
+  }
+
+  updateServerHealth(serverName: string) {
+    this.serverHealth.set(serverName, Date.now());
+  }
+
+  private startHealthChecker() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    const { enabled, healthCheckIntervalMs } =
+      this.cliConfig.getMcpAutoRestartConfig();
+
+    if (!enabled) {
+      return;
+    }
+
+    this.healthCheckInterval = setInterval(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.checkServerHealth();
+    }, healthCheckIntervalMs);
+  }
+
+  private async checkServerHealth() {
+    const { unhealthyTimeoutMs } = this.cliConfig.getMcpAutoRestartConfig();
+    for (const [name] of this.clients.entries()) {
+      const lastHealthUpdate = this.serverHealth.get(name);
+      if (
+        lastHealthUpdate &&
+        Date.now() - lastHealthUpdate > unhealthyTimeoutMs
+      ) {
+        coreEvents.emitFeedback(
+          'info',
+          `MCP server '${name}' is unresponsive. Restarting...`,
+        );
+        try {
+          await this.restartServer(name);
+          coreEvents.emitFeedback(
+            'info',
+            `MCP server '${name}' restarted successfully.`,
+          );
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            `Failed to restart MCP server '${name}': ${getErrorMessage(error)}`,
+            error,
+          );
+        }
+      }
+    }
   }
 }

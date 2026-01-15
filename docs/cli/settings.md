@@ -101,6 +101,14 @@ they appear in the UI.
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                   | `1000`    |
 | Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `false`   |
 
+### Mcp
+
+| UI Label                   | Setting                                 | Description                                                      | Default |
+| -------------------------- | --------------------------------------- | ---------------------------------------------------------------- | ------- |
+| Enable Auto Restart        | `mcp.autoRestart.enabled`               | Enable auto-restarting of MCP servers.                           | `true`  |
+| Health Check Interval (ms) | `mcp.autoRestart.healthCheckIntervalMs` | The interval in milliseconds to check the health of MCP servers. | `15000` |
+| Unhealthy Timeout (ms)     | `mcp.autoRestart.unhealthyTimeoutMs`    | The timeout in milliseconds to consider an MCP server unhealthy. | `30000` |
+
 ### Security
 
 | UI Label                              | Setting                                         | Description                                                                     | Default |
