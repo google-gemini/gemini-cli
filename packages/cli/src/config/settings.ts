@@ -16,9 +16,11 @@ import {
   Storage,
   coreEvents,
   homedir,
+  debugLogger,
   type GeminiCodeAssistSetting,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
+import type { ExtensionManager } from './extension-manager.js';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -138,7 +140,7 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface AccessibilitySettings {
-  enableLoadingPhrases?: boolean;
+  loadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -664,23 +666,55 @@ export function migrateDeprecatedSettings(
       const newGeneral: Record<string, unknown> = { ...generalSettings };
       let modified = false;
 
+      // Migrate disableAutoUpdate -> autoUpdate
       if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
         const oldValue = newGeneral['disableAutoUpdate'];
         debugLogger.log(
-          `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          `Migrating deprecated general.disableAutoUpdate to general.autoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
         );
-        newGeneral['enableAutoUpdate'] = !oldValue;
+        newGeneral['autoUpdate'] = !oldValue;
         delete newGeneral['disableAutoUpdate'];
         modified = true;
       }
+      // Migrate enableAutoUpdate -> autoUpdate
+      if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
+        const oldValue = newGeneral['enableAutoUpdate'];
+        debugLogger.log(
+          `Migrating deprecated general.enableAutoUpdate to general.autoUpdate from ${scope} settings...`,
+        );
+        newGeneral['autoUpdate'] = oldValue;
+        delete newGeneral['enableAutoUpdate'];
+        modified = true;
+      }
 
+      // Migrate disableUpdateNag -> autoUpdateNotification
       if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
         const oldValue = newGeneral['disableUpdateNag'];
         debugLogger.log(
-          `Migrating deprecated general.disableUpdateNag to general.enableAutoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          `Migrating deprecated general.disableUpdateNag to general.autoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
         );
-        newGeneral['enableAutoUpdateNotification'] = !oldValue;
+        newGeneral['autoUpdateNotification'] = !oldValue;
         delete newGeneral['disableUpdateNag'];
+        modified = true;
+      }
+      // Migrate enableAutoUpdateNotification -> autoUpdateNotification
+      if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
+        const oldValue = newGeneral['enableAutoUpdateNotification'];
+        debugLogger.log(
+          `Migrating deprecated general.enableAutoUpdateNotification to general.autoUpdateNotification from ${scope} settings...`,
+        );
+        newGeneral['autoUpdateNotification'] = oldValue;
+        delete newGeneral['enableAutoUpdateNotification'];
+        modified = true;
+      }
+
+      if (typeof newGeneral['enablePromptCompletion'] === 'boolean') {
+        const oldValue = newGeneral['enablePromptCompletion'];
+        debugLogger.log(
+          `Migrating deprecated general.enablePromptCompletion to general.promptCompletion from ${scope} settings...`,
+        );
+        newGeneral['promptCompletion'] = oldValue;
+        delete newGeneral['enablePromptCompletion'];
         modified = true;
       }
 
@@ -694,7 +728,7 @@ export function migrateDeprecatedSettings(
       const newUi: Record<string, unknown> = { ...uiSettings };
       let modified = false;
 
-      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.loadingPhrases
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
@@ -704,13 +738,30 @@ export function migrateDeprecatedSettings(
       ) {
         const oldValue = accessibilitySettings['disableLoadingPhrases'];
         debugLogger.log(
-          `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.enableLoadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
         );
         const newAccessibility: Record<string, unknown> = {
           ...accessibilitySettings,
-          enableLoadingPhrases: !oldValue,
+          loadingPhrases: !oldValue,
         };
         delete newAccessibility['disableLoadingPhrases'];
+        newUi['accessibility'] = newAccessibility;
+        modified = true;
+      }
+      // Migrate ui.accessibility.enableLoadingPhrases -> ui.accessibility.loadingPhrases
+      if (
+        accessibilitySettings &&
+        typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
+      ) {
+        const oldValue = accessibilitySettings['enableLoadingPhrases'];
+        debugLogger.log(
+          `Migrating deprecated ui.accessibility.enableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings...`,
+        );
+        const newAccessibility: Record<string, unknown> = {
+          ...accessibilitySettings,
+          loadingPhrases: oldValue,
+        };
+        delete newAccessibility['enableLoadingPhrases'];
         newUi['accessibility'] = newAccessibility;
         modified = true;
       }
@@ -725,7 +776,7 @@ export function migrateDeprecatedSettings(
       const newContext: Record<string, unknown> = { ...contextSettings };
       let modified = false;
 
-      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.fuzzySearch
       const fileFilteringSettings = newContext['fileFiltering'] as
         | Record<string, unknown>
         | undefined;
@@ -735,13 +786,47 @@ export function migrateDeprecatedSettings(
       ) {
         const oldValue = fileFilteringSettings['disableFuzzySearch'];
         debugLogger.log(
-          `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.enableFuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.fuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
         );
         const newFileFiltering: Record<string, unknown> = {
           ...fileFilteringSettings,
-          enableFuzzySearch: !oldValue,
+          fuzzySearch: !oldValue,
         };
         delete newFileFiltering['disableFuzzySearch'];
+        newContext['fileFiltering'] = newFileFiltering;
+        modified = true;
+      }
+      // Migrate context.fileFiltering.enableFuzzySearch -> context.fileFiltering.fuzzySearch
+      if (
+        fileFilteringSettings &&
+        typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean'
+      ) {
+        const oldValue = fileFilteringSettings['enableFuzzySearch'];
+        debugLogger.log(
+          `Migrating deprecated context.fileFiltering.enableFuzzySearch to context.fileFiltering.fuzzySearch from ${scope} settings...`,
+        );
+        const newFileFiltering: Record<string, unknown> = {
+          ...fileFilteringSettings,
+          fuzzySearch: oldValue,
+        };
+        delete newFileFiltering['enableFuzzySearch'];
+        newContext['fileFiltering'] = newFileFiltering;
+        modified = true;
+      }
+
+      if (
+        fileFilteringSettings &&
+        typeof fileFilteringSettings['enableRecursiveFileSearch'] === 'boolean'
+      ) {
+        const oldValue = fileFilteringSettings['enableRecursiveFileSearch'];
+        debugLogger.log(
+          `Migrating deprecated context.fileFiltering.enableRecursiveFileSearch to context.fileFiltering.recursiveFileSearch from ${scope} settings...`,
+        );
+        const newFileFiltering: Record<string, unknown> = {
+          ...fileFilteringSettings,
+          recursiveFileSearch: oldValue,
+        };
+        delete newFileFiltering['enableRecursiveFileSearch'];
         newContext['fileFiltering'] = newFileFiltering;
         modified = true;
       }

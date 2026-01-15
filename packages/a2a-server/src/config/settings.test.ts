@@ -178,7 +178,7 @@ describe('loadSettings', () => {
       showMemoryUsage: false,
       fileFiltering: {
         respectGitIgnore: true,
-        enableRecursiveFileSearch: true,
+        recursiveFileSearch: true,
       },
     };
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
@@ -201,6 +201,6 @@ describe('loadSettings', () => {
 
     // Object value completely replaced (shallow merge behavior)
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.fileFiltering?.recursiveFileSearch).toBeUndefined();
   });
 });

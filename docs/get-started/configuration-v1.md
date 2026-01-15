@@ -111,13 +111,13 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 - **`fileFiltering`** (object):
   - **Description:** Controls git-aware file filtering behavior for @ commands
     and file discovery tools.
-  - **Default:** `"respectGitIgnore": true, "enableRecursiveFileSearch": true`
+  - **Default:** `"respectGitIgnore": true, "recursiveFileSearch": true`
   - **Properties:**
     - **`respectGitIgnore`** (boolean): Whether to respect .gitignore patterns
       when discovering files. When set to `true`, git-ignored files (like
       `node_modules/`, `dist/`, `.env`) are automatically excluded from @
       commands and file listing operations.
-    - **`enableRecursiveFileSearch`** (boolean): Whether to enable searching
+    - **`recursiveFileSearch`** (boolean): Whether to enable searching
       recursively for filenames under the current tree when completing @
       prefixes in the prompt.
     - **`disableFuzzySearch`** (boolean): When `true`, disables the fuzzy search
@@ -127,7 +127,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
     ```json
     "fileFiltering": {
       "respectGitIgnore": true,
-      "enableRecursiveFileSearch": false,
+      "recursiveFileSearch": false,
       "disableFuzzySearch": true
     }
     ```
@@ -150,10 +150,10 @@ a few things you can try in order of recommendation:
     which can be faster.
 
 3.  **Disable recursive file search:** As a last resort, you can disable
-    recursive file search entirely by setting `enableRecursiveFileSearch` to
-    `false`. This will be the fastest option as it avoids a recursive crawl of
-    your project. However, it means you will need to type the full path to files
-    when using `@` completions.
+    recursive file search entirely by setting `recursiveFileSearch` to `false`.
+    This will be the fastest option as it avoids a recursive crawl of your
+    project. However, it means you will need to type the full path to files when
+    using `@` completions.
 
 - **`coreTools`** (array of strings):
   - **Description:** Allows you to specify a list of core tool names that should

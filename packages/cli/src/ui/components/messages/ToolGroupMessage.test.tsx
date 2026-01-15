@@ -395,7 +395,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const settings = createMockSettings({
-        security: { enablePermanentToolApproval: true },
+        security: { permanentToolApproval: true },
       });
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -421,7 +421,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const settings = createMockSettings({
-        security: { enablePermanentToolApproval: false },
+        security: { permanentToolApproval: false },
       });
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,

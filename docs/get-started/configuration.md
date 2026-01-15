@@ -110,11 +110,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
-- **`general.enableAutoUpdate`** (boolean):
+- **`general.autoUpdate`** (boolean):
   - **Description:** Enable automatic updates.
   - **Default:** `true`
 
-- **`general.enableAutoUpdateNotification`** (boolean):
+- **`general.autoUpdateNotification`** (boolean):
   - **Description:** Enable update notification prompts.
   - **Default:** `true`
 
@@ -123,7 +123,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`general.enablePromptCompletion`** (boolean):
+- **`general.promptCompletion`** (boolean):
   - **Description:** Enable AI-powered prompt completion suggestions while
     typing.
   - **Default:** `false`
@@ -261,7 +261,7 @@ their corresponding top-level category object in your `settings.json` file.
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
-- **`ui.accessibility.enableLoadingPhrases`** (boolean):
+- **`ui.accessibility.loadingPhrases`** (boolean):
   - **Description:** Enable loading phrases during operations.
   - **Default:** `true`
   - **Requires restart:** Yes
@@ -588,13 +588,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
+- **`context.fileFiltering.recursiveFileSearch`** (boolean):
   - **Description:** Enable recursive file search functionality when completing
     @ references in the prompt.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.enableFuzzySearch`** (boolean):
+- **`context.fileFiltering.fuzzySearch`** (boolean):
   - **Description:** Enable fuzzy search when searching for files.
   - **Default:** `true`
   - **Requires restart:** Yes
@@ -607,7 +607,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
-- **`tools.shell.enableInteractiveShell`** (boolean):
+- **`tools.shell.interactiveShell`** (boolean):
   - **Description:** Use node-pty for an interactive shell experience. Fallback
     to child_process still applies.
   - **Default:** `true`
@@ -627,7 +627,7 @@ their corresponding top-level category object in your `settings.json` file.
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
 
-- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+- **`tools.shell.shellOutputEfficiency`** (boolean):
   - **Description:** Enable shell output efficiency optimizations for better
     performance.
   - **Default:** `true`
@@ -674,7 +674,7 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
-- **`tools.enableToolOutputTruncation`** (boolean):
+- **`tools.toolOutputTruncation`** (boolean):
   - **Description:** Enable truncation of large tool outputs.
   - **Default:** `true`
   - **Requires restart:** Yes
@@ -690,7 +690,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `1000`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
+- **`tools.hooks`** (boolean):
   - **Description:** Enables the hooks system experiment. When disabled, the
     hooks system is completely deactivated regardless of other settings.
   - **Default:** `true`
@@ -726,7 +726,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`security.enablePermanentToolApproval`** (boolean):
+- **`security.permanentToolApproval`** (boolean):
   - **Description:** Enable the "Allow for all future sessions" option in tool
     confirmation dialogs.
   - **Default:** `false`
@@ -799,7 +799,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `experimental`
 
-- **`experimental.enableAgents`** (boolean):
+- **`experimental.agents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
     feature, uses YOLO mode for subagents
   - **Default:** `false`

@@ -77,8 +77,8 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
-    "node-pty": "^1.0.0",
-    "keytar": "^7.9.0"
+    "keytar": "^7.9.0",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
@@ -87,6 +87,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

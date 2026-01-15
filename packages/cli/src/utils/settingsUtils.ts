@@ -438,7 +438,12 @@ export function getDisplayValue(
     value = getDefaultValue(key);
   }
 
-  let valueString = String(value);
+  let valueString: string;
+  if (typeof value === 'boolean') {
+    valueString = value ? 'Enabled' : 'Disabled';
+  } else {
+    valueString = String(value);
+  }
 
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);

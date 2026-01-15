@@ -337,7 +337,7 @@ https://github.com/google-gemini/gemini-cli/compare/v0.21.3...v0.22.0
   https://github.com/google-gemini/gemini-cli/pull/14404
 - feat: Support Extension Hooks with Security Warning by @abhipatel12 in
   https://github.com/google-gemini/gemini-cli/pull/14460
-- feat: Add enableAgents experimental flag by @adamfweidman in
+- feat: Add agents experimental flag by @adamfweidman in
   https://github.com/google-gemini/gemini-cli/pull/14371
 - docs: fix typo 'socus' to 'focus' in todos.md by @Viktor286 in
   https://github.com/google-gemini/gemini-cli/pull/14374

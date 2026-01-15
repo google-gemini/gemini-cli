@@ -27,7 +27,7 @@ they appear in the UI.
 | Preview Features (e.g., models) | `general.previewFeatures`          | Enable preview features (e.g., preview models).               | `false` |
 | Vim Mode                        | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
 | Disable Auto Update             | `general.disableAutoUpdate`        | Disable automatic updates                                     | `false` |
-| Enable Prompt Completion        | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
+| Enable Prompt Completion        | `general.promptCompletion`         | Enable AI-powered prompt completion suggestions while typing. | `false` |
 | Debug Keystroke Logging         | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
 | Enable Session Cleanup          | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
 
@@ -78,33 +78,33 @@ they appear in the UI.
 
 ### Context
 
-| UI Label                             | Setting                                           | Description                                                                                                                                     | Default |
-| ------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                        | Maximum number of directories to search for memory.                                                                                             | `200`   |
-| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used. | `false` |
-| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`          | Respect .gitignore files when searching.                                                                                                        | `true`  |
-| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`       | Respect .geminiignore files when searching.                                                                                                     | `true`  |
-| Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                          | `true`  |
-| Disable Fuzzy Search                 | `context.fileFiltering.disableFuzzySearch`        | Disable fuzzy search when searching for files.                                                                                                  | `false` |
+| UI Label                             | Setting                                     | Description                                                                                                                                     | Default |
+| ------------------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                  | Maximum number of directories to search for memory.                                                                                             | `200`   |
+| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`  | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used. | `false` |
+| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`    | Respect .gitignore files when searching.                                                                                                        | `true`  |
+| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore` | Respect .geminiignore files when searching.                                                                                                     | `true`  |
+| Enable Recursive File Search         | `context.fileFiltering.recursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                          | `true`  |
+| Disable Fuzzy Search                 | `context.fileFiltering.disableFuzzySearch`  | Disable fuzzy search when searching for files.                                                                                                  | `false` |
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                     | Default   |
-| -------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- | --------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                      | `true`    |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                     | `false`   |
-| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).              | `false`   |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance. | `true`    |
-| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                        | `true`    |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `4000000` |
-| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                        | `1000`    |
+| UI Label                         | Setting                             | Description                                                                                                     | Default   |
+| -------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------- |
+| Enable Interactive Shell         | `tools.shell.interactiveShell`      | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                      | `true`    |
+| Show Color                       | `tools.shell.showColor`             | Show color in shell output.                                                                                     | `false`   |
+| Auto Accept                      | `tools.autoAccept`                  | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).              | `false`   |
+| Use Ripgrep                      | `tools.useRipgrep`                  | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance. | `true`    |
+| Enable Tool Output Truncation    | `tools.toolOutputTruncation`        | Enable truncation of large tool outputs.                                                                        | `true`    |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold` | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                           | `4000000` |
+| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`     | The number of lines to keep when truncating tool output.                                                        | `1000`    |
 
 ### Security
 
 | UI Label                              | Setting                                         | Description                                                                     | Default |
 | ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
 | Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                   | `false` |
-| Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs. | `false` |
+| Allow Permanent Tool Approval         | `security.permanentToolApproval`                | Enable the "Allow for all future sessions" option in tool confirmation dialogs. | `false` |
 | Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                              | `false` |
 | Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                               | `false` |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.             | `false` |

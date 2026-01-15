@@ -253,10 +253,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
           cache: true,
           cacheTtl: 30, // 30 seconds
-          enableRecursiveFileSearch:
-            config?.getEnableRecursiveFileSearch() ?? true,
-          enableFuzzySearch:
-            config?.getFileFilteringEnableFuzzySearch() ?? true,
+          recursiveFileSearch: config?.getEnableRecursiveFileSearch() ?? true,
+          fuzzySearch: config?.getFileFilteringEnableFuzzySearch() ?? true,
         });
         await searcher.initialize();
         fileSearch.current = searcher;

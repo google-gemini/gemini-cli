@@ -268,7 +268,7 @@ describe('useShellCommandProcessor', () => {
         '/test/dir',
         expect.any(Function),
         expect.any(Object),
-        false, // enableInteractiveShell
+        false, // interactiveShell
         expect.any(Object),
       );
 

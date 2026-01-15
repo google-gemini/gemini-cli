@@ -103,7 +103,7 @@ import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 
 export interface AccessibilitySettings {
-  enableLoadingPhrases?: boolean;
+  loadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -288,8 +288,8 @@ export interface ConfigParameters {
   fileFiltering?: {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
-    enableRecursiveFileSearch?: boolean;
-    enableFuzzySearch?: boolean;
+    recursiveFileSearch?: boolean;
+    fuzzySearch?: boolean;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -322,14 +322,14 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
-  enableInteractiveShell?: boolean;
+  interactiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
-  enablePromptCompletion?: boolean;
+  promptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
   truncateToolOutputLines?: number;
-  enableToolOutputTruncation?: boolean;
+  toolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
@@ -339,22 +339,22 @@ export interface ConfigParameters {
   cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
-  enableShellOutputEfficiency?: boolean;
+  shellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
-  enableHooks?: boolean;
-  enableHooksUI?: boolean;
+  hooksEnabled?: boolean;
+  hooksUI?: boolean;
   experiments?: Experiments;
   hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
   previewFeatures?: boolean;
-  enableAgents?: boolean;
+  agents?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   experimentalJitContext?: boolean;
@@ -411,8 +411,8 @@ export class Config {
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
-    enableRecursiveFileSearch: boolean;
-    enableFuzzySearch: boolean;
+    recursiveFileSearch: boolean;
+    fuzzySearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -449,14 +449,14 @@ export class Config {
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
-  private readonly enableInteractiveShell: boolean;
+  private readonly interactiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
-  private readonly enablePromptCompletion: boolean = false;
+  private readonly promptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
-  private readonly enableToolOutputTruncation: boolean;
+  private readonly toolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
@@ -469,14 +469,14 @@ export class Config {
   private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
-  private readonly enableShellOutputEfficiency: boolean;
+  private readonly shellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
   private pendingIncludeDirectories: string[];
-  private readonly enableHooks: boolean;
-  private readonly enableHooksUI: boolean;
+  private readonly hooksEnabled: boolean;
+  private readonly hooksUI: boolean;
   private readonly hooks:
     | { [K in HookEventName]?: HookDefinition[] }
     | undefined;
@@ -492,7 +492,7 @@ export class Config {
     | (() => Promise<{ disabledSkills?: string[] }>)
     | undefined;
 
-  private readonly enableAgents: boolean;
+  private readonly agents: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
 
@@ -554,9 +554,8 @@ export class Config {
       respectGeminiIgnore:
         params.fileFiltering?.respectGeminiIgnore ??
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        params.fileFiltering?.enableRecursiveFileSearch ?? true,
-      enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
+      recursiveFileSearch: params.fileFiltering?.recursiveFileSearch ?? true,
+      fuzzySearch: params.fileFiltering?.fuzzySearch ?? true,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -565,7 +564,7 @@ export class Config {
     this.bugCommand = params.bugCommand;
     this.model = params.model;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.agents = params.agents ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -593,7 +592,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
-    this.enableInteractiveShell = params.enableInteractiveShell ?? false;
+    this.interactiveShell = params.interactiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -607,13 +606,13 @@ export class Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
+    this.toolOutputTruncation = params.toolOutputTruncation ?? true;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
-    this.enableHooksUI = params.enableHooksUI ?? true;
-    this.enableHooks = params.enableHooks ?? false;
+    this.hooksUI = params.hooksUI ?? true;
+    this.hooksEnabled = params.hooksEnabled ?? false;
     this.disabledHooks =
       (params.hooks && 'disabled' in params.hooks
         ? params.hooks.disabled
@@ -632,8 +631,7 @@ export class Config {
       enabled: params.cliHelpAgentSettings?.enabled ?? true,
     };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
-    this.enableShellOutputEfficiency =
-      params.enableShellOutputEfficiency ?? true;
+    this.shellOutputEfficiency = params.shellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
@@ -641,7 +639,7 @@ export class Config {
     this.storage = new Storage(this.targetDir);
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
-    this.enablePromptCompletion = params.enablePromptCompletion ?? false;
+    this.promptCompletion = params.promptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine({
@@ -1323,11 +1321,11 @@ export class Config {
   }
 
   getEnableRecursiveFileSearch(): boolean {
-    return this.fileFiltering.enableRecursiveFileSearch;
+    return this.fileFiltering.recursiveFileSearch;
   }
 
   getFileFilteringEnableFuzzySearch(): boolean {
-    return this.fileFiltering.enableFuzzySearch;
+    return this.fileFiltering.fuzzySearch;
   }
 
   getFileFilteringRespectGitIgnore(): boolean {
@@ -1425,7 +1423,7 @@ export class Config {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.agents;
   }
 
   getNoBrowser(): boolean {
@@ -1538,7 +1536,7 @@ export class Config {
     return (
       this.interactive &&
       this.ptyInfo !== 'child_process' &&
-      this.enableInteractiveShell
+      this.interactiveShell
     );
   }
 
@@ -1587,7 +1585,7 @@ export class Config {
   }
 
   getEnableInteractiveShell(): boolean {
-    return this.enableInteractiveShell;
+    return this.interactiveShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
@@ -1603,7 +1601,7 @@ export class Config {
   }
 
   getEnableShellOutputEfficiency(): boolean {
-    return this.enableShellOutputEfficiency;
+    return this.shellOutputEfficiency;
   }
 
   getShellToolInactivityTimeout(): number {
@@ -1632,11 +1630,11 @@ export class Config {
   }
 
   getEnablePromptCompletion(): boolean {
-    return this.enablePromptCompletion;
+    return this.promptCompletion;
   }
 
   getEnableToolOutputTruncation(): boolean {
-    return this.enableToolOutputTruncation;
+    return this.toolOutputTruncation;
   }
 
   getTruncateToolOutputThreshold(): number {
@@ -1683,11 +1681,11 @@ export class Config {
   }
 
   getEnableHooks(): boolean {
-    return this.enableHooks;
+    return this.hooksEnabled;
   }
 
   getEnableHooksUI(): boolean {
-    return this.enableHooksUI;
+    return this.hooksUI;
   }
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {

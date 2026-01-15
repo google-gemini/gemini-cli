@@ -1974,12 +1974,12 @@ describe('loadCliConfig fileFiltering', () => {
     value: boolean;
   }> = [
     {
-      property: 'enableFuzzySearch',
+      property: 'fuzzySearch',
       getter: (c) => c.getFileFilteringEnableFuzzySearch(),
       value: true,
     },
     {
-      property: 'enableFuzzySearch',
+      property: 'fuzzySearch',
       getter: (c) => c.getFileFilteringEnableFuzzySearch(),
       value: false,
     },
@@ -2004,12 +2004,12 @@ describe('loadCliConfig fileFiltering', () => {
       value: false,
     },
     {
-      property: 'enableRecursiveFileSearch',
+      property: 'recursiveFileSearch',
       getter: (c) => c.getEnableRecursiveFileSearch(),
       value: true,
     },
     {
-      property: 'enableRecursiveFileSearch',
+      property: 'recursiveFileSearch',
       getter: (c) => c.getEnableRecursiveFileSearch(),
       value: false,
     },

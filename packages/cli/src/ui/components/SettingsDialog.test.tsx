@@ -207,7 +207,7 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
             description: 'Show color in shell output.',
             showInDialog: true,
           },
-          enableInteractiveShell: {
+          interactiveShell: {
             type: 'boolean',
             label: 'Enable Interactive Shell',
             category: 'Tools',
@@ -314,7 +314,7 @@ describe('SettingsDialog', () => {
       // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
       expect(output).toContain('Vim Mode');
       expect(output).toContain('Enable Vim keybindings');
-      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
+      // 'general.autoUpdate' has description 'Enable automatic updates.'
       expect(output).toContain('Enable Auto Update');
       expect(output).toContain('Enable automatic updates.');
     });
@@ -805,10 +805,10 @@ describe('SettingsDialog', () => {
         toggleCount: 5,
         shellSettings: {
           showColor: false,
-          enableInteractiveShell: true,
+          interactiveShell: true,
         },
         expectedSiblings: {
-          enableInteractiveShell: true,
+          interactiveShell: true,
         },
       },
       {
@@ -816,11 +816,11 @@ describe('SettingsDialog', () => {
         toggleCount: 3,
         shellSettings: {
           showColor: false,
-          enableInteractiveShell: true,
+          interactiveShell: true,
           pager: 'less',
         },
         expectedSiblings: {
-          enableInteractiveShell: true,
+          interactiveShell: true,
           pager: 'less',
         },
       },
@@ -1257,9 +1257,9 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            enableAutoUpdate: false,
+            autoUpdate: false,
             debugKeystrokeLogging: true,
-            enablePromptCompletion: true,
+            promptCompletion: true,
           },
           ui: {
             hideWindowTitle: true,
@@ -1268,7 +1268,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              enableLoadingPhrases: false,
+              loadingPhrases: false,
               screenReader: true,
             },
           },
@@ -1280,12 +1280,12 @@ describe('SettingsDialog', () => {
             fileFiltering: {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
-              enableRecursiveFileSearch: true,
-              enableFuzzySearch: true,
+              recursiveFileSearch: true,
+              fuzzySearch: true,
             },
           },
           tools: {
-            enableInteractiveShell: true,
+            interactiveShell: true,
             autoAccept: true,
             useRipgrep: true,
           },
@@ -1304,7 +1304,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: false,
+            autoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1342,7 +1342,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              enableLoadingPhrases: false,
+              loadingPhrases: false,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1363,8 +1363,8 @@ describe('SettingsDialog', () => {
             fileFiltering: {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
-              enableRecursiveFileSearch: false,
-              enableFuzzySearch: false,
+              recursiveFileSearch: false,
+              fuzzySearch: false,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1378,7 +1378,7 @@ describe('SettingsDialog', () => {
         name: 'tools and security settings',
         userSettings: {
           tools: {
-            enableInteractiveShell: true,
+            interactiveShell: true,
             autoAccept: false,
             useRipgrep: true,
             truncateToolOutputThreshold: 25000,
@@ -1403,9 +1403,9 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: true,
+            autoUpdate: true,
             debugKeystrokeLogging: false,
-            enablePromptCompletion: false,
+            promptCompletion: false,
           },
           ui: {
             hideWindowTitle: false,
@@ -1414,7 +1414,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              enableLoadingPhrases: true,
+              loadingPhrases: true,
               screenReader: false,
             },
           },
@@ -1426,12 +1426,12 @@ describe('SettingsDialog', () => {
             fileFiltering: {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
-              enableRecursiveFileSearch: false,
-              enableFuzzySearch: true,
+              recursiveFileSearch: false,
+              fuzzySearch: true,
             },
           },
           tools: {
-            enableInteractiveShell: false,
+            interactiveShell: false,
             autoAccept: false,
             useRipgrep: false,
           },

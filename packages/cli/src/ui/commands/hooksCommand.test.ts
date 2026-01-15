@@ -29,7 +29,7 @@ describe('hooksCommand', () => {
         disabled?: string[];
       };
       tools?: {
-        enableHooks?: boolean;
+        hooks?: boolean;
       };
     };
     setValue: ReturnType<typeof vi.fn>;
@@ -163,7 +163,7 @@ describe('hooksCommand', () => {
       mockHookSystem.getAllHooks.mockReturnValue([]);
       (mockContext.services.settings.merged as Record<string, unknown>)[
         'tools'
-      ] = { enableHooks: true };
+      ] = { hooks: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -192,7 +192,7 @@ describe('hooksCommand', () => {
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
       (mockContext.services.settings.merged as Record<string, unknown>)[
         'tools'
-      ] = { enableHooks: true };
+      ] = { hooks: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',

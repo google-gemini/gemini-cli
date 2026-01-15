@@ -508,7 +508,7 @@ on GitHub.
   [@allenhutchison](https://github.com/allenhutchison))
 - **Experimental Tool output truncation:** Enable truncating shell tool outputs
   and saving full output to a file by setting
-  `"enableToolOutputTruncation": true `([pr](https://github.com/google-gemini/gemini-cli/pull/8039)
+  `"toolOutputTruncation": true `([pr](https://github.com/google-gemini/gemini-cli/pull/8039)
   by [@SandyTao520](https://github.com/SandyTao520))
 - **Edit Tool improvements:** Gemini CLI’s ability to edit files should now be
   far more capable. ([pr](https://github.com/google-gemini/gemini-cli/pull/7679)
@@ -560,8 +560,8 @@ on GitHub.
     [pr](https://github.com/google-gemini/gemini-cli/pull/7614) by
     [@SandyTao520](https://github.com/SandyTao520))
   - **Prompt completion:** Get real-time AI suggestions to complete your prompts
-    as you type. Enable it with `"general": { "enablePromptCompletion": true }`
-    and share your feedback!
+    as you type. Enable it with `"general": { "promptCompletion": true }` and
+    share your feedback!
     ([gif](https://miro.medium.com/v2/resize:fit:2000/format:webp/1*hvegW7YXOg6N_beUWhTdxA.gif),
     [pr](https://github.com/google-gemini/gemini-cli/pull/4691) by
     [@3ks](https://github.com/3ks))

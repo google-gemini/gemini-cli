@@ -163,7 +163,7 @@ describe('ToolConfirmationMessage', () => {
     });
   });
 
-  describe('enablePermanentToolApproval setting', () => {
+  describe('permanentToolApproval setting', () => {
     const editConfirmationDetails: ToolCallConfirmationDetails = {
       type: 'edit',
       title: 'Confirm Edit',
@@ -190,7 +190,7 @@ describe('ToolConfirmationMessage', () => {
         />,
         {
           settings: createMockSettings({
-            security: { enablePermanentToolApproval: false },
+            security: { permanentToolApproval: false },
           }),
         },
       );
@@ -213,7 +213,7 @@ describe('ToolConfirmationMessage', () => {
         />,
         {
           settings: createMockSettings({
-            security: { enablePermanentToolApproval: true },
+            security: { permanentToolApproval: true },
           }),
         },
       );

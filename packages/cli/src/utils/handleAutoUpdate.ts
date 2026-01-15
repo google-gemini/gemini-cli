@@ -30,13 +30,13 @@ export function handleAutoUpdate(
     return;
   }
 
-  if (settings.merged.general?.enableAutoUpdateNotification === false) {
+  if (settings.merged.general?.autoUpdateNotification === false) {
     return;
   }
 
   const installationInfo = getInstallationInfo(
     projectRoot,
-    settings.merged.general?.enableAutoUpdate ?? true,
+    settings.merged.general?.autoUpdate ?? true,
   );
 
   if (
@@ -58,7 +58,7 @@ export function handleAutoUpdate(
 
   if (
     !installationInfo.updateCommand ||
-    settings.merged.general?.enableAutoUpdate === false
+    settings.merged.general?.autoUpdate === false
   ) {
     return;
   }

@@ -21,8 +21,8 @@ export interface FileSearchOptions {
   useGeminiignore: boolean;
   cache: boolean;
   cacheTtl: number;
-  enableRecursiveFileSearch: boolean;
-  enableFuzzySearch: boolean;
+  recursiveFileSearch: boolean;
+  fuzzySearch: boolean;
   maxDepth?: number;
 }
 
@@ -119,7 +119,7 @@ class RecursiveFileSearch implements FileSearch {
   ): Promise<string[]> {
     if (
       !this.resultCache ||
-      (!this.fzf && this.options.enableFuzzySearch) ||
+      (!this.fzf && this.options.fuzzySearch) ||
       !this.ignore
     ) {
       throw new Error('Engine not initialized. Call initialize() first.');
@@ -180,7 +180,7 @@ class RecursiveFileSearch implements FileSearch {
 
   private buildResultCache(): void {
     this.resultCache = new ResultCache(this.allFiles);
-    if (this.options.enableFuzzySearch) {
+    if (this.options.fuzzySearch) {
       // The v1 algorithm is much faster since it only looks at the first
       // occurrence of the pattern. We use it for search spaces that have >20k
       // files, because the v2 algorithm is just too slow in those cases.
@@ -240,7 +240,7 @@ class DirectoryFileSearch implements FileSearch {
 
 export class FileSearchFactory {
   static create(options: FileSearchOptions): FileSearch {
-    if (options.enableRecursiveFileSearch) {
+    if (options.recursiveFileSearch) {
       return new RecursiveFileSearch(options);
     }
     return new DirectoryFileSearch(options);

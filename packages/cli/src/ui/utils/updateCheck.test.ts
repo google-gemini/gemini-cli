@@ -34,7 +34,7 @@ describe('checkForUpdates', () => {
     mockSettings = {
       merged: {
         general: {
-          enableAutoUpdateNotification: true,
+          autoUpdateNotification: true,
         },
       },
     } as LoadedSettings;
@@ -45,8 +45,8 @@ describe('checkForUpdates', () => {
     vi.restoreAllMocks();
   });
 
-  it('should return null if enableAutoUpdateNotification is false', async () => {
-    mockSettings.merged.general!.enableAutoUpdateNotification = false;
+  it('should return null if autoUpdateNotification is false', async () => {
+    mockSettings.merged.general!.autoUpdateNotification = false;
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
     expect(getPackageJson).not.toHaveBeenCalled();

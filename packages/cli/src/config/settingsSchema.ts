@@ -190,18 +190,18 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      enableAutoUpdate: {
+      autoUpdate: {
         type: 'boolean',
-        label: 'Enable Auto Update',
+        label: 'Auto Update',
         category: 'General',
         requiresRestart: false,
         default: true,
         description: 'Enable automatic updates.',
         showInDialog: true,
       },
-      enableAutoUpdateNotification: {
+      autoUpdateNotification: {
         type: 'boolean',
-        label: 'Enable Auto Update Notification',
+        label: 'Auto Update Notification',
         category: 'General',
         requiresRestart: false,
         default: true,
@@ -219,7 +219,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Checkpointing',
+            label: 'Checkpointing',
             category: 'General',
             requiresRestart: true,
             default: false,
@@ -228,9 +228,9 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      enablePromptCompletion: {
+      promptCompletion: {
         type: 'boolean',
-        label: 'Enable Prompt Completion',
+        label: 'Prompt Completion',
         category: 'General',
         requiresRestart: true,
         default: false,
@@ -267,7 +267,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Session Cleanup',
+            label: 'Session Cleanup',
             category: 'General',
             requiresRestart: false,
             default: false,
@@ -566,7 +566,7 @@ const SETTINGS_SCHEMA = {
         description: 'Accessibility settings.',
         showInDialog: false,
         properties: {
-          enableLoadingPhrases: {
+          loadingPhrases: {
             type: 'boolean',
             label: 'Enable Loading Phrases',
             category: 'UI',
@@ -631,7 +631,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       usageStatisticsEnabled: {
         type: 'boolean',
-        label: 'Enable Usage Statistics',
+        label: 'Usage Statistics',
         category: 'Privacy',
         requiresRestart: true,
         default: true,
@@ -866,9 +866,9 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
-          enableRecursiveFileSearch: {
+          recursiveFileSearch: {
             type: 'boolean',
-            label: 'Enable Recursive File Search',
+            label: 'Recursive File Search',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -877,9 +877,9 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          enableFuzzySearch: {
+          fuzzySearch: {
             type: 'boolean',
-            label: 'Enable Fuzzy Search',
+            label: 'Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -922,9 +922,9 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for shell execution.',
         showInDialog: false,
         properties: {
-          enableInteractiveShell: {
+          interactiveShell: {
             type: 'boolean',
-            label: 'Enable Interactive Shell',
+            label: 'Interactive Shell',
             category: 'Tools',
             requiresRestart: true,
             default: true,
@@ -963,9 +963,9 @@ const SETTINGS_SCHEMA = {
               'The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.',
             showInDialog: false,
           },
-          enableShellOutputEfficiency: {
+          shellOutputEfficiency: {
             type: 'boolean',
-            label: 'Enable Shell Output Efficiency',
+            label: 'Shell Output Efficiency',
             category: 'Tools',
             requiresRestart: false,
             default: true,
@@ -1055,9 +1055,9 @@ const SETTINGS_SCHEMA = {
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
       },
-      enableToolOutputTruncation: {
+      toolOutputTruncation: {
         type: 'boolean',
-        label: 'Enable Tool Output Truncation',
+        label: 'Tool Output Truncation',
         category: 'General',
         requiresRestart: true,
         default: true,
@@ -1083,9 +1083,9 @@ const SETTINGS_SCHEMA = {
         description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
-      enableHooks: {
+      hooks: {
         type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
+        label: 'Hooks System (Experimental)',
         category: 'Advanced',
         requiresRestart: true,
         default: true,
@@ -1163,9 +1163,9 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
-      enablePermanentToolApproval: {
+      permanentToolApproval: {
         type: 'boolean',
-        label: 'Allow Permanent Tool Approval',
+        label: 'Permanent Tool Approval',
         category: 'Security',
         requiresRestart: false,
         default: false,
@@ -1234,7 +1234,7 @@ const SETTINGS_SCHEMA = {
           },
           enabled: {
             type: 'boolean',
-            label: 'Enable Environment Variable Redaction',
+            label: 'Environment Variable Redaction',
             category: 'Security',
             requiresRestart: true,
             default: false,
@@ -1346,9 +1346,9 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
-      enableAgents: {
+      agents: {
         type: 'boolean',
-        label: 'Enable Agents',
+        label: 'Agents',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
@@ -1404,7 +1404,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Codebase Investigator',
+            label: 'Codebase Investigator',
             category: 'Experimental',
             requiresRestart: true,
             default: true,
@@ -1474,7 +1474,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable CLI Help Agent',
+            label: 'CLI Help Agent',
             category: 'Experimental',
             requiresRestart: true,
             default: true,
@@ -1741,7 +1741,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       secureModeEnabled: {
         type: 'boolean',
-        label: 'Secure Mode Enabled',
+        label: 'Secure Mode',
         category: 'Admin',
         requiresRestart: false,
         default: false,
@@ -2147,7 +2147,7 @@ type InferSettings<T extends SettingsSchema> = {
 export type Settings = InferSettings<SettingsSchemaType>;
 
 export function getEnableHooksUI(settings: Settings): boolean {
-  return settings.tools?.enableHooks ?? true;
+  return settings.tools?.hooks ?? true;
 }
 
 export function getEnableHooks(settings: Settings): boolean {

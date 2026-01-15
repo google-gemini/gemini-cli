@@ -88,7 +88,7 @@ describe('AgentRegistry', () => {
     it('should log the count of loaded agents in debug mode', async () => {
       const debugConfig = makeFakeConfig({
         debugMode: true,
-        enableAgents: true,
+        agents: true,
       });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
@@ -167,7 +167,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should load agents from user and project directories with correct precedence', async () => {
-      mockConfig = makeFakeConfig({ enableAgents: true });
+      mockConfig = makeFakeConfig({ agents: true });
       registry = new TestableAgentRegistry(mockConfig);
 
       const userAgent = {
@@ -205,9 +205,9 @@ describe('AgentRegistry', () => {
       ).toHaveBeenCalledTimes(2);
     });
 
-    it('should NOT load TOML agents when enableAgents is false', async () => {
+    it('should NOT load TOML agents when agents is false', async () => {
       const disabledConfig = makeFakeConfig({
-        enableAgents: false,
+        agents: false,
         codebaseInvestigatorSettings: { enabled: false },
         cliHelpAgentSettings: { enabled: false },
       });
@@ -446,7 +446,7 @@ describe('AgentRegistry', () => {
 
   describe('reload', () => {
     it('should clear existing agents and reload from directories', async () => {
-      const config = makeFakeConfig({ enableAgents: true });
+      const config = makeFakeConfig({ agents: true });
       const registry = new TestableAgentRegistry(config);
 
       const initialAgent = { ...MOCK_AGENT_V1, name: 'InitialAgent' };

@@ -79,7 +79,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().ui?.properties?.accessibility.properties
-          ?.enableLoadingPhrases.type,
+          ?.loadingPhrases.type,
       ).toBe('boolean');
     });
 
@@ -105,7 +105,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties
-          ?.enableRecursiveFileSearch,
+          ?.recursiveFileSearch,
       ).toBeDefined();
     });
 
@@ -170,7 +170,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.autoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
@@ -344,8 +344,8 @@ describe('SettingsSchema', () => {
       ).toBe('Enable preview features (e.g., preview models).');
     });
 
-    it('should have enableAgents setting in schema', () => {
-      const setting = getSettingsSchema().experimental.properties.enableAgents;
+    it('should have agents setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.agents;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');

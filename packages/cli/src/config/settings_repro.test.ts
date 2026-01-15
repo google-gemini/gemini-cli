@@ -131,7 +131,7 @@ describe('Settings Repro', () => {
       },
       general: {
         debugKeystrokeLogging: false,
-        enablePromptCompletion: false,
+        promptCompletion: false,
         preferredEditor: 'vim',
         vimMode: false,
         previewFeatures: false,
@@ -148,7 +148,7 @@ describe('Settings Repro', () => {
         useRipgrep: true,
         shell: {
           showColor: true,
-          enableInteractiveShell: true,
+          interactiveShell: true,
         },
         truncateToolOutputLines: 100,
       },

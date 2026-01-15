@@ -10,7 +10,7 @@ the CLI's source code.
 >
 > ```json
 > {
->   "tools": { "enableHooks": true },
+>   "tools": { "hooks": true },
 >   "hooks": { "enabled": true }
 > }
 > ```

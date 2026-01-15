@@ -152,8 +152,8 @@ describe('useAtCompletion', () => {
         useGeminiignore: false,
         cache: false,
         cacheTtl: 0,
-        enableRecursiveFileSearch: true,
-        enableFuzzySearch: true,
+        recursiveFileSearch: true,
+        fuzzySearch: true,
       });
       await fileSearch.initialize();
 
@@ -275,8 +275,8 @@ describe('useAtCompletion', () => {
         useGeminiignore: true,
         cache: false,
         cacheTtl: 0,
-        enableRecursiveFileSearch: true,
-        enableFuzzySearch: true,
+        recursiveFileSearch: true,
+        fuzzySearch: true,
       });
       await realFileSearch.initialize();
 
@@ -543,7 +543,7 @@ describe('useAtCompletion', () => {
       await cleanupTmpDir(rootDir2);
     });
 
-    it('should perform a non-recursive search when enableRecursiveFileSearch is false', async () => {
+    it('should perform a non-recursive search when recursiveFileSearch is false', async () => {
       const structure: FileSystemStructure = {
         'file.txt': '',
         src: {
