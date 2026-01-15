@@ -24,6 +24,12 @@ import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import {
+  REDIRECTION_WARNING_NOTE_LABEL,
+  REDIRECTION_WARNING_NOTE_TEXT,
+  REDIRECTION_WARNING_TIP_LABEL,
+  REDIRECTION_WARNING_TIP_TEXT,
+} from '../../textConstants.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -50,14 +56,6 @@ export const ToolConfirmationMessage: React.FC<
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
-
-  // Constants for warnings to ensure accurate height calculation
-  const WARNING_NOTE_LABEL = 'Note: ';
-  const WARNING_NOTE_TEXT =
-    'Command contains redirection which can be undesirable.';
-  const WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
-  const WARNING_TIP_TEXT =
-    'Toggle auto-edit (Shift+Tab) to allow redirection in the future.';
 
   useEffect(() => {
     let isMounted = true;
@@ -301,8 +299,12 @@ export const ToolConfirmationMessage: React.FC<
       if (containsRedirection) {
         // Calculate lines needed for Note and Tip
         const safeWidth = Math.max(terminalWidth, 1);
-        const noteLength = WARNING_NOTE_LABEL.length + WARNING_NOTE_TEXT.length;
-        const tipLength = WARNING_TIP_LABEL.length + WARNING_TIP_TEXT.length;
+        const noteLength =
+          REDIRECTION_WARNING_NOTE_LABEL.length +
+          REDIRECTION_WARNING_NOTE_TEXT.length;
+        const tipLength =
+          REDIRECTION_WARNING_TIP_LABEL.length +
+          REDIRECTION_WARNING_TIP_TEXT.length;
 
         const noteLines = Math.ceil(noteLength / safeWidth);
         const tipLines = Math.ceil(tipLength / safeWidth);
@@ -321,14 +323,14 @@ export const ToolConfirmationMessage: React.FC<
             <Box height={1} />
             <Box>
               <Text color={theme.text.primary}>
-                <Text bold>{WARNING_NOTE_LABEL}</Text>
-                {WARNING_NOTE_TEXT}
+                <Text bold>{REDIRECTION_WARNING_NOTE_LABEL}</Text>
+                {REDIRECTION_WARNING_NOTE_TEXT}
               </Text>
             </Box>
             <Box>
               <Text color={theme.border.default}>
-                <Text bold>{WARNING_TIP_LABEL}</Text>
-                {WARNING_TIP_TEXT}
+                <Text bold>{REDIRECTION_WARNING_TIP_LABEL}</Text>
+                {REDIRECTION_WARNING_TIP_TEXT}
               </Text>
             </Box>
           </>
