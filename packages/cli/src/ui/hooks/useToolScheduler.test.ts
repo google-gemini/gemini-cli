@@ -172,8 +172,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       args: { data: 'any data' },
     } as any;
 
-    await act(async () => {
-      await schedule(request, new AbortController().signal);
+    act(() => {
+      schedule(request, new AbortController().signal);
     });
 
     await act(async () => {
@@ -229,11 +229,11 @@ describe('useReactToolScheduler', () => {
     schedule: (
       req: ToolCallRequestInfo | ToolCallRequestInfo[],
       signal: AbortSignal,
-    ) => Promise<void>,
+    ) => void,
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
   ) => {
-    await act(async () => {
-      await schedule(request, new AbortController().signal);
+    act(() => {
+      schedule(request, new AbortController().signal);
     });
 
     await advanceAndSettle();
@@ -346,8 +346,8 @@ describe('useReactToolScheduler', () => {
       name: 'mockTool',
       args: {},
     } as any;
-    await act(async () => {
-      await schedule(newRequest, new AbortController().signal);
+    act(() => {
+      schedule(newRequest, new AbortController().signal);
     });
 
     // After scheduling, the old call should be gone,
@@ -388,8 +388,8 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
-    await act(async () => {
-      await schedule(request, new AbortController().signal);
+    act(() => {
+      schedule(request, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -520,8 +520,8 @@ describe('useReactToolScheduler', () => {
       args: { data: 'sensitive' },
     } as any;
 
-    await act(async () => {
-      await schedule(request, new AbortController().signal);
+    act(() => {
+      schedule(request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -567,8 +567,8 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
-    await act(async () => {
-      await schedule(request, new AbortController().signal);
+    act(() => {
+      schedule(request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -628,8 +628,8 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
-    await act(async () => {
-      await result.current[1](request, new AbortController().signal);
+    act(() => {
+      result.current[1](request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -699,8 +699,8 @@ describe('useReactToolScheduler', () => {
       { callId: 'multi2', name: 'tool2', args: { p: 2 } } as any,
     ];
 
-    await act(async () => {
-      await schedule(requests, new AbortController().signal);
+    act(() => {
+      schedule(requests, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -791,15 +791,15 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
-    await act(async () => {
-      await schedule(request1, new AbortController().signal);
+    act(() => {
+      schedule(request1, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    await act(async () => {
-      await schedule(request2, new AbortController().signal);
+    act(() => {
+      schedule(request2, new AbortController().signal);
     });
 
     await act(async () => {
