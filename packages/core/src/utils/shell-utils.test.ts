@@ -22,6 +22,7 @@ import {
   hasRedirection,
   resolveExecutable,
 } from './shell-utils.js';
+import path from 'node:path';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -492,31 +493,36 @@ describe('resolveExecutable', () => {
   });
 
   it('should return the absolute path if it exists and is executable', async () => {
-    const absPath = '/usr/bin/git';
+    const absPath = path.resolve('/usr/bin/git');
     mockAccess.mockResolvedValue(undefined); // success
     expect(await resolveExecutable(absPath)).toBe(absPath);
     expect(mockAccess).toHaveBeenCalledWith(absPath, 1);
   });
 
   it('should return undefined for absolute path if it does not exist', async () => {
-    const absPath = '/usr/bin/nonexistent';
+    const absPath = path.resolve('/usr/bin/nonexistent');
     mockAccess.mockRejectedValue(new Error('ENOENT'));
     expect(await resolveExecutable(absPath)).toBeUndefined();
   });
 
   it('should resolve executable in PATH', async () => {
-    process.env['PATH'] = '/bin:/usr/bin';
+    const binDir = path.resolve('/bin');
+    const usrBinDir = path.resolve('/usr/bin');
+    process.env['PATH'] = `${binDir}${path.delimiter}${usrBinDir}`;
     mockPlatform.mockReturnValue('linux');
+
+    const targetPath = path.join(usrBinDir, 'ls');
     mockAccess.mockImplementation(async (p: string) => {
-      if (p === '/usr/bin/ls') return undefined;
+      if (p === targetPath) return undefined;
       throw new Error('ENOENT');
     });
 
-    expect(await resolveExecutable('ls')).toBe('/usr/bin/ls');
+    expect(await resolveExecutable('ls')).toBe(targetPath);
   });
 
   it('should try extensions on Windows', async () => {
-    process.env['PATH'] = 'C:\\Windows\\System32';
+    const sys32 = path.resolve('C:\\Windows\\System32');
+    process.env['PATH'] = sys32;
     mockPlatform.mockReturnValue('win32');
     mockAccess.mockImplementation(async (p: string) => {
       // Use includes because on Windows path separators might differ
@@ -528,7 +534,7 @@ describe('resolveExecutable', () => {
   });
 
   it('should return undefined if not found in PATH', async () => {
-    process.env['PATH'] = '/bin';
+    process.env['PATH'] = path.resolve('/bin');
     mockPlatform.mockReturnValue('linux');
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
