@@ -114,7 +114,27 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
     !part.functionCall &&
     !part.functionResponse &&
     !part.inlineData &&
-    !part.fileData
+    !part.fileData &&
+    !part.executableCode &&
+    !part.codeExecutionResult &&
+    !(part as Part & { videoMetadata?: unknown }).videoMetadata
+  );
+}
+
+/**
+ * Returns true if the part contributes meaningful content to the turn.
+ */
+function isContributingPart(part: Part): boolean {
+  return (
+    !!part.thought ||
+    (typeof part.text === 'string' && part.text !== '') ||
+    !!part.functionCall ||
+    !!part.functionResponse ||
+    !!part.inlineData ||
+    !!part.fileData ||
+    !!part.executableCode ||
+    !!part.codeExecutionResult ||
+    !!(part as Part & { videoMetadata?: unknown }).videoMetadata
   );
 }
 
@@ -122,15 +142,19 @@ function isValidContent(content: Content): boolean {
   if (content.parts === undefined || content.parts.length === 0) {
     return false;
   }
+  // A turn is valid if it contains at least one part that is contributing.
+  // This ensures turns with tool calls are preserved even if they
+  // contain empty text parts.
+  let hasContributingPart = false;
   for (const part of content.parts) {
-    if (part === undefined || Object.keys(part).length === 0) {
+    if (!part || Object.keys(part).length === 0) {
       return false;
     }
-    if (!part.thought && part.text !== undefined && part.text === '') {
-      return false;
+    if (isContributingPart(part)) {
+      hasContributingPart = true;
     }
   }
-  return true;
+  return hasContributingPart;
 }
 
 /**
@@ -170,9 +194,17 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       const modelOutput: Content[] = [];
       let isValid = true;
       while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
+        const content = comprehensiveHistory[i];
+        if (isValid && !isValidContent(content)) {
           isValid = false;
+        }
+        if (isValid) {
+          // Filter out non-contributing parts (like empty text parts) from the
+          // curated history to avoid API errors
+          const filteredParts = (content.parts ?? []).filter(
+            isContributingPart,
+          );
+          modelOutput.push({ ...content, parts: filteredParts });
         }
         i++;
       }
@@ -854,7 +886,7 @@ export class GeminiChat {
       }
     }
 
-    // String thoughts and consolidate text parts.
+    // Consolidate text parts.
     const consolidatedParts: Part[] = [];
     for (const part of modelResponseParts) {
       const lastPart = consolidatedParts[consolidatedParts.length - 1];
@@ -864,7 +896,7 @@ export class GeminiChat {
         isValidNonThoughtTextPart(part)
       ) {
         lastPart.text += part.text;
-      } else {
+      } else if (isContributingPart(part)) {
         consolidatedParts.push(part);
       }
     }
