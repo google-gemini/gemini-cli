@@ -61,7 +61,6 @@ describe('useSelectionList', () => {
           ctrl: options.ctrl ?? false,
           meta: false,
           shift: options.shift ?? false,
-          paste: false,
           insertable: false,
         };
         activeKeypressHandler(key);
@@ -331,7 +330,6 @@ describe('useSelectionList', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
         };
         handler(key);
@@ -381,7 +379,6 @@ describe('useSelectionList', () => {
             ctrl: false,
             meta: false,
             shift: false,
-            paste: false,
             insertable: false,
           };
           handler(key);

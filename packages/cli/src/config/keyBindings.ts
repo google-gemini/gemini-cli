@@ -66,6 +66,8 @@ export enum Command {
   TOGGLE_AUTO_EDIT = 'toggleAutoEdit',
   UNDO = 'undo',
   REDO = 'redo',
+  MOVE_UP = 'moveUp',
+  MOVE_DOWN = 'moveDown',
   MOVE_LEFT = 'moveLeft',
   MOVE_RIGHT = 'moveRight',
   MOVE_WORD_LEFT = 'moveWordLeft',
@@ -76,7 +78,6 @@ export enum Command {
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
-  REWIND = 'rewind',
 
   // Shell commands
   REVERSE_SEARCH = 'reverseSearch',
@@ -95,17 +96,13 @@ export enum Command {
  */
 export interface KeyBinding {
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
-  key?: string;
-  /** The key sequence (e.g., '\x18' for Ctrl+X) - alternative to key name */
-  sequence?: string;
+  key: string;
   /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   ctrl?: boolean;
   /** Shift key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   shift?: boolean;
   /** Command/meta key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   command?: boolean;
-  /** Paste operation requirement: true=must be paste, false=must not be paste, undefined=ignore */
-  paste?: boolean;
 }
 
 /**
@@ -136,8 +133,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
     { key: 'backspace', command: true },
-    { sequence: '\x7f', ctrl: true },
-    { sequence: '\x7f', command: true },
     { key: 'w', ctrl: true },
   ],
   [Command.MOVE_LEFT]: [
@@ -148,6 +143,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', ctrl: false, command: false },
     { key: 'f', ctrl: true },
   ],
+  [Command.MOVE_UP]: [{ key: 'up', ctrl: false, command: false }],
+  [Command.MOVE_DOWN]: [{ key: 'down', ctrl: false, command: false }],
   [Command.MOVE_WORD_LEFT]: [
     { key: 'left', ctrl: true },
     { key: 'left', command: true },
@@ -158,11 +155,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', command: true },
     { key: 'f', command: true },
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    { key: 'backspace' },
-    { sequence: '\x7f' },
-    { key: 'h', ctrl: true },
-  ],
+  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
@@ -217,7 +210,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
       key: 'return',
       ctrl: false,
       command: false,
-      paste: false,
       shift: false,
     },
   ],
@@ -226,16 +218,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', command: true },
-    { key: 'return', paste: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
   ],
 
   // External tools
-  [Command.OPEN_EXTERNAL_EDITOR]: [
-    { key: 'x', ctrl: true },
-    { sequence: '\x18', ctrl: true },
-  ],
+  [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
     { key: 'v', command: true },
@@ -265,7 +253,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
-  [Command.REWIND]: [{ key: 'Esc (×2)' }],
 };
 
 interface CommandCategory {
@@ -286,6 +273,8 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [
       Command.HOME,
       Command.END,
+      Command.MOVE_UP,
+      Command.MOVE_DOWN,
       Command.MOVE_LEFT,
       Command.MOVE_RIGHT,
       Command.MOVE_WORD_LEFT,
@@ -329,7 +318,6 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
-      Command.REWIND,
     ],
   },
   {
@@ -390,6 +378,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.END]: 'Move the cursor to the end of the line.',
   [Command.MOVE_LEFT]: 'Move the cursor one character to the left.',
   [Command.MOVE_RIGHT]: 'Move the cursor one character to the right.',
+  [Command.MOVE_UP]: 'Move the cursor up one line.',
+  [Command.MOVE_DOWN]: 'Move the cursor down one line.',
   [Command.MOVE_WORD_LEFT]: 'Move the cursor one word to the left.',
   [Command.MOVE_WORD_RIGHT]: 'Move the cursor one word to the right.',
   [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',
@@ -442,5 +432,4 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
   [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
-  [Command.REWIND]: 'Browse and rewind previous interactions.',
 };
