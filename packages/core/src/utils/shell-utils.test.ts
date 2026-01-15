@@ -44,6 +44,16 @@ vi.mock('shell-quote', () => ({
   quote: mockQuote,
 }));
 
+const mockDebugLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  debug: vi.fn(),
+  log: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock('./debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
+}));
+
 const isWindowsRuntime = process.platform === 'win32';
 const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
 
@@ -160,6 +170,28 @@ describe('getCommandRoots', () => {
     // Fallback: splitting commands depends on parser, so if parser fails, it returns empty
     const roots = shellUtils.getCommandRoots('ls -la');
     expect(roots).toEqual([]);
+  });
+
+  it('should handle bash parser timeouts', () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+    // Mock performance.now() to trigger timeout:
+    // 1st call: start time = 0. deadline = 0 + 1000ms.
+    // 2nd call (and onwards): inside progressCallback, return 2000ms.
+    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
+
+    // Use a very complex command to ensure progressCallback is triggered at least once
+    const complexCommand =
+      'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
+    const roots = getCommandRoots(complexCommand);
+    expect(roots).toEqual([]);
+    expect(nowSpy).toHaveBeenCalled();
+
+    expect(mockDebugLogger.error).toHaveBeenCalledWith(
+      'Bash command parsing timed out for command:',
+      complexCommand,
+    );
+
+    nowSpy.mockRestore();
   });
 });
 
