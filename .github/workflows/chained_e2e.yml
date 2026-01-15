@@ -59,7 +59,7 @@ jobs:
           name: 'repo_name'
           path: 'pr/'
       - name: 'Download the repo_name artifact'
-        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
+        uses: 'actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131' # ratchet:actions/download-artifact@v5
         env:
           RUN_ID: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id  }}"
         with:
