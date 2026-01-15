@@ -10,6 +10,7 @@ import {
   resolveColor,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
+  isValidColor,
 } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
@@ -481,11 +482,63 @@ export function validateCustomTheme(customTheme: Partial<CustomTheme>): {
   error?: string;
   warning?: string;
 } {
-  // Since all fields are optional, we only need to validate the name.
-  if (customTheme.name && !isValidThemeName(customTheme.name)) {
+  // Helper to validate all colors in an object recursively
+  const validateColors = (
+    obj: unknown,
+    path: string = '',
+  ): { isValid: boolean; error?: string } => {
+    if (typeof obj !== 'object' || obj === null) {
+      return { isValid: true };
+    }
+    const record = obj as Record<string, unknown>;
+
+    for (const key in record) {
+      const value = record[key];
+      const currentPath = path ? `${path}.${key}` : key;
+
+      if (key === 'name' || key === 'type') continue;
+
+      if (typeof value === 'string') {
+        if (!isValidColor(value)) {
+          return {
+            isValid: false,
+            error: `Invalid color "${value}" at ${currentPath}`,
+          };
+        }
+      } else if (Array.isArray(value)) {
+        // Assume array of strings (like gradient)
+        for (let i = 0; i < value.length; i++) {
+          if (typeof value[i] === 'string' && !isValidColor(value[i])) {
+            return {
+              isValid: false,
+              error: `Invalid color "${value[i]}" at ${currentPath}[${i}]`,
+            };
+          }
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        const result = validateColors(value, currentPath);
+        if (!result.isValid) {
+          return result;
+        }
+      }
+    }
+    return { isValid: true };
+  };
+
+  // 1. Validate name
+  if (customTheme.name !== undefined && !isValidThemeName(customTheme.name)) {
     return {
       isValid: false,
       error: `Invalid theme name: ${customTheme.name}`,
+    };
+  }
+
+  // 2. Validate all color fields
+  const colorValidation = validateColors(customTheme);
+  if (!colorValidation.isValid) {
+    return {
+      isValid: false,
+      error: colorValidation.error,
     };
   }
 
