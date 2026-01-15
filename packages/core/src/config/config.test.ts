@@ -1924,6 +1924,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
     });
   });
+
+  describe('isPlanEnabled', () => {
+    it('should return false by default', () => {
+      const config = new Config(baseParams);
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+
+    it('should return true when plan is enabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: true,
+      });
+      expect(config.isPlanEnabled()).toBe(true);
+    });
+
+    it('should return false when plan is explicitly disabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: false,
+      });
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
