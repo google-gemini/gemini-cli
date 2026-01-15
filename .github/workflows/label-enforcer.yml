@@ -10,7 +10,7 @@ jobs:
   enforce-label:
     # Run this job only when restricted labels are changed
     if: |-
-      ${{ (github.event.label.name == 'help wanted' || github.event.label.name == 'status/need-triage') &&
+      ${{ (github.event.label.name == 'help wanted' || github.event.label.name == 'status/need-triage' || github.event.label.name == '🔒 maintainer only') &&
           (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') }}
     runs-on: 'ubuntu-latest'
     permissions:
@@ -39,7 +39,7 @@ jobs:
             const labelName = context.payload.label.name;
 
             // Skip if the change was made by a bot to avoid infinite loops
-            if (username === 'github-actions[bot]') {
+            if (username === 'github-actions[bot]' || username === 'gemini-cli[bot]' || username.endsWith('[bot]')) {
               core.info('Change made by a bot. Skipping.');
               return;
             }
