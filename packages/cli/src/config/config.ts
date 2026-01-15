@@ -36,6 +36,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import { saveModelChange, loadSettings } from './settings.js';
@@ -93,7 +94,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .option('debug', {
       alias: 'd',
       type: 'boolean',
-      description: 'Run in debug mode?',
+      description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
@@ -242,11 +243,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
-        })
-        .deprecateOption(
-          'prompt',
-          'Use the positional prompt instead. This flag will be removed in a future version.',
-        ),
+        }),
     )
     // Register MCP subcommands
     .command(mcpCommand)
@@ -621,12 +618,13 @@ export async function loadCliConfig(
   const defaultModel = settings.general?.previewFeatures
     ? PREVIEW_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL_AUTO;
-  const resolvedModel: string =
-    argv.model ||
-    process.env['GEMINI_MODEL'] ||
-    settings.model?.name ||
-    defaultModel;
+  const specifiedModel =
+    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
+  const resolvedModel =
+    specifiedModel === GEMINI_MODEL_ALIAS_AUTO
+      ? defaultModel
+      : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
@@ -637,6 +635,7 @@ export async function loadCliConfig(
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
+  const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
   return new Config({
     sessionId,
@@ -660,6 +659,8 @@ export async function loadCliConfig(
     mcpServers: mcpEnabled ? settings.mcpServers : {},
     mcpEnabled,
     extensionsEnabled,
+    agents: settings.agents,
+    adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -737,6 +738,7 @@ export async function loadCliConfig(
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
+    disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: getEnableHooks(settings),
@@ -748,6 +750,7 @@ export async function loadCliConfig(
       const refreshedSettings = loadSettings(cwd);
       return {
         disabledSkills: refreshedSettings.merged.skills?.disabled,
+        agents: refreshedSettings.merged.agents,
       };
     },
   });
