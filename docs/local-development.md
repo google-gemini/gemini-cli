@@ -10,7 +10,7 @@ debug your code by instrumenting interesting events like model calls, tool
 scheduler, tool calls, etc.
 
 Dev traces are verbose and are specifically meant for understanding agent
-behaviour and debugging issues. They are disabled by default.
+behavior and debugging issues. They are disabled by default.
 
 To enable dev traces, set the `GEMINI_DEV_TRACING=true` environment variable
 when running Gemini CLI.
