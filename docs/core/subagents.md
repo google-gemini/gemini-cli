@@ -27,7 +27,7 @@ the main agent's context or toolset.
 Think of sub-agents as "specialists" that the main Gemini agent can hire for a
 specific job.
 
-- **Focused Context:** Each sub-agent has its own system prompt and persona.
+- **Focused context:** Each sub-agent has its own system prompt and persona.
 - **Specialized Tools:** Sub-agents can have a restricted or specialized set of
   tools.
 - **Independent Context Window:** Interactions with a sub-agent happen in a
