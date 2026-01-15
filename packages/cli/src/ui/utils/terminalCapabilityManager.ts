@@ -215,13 +215,7 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (
-        this.modifyOtherKeysSupported === true ||
-        // If device attributes were received it's safe to try enabling
-        // anyways, since it will be ignored if unsupported
-        (this.modifyOtherKeysSupported === undefined &&
-          this.deviceAttributesSupported)
-      ) {
+      } else if (this.modifyOtherKeysSupported === true) {
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
