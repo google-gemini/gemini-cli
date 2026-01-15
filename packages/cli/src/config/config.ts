@@ -289,7 +289,7 @@ export async function parseArguments(
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.skills?.enabled ?? settings.experimental?.skills ?? true) {
+  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
@@ -530,7 +530,7 @@ export async function loadCliConfig(
   // Force approval mode to default if the folder is not trusted.
   if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
     debugLogger.warn(
-      `Approval mode overridden to "default" because the current folder is not trusted.`, 
+      `Approval mode overridden to "default" because the current folder is not trusted.`,
     );
     approvalMode = ApprovalMode.DEFAULT;
   }
@@ -709,7 +709,7 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     skillsSupport:
-      settings.skills?.enabled ?? settings.experimental?.skills ?? true,
+      settings.experimental?.skills || (settings.skills?.enabled ?? true),
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],

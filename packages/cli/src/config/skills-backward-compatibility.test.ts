@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadCliConfig, parseArguments } from './config.js';
 import * as trustedFolders from './trustedFolders.js';
 import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
+import { createTestMergedSettings } from './settings.js';
 
 vi.mock('./trustedFolders.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -26,10 +27,9 @@ describe('Agent Skills Backward Compatibility', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
-      reason: 'test',
-    });
+    } as unknown as trustedFolders.TrustResult);
   });
 
   afterEach(() => {
@@ -39,28 +39,35 @@ describe('Agent Skills Backward Compatibility', () => {
   describe('loadCliConfig', () => {
     it('should default skillsSupport to true when no settings are present', async () => {
       vi.mocked(loadServerHierarchicalMemory).mockResolvedValue({
-        settings: {},
-        configFiles: [],
+        memoryContent: '',
+        fileCount: 0,
+        filePaths: [],
       });
 
       process.argv = ['node', 'gemini'];
+      const settings = createTestMergedSettings({});
       const config = await loadCliConfig(
-        {},
+        settings,
         'test-session',
-        await parseArguments({}),
+        await parseArguments(settings),
       );
-      expect(config.skillsSupport).toBe(true);
+      expect(
+        (
+          config as unknown as { isSkillsSupportEnabled: () => boolean }
+        ).isSkillsSupportEnabled(),
+      ).toBe(true);
     });
 
     it('should prioritize skills.enabled=false from settings', async () => {
       vi.mocked(loadServerHierarchicalMemory).mockResolvedValue({
-        settings: {},
-        configFiles: [],
+        memoryContent: '',
+        fileCount: 0,
+        filePaths: [],
       });
 
-      const settings = {
+      const settings = createTestMergedSettings({
         skills: { enabled: false },
-      };
+      } as unknown as Settings);
 
       process.argv = ['node', 'gemini'];
       const config = await loadCliConfig(
@@ -68,18 +75,23 @@ describe('Agent Skills Backward Compatibility', () => {
         'test-session',
         await parseArguments(settings),
       );
-      expect(config.skillsSupport).toBe(false);
+      expect(
+        (
+          config as unknown as { isSkillsSupportEnabled: () => boolean }
+        ).isSkillsSupportEnabled(),
+      ).toBe(false);
     });
 
     it('should support legacy experimental.skills=true from settings', async () => {
       vi.mocked(loadServerHierarchicalMemory).mockResolvedValue({
-        settings: {},
-        configFiles: [],
+        memoryContent: '',
+        fileCount: 0,
+        filePaths: [],
       });
 
-      const settings = {
+      const settings = createTestMergedSettings({
         experimental: { skills: true },
-      };
+      } as unknown as Settings);
 
       process.argv = ['node', 'gemini'];
       const config = await loadCliConfig(
@@ -87,18 +99,24 @@ describe('Agent Skills Backward Compatibility', () => {
         'test-session',
         await parseArguments(settings),
       );
-      expect(config.skillsSupport).toBe(true);
+      expect(
+        (
+          config as unknown as { isSkillsSupportEnabled: () => boolean }
+        ).isSkillsSupportEnabled(),
+      ).toBe(true);
     });
 
-    it('should support legacy experimental.skills=false from settings', async () => {
+    it('should prioritize legacy experimental.skills=true over new skills.enabled=false', async () => {
       vi.mocked(loadServerHierarchicalMemory).mockResolvedValue({
-        settings: {},
-        configFiles: [],
+        memoryContent: '',
+        fileCount: 0,
+        filePaths: [],
       });
 
-      const settings = {
-        experimental: { skills: false },
-      };
+      const settings = createTestMergedSettings({
+        skills: { enabled: false },
+        experimental: { skills: true },
+      } as unknown as Settings);
 
       process.argv = ['node', 'gemini'];
       const config = await loadCliConfig(
@@ -106,19 +124,23 @@ describe('Agent Skills Backward Compatibility', () => {
         'test-session',
         await parseArguments(settings),
       );
-      expect(config.skillsSupport).toBe(false);
+      expect(
+        (
+          config as unknown as { isSkillsSupportEnabled: () => boolean }
+        ).isSkillsSupportEnabled(),
+      ).toBe(true);
     });
 
-    it('should prioritize new skills.enabled over legacy experimental.skills in settings', async () => {
+    it('should still be enabled by default if legacy experimental.skills is false (since new default is true)', async () => {
       vi.mocked(loadServerHierarchicalMemory).mockResolvedValue({
-        settings: {},
-        configFiles: [],
+        memoryContent: '',
+        fileCount: 0,
+        filePaths: [],
       });
 
-      const settings = {
-        skills: { enabled: true },
+      const settings = createTestMergedSettings({
         experimental: { skills: false },
-      };
+      } as unknown as Settings);
 
       process.argv = ['node', 'gemini'];
       const config = await loadCliConfig(
@@ -126,7 +148,11 @@ describe('Agent Skills Backward Compatibility', () => {
         'test-session',
         await parseArguments(settings),
       );
-      expect(config.skillsSupport).toBe(true);
+      expect(
+        (
+          config as unknown as { isSkillsSupportEnabled: () => boolean }
+        ).isSkillsSupportEnabled(),
+      ).toBe(true);
     });
   });
 });
