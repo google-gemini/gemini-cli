@@ -726,9 +726,17 @@ export function getTransformedImagePath(filePath: string): string {
   return `[Image ${truncatedBase}${extension}]`;
 }
 
+// Memoization for transformations and layout to improve performance with large buffers.
+// These caches are simple because the inputs are typically many identical strings across renders.
+const transformationsCache = new Map<string, Transformation[]>();
+const transformationCacheLimit = 20000;
+
 export function calculateTransformationsForLine(
   line: string,
 ): Transformation[] {
+  const cached = transformationsCache.get(line);
+  if (cached) return cached;
+
   const transformations: Transformation[] = [];
   let match: RegExpExecArray | null;
 
@@ -747,6 +755,12 @@ export function calculateTransformationsForLine(
       collapsedText: getTransformedImagePath(logicalText),
     });
   }
+
+  if (transformationsCache.size >= transformationCacheLimit) {
+    // Prevent memory leaks by clearing when limit is reached
+    transformationsCache.clear();
+  }
+  transformationsCache.set(line, transformations);
 
   return transformations;
 }
@@ -845,6 +859,7 @@ export function calculateTransformedLine(
 
   return { transformedLine, transformedToLogMap };
 }
+
 export interface VisualLayout {
   visualLines: string[];
   // For each logical line, an array of [visualLineIndex, startColInLogical]
@@ -856,6 +871,32 @@ export interface VisualLayout {
   transformedToLogicalMaps: number[][];
   // For each visual line, its [startColInTransformed]
   visualToTransformedMap: number[];
+}
+
+// Caches for layout calculation
+interface LineLayoutResult {
+  visualLines: string[];
+  logicalToVisualMap: Array<[number, number]>;
+  visualToLogicalMap: Array<[number, number]>;
+  transformedToLogMap: number[];
+  visualToTransformedMap: number[];
+}
+
+const lineLayoutCache = new Map<string, LineLayoutResult>();
+const lineLayoutCacheLimit = 20000;
+
+function getLineLayoutCacheKey(
+  line: string,
+  viewportWidth: number,
+  isCursorOnLine: boolean,
+  cursorCol: number,
+): string {
+  // Most lines (99.9% in a large buffer) are not cursor lines.
+  // We use a simpler key for them to reduce string allocation overhead.
+  if (!isCursorOnLine) {
+    return `${viewportWidth}:N:${line}`;
+  }
+  return `${viewportWidth}:C:${cursorCol}:${line}`;
 }
 
 // Calculates the visual wrapping of lines and the mapping between logical and visual coordinates.
@@ -873,6 +914,34 @@ function calculateLayout(
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
+
+    const isCursorOnLine = logIndex === logicalCursor[0];
+    const cacheKey = getLineLayoutCacheKey(
+      logLine,
+      viewportWidth,
+      isCursorOnLine,
+      logicalCursor[1],
+    );
+    const cached = lineLayoutCache.get(cacheKey);
+
+    if (cached) {
+      const visualLineOffset = visualLines.length;
+      visualLines.push(...cached.visualLines);
+      cached.logicalToVisualMap.forEach(([relVisualIdx, logCol]) => {
+        logicalToVisualMap[logIndex].push([
+          visualLineOffset + relVisualIdx,
+          logCol,
+        ]);
+      });
+      cached.visualToLogicalMap.forEach(([, logCol]) => {
+        visualToLogicalMap.push([logIndex, logCol]);
+      });
+      transformedToLogicalMaps[logIndex] = cached.transformedToLogMap;
+      visualToTransformedMap.push(...cached.visualToTransformedMap);
+      return;
+    }
+
+    // Not in cache, calculate
     const transformations = calculateTransformationsForLine(logLine);
     const { transformedLine, transformedToLogMap } = calculateTransformedLine(
       logLine,
@@ -880,13 +949,18 @@ function calculateLayout(
       logicalCursor,
       transformations,
     );
-    transformedToLogicalMaps[logIndex] = transformedToLogMap;
+
+    const lineVisualLines: string[] = [];
+    const lineLogicalToVisualMap: Array<[number, number]> = [];
+    const lineVisualToLogicalMap: Array<[number, number]> = [];
+    const lineVisualToTransformedMap: number[] = [];
+
     if (transformedLine.length === 0) {
       // Handle empty logical line
-      logicalToVisualMap[logIndex].push([visualLines.length, 0]);
-      visualToLogicalMap.push([logIndex, 0]);
-      visualToTransformedMap.push(0);
-      visualLines.push('');
+      lineLogicalToVisualMap.push([0, 0]);
+      lineVisualToLogicalMap.push([logIndex, 0]);
+      lineVisualToTransformedMap.push(0);
+      lineVisualLines.push('');
     } else {
       // Non-empty logical line
       let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
@@ -929,15 +1003,6 @@ function calculateLayout(
                 // Single character is wider than viewport, take it anyway
                 currentChunk = char;
                 numCodePointsInChunk = 1;
-              } else if (
-                numCodePointsInChunk === 0 &&
-                charVisualWidth <= viewportWidth
-              ) {
-                // This case should ideally be caught by the next iteration if the char fits.
-                // If it doesn't fit (because currentChunkVisualWidth was already > 0 from a previous char that filled the line),
-                // then numCodePointsInChunk would not be 0.
-                // This branch means the current char *itself* doesn't fit an empty line, which is handled by the above.
-                // If we are here, it means the loop should break and the current chunk (which is empty) is finalized.
               }
             }
             break; // Break from inner loop to finalize this chunk
@@ -955,55 +1020,60 @@ function calculateLayout(
           }
         }
 
-        // If the inner loop completed without breaking (i.e., remaining text fits)
-        // or if the loop broke but numCodePointsInChunk is still 0 (e.g. first char too wide for empty line)
         if (
           numCodePointsInChunk === 0 &&
           currentPosInLogLine < codePointsInLogLine.length
         ) {
-          // This can happen if the very first character considered for a new visual line is wider than the viewport.
-          // In this case, we take that single character.
           const firstChar = codePointsInLogLine[currentPosInLogLine];
           currentChunk = firstChar;
-          numCodePointsInChunk = 1; // Ensure we advance
-        }
-
-        // If after everything, numCodePointsInChunk is still 0 but we haven't processed the whole logical line,
-        // it implies an issue, like viewportWidth being 0 or less. Avoid infinite loop.
-        if (
-          numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
-        ) {
-          // Force advance by one character to prevent infinite loop if something went wrong
-          currentChunk = codePointsInLogLine[currentPosInLogLine];
           numCodePointsInChunk = 1;
         }
 
         const logicalStartCol = transformedToLogMap[currentPosInLogLine] ?? 0;
-        logicalToVisualMap[logIndex].push([
-          visualLines.length,
-          logicalStartCol,
-        ]);
-        visualToLogicalMap.push([logIndex, logicalStartCol]);
-        visualToTransformedMap.push(currentPosInLogLine);
-        visualLines.push(currentChunk);
+        lineLogicalToVisualMap.push([lineVisualLines.length, logicalStartCol]);
+        lineVisualToLogicalMap.push([logIndex, logicalStartCol]);
+        lineVisualToTransformedMap.push(currentPosInLogLine);
+        lineVisualLines.push(currentChunk);
 
         const logicalStartOfThisChunk = currentPosInLogLine;
         currentPosInLogLine += numCodePointsInChunk;
 
-        // If the chunk processed did not consume the entire logical line,
-        // and the character immediately following the chunk is a space,
-        // advance past this space as it acted as a delimiter for word wrapping.
         if (
           logicalStartOfThisChunk + numCodePointsInChunk <
             codePointsInLogLine.length &&
-          currentPosInLogLine < codePointsInLogLine.length && // Redundant if previous is true, but safe
+          currentPosInLogLine < codePointsInLogLine.length &&
           codePointsInLogLine[currentPosInLogLine] === ' '
         ) {
           currentPosInLogLine++;
         }
       }
     }
+
+    // Cache the result for this line
+    if (lineLayoutCache.size >= lineLayoutCacheLimit) {
+      lineLayoutCache.clear();
+    }
+    lineLayoutCache.set(cacheKey, {
+      visualLines: lineVisualLines,
+      logicalToVisualMap: lineLogicalToVisualMap,
+      visualToLogicalMap: lineVisualToLogicalMap,
+      transformedToLogMap,
+      visualToTransformedMap: lineVisualToTransformedMap,
+    });
+
+    const visualLineOffset = visualLines.length;
+    visualLines.push(...lineVisualLines);
+    lineLogicalToVisualMap.forEach(([relVisualIdx, logCol]) => {
+      logicalToVisualMap[logIndex].push([
+        visualLineOffset + relVisualIdx,
+        logCol,
+      ]);
+    });
+    lineVisualToLogicalMap.forEach(([, logCol]) => {
+      visualToLogicalMap.push([logIndex, logCol]);
+    });
+    transformedToLogicalMaps[logIndex] = transformedToLogMap;
+    visualToTransformedMap.push(...lineVisualToTransformedMap);
   });
 
   // If the entire logical text was empty, ensure there's one empty visual line.
@@ -2378,6 +2448,7 @@ export function useTextBuffer({
       transformedToLogicalMaps,
       visualToTransformedMap,
       transformationsByLine,
+      visualLayout,
       setText,
       insert,
       newline,
@@ -2447,6 +2518,7 @@ export function useTextBuffer({
       transformedToLogicalMaps,
       visualToTransformedMap,
       transformationsByLine,
+      visualLayout,
       setText,
       insert,
       newline,
@@ -2540,6 +2612,7 @@ export interface TextBuffer {
   visualToTransformedMap: number[];
   /** Cached transformations per logical line */
   transformationsByLine: Transformation[][];
+  visualLayout: VisualLayout;
 
   // Actions
 

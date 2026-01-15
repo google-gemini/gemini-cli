@@ -127,9 +127,13 @@ const stringWidthCache = new Map<string, number>();
  * Follows Ink's approach with unlimited cache (no eviction)
  */
 export const getCachedStringWidth = (str: string): number => {
-  // ASCII printable chars have width 1
-  if (/^[\x20-\x7E]*$/.test(str)) {
-    return str.length;
+  // ASCII printable chars (32-126) have width 1.
+  // This is a very frequent path, so we use a fast numeric check.
+  if (str.length === 1) {
+    const code = str.charCodeAt(0);
+    if (code >= 0x20 && code <= 0x7e) {
+      return 1;
+    }
   }
 
   if (stringWidthCache.has(str)) {

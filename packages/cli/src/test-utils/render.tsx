@@ -293,6 +293,7 @@ export function renderHook<Result, Props>(
     renderCallback: (props: Props) => Result;
     props: Props;
   }) {
+    // Execute the callback on every render to capture latest state/result
     result.current = renderCallback(props);
     return null;
   }
@@ -301,6 +302,9 @@ export function renderHook<Result, Props>(
 
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
+
+  // Execute once before render to ensure result.current is set
+  result.current = renderCallback(currentProps);
 
   act(() => {
     const renderResult = render(
@@ -354,6 +358,7 @@ export function renderHookWithProviders<Result, Props>(
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
     setPropsFn = setProps;
+    // Execute the callback on every render to capture latest state/result
     result.current = renderCallback(props);
     return null;
   }

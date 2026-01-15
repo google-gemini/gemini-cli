@@ -18,12 +18,31 @@ export type HighlightToken = {
 // semicolon, common punctuation, and brackets.
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
+const highlightCache = new Map<string, readonly HighlightToken[]>();
+const highlightCacheLimit = 20000;
+
 export function parseInputForHighlighting(
   text: string,
   index: number,
   transformations: Transformation[] = [],
   cursorCol?: number,
 ): readonly HighlightToken[] {
+  // Simple cache key. Transformations are omitted from key because they are derived from text.
+  // We include cursorCol only if it's within a transformation range.
+  let isCursorInsideTransform = false;
+  if (typeof cursorCol === 'number') {
+    for (const transform of transformations) {
+      if (cursorCol >= transform.logStart && cursorCol <= transform.logEnd) {
+        isCursorInsideTransform = true;
+        break;
+      }
+    }
+  }
+
+  const cacheKey = `${index === 0 ? 'F' : 'N'}:${isCursorInsideTransform ? cursorCol : 'NC'}:${text}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached) return cached;
+
   HIGHLIGHT_REGEX.lastIndex = 0;
 
   if (!text) {
@@ -92,6 +111,12 @@ export function parseInputForHighlighting(
 
   const textAfterFinalTransformation = cpSlice(text, column);
   tokens.push(...parseUntransformedInput(textAfterFinalTransformation));
+
+  if (highlightCache.size >= highlightCacheLimit) {
+    highlightCache.clear();
+  }
+  highlightCache.set(cacheKey, tokens);
+
   return tokens;
 }
 
