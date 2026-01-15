@@ -39,10 +39,12 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
-export function resolveExecutable(exe: string): string | undefined {
+export async function resolveExecutable(
+  exe: string,
+): Promise<string | undefined> {
   if (path.isAbsolute(exe)) {
     try {
-      fs.accessSync(exe, fs.constants.X_OK);
+      await fs.promises.access(exe, fs.constants.X_OK);
       return exe;
     } catch {
       return undefined;
@@ -56,7 +58,7 @@ export function resolveExecutable(exe: string): string | undefined {
     for (const ext of extensions) {
       const fullPath = path.join(p, exe + ext);
       try {
-        fs.accessSync(fullPath, fs.constants.X_OK);
+        await fs.promises.access(fullPath, fs.constants.X_OK);
         return fullPath;
       } catch {
         continue;

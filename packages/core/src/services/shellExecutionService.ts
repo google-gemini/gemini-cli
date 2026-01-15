@@ -187,7 +187,7 @@ export class ShellExecutionService {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
-          return this.executeWithPty(
+          return await this.executeWithPty(
             commandToExecute,
             cwd,
             onOutputEvent,
@@ -449,14 +449,14 @@ export class ShellExecutionService {
     }
   }
 
-  private static executeWithPty(
+  private static async executeWithPty(
     commandToExecute: string,
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
-  ): ShellExecutionHandle {
+  ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
@@ -466,9 +466,11 @@ export class ShellExecutionService {
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
 
-      const resolvedExecutable = resolveExecutable(executable);
+      const resolvedExecutable = await resolveExecutable(executable);
       if (!resolvedExecutable) {
-        throw new Error(`Shell executable not found: ${executable}`);
+        throw new Error(
+          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
+        );
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);

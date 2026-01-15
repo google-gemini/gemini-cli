@@ -163,7 +163,7 @@ describe('ShellExecutionService', () => {
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
-    mockResolveExecutable.mockImplementation((exe: string) => exe);
+    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
     process.env['PATH'] = '/test/path';
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },
