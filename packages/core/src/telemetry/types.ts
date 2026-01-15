@@ -240,6 +240,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   mcp_server_name?: string;
   extension_name?: string;
   extension_id?: string;
+  result?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -253,6 +254,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id: string,
     tool_type: 'native' | 'mcp',
     error?: string,
+    result?: string,
   );
   constructor(
     call?: CompletedToolCall,
@@ -263,6 +265,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     prompt_id?: string,
     tool_type?: 'native' | 'mcp',
     error?: string,
+    result?: string,
   ) {
     this['event.name'] = 'tool_call';
     this['event.timestamp'] = new Date().toISOString();
@@ -289,6 +292,53 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
+      }
+
+      if (call.status === 'success') {
+        const display = call.response.resultDisplay;
+        if (typeof display === 'string') {
+          this.result = display;
+        } else if (display && typeof display === 'object') {
+          if ('fileDiff' in display) {
+            // FileDiff
+            this.result = (display as { fileDiff: string }).fileDiff;
+          } else if ('todos' in display) {
+            // TodoList
+            this.result = JSON.stringify(
+              (display as { todos: unknown[] }).todos,
+            );
+          } else if (Array.isArray(display)) {
+            // AnsiOutput
+            this.result = display
+              .map((line: Array<{ text: string }>) =>
+                line.map((token) => token.text).join(''),
+              )
+              .join('\n');
+          } else {
+            // Fallback for other object types
+            this.result = safeJsonStringify(display, 2);
+          }
+        }
+
+        // Fallback: If result is still empty, try to get it from responseParts
+        if (
+          !this.result &&
+          call.response.responseParts &&
+          call.response.responseParts.length > 0
+        ) {
+          const part = call.response.responseParts[0];
+          if ('functionResponse' in part) {
+            const response = part.functionResponse?.response;
+            if (
+              response &&
+              typeof response === 'object' &&
+              'output' in response
+            ) {
+              const output = (response as { output: unknown }).output;
+              this.result = String(output);
+            }
+          }
+        }
       }
 
       const fileDiff = getFileDiffFromResultDisplay(
@@ -323,12 +373,14 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       this.prompt_id = prompt_id!;
       this.tool_type = tool_type!;
       this.error = error;
+      this.result = result;
     }
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     const attributes: LogAttributes = {
       ...getCommonAttributes(config),
+
       'event.name': EVENT_TOOL_CALL,
       'event.timestamp': this['event.timestamp'],
       function_name: this.function_name,
@@ -344,6 +396,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       extension_id: this.extension_id,
       metadata: this.metadata,
     };
+
+    if (this.result) {
+      attributes['result'] = this.result;
+    }
 
     if (this.error) {
       attributes['error'] = this.error;

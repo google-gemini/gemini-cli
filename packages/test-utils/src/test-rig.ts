@@ -168,6 +168,7 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    result?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -331,6 +332,7 @@ export class TestRig {
         target: 'local',
         otlpEndpoint: '',
         outfile: telemetryPath,
+        logPrompts: true,
       },
       security: {
         auth: {
@@ -1038,6 +1040,7 @@ export class TestRig {
         args: string;
         success: boolean;
         duration_ms: number;
+        result?: string;
       };
     }[] = [];
 
@@ -1054,6 +1057,7 @@ export class TestRig {
             args: logData.attributes.function_args ?? '{}',
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
+            result: logData.attributes.result,
           },
         });
       }
