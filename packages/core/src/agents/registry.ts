@@ -69,6 +69,7 @@ export class AgentRegistry {
    */
   async reload(): Promise<void> {
     A2AClientManager.getInstance().clearCache();
+    await this.config.reloadAgents();
     this.agents.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
@@ -143,9 +144,14 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const cliHelpSettings = this.config.getCliHelpAgentSettings();
+    const agentsSettings = this.config.getAgentsSettings();
+    const agentsOverrides = agentsSettings.overrides ?? {};
 
-    // Only register the agent if it's enabled in the settings.
-    if (investigatorSettings?.enabled) {
+    // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
+    if (
+      investigatorSettings?.enabled &&
+      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
+    ) {
       let model;
       const settingsModel = investigatorSettings.model;
       // Check if the user explicitly set a model in the settings.
@@ -189,8 +195,11 @@ export class AgentRegistry {
       this.registerLocalAgent(agentDef);
     }
 
-    // Register the CLI help agent if it's explicitly enabled.
-    if (cliHelpSettings.enabled) {
+    // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
+    if (
+      cliHelpSettings.enabled &&
+      !agentsOverrides[CliHelpAgent.name]?.disabled
+    ) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
   }
