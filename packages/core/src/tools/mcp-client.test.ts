@@ -133,6 +133,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -213,6 +214,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -264,6 +266,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
@@ -319,6 +322,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
@@ -378,6 +382,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -451,6 +456,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -690,6 +696,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -1675,6 +1682,7 @@ describe('connectToMcpServer with OAuth', () => {
     );
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
@@ -1720,6 +1728,7 @@ describe('connectToMcpServer with OAuth', () => {
     );
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
