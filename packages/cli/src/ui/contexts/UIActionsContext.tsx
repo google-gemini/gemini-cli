@@ -60,6 +60,8 @@ export interface UIActions {
     [questionIndex: string]: string;
   }) => Promise<void>;
   clearAskUserQuestionRequest: () => void;
+  setHasActiveTextInput: (value: boolean) => void;
+  setAuthContext: (context: { requiresRestart?: boolean }) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

@@ -287,10 +287,166 @@ describe('AskUserQuestionDialog', () => {
     // Navigate forward again
     await writeKey(stdin, '\x1b[C'); // Right arrow
 
-    // Answer second question
+    // Answer second question (should advance to Review tab)
+    await writeKey(stdin, '\r', 100);
+
+    // Should be on Review tab now
+    expect(lastFrame()).toContain('Review your answers:');
+
+    // Press Enter on Review tab to submit
     await writeKey(stdin, '\r', 100);
 
     // Both answers should be submitted
     expect(onSubmit).toHaveBeenCalledWith({ '0': 'Opt1', '1': 'Opt2' });
+  });
+
+  it('shows Review tab in progress header for multiple questions', () => {
+    const multiQuestions: Question[] = [
+      {
+        question: 'Q1?',
+        header: 'First',
+        options: [
+          { label: 'Opt1', description: 'Desc1' },
+          { label: 'Opt2', description: 'Desc2' },
+        ],
+        multiSelect: false,
+      },
+      {
+        question: 'Q2?',
+        header: 'Second',
+        options: [
+          { label: 'Opt3', description: 'Desc3' },
+          { label: 'Opt4', description: 'Desc4' },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame } = renderWithProviders(
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const output = lastFrame();
+    // Should show Review tab with menu icon
+    expect(output).toContain('≡');
+    expect(output).toContain('Review');
+  });
+
+  it('allows navigating to Review tab and back', async () => {
+    const multiQuestions: Question[] = [
+      {
+        question: 'Q1?',
+        header: 'First',
+        options: [{ label: 'Opt1', description: 'Desc1' }],
+        multiSelect: false,
+      },
+      {
+        question: 'Q2?',
+        header: 'Second',
+        options: [{ label: 'Opt2', description: 'Desc2' }],
+        multiSelect: false,
+      },
+    ];
+
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // Navigate to second question
+    await writeKey(stdin, '\x1b[C'); // Right arrow
+
+    // Should be on Q2
+    expect(lastFrame()).toContain('Q2?');
+
+    // Navigate to Review tab
+    await writeKey(stdin, '\x1b[C'); // Right arrow
+
+    // Should be on Review tab
+    expect(lastFrame()).toContain('Review your answers:');
+
+    // Navigate back to Q2
+    await writeKey(stdin, '\x1b[D'); // Left arrow
+
+    // Should be on Q2 again
+    expect(lastFrame()).toContain('Q2?');
+  });
+
+  it('shows warning for unanswered questions on Review tab', async () => {
+    const multiQuestions: Question[] = [
+      {
+        question: 'Q1?',
+        header: 'First',
+        options: [{ label: 'Opt1', description: 'Desc1' }],
+        multiSelect: false,
+      },
+      {
+        question: 'Q2?',
+        header: 'Second',
+        options: [{ label: 'Opt2', description: 'Desc2' }],
+        multiSelect: false,
+      },
+    ];
+
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // Navigate directly to Review tab without answering
+    await writeKey(stdin, '\x1b[C'); // Right arrow to Q2
+    await writeKey(stdin, '\x1b[C'); // Right arrow to Review
+
+    // Should show warning
+    expect(lastFrame()).toContain('You have 2 unanswered questions');
+    expect(lastFrame()).toContain('(not answered)');
+  });
+
+  it('submits with unanswered questions when user confirms on Review', async () => {
+    const multiQuestions: Question[] = [
+      {
+        question: 'Q1?',
+        header: 'First',
+        options: [{ label: 'Opt1', description: 'Desc1' }],
+        multiSelect: false,
+      },
+      {
+        question: 'Q2?',
+        header: 'Second',
+        options: [{ label: 'Opt2', description: 'Desc2' }],
+        multiSelect: false,
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin } = renderWithProviders(
+      <AskUserQuestionDialog
+        questions={multiQuestions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // Answer only first question
+    await writeKey(stdin, '\r', 100);
+
+    // Navigate to Review tab
+    await writeKey(stdin, '\x1b[C'); // Right arrow to Review
+
+    // Press Enter to submit with partial answers
+    await writeKey(stdin, '\r', 100);
+
+    // Should submit with only the first answer
+    expect(onSubmit).toHaveBeenCalledWith({ '0': 'Opt1' });
   });
 });

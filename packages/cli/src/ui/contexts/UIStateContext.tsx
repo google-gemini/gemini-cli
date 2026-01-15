@@ -74,6 +74,7 @@ export interface UIState {
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   askUserQuestionRequest: AskUserQuestionState | null;
+  hasActiveTextInput: boolean;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;

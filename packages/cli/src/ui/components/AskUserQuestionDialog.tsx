@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
@@ -16,11 +22,13 @@ interface AskUserQuestionDialogProps {
   questions: Question[];
   onSubmit: (answers: { [questionIndex: string]: string }) => void;
   onCancel: () => void;
+  onActiveTextInputChange?: (active: boolean) => void;
 }
 
 interface QuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
+  onSelectionChange?: (answer: string) => void;
   onEditingOther?: (editing: boolean) => void;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
@@ -31,12 +39,16 @@ interface QuestionProgressHeaderProps {
   questions: Question[];
   currentIndex: number;
   answeredIndices: Set<number>;
+  showReviewTab?: boolean;
+  isOnReviewTab?: boolean;
 }
 
 const QuestionProgressHeader: React.FC<QuestionProgressHeaderProps> = ({
   questions,
   currentIndex,
   answeredIndices,
+  showReviewTab = false,
+  isOnReviewTab = false,
 }) => {
   if (questions.length <= 1) return null;
 
@@ -51,15 +63,96 @@ const QuestionProgressHeader: React.FC<QuestionProgressHeaderProps> = ({
           </Text>
           <Text
             color={
-              i === currentIndex ? theme.text.accent : theme.text.secondary
+              i === currentIndex && !isOnReviewTab
+                ? theme.text.accent
+                : theme.text.secondary
             }
-            bold={i === currentIndex}
+            bold={i === currentIndex && !isOnReviewTab}
           >
             {q.header}
           </Text>
         </React.Fragment>
       ))}
+      {showReviewTab && (
+        <>
+          <Text color={theme.text.secondary}>{' │ '}</Text>
+          <Text color={theme.text.secondary}>{'≡'} </Text>
+          <Text
+            color={isOnReviewTab ? theme.text.accent : theme.text.secondary}
+            bold={isOnReviewTab}
+          >
+            Review
+          </Text>
+        </>
+      )}
       <Text color={theme.text.secondary}>{' →'}</Text>
+    </Box>
+  );
+};
+
+interface ReviewViewProps {
+  questions: Question[];
+  answers: { [key: string]: string };
+  onSubmit: () => void;
+  progressHeader?: React.ReactNode;
+}
+
+const ReviewView: React.FC<ReviewViewProps> = ({
+  questions,
+  answers,
+  onSubmit,
+  progressHeader,
+}) => {
+  const unansweredCount = questions.length - Object.keys(answers).length;
+  const hasUnanswered = unansweredCount > 0;
+
+  // Handle Enter to submit
+  useKeypress(
+    (key: Key) => {
+      if (key.name === 'return') {
+        onSubmit();
+      }
+    },
+    { isActive: true },
+  );
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      paddingX={1}
+      borderColor={theme.border.default}
+    >
+      {progressHeader}
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.primary}>
+          Review your answers:
+        </Text>
+      </Box>
+
+      {hasUnanswered && (
+        <Box marginBottom={1}>
+          <Text color={theme.status.warning}>
+            ⚠ You have {unansweredCount} unanswered question
+            {unansweredCount > 1 ? 's' : ''}
+          </Text>
+        </Box>
+      )}
+
+      {questions.map((q, i) => (
+        <Box key={i} marginBottom={0}>
+          <Text color={theme.text.secondary}>{q.header}</Text>
+          <Text color={theme.text.secondary}> → </Text>
+          <Text color={answers[i] ? theme.text.primary : theme.status.warning}>
+            {answers[i] || '(not answered)'}
+          </Text>
+        </Box>
+      ))}
+      <Box marginTop={1}>
+        <Text color={theme.text.secondary}>
+          Enter to submit · ←/→ to edit answers · Esc to cancel
+        </Text>
+      </Box>
     </Box>
   );
 };
@@ -75,6 +168,7 @@ interface OptionItem {
 const QuestionView: React.FC<QuestionViewProps> = ({
   question,
   onAnswer,
+  onSelectionChange,
   onEditingOther,
   initialAnswer,
   progressHeader,
@@ -130,16 +224,52 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   );
   const [isOtherFocused, setIsOtherFocused] = useState(false);
 
+  // Helper to build answer string from selections
+  const buildAnswerString = useCallback(
+    (indices: Set<number>, includeOther: boolean, other: string) => {
+      const answers: string[] = [];
+      question.options.forEach((opt, i) => {
+        if (indices.has(i)) {
+          answers.push(opt.label);
+        }
+      });
+      if (includeOther && other.trim()) {
+        answers.push(other.trim());
+      }
+      return answers.join(', ');
+    },
+    [question.options],
+  );
+
   // Handle inline typing when "Other" is focused
   const handleOtherTyping = useCallback(
     (key: Key) => {
       if (!isOtherFocused) return;
 
+      // Handle Ctrl+C to clear all text
+      if (key.ctrl && key.name === 'c') {
+        setOtherText('');
+        setIsOtherSelected(false);
+        // Save for multi-select
+        if (question.multiSelect) {
+          onSelectionChange?.(buildAnswerString(selectedIndices, false, ''));
+        }
+        return;
+      }
+
       // Handle backspace
       if (key.name === 'backspace' || key.name === 'delete') {
-        setOtherText((prev) => prev.slice(0, -1));
-        if (otherText.length <= 1) {
+        const newText = otherText.slice(0, -1);
+        setOtherText(newText);
+        const newIsOtherSelected = newText.length > 0;
+        if (!newIsOtherSelected) {
           setIsOtherSelected(false);
+        }
+        // Save for multi-select
+        if (question.multiSelect) {
+          onSelectionChange?.(
+            buildAnswerString(selectedIndices, newIsOtherSelected, newText),
+          );
         }
         return;
       }
@@ -152,16 +282,29 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         !key.meta &&
         key.sequence.charCodeAt(0) >= 32
       ) {
-        setOtherText((prev) => prev + key.sequence);
+        const newText = otherText + key.sequence;
+        setOtherText(newText);
         // Only mark as selected in multi-select mode (for single-select, green/checkmark
         // should only appear for previously submitted answers from initialAnswer)
         if (question.multiSelect) {
           setIsOtherSelected(true);
+          // Save immediately so navigation preserves it
+          onSelectionChange?.(
+            buildAnswerString(selectedIndices, true, newText),
+          );
         }
         onEditingOther?.(true);
       }
     },
-    [isOtherFocused, otherText.length, onEditingOther, question.multiSelect],
+    [
+      isOtherFocused,
+      otherText,
+      onEditingOther,
+      question.multiSelect,
+      onSelectionChange,
+      buildAnswerString,
+      selectedIndices,
+    ],
   );
 
   useKeypress(handleOtherTyping, { isActive: isOtherFocused });
@@ -219,31 +362,32 @@ const QuestionView: React.FC<QuestionViewProps> = ({
     (itemValue: OptionItem) => {
       if (question.multiSelect) {
         if (itemValue.type === 'option') {
-          setSelectedIndices((prev) => {
-            const next = new Set(prev);
-            if (next.has(itemValue.index)) {
-              next.delete(itemValue.index);
-            } else {
-              next.add(itemValue.index);
-            }
-            return next;
-          });
+          const newIndices = new Set(selectedIndices);
+          if (newIndices.has(itemValue.index)) {
+            newIndices.delete(itemValue.index);
+          } else {
+            newIndices.add(itemValue.index);
+          }
+          setSelectedIndices(newIndices);
+          // Save selection immediately so navigation preserves it
+          onSelectionChange?.(
+            buildAnswerString(newIndices, isOtherSelected, otherText),
+          );
         } else if (itemValue.type === 'other') {
           // Toggle other selection
           if (otherText.trim()) {
-            setIsOtherSelected((prev) => !prev);
+            const newIsOtherSelected = !isOtherSelected;
+            setIsOtherSelected(newIsOtherSelected);
+            // Save selection immediately
+            onSelectionChange?.(
+              buildAnswerString(selectedIndices, newIsOtherSelected, otherText),
+            );
           }
         } else if (itemValue.type === 'done') {
-          const answers: string[] = [];
-          question.options.forEach((opt, i) => {
-            if (selectedIndices.has(i)) {
-              answers.push(opt.label);
-            }
-          });
-          if (isOtherSelected && otherText.trim()) {
-            answers.push(otherText.trim());
-          }
-          onAnswer(answers.join(', '));
+          // Done just triggers navigation, selections already saved
+          onAnswer(
+            buildAnswerString(selectedIndices, isOtherSelected, otherText),
+          );
         }
       } else {
         if (itemValue.type === 'option') {
@@ -256,7 +400,15 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         }
       }
     },
-    [question, selectedIndices, isOtherSelected, otherText, onAnswer],
+    [
+      question.multiSelect,
+      selectedIndices,
+      isOtherSelected,
+      otherText,
+      onAnswer,
+      onSelectionChange,
+      buildAnswerString,
+    ],
   );
 
   return (
@@ -386,19 +538,33 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
   questions,
   onSubmit,
   onCancel,
+  onActiveTextInputChange,
 }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   const [editingOther, setEditingOther] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  // Use ref for synchronous check to prevent race conditions during unmount
+  // Use refs for synchronous checks to prevent race conditions
   const submittedRef = useRef(false);
+  const editingOtherRef = useRef(false);
+  editingOtherRef.current = editingOther;
 
-  // Handle Escape or Ctrl+C to cancel
+  // Sync editingOther state with parent for global keypress handling
+  // Clean up on unmount to ensure Ctrl+C works normally after dialog closes
+  useEffect(() => {
+    onActiveTextInputChange?.(editingOther);
+    return () => {
+      onActiveTextInputChange?.(false);
+    };
+  }, [editingOther, onActiveTextInputChange]);
+
+  // Handle Escape or Ctrl+C to cancel (but not Ctrl+C when editing Other)
   const handleCancel = useCallback(
     (key: Key) => {
       if (submittedRef.current) return;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      if (key.name === 'escape') {
+        onCancel();
+      } else if (key.ctrl && key.name === 'c' && !editingOtherRef.current) {
         onCancel();
       }
     },
@@ -409,13 +575,20 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
     isActive: !submitted,
   });
 
+  // Review tab is at index questions.length (after all questions)
+  const reviewTabIndex = questions.length;
+  const isOnReviewTab = currentQuestionIndex === reviewTabIndex;
+
   // Bidirectional navigation between questions using custom useKeypress for consistency
   const handleNavigation = useCallback(
     (key: Key) => {
       if (editingOther || submittedRef.current) return;
 
       if (key.name === 'tab' || key.name === 'right') {
-        if (currentQuestionIndex < questions.length - 1) {
+        // Allow navigation up to Review tab for multi-question flows
+        const maxIndex =
+          questions.length > 1 ? reviewTabIndex : questions.length - 1;
+        if (currentQuestionIndex < maxIndex) {
           setCurrentQuestionIndex((prev) => prev + 1);
         }
       } else if (key.name === 'left') {
@@ -424,7 +597,7 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
         }
       }
     },
-    [editingOther, currentQuestionIndex, questions.length],
+    [editingOther, currentQuestionIndex, questions.length, reviewTabIndex],
   );
 
   useKeypress(handleNavigation, {
@@ -435,18 +608,56 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
     (answer: string) => {
       if (submittedRef.current) return;
 
-      const newAnswers = { ...answers, [currentQuestionIndex]: answer };
-      setAnswers(newAnswers);
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex((prev) => prev + 1);
-      } else {
-        // Set ref first (synchronous) to prevent any further input handling
+      // Only record non-empty answers
+      const hasAnswer = answer && answer.trim();
+      const newAnswers = hasAnswer
+        ? { ...answers, [currentQuestionIndex]: answer }
+        : answers;
+      if (hasAnswer) {
+        setAnswers(newAnswers);
+      }
+
+      // For single questions, submit directly (no review tab)
+      if (questions.length === 1) {
         submittedRef.current = true;
         setSubmitted(true);
         onSubmit(newAnswers);
+        return;
+      }
+
+      // For multi-questions, advance to next question or Review tab
+      if (currentQuestionIndex < reviewTabIndex) {
+        setCurrentQuestionIndex((prev) => prev + 1);
       }
     },
-    [currentQuestionIndex, questions.length, answers, onSubmit],
+    [currentQuestionIndex, questions.length, answers, onSubmit, reviewTabIndex],
+  );
+
+  // Submit from Review tab
+  const handleReviewSubmit = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setSubmitted(true);
+    onSubmit(answers);
+  }, [answers, onSubmit]);
+
+  // Save multi-select selections without triggering navigation
+  const handleSelectionChange = useCallback(
+    (answer: string) => {
+      if (submittedRef.current) return;
+      const hasAnswer = answer && answer.trim();
+      if (hasAnswer) {
+        setAnswers((prev) => ({ ...prev, [currentQuestionIndex]: answer }));
+      } else {
+        // Remove empty answer from state
+        setAnswers((prev) => {
+          const next = { ...prev };
+          delete next[currentQuestionIndex];
+          return next;
+        });
+      }
+    },
+    [currentQuestionIndex],
   );
 
   const answeredIndices = useMemo(
@@ -456,16 +667,31 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  if (!currentQuestion) return null;
-
   const progressHeader =
     questions.length > 1 ? (
       <QuestionProgressHeader
         questions={questions}
         currentIndex={currentQuestionIndex}
         answeredIndices={answeredIndices}
+        showReviewTab={true}
+        isOnReviewTab={isOnReviewTab}
       />
     ) : null;
+
+  // Render Review tab when on it
+  if (isOnReviewTab) {
+    return (
+      <ReviewView
+        questions={questions}
+        answers={answers}
+        onSubmit={handleReviewSubmit}
+        progressHeader={progressHeader}
+      />
+    );
+  }
+
+  // Safeguard for invalid question index
+  if (!currentQuestion) return null;
 
   const keyboardHints = (
     <Box marginTop={1}>
@@ -482,6 +708,7 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
       key={currentQuestionIndex}
       question={currentQuestion}
       onAnswer={handleAnswer}
+      onSelectionChange={handleSelectionChange}
       onEditingOther={setEditingOther}
       initialAnswer={answers[currentQuestionIndex]}
       progressHeader={progressHeader}

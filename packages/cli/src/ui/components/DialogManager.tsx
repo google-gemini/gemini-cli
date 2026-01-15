@@ -57,6 +57,7 @@ export const DialogManager = ({
         questions={uiState.askUserQuestionRequest.questions}
         onSubmit={uiActions.handleAskUserQuestionSubmit}
         onCancel={uiActions.clearAskUserQuestionRequest}
+        onActiveTextInputChange={uiActions.setHasActiveTextInput}
       />
     );
   }
@@ -193,6 +194,7 @@ export const DialogManager = ({
           setAuthState={uiActions.setAuthState}
           authError={uiState.authError}
           onAuthError={uiActions.onAuthError}
+          setAuthContext={uiActions.setAuthContext}
         />
       </Box>
     );

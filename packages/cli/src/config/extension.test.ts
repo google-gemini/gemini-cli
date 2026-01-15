@@ -23,6 +23,8 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   KeychainTokenStorage,
+  loadAgentsFromDirectory,
+  loadSkillsFromDir,
 } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from './settings.js';
 import {
@@ -117,6 +119,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       listSecrets: vi.fn(),
       isAvailable: vi.fn().mockResolvedValue(true),
     })),
+    loadAgentsFromDirectory: vi
+      .fn()
+      .mockImplementation(async () => ({ agents: [], errors: [] })),
+    loadSkillsFromDir: vi.fn().mockImplementation(async () => []),
   };
 });
 
@@ -171,6 +177,11 @@ describe('extension tests', () => {
     (
       KeychainTokenStorage as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => mockKeychainStorage);
+    vi.mocked(loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
+    vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
@@ -189,11 +200,13 @@ describe('extension tests', () => {
       source: undefined,
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+    const settings = loadSettings(tempWorkspaceDir).merged;
+    (settings.experimental ??= {}).extensionConfig = true;
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
-      settings: loadSettings(tempWorkspaceDir).merged,
+      settings,
     });
     resetTrustedFoldersForTesting();
   });
@@ -1285,10 +1298,11 @@ describe('extension tests', () => {
 
       expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
-${INSTALL_WARNING_MESSAGE}
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
-  * test-server-2 (remote): https://google.com`,
+  * test-server-2 (remote): https://google.com
+
+${INSTALL_WARNING_MESSAGE}`,
       );
     });
 

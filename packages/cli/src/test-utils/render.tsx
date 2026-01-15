@@ -133,6 +133,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
 };
@@ -173,6 +174,8 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   handleAskUserQuestionSubmit: vi.fn(),
   clearAskUserQuestionRequest: vi.fn(),
+  setHasActiveTextInput: vi.fn(),
+  setAuthContext: vi.fn(),
 };
 
 export const renderWithProviders = (
