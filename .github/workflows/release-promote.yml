@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -169,12 +169,12 @@ jobs:
             sha: '${{ github.event.inputs.ref }}'
     steps:
       - name: 'Checkout Ref'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ matrix.sha }}'
           path: 'release'
@@ -208,12 +208,12 @@ jobs:
       issues: 'write'
     steps:
       - name: 'Checkout Ref'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
@@ -274,12 +274,12 @@ jobs:
       issues: 'write'
     steps:
       - name: 'Checkout Ref'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
           path: 'release'
@@ -339,7 +339,7 @@ jobs:
       issues: 'write'
     steps:
       - name: 'Checkout Ref'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8'
         with:
           ref: '${{ github.event.inputs.ref }}'
 

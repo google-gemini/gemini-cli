@@ -47,7 +47,7 @@ jobs:
       duplicate_issues_csv: '${{ env.DUPLICATE_ISSUES_CSV }}'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v5
 
       - name: 'Log in to GitHub Container Registry'
         uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
