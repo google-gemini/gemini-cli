@@ -73,6 +73,8 @@ export interface CliArgs {
   resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
+  manager: boolean | undefined;
+  sandboxWorkers: boolean | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useWriteTodos: boolean | undefined;
@@ -225,6 +227,16 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('screen-reader', {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
+        })
+        .option('manager', {
+          type: 'boolean',
+          description:
+            'Start in Manager Mode to orchestrate multiple sessions.',
+        })
+        .option('sandbox-workers', {
+          type: 'boolean',
+          description:
+            'Force worker sessions to run in a sandbox, even if the manager is not sandboxed.',
         })
         .option('output-format', {
           alias: 'o',
@@ -703,6 +715,8 @@ export async function loadCliConfig(
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
+    managerMode: argv.manager,
+    sandboxWorkers: argv.sandboxWorkers,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     skillsSupport: settings.experimental?.skills,

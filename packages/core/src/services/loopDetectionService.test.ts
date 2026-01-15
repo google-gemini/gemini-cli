@@ -38,6 +38,8 @@ describe('LoopDetectionService', () => {
     mockConfig = {
       getTelemetryEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -757,6 +759,8 @@ describe('LoopDetectionService LLM Checks', () => {
         }),
       },
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getModelAvailabilityService: vi.fn().mockReturnValue(mockAvailability),
     } as unknown as Config;
 

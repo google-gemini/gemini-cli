@@ -82,6 +82,8 @@ const mockConfig = {
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
   getMessageBus: () => null,
   isInteractive: () => false,
+  isManagerMode: () => false,
+  isSandboxWorkers: () => false,
   getExperiments: () => {},
   getEnableHooks: () => false,
 } as unknown as Config;
@@ -505,6 +507,8 @@ describe('useReactToolScheduler', () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
     const config = createMockConfigOverride({
       isInteractive: () => true,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const expectedOutput = 'Confirmed output';
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
@@ -558,6 +562,8 @@ describe('useReactToolScheduler', () => {
     mockToolRegistry.getTool.mockReturnValue(mockToolRequiresConfirmation);
     const config = createMockConfigOverride({
       isInteractive: () => true,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const { result } = renderScheduler(config);
     const schedule = result.current[1];

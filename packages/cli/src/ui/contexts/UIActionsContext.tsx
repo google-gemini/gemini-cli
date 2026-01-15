@@ -34,6 +34,7 @@ export interface UIActions {
   closeModelDialog: () => void;
   openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
+  toggleSessionsView: () => void;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
   handleIdePromptComplete: (result: IdeIntegrationNudgeResult) => void;

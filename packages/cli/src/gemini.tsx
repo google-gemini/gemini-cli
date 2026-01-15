@@ -96,6 +96,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { SessionManager } from './services/session-manager.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -176,6 +177,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
+  sessionManager?: SessionManager,
 ) {
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
@@ -231,6 +233,7 @@ export async function startInteractiveUI(
                     version={version}
                     resumedSessionData={resumedSessionData}
                     initializationResult={initializationResult}
+                    sessionManager={sessionManager}
                   />
                 </VimModeProvider>
               </SessionStatsProvider>
@@ -467,6 +470,24 @@ export async function main() {
     });
     loadConfigHandle?.end();
 
+    let sessionManager: SessionManager | undefined;
+    if (config.isManagerMode()) {
+      try {
+        sessionManager = new SessionManager(config.getProjectRoot(), {
+          useSandbox: config.isSandboxWorkers(),
+        });
+        await sessionManager.initialize();
+
+        debugLogger.log('Manager Mode enabled. Session Manager initialized.');
+      } catch (error) {
+        debugLogger.error('Failed to initialize Session Manager:', error);
+        coreEvents.emitFeedback(
+          'error',
+          `Failed to initialize Manager Mode: ${error}`,
+        );
+      }
+    }
+
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
         './utils/activityLogger.js'
@@ -618,6 +639,7 @@ export async function main() {
         process.cwd(),
         resumedSessionData,
         initializationResult,
+        sessionManager,
       );
       return;
     }

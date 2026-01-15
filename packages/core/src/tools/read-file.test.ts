@@ -46,6 +46,8 @@ describe('ReadFileTool', () => {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
   });

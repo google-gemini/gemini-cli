@@ -226,6 +226,8 @@ describe('loggers', () => {
           }),
         }),
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -271,6 +273,8 @@ describe('loggers', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -308,6 +312,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -343,6 +349,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -519,6 +527,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -651,6 +661,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getContentGeneratorConfig: () => ({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
@@ -727,6 +739,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true, // Enabled
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
         }),
@@ -814,6 +828,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false, // Disabled
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_VERTEX_AI,
         }),
@@ -867,6 +883,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
         getUsageStatisticsEnabled: () => true,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
@@ -903,6 +921,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -930,6 +950,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1024,6 +1046,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -1594,6 +1618,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as Config;
 
     const mockMetrics = {
@@ -1654,6 +1680,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1693,6 +1721,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1762,6 +1792,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1812,6 +1844,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1864,6 +1898,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1908,6 +1944,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1953,6 +1991,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1998,6 +2038,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2034,6 +2076,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2085,6 +2129,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2120,6 +2166,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getTelemetryLogPromptsEnabled: () => false,
     } as unknown as Config;
 

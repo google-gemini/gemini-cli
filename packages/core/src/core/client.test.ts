@@ -284,6 +284,8 @@ describe('Gemini Client (client.ts)', () => {
         },
       },
       isInteractive: vi.fn().mockReturnValue(false),
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getExperiments: () => {},
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),

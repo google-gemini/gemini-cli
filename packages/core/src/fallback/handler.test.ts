@@ -76,6 +76,8 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getPreviewFeatures: vi.fn(() => false),
     getUserTier: vi.fn(() => undefined),
     isInteractive: vi.fn(() => false),
+    isManagerMode: () => false,
+    isSandboxWorkers: () => false,
     ...overrides,
   }) as unknown as Config;
 

@@ -155,6 +155,7 @@ const mockUIActions: UIActions = {
   handleResumeSession: vi.fn(),
   handleDeleteSession: vi.fn(),
   closePermissionsDialog: vi.fn(),
+  toggleSessionsView: vi.fn(),
   setShellModeActive: vi.fn(),
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),

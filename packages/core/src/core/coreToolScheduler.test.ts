@@ -249,6 +249,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getUsageStatisticsEnabled: () => true,
     getDebugMode: () => false,
     isInteractive: () => true,
+    isManagerMode: () => false,
+    isSandboxWorkers: () => false,
     getApprovalMode: () => ApprovalMode.DEFAULT,
     setApprovalMode: () => {},
     getAllowedTools: () => [],
@@ -337,6 +339,8 @@ describe('CoreToolScheduler', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -600,6 +604,8 @@ describe('CoreToolScheduler', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => true,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -655,6 +661,8 @@ describe('CoreToolScheduler', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => mockToolRegistry,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
 
     const scheduler = new CoreToolScheduler({
@@ -954,6 +962,8 @@ describe('CoreToolScheduler YOLO mode', () => {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1046,6 +1056,8 @@ describe('CoreToolScheduler request queueing', () => {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1171,6 +1183,8 @@ describe('CoreToolScheduler request queueing', () => {
         },
       }),
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1576,6 +1590,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1681,6 +1697,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
     const mockMessageBus = createMockMessageBus();
     mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
@@ -1881,6 +1899,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
           check: mockPolicyEngineCheck,
         }) as unknown as PolicyEngine,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     });
 
     const scheduler = new CoreToolScheduler({

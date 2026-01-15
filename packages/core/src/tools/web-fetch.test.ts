@@ -149,6 +149,8 @@ describe('WebFetchTool', () => {
         })),
       },
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
   });
 

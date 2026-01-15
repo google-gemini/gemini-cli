@@ -186,6 +186,8 @@ describe('GeminiChat', () => {
         }),
       },
       isInteractive: vi.fn().mockReturnValue(false),
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getEnableHooks: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
       setActiveModel: vi

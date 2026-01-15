@@ -15,6 +15,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
+import { SessionsView } from '../components/SessionsView.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
@@ -48,7 +49,9 @@ export const DefaultAppLayout: React.FC = () => {
         <Notifications />
         <CopyModeWarning />
 
-        {uiState.customDialog ? (
+        {uiState.isSessionsViewOpen ? (
+          <SessionsView />
+        ) : uiState.customDialog ? (
           uiState.customDialog
         ) : uiState.dialogsVisible ? (
           <DialogManager

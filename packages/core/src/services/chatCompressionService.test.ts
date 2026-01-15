@@ -154,6 +154,8 @@ describe('ChatCompressionService', () => {
         generateContent: mockGenerateContent,
       }),
       isInteractive: vi.fn().mockReturnValue(false),
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getContentGenerator: vi.fn().mockReturnValue({
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
       }),

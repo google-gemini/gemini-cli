@@ -70,6 +70,8 @@ describe('executeToolCall', () => {
         check: async () => ({ decision: PolicyDecision.ALLOW }),
       }),
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getExperiments: () => {},
       getEnableHooks: () => false,
     } as unknown as Config;

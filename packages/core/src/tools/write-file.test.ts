@@ -106,6 +106,8 @@ const mockConfigInternal = {
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
+  isManagerMode: () => false,
+  isSandboxWorkers: () => false,
   getDisableLLMCorrection: vi.fn(() => false),
 };
 const mockConfig = mockConfigInternal as unknown as Config;

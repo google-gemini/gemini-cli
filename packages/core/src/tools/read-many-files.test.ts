@@ -90,6 +90,8 @@ describe('ReadManyFilesTool', () => {
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
@@ -505,6 +507,8 @@ describe('ReadManyFilesTool', () => {
           getReadManyFilesExcludes: () => [],
         }),
         isInteractive: () => false,
+        isManagerMode: () => false,
+        isSandboxWorkers: () => false,
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 

@@ -303,6 +303,8 @@ export interface ConfigParameters {
   listSessions?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
+  managerMode?: boolean;
+  sandboxWorkers?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
   enableExtensionReloading?: boolean;
@@ -433,6 +435,8 @@ export class Config {
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
+  private readonly managerMode: boolean;
+  private readonly sandboxWorkers: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
@@ -580,6 +584,8 @@ export class Config {
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
+    this.managerMode = params.managerMode ?? false;
+    this.sandboxWorkers = params.sandboxWorkers ?? false;
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
     this._enabledExtensions = params.enabledExtensions ?? [];
@@ -1397,6 +1403,14 @@ export class Config {
 
   getListExtensions(): boolean {
     return this.listExtensions;
+  }
+
+  isManagerMode(): boolean {
+    return this.managerMode;
+  }
+
+  isSandboxWorkers(): boolean {
+    return this.sandboxWorkers;
   }
 
   getListSessions(): boolean {

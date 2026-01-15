@@ -43,9 +43,17 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 
+import {
+  type ActiveSession,
+  type WorkflowTask,
+} from '../../services/session-manager.js';
+
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
+  isSessionsViewOpen: boolean;
+  activeSessions: ActiveSession[];
+  workflowTasks: WorkflowTask[];
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;

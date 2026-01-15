@@ -129,6 +129,17 @@ import {
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
+import {
+  type SessionManager,
+  type ActiveSession,
+  type WorkflowTask,
+} from '../services/session-manager.js';
+import { StartSessionTool } from '../tools/manager/start-session-tool.js';
+import { ListSessionsTool } from '../tools/manager/list-sessions-tool.js';
+import { SendSessionInputTool } from '../tools/manager/send-session-input-tool.js';
+import { PlanWorkflowTool } from '../tools/manager/plan-workflow-tool.js';
+import { TailSessionTool } from '../tools/manager/tail-session-tool.js';
+import { StopSessionTool } from '../tools/manager/stop-session-tool.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -147,6 +158,7 @@ interface AppContainerProps {
   version: string;
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
+  sessionManager?: SessionManager;
 }
 
 /**
@@ -162,7 +174,8 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
-  const { config, initializationResult, resumedSessionData } = props;
+  const { config, initializationResult, resumedSessionData, sessionManager } =
+    props;
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
@@ -170,6 +183,11 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+
+  const [isSessionsViewOpen, setIsSessionsViewOpen] = useState(false);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [workflowTasks, setWorkflowTasks] = useState<WorkflowTask[]>([]);
+
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -256,6 +274,28 @@ export const AppContainer = (props: AppContainerProps) => {
     [],
   );
 
+  const toggleSessionsView = useCallback(() => {
+    if (!sessionManager) return;
+    setIsSessionsViewOpen((prev) => !prev);
+    // Refresh sessions when opening
+    if (!isSessionsViewOpen) {
+      setActiveSessions(sessionManager.getSessions());
+      setWorkflowTasks(sessionManager.getTasks());
+    }
+  }, [sessionManager, isSessionsViewOpen]);
+
+  // Poll for session updates if view is open
+  useEffect(() => {
+    if (!isSessionsViewOpen || !sessionManager) return;
+
+    const interval = setInterval(() => {
+      setActiveSessions(sessionManager.getSessions());
+      setWorkflowTasks(sessionManager.getTasks());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isSessionsViewOpen, sessionManager]);
+
   const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
@@ -289,6 +329,46 @@ export const AppContainer = (props: AppContainerProps) => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
       await config.initialize();
+
+      if (sessionManager && config.isManagerMode()) {
+        const toolRegistry = config.getToolRegistry();
+        const messageBus = config.getMessageBus();
+
+        // Register tools dynamically
+        toolRegistry.registerTool(
+          new StartSessionTool(sessionManager, messageBus),
+        );
+        toolRegistry.registerTool(
+          new ListSessionsTool(sessionManager, messageBus),
+        );
+        toolRegistry.registerTool(
+          new SendSessionInputTool(sessionManager, messageBus),
+        );
+        toolRegistry.registerTool(
+          new PlanWorkflowTool(sessionManager, messageBus),
+        );
+        toolRegistry.registerTool(
+          new TailSessionTool(sessionManager, messageBus),
+        );
+        toolRegistry.registerTool(
+          new StopSessionTool(sessionManager, messageBus),
+        );
+
+        // We also need to notify the client/agent that new tools are available
+        const geminiClient = config.getGeminiClient();
+        if (geminiClient && geminiClient.isInitialized()) {
+          await geminiClient.setTools();
+        }
+
+        // Listen for session completion to auto-wake the manager
+        sessionManager.on('session_completed', (session: ActiveSession) => {
+          const msg = `System Notification: Session ${session.id} (${session.branchName}) completed with status: ${session.status}.`;
+          addMessage(msg);
+        });
+
+        debugLogger.log('[AppContainer] Registered Manager Mode tools.');
+      }
+
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
@@ -1244,6 +1324,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      if (keyMatchers[Command.TOGGLE_SESSIONS_VIEW](key)) {
+        debugLogger.log(
+          '[AppContainer] Toggle Sessions View triggered. SessionManager:',
+          !!sessionManager,
+        );
+        toggleSessionsView();
+        return;
+      }
+
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
@@ -1340,6 +1429,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       copyModeEnabled,
       isAlternateBuffer,
       handleWarning,
+      sessionManager,
+      toggleSessionsView,
     ],
   );
 
@@ -1457,6 +1548,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isSessionsViewOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
@@ -1522,6 +1614,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => ({
       history: historyManager.history,
       historyManager,
+      isSessionsViewOpen,
+      activeSessions,
+      workflowTasks,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
@@ -1707,6 +1802,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      isSessionsViewOpen,
+      activeSessions,
+      workflowTasks,
     ],
   );
 
@@ -1730,6 +1828,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeModelDialog,
       openPermissionsDialog,
       closePermissionsDialog,
+      toggleSessionsView,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1766,6 +1865,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeModelDialog,
       openPermissionsDialog,
       closePermissionsDialog,
+      toggleSessionsView,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,

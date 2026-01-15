@@ -106,6 +106,8 @@ describe('BaseLlmClient', () => {
         .mockReturnValue({ authType: AuthType.USE_GEMINI }),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
       isInteractive: vi.fn().mockReturnValue(false),
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       modelConfigService: {
         getResolvedConfig: vi
           .fn()

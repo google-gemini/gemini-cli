@@ -28,6 +28,8 @@ function createMockConfig(logPromptsEnabled: boolean): Config {
     getSessionId: () => 'test-session-id',
     getModel: () => 'gemini-1.5-flash',
     isInteractive: () => true,
+    isManagerMode: () => false,
+    isSandboxWorkers: () => false,
     getUserEmail: () => undefined,
   } as unknown as Config;
 }

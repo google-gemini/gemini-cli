@@ -140,7 +140,9 @@ vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
-    isInteractive: () => false,
+    isInteractive: vi.fn(() => false),
+    isManagerMode: () => false,
+    isSandboxWorkers: () => false,
     setTerminalBackground: vi.fn(),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
@@ -406,6 +408,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     const { loadSettings } = await import('./config/settings.js');
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => true,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => '',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -477,6 +481,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      manager: undefined,
+      sandboxWorkers: undefined,
     });
 
     await act(async () => {
@@ -523,6 +529,8 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     const mockConfig = {
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => '',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -608,6 +616,8 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     const mockConfig = {
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => '',
       getSandbox: () => true,
       getDebugMode: () => false,
@@ -682,6 +692,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => 'test',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -767,6 +779,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => true,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => '',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -852,6 +866,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => 'test',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -931,6 +947,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => 'test-question',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -1096,6 +1114,8 @@ describe('gemini.tsx main function exit codes', () => {
 
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => 'test',
       getSandbox: () => false,
       getDebugMode: () => false,
@@ -1165,6 +1185,8 @@ describe('gemini.tsx main function exit codes', () => {
 
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getQuestion: () => '',
       getSandbox: () => false,
       getDebugMode: () => false,

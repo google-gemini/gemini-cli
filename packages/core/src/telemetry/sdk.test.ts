@@ -75,6 +75,8 @@ describe('Telemetry SDK', () => {
       getSessionId: () => 'test-session',
       getTelemetryUseCliAuth: () => false,
       isInteractive: () => false,
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
     } as unknown as Config;
   });
 

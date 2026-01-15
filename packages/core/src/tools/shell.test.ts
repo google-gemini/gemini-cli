@@ -102,6 +102,8 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn(),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
+      isManagerMode: () => false,
+      isSandboxWorkers: () => false,
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     } as unknown as Config;
 

@@ -426,7 +426,11 @@ export async function start_sandbox(
     const isIntegrationTest =
       process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
     let containerName;
-    if (isIntegrationTest) {
+
+    if (process.env['GEMINI_SANDBOX_CONTAINER_NAME']) {
+      containerName = process.env['GEMINI_SANDBOX_CONTAINER_NAME'];
+      debugLogger.log(`ContainerName (env override): ${containerName}`);
+    } else if (isIntegrationTest) {
       containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
         'hex',
       )}`;

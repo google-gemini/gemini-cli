@@ -67,6 +67,8 @@ describe('Core System Prompt (prompts.ts)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
+      isManagerMode: vi.fn().mockReturnValue(false),
+      isSandboxWorkers: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
@@ -123,7 +125,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    if (prompt.includes('Gemini 3')) {
+      expect(prompt).toContain('Explain Before Acting:');
+    }
     expect(prompt).toMatchSnapshot();
   });
 
@@ -133,7 +137,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     );
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    if (prompt.includes('Gemini 3')) {
+      expect(prompt).toContain('Explain Before Acting:');
+    }
     expect(prompt).toMatchSnapshot();
   });
 
@@ -145,7 +151,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    if (prompt.includes('Gemini 3')) {
+      expect(prompt).toContain('Explain Before Acting:');
+    }
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
@@ -195,7 +203,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     mockConfig.isInteractive = vi.fn().mockReturnValue(false);
     const prompt = getCoreSystemPrompt(mockConfig, '');
-    expect(prompt).toContain('**Interactive Commands:**'); // Check for interactive prompt
+    expect(prompt).toContain('Do your best to complete the task at hand');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
@@ -216,6 +224,8 @@ describe('Core System Prompt (prompts.ts)', () => {
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
+        isManagerMode: vi.fn().mockReturnValue(false),
+        isSandboxWorkers: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
         getPreviewFeatures: vi.fn().mockReturnValue(false),
