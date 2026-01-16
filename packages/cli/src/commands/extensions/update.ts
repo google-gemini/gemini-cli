@@ -47,6 +47,13 @@ export async function handleUpdate(args: UpdateArgs) {
       );
       if (!extension) {
         debugLogger.log(`Extension "${args.name}" not found.`);
+        if (extensions.length > 0) {
+          debugLogger.log(
+            `Installed extensions:\n${extensions.map((e) => `- ${e.name}`).join('\n')}`,
+          );
+        } else {
+          debugLogger.log('No extensions installed.');
+        }
         return;
       }
       if (!extension.installMetadata) {
