@@ -141,6 +141,7 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
+  adminSettingsChanged: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

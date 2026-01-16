@@ -81,6 +81,7 @@ export enum Command {
   FOCUS_SHELL_INPUT = 'app.focusShellInput',
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
+  RESTART_APP = 'app.restart',
 }
 
 /**
@@ -238,6 +239,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
+  [Command.RESTART_APP]: [{ key: 'r' }],
 };
 
 interface CommandCategory {
@@ -343,6 +345,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
+      Command.RESTART_APP,
     ],
   },
 ];
@@ -428,4 +431,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.RESTART_APP]: 'Restart the application.',
 };
