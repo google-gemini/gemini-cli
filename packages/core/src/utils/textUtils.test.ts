@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeLiteralReplace } from './textUtils.js';
+import { safeLiteralReplace, truncateString } from './textUtils.js';
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
@@ -75,5 +75,27 @@ describe('safeLiteralReplace', () => {
 
   it('handles newString with only dollar signs', () => {
     expect(safeLiteralReplace('abc', 'b', '$$')).toBe('a$$c');
+  });
+});
+
+describe('truncateString', () => {
+  it('should not truncate string shorter than maxLength', () => {
+    expect(truncateString('abc', 5)).toBe('abc');
+  });
+
+  it('should not truncate string equal to maxLength', () => {
+    expect(truncateString('abcde', 5)).toBe('abcde');
+  });
+
+  it('should truncate string longer than maxLength and append default suffix', () => {
+    expect(truncateString('abcdef', 5)).toBe('abcde...[TRUNCATED]');
+  });
+
+  it('should truncate string longer than maxLength and append custom suffix', () => {
+    expect(truncateString('abcdef', 5, '...')).toBe('abcde...');
+  });
+
+  it('should handle empty string', () => {
+    expect(truncateString('', 5)).toBe('');
   });
 });
