@@ -18,6 +18,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import type { CliArgs } from '../../config/config.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -153,11 +154,16 @@ export async function listMcpServers(): Promise<void> {
   }
 }
 
-export const listCommand: CommandModule = {
+export const listCommand: CommandModule<object, CliArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
-  handler: async () => {
-    await listMcpServers();
-    await exitCli();
+  handler: async (argv) => {
+    argv._deferredCommand = {
+      run: async () => {
+        await listMcpServers();
+        await exitCli();
+      },
+      type: 'mcp',
+    };
   },
 };

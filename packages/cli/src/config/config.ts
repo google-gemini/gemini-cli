@@ -58,6 +58,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+import type { DeferredCommand } from './types.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -83,6 +84,8 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  // Command that should only run after refreshing auth & fetching admin settings.
+  _deferredCommand?: DeferredCommand;
 }
 
 export async function parseArguments(
