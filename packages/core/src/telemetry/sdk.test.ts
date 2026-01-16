@@ -110,13 +110,13 @@ describe('Telemetry SDK', () => {
     await initializeTelemetry(mockConfig);
 
     expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/traces',
     });
     expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/logs',
     });
     expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
-      url: 'http://localhost:4318/',
+      url: 'http://localhost:4318/v1/metrics',
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
@@ -138,7 +138,7 @@ describe('Telemetry SDK', () => {
     );
     await initializeTelemetry(mockConfig);
     expect(OTLPTraceExporterHttp).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'https://my-collector.com/' }),
+      expect.objectContaining({ url: 'https://my-collector.com/v1/traces' }),
     );
   });
 
