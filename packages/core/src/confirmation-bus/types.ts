@@ -21,6 +21,8 @@ export enum MessageBusType {
   HOOK_EXECUTION_REQUEST = 'hook-execution-request',
   HOOK_EXECUTION_RESPONSE = 'hook-execution-response',
   HOOK_POLICY_DECISION = 'hook-policy-decision',
+  ASK_USER_QUESTION_REQUEST = 'ask-user-question-request',
+  ASK_USER_QUESTION_RESPONSE = 'ask-user-question-response',
   TOOL_CALLS_UPDATE = 'tool-calls-update',
 }
 
@@ -139,6 +141,36 @@ export interface HookPolicyDecision {
   reason?: string;
 }
 
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface Question {
+  question: string;
+  header: string;
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input. Defaults to 'choice'. */
+  type?: 'choice' | 'text';
+  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  options?: QuestionOption[];
+  /** Allow multiple selections. Only applies to 'choice' type. */
+  multiSelect?: boolean;
+  /** Placeholder hint text for 'text' type input field. */
+  placeholder?: string;
+}
+
+export interface AskUserQuestionRequest {
+  type: MessageBusType.ASK_USER_QUESTION_REQUEST;
+  questions: Question[];
+  correlationId: string;
+}
+
+export interface AskUserQuestionResponse {
+  type: MessageBusType.ASK_USER_QUESTION_RESPONSE;
+  correlationId: string;
+  answers: { [questionIndex: string]: string };
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -149,4 +181,6 @@ export type Message =
   | HookExecutionRequest
   | HookExecutionResponse
   | HookPolicyDecision
+  | AskUserQuestionRequest
+  | AskUserQuestionResponse
   | ToolCallsUpdateMessage;

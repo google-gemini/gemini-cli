@@ -560,6 +560,7 @@ export async function handleAtCommand({
     readManyFilesDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
+      toolName: readManyFilesTool.name,
       description: invocation.getDescription(),
       status: ToolCallStatus.Success,
       resultDisplay:
@@ -631,6 +632,7 @@ export async function handleAtCommand({
     readManyFilesDisplay = {
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
+      toolName: readManyFilesTool.name,
       description:
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',

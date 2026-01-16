@@ -13,6 +13,7 @@ export interface SelectionListItem<T> {
   key: string;
   value: T;
   disabled?: boolean;
+  hideNumber?: boolean;
 }
 
 interface BaseSelectionItem {

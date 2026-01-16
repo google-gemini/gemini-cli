@@ -60,6 +60,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  ASK_USER_QUESTION_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -127,6 +128,7 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
 } from './constants.js';
+import { useAskUserQuestion } from './hooks/useAskUserQuestion.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
 
@@ -215,6 +217,15 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const { bannerText } = useBanner(bannerData, config);
+
+  const {
+    request: askUserQuestionRequest,
+    handleSubmit: handleAskUserQuestionSubmit,
+    clearRequest: clearAskUserQuestionRequest,
+  } = useAskUserQuestion(config);
+
+  // Track when a dialog text input is focused
+  const [hasActiveTextInput, setHasActiveTextInput] = useState(false);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -1248,10 +1259,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.QUIT](key)) {
-        // If the user presses Ctrl+C, we want to cancel any ongoing requests.
-        // This should happen regardless of the count.
+        // Skip when a dialog text input is focused (Ctrl+C clears text instead)
+        if (hasActiveTextInput) {
+          return;
+        }
+        // Cancel any ongoing requests
         cancelOngoingRequest?.();
-
         setCtrlCPressCount((prev) => prev + 1);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
@@ -1335,6 +1348,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCtrlDPressCount,
       handleSlashCommand,
       cancelOngoingRequest,
+      hasActiveTextInput,
       activePtyId,
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
@@ -1450,6 +1464,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    !!askUserQuestionRequest ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
@@ -1471,10 +1486,39 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput;
 
-  const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
-  );
+  const pendingHistoryItems = useMemo(() => {
+    const items = [
+      ...pendingSlashCommandHistoryItems,
+      ...pendingGeminiHistoryItems,
+    ];
+
+    // Hide ask_user_question tool display when the dialog is shown
+    if (askUserQuestionRequest) {
+      return items
+        .map((item) => {
+          if (item.type === 'tool_group') {
+            // Filter out ask_user_question tool but keep others
+            const filteredTools = item.tools.filter(
+              (tool) => tool.toolName !== ASK_USER_QUESTION_TOOL_NAME,
+            );
+            // If no tools left, exclude the entire group
+            if (filteredTools.length === 0) {
+              return null;
+            }
+            // Return group with filtered tools
+            return { ...item, tools: filteredTools };
+          }
+          return item;
+        })
+        .filter((item): item is HistoryItemWithoutId => item !== null);
+    }
+
+    return items;
+  }, [
+    pendingSlashCommandHistoryItems,
+    pendingGeminiHistoryItems,
+    askUserQuestionRequest,
+  ]);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     config.getGeminiMdFileCount(),
@@ -1616,6 +1660,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      askUserQuestionRequest,
+      hasActiveTextInput,
     }),
     [
       isThemeDialogOpen,
@@ -1710,6 +1756,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      askUserQuestionRequest,
+      hasActiveTextInput,
     ],
   );
 
@@ -1753,6 +1801,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      handleAskUserQuestionSubmit,
+      clearAskUserQuestionRequest,
+      setHasActiveTextInput,
       setAuthContext,
     }),
     [
@@ -1789,6 +1840,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
+      handleAskUserQuestionSubmit,
+      clearAskUserQuestionRequest,
+      setHasActiveTextInput,
       setAuthContext,
     ],
   );

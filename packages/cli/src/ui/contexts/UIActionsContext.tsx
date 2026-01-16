@@ -56,6 +56,11 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  handleAskUserQuestionSubmit: (answers: {
+    [questionIndex: string]: string;
+  }) => Promise<void>;
+  clearAskUserQuestionRequest: () => void;
+  setHasActiveTextInput: (value: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
 }
 

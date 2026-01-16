@@ -46,6 +46,7 @@ describe('ToolMessage Sticky Header Regression', () => {
   const createToolCall = (id: string, name: string, resultPrefix: string) => ({
     callId: id,
     name,
+    toolName: name,
     description: `Description for ${name}`,
     resultDisplay: Array.from(
       { length: 10 },

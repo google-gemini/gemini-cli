@@ -200,6 +200,7 @@ describe('<HistoryItemDisplay />', () => {
         {
           callId: '123',
           name: 'run_shell_command',
+          toolName: 'run_shell_command',
           description: 'Run a shell command',
           resultDisplay: 'blank',
           status: ToolCallStatus.Confirming,
