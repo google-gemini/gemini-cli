@@ -158,7 +158,7 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
-    it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
+    it('should handle llmContent with fileData for Gemini 3 model (should be nested)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
       };
@@ -174,9 +174,9 @@ describe('generateContentResponseUtilities', () => {
             name: toolName,
             id: callId,
             response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [llmContent],
           },
         },
-        llmContent,
       ]);
     });
 
@@ -202,7 +202,7 @@ describe('generateContentResponseUtilities', () => {
       ]);
     });
 
-    it('should handle llmContent with fileData for non-Gemini 3 models', () => {
+    it('should handle llmContent with fileData for non-Gemini 3 models (should omit siblings)', () => {
       const llmContent: Part = {
         fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
       };
@@ -212,15 +212,17 @@ describe('generateContentResponseUtilities', () => {
         llmContent,
         DEFAULT_GEMINI_MODEL,
       );
+      // Binary content is omitted for non-multimodal models, so message should reflect that
       expect(result).toEqual([
         {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output: `Binary content was provided but omitted because model '${DEFAULT_GEMINI_MODEL}' does not support it in function responses.`,
+            },
           },
         },
-        llmContent,
       ]);
     });
 

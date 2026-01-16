@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { coreEvents } from '@google/gemini-cli-core';
 import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -45,7 +46,7 @@ export function useSessionResume({
   });
 
   const loadHistoryForResume = useCallback(
-    (
+    async (
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
       resumedData: ResumedSessionData,
@@ -64,8 +65,8 @@ export function useSessionResume({
       refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
       // Give the history to the Gemini client.
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+      // Await to ensure chat is initialized before user can send prompts.
+      await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
     },
     [config, isGeminiClientInitialized, setQuittingMessages],
   );
@@ -84,11 +85,19 @@ export function useSessionResume({
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
-      loadHistoryForResume(
-        historyData.uiHistory,
-        historyData.clientHistory,
-        resumedSessionData,
-      );
+      // Use async IIFE to properly await the async callback
+      // This ensures chat is fully initialized before user can send prompts
+      void (async () => {
+        try {
+          await loadHistoryForResume(
+            historyData.uiHistory,
+            historyData.clientHistory,
+            resumedSessionData,
+          );
+        } catch (error) {
+          coreEvents.emitFeedback('error', 'Error resuming session:', error);
+        }
+      })();
     }
   }, [
     resumedSessionData,

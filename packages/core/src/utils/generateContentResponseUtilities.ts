@@ -97,17 +97,18 @@ export function convertToFunctionResponse(
   };
 
   const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
-  const siblingParts: Part[] = [...fileDataParts];
+  const siblingParts: Part[] = [];
 
-  if (inlineDataParts.length > 0) {
-    if (isMultimodalFRSupported) {
-      // Nest inlineData if supported by the model
+  if (isMultimodalFRSupported) {
+    const binaryParts = [...fileDataParts, ...inlineDataParts];
+    if (binaryParts.length > 0) {
+      // Nest all binary content if supported by the model
       (part.functionResponse as unknown as { parts: Part[] }).parts =
-        inlineDataParts;
-    } else {
-      // Otherwise treat as siblings
-      siblingParts.push(...inlineDataParts);
+        binaryParts;
     }
+  } else {
+    // Otherwise treat as siblings (which will be dropped below)
+    siblingParts.push(...fileDataParts, ...inlineDataParts);
   }
 
   // Add descriptive text if the response object is empty but we have binary content
@@ -122,7 +123,18 @@ export function convertToFunctionResponse(
   }
 
   if (siblingParts.length > 0) {
-    return [part, ...siblingParts];
+    debugLogger.warn(
+      `Model ${model} does not support multimodal function responses. Sibling parts will be omitted to prevent API errors in parallel function calling.`,
+    );
+    // If binary parts were omitted, update the response text to avoid misleading the model
+    if (
+      textParts.length === 0 &&
+      (inlineDataParts.length > 0 || fileDataParts.length > 0)
+    ) {
+      part.functionResponse!.response = {
+        output: `Binary content was provided but omitted because model '${model}' does not support it in function responses.`,
+      };
+    }
   }
 
   return [part];

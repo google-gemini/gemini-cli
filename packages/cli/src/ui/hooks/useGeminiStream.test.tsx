@@ -922,6 +922,227 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should not resubmit tool responses that have already been submitted to Gemini', async () => {
+    // This tests the fix for the unrecoverable 400 error where already-submitted
+    // tools were being resubmitted due to stale closure in handleCompletedTools.
+    // Once triggered, ALL subsequent prompts fail and session must be /clear'd.
+
+    const alreadySubmittedTool = {
+      request: {
+        callId: 'already-submitted-call',
+        name: 'tool1',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: true, // KEY: Already submitted
+      response: {
+        callId: 'already-submitted-call',
+        responseParts: [{ text: 'already sent' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool1' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    const newTool = {
+      request: {
+        callId: 'new-call',
+        name: 'tool2',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false, // Not yet submitted
+      response: {
+        callId: 'new-call',
+        responseParts: [{ text: 'new response' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool2' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [alreadySubmittedTool, newTool], // Current tracked state with flags
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Simulate scheduler calling onComplete - scheduler core doesn't track
+    // responseSubmittedToGemini, so we strip it to simulate real behavior
+    const fromScheduler = [
+      { ...alreadySubmittedTool, responseSubmittedToGemini: undefined },
+      { ...newTool, responseSubmittedToGemini: undefined },
+    ];
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(fromScheduler as TrackedToolCall[]);
+      }
+    });
+
+    // Only the NEW tool should be marked as submitted
+    // The already-submitted tool should be filtered out
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledTimes(1);
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['new-call']);
+    });
+  });
+
+  it('should await submitQuery before marking tools as submitted (race condition fix)', async () => {
+    // This tests the fix for the race condition where markToolsAsSubmitted was
+    // called BEFORE submitQuery completed, allowing user prompts to race ahead
+    // of tool responses and causing unrecoverable 400 errors.
+    // See: https://github.com/google-gemini/gemini-cli/issues/16144
+
+    const toolCallResponseParts: PartListUnion = [{ text: 'tool response' }];
+
+    const completedTool = {
+      request: {
+        callId: 'race-test-call',
+        name: 'test_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race-test',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false,
+      response: {
+        callId: 'race-test-call',
+        responseParts: toolCallResponseParts,
+        errorType: undefined,
+      },
+      tool: { displayName: 'TestTool' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    // Track the order of operations
+    const callOrder: string[] = [];
+    let resolveStreamPromise: () => void;
+    const streamPromise = new Promise<void>((resolve) => {
+      resolveStreamPromise = resolve;
+    });
+
+    // Mock sendMessageStream to be a slow async operation
+    mockSendMessageStream.mockImplementation(() => {
+      callOrder.push('sendMessageStream:start');
+      return (async function* () {
+        await streamPromise; // Wait until we explicitly resolve
+        callOrder.push('sendMessageStream:end');
+        yield { type: ServerGeminiEventType.Finished, text: '' };
+      })();
+    });
+
+    // Track when markToolsAsSubmitted is called
+    mockMarkToolsAsSubmitted.mockImplementation((callIds: string[]) => {
+      callOrder.push(`markToolsAsSubmitted:${callIds.join(',')}`);
+    });
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [completedTool],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Start tool completion (this will call submitQuery -> sendMessageStream)
+    const completionPromise = act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete([completedTool] as TrackedToolCall[]);
+      }
+    });
+
+    // Give time for sendMessageStream to start but NOT complete
+    await new Promise((r) => setTimeout(r, 10));
+
+    // At this point, sendMessageStream should have started but not finished
+    // markToolsAsSubmitted should NOT have been called yet (the fix!)
+    expect(callOrder).toContain('sendMessageStream:start');
+    expect(callOrder).not.toContain('markToolsAsSubmitted:race-test-call');
+
+    // Now resolve the stream
+    resolveStreamPromise!();
+    await completionPromise;
+
+    // After stream completes, markToolsAsSubmitted should be called
+    await waitFor(() => {
+      expect(callOrder).toContain('markToolsAsSubmitted:race-test-call');
+    });
+
+    // Verify the correct order: stream must complete before marking
+    const streamEndIndex = callOrder.indexOf('sendMessageStream:end');
+    const markIndex = callOrder.indexOf('markToolsAsSubmitted:race-test-call');
+    expect(streamEndIndex).toBeLessThan(markIndex);
+  });
+
   it('should not flicker streaming state to Idle between tool completion and submission', async () => {
     const toolCallResponseParts: PartListUnion = [
       { text: 'tool 1 final response' },
@@ -2970,6 +3191,136 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
       });
+    });
+
+    it('should await retry submitQuery when user disables loop detection (race condition fix)', async () => {
+      // This tests the fix for the race condition where the retry submitQuery was
+      // called fire-and-forget after user clicked "disable" in the loop detection dialog.
+      // Since streamingState was Idle at that point, the guard at line 946 didn't block
+      // concurrent requests, allowing user prompts to race with the retry.
+      // See: https://github.com/google-gemini/gemini-cli/issues/16144 (related)
+
+      const mockLoopDetectionService = {
+        disableForSession: vi.fn(),
+      };
+      const mockClient = {
+        ...new MockedGeminiClientClass(mockConfig),
+        getLoopDetectionService: () => mockLoopDetectionService,
+      };
+      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+      // Track request order and timing
+      const requestOrder: string[] = [];
+      let resolveRetryPromise: () => void;
+      const retryPromise = new Promise<void>((resolve) => {
+        resolveRetryPromise = resolve;
+      });
+
+      // First call: returns LoopDetected
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('first-request:start');
+        return (async function* () {
+          requestOrder.push('first-request:loopdetected');
+          yield { type: ServerGeminiEventType.LoopDetected };
+        })();
+      });
+
+      // Second call: retry after user clicks "disable" - this is slow
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('retry-request:start');
+        return (async function* () {
+          await retryPromise; // Wait until we explicitly resolve
+          requestOrder.push('retry-request:finished');
+          yield { type: ServerGeminiEventType.Content, value: 'Retry success' };
+          yield { type: ServerGeminiEventType.Finished, text: '' };
+        })();
+      });
+
+      // Third call: user's new prompt (should be blocked/queued)
+      mockSendMessageStream.mockImplementationOnce(() => {
+        requestOrder.push('user-prompt:start');
+        return (async function* () {
+          requestOrder.push('user-prompt:finished');
+          yield { type: ServerGeminiEventType.Content, value: 'New prompt' };
+          yield { type: ServerGeminiEventType.Finished, text: '' };
+        })();
+      });
+
+      const { result } = renderTestHook();
+
+      // Send first query that triggers loop detection
+      await act(async () => {
+        await result.current.submitQuery('original query');
+      });
+
+      // Wait for loop detection confirmation request
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // At this point, streamingState should be Idle (which is the bug!)
+      // The fix should ensure streamingState stays Responding during retry
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+
+      // User clicks "disable" - this triggers the retry
+      // Start the completion promise but don't await it yet
+      const completionPromise = act(async () => {
+        result.current.loopDetectionConfirmationRequest?.onComplete({
+          userSelection: 'disable',
+        });
+      });
+
+      // Give time for retry to start but NOT complete
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Verify retry has started
+      expect(requestOrder).toContain('retry-request:start');
+      // Verify retry has NOT finished
+      expect(requestOrder).not.toContain('retry-request:finished');
+
+      // Try to send a new user prompt while retry is in progress
+      // This simulates a fast user typing immediately after clicking "disable"
+      const userPromptPromise = act(async () => {
+        await result.current.submitQuery('new user prompt');
+      });
+
+      // Give time for the user prompt to potentially start
+      await new Promise((r) => setTimeout(r, 10));
+
+      // THE FIX: After awaiting submitQuery in onComplete:
+      // - streamingState should be Responding during retry
+      // - The guard at line 946 should block the user prompt
+      // - User prompt should NOT start until retry finishes
+
+      // BEFORE FIX: Both retry and user prompt would be racing
+      // AFTER FIX: User prompt waits for retry to complete
+
+      // Now resolve the retry
+      resolveRetryPromise!();
+
+      // Wait for everything to complete
+      await completionPromise;
+      await userPromptPromise;
+
+      // Verify the correct order: retry must complete before user prompt starts
+      await waitFor(() => {
+        expect(requestOrder).toContain('retry-request:finished');
+      });
+
+      // Check that retry finished BEFORE user prompt started
+      // (This is the assertion that will fail on buggy code)
+      const retryFinishIndex = requestOrder.indexOf('retry-request:finished');
+      const userPromptStartIndex = requestOrder.indexOf('user-prompt:start');
+
+      // If user-prompt was properly blocked, either:
+      // 1. It started after retry finished (retryFinishIndex < userPromptStartIndex)
+      // 2. Or it was dropped entirely (userPromptStartIndex === -1)
+      if (userPromptStartIndex !== -1) {
+        expect(retryFinishIndex).toBeLessThan(userPromptStartIndex);
+      }
+
+      // Clean up mock implementations to not affect subsequent tests
+      mockSendMessageStream.mockReset();
     });
   });
 
