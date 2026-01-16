@@ -453,7 +453,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
@@ -559,7 +558,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getGeminiMdFileCount: () => 0,
       getProjectRoot: () => '/',
       getRemoteAdminSettings: () => undefined,
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
     } as unknown as Config;
 
@@ -647,10 +645,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getProjectRoot: () => '/',
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: () => undefined,
-      isPlanEnabled: () => false,
-      getToolRegistry: vi.fn(() => ({
-        getToolSchemaList: vi.fn(() => []),
-      })),
       setTerminalBackground: vi.fn(),
     } as unknown as Config;
 
@@ -735,7 +729,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
       refreshAuth: vi.fn(),
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       getRemoteAdminSettings: () => undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -822,7 +815,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
@@ -989,7 +981,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getOutputFormat: () => 'text',
       getUsageStatisticsEnabled: () => false,
       refreshAuth: vi.fn(),
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       getRemoteAdminSettings: () => undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -1154,7 +1145,6 @@ describe('gemini.tsx main function exit codes', () => {
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
@@ -1223,7 +1213,6 @@ describe('gemini.tsx main function exit codes', () => {
       getOutputFormat: () => 'text',
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
-      isPlanEnabled: () => false,
       setTerminalBackground: vi.fn(),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
