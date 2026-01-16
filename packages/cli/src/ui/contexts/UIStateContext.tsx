@@ -29,7 +29,6 @@ import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
-import type { LoadedSettings } from '../../config/settings.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -142,7 +141,6 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
-  settings: LoadedSettings;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

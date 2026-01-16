@@ -17,6 +17,7 @@ import { ScrollableList } from './shared/ScrollableList.js';
 import { useMemo, memo, useCallback } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { VERBOSITY_MAPPING, Verbosity } from '../types.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -28,6 +29,7 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
 
   const {
@@ -35,7 +37,6 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
-    settings,
   } = uiState;
 
   const currentVerbosity =
@@ -45,8 +46,7 @@ export const MainContent = () => {
   const filteredHistory = useMemo(
     () =>
       uiState.history.filter((item) => {
-        // Cast to string to safely index into VERBOSITY_MAPPING
-        const itemType = item.type as string;
+        const itemType = item.type;
         const itemVerbosity =
           item.verbosity ?? VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
         return itemVerbosity <= currentVerbosity;

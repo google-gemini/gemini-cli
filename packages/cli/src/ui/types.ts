@@ -135,6 +135,16 @@ export type HistoryItemVerbose = HistoryItemBase & {
   color?: string;
 };
 
+export type HistoryItemDebug = HistoryItemBase & {
+  type: 'debug';
+  text: string;
+};
+
+export type HistoryItemTrace = HistoryItemBase & {
+  type: 'trace';
+  text: string;
+};
+
 export type HistoryItemAbout = HistoryItemBase & {
   type: 'about';
   cliVersion: string;
@@ -302,6 +312,8 @@ export type HistoryItemWithoutId =
   | HistoryItemError
   | HistoryItemWarning
   | HistoryItemVerbose
+  | HistoryItemDebug
+  | HistoryItemTrace
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
@@ -319,12 +331,16 @@ export type HistoryItemWithoutId =
   | HistoryItemChatList
   | HistoryItemHooksList;
 
+export type HistoryItemType = HistoryItemWithoutId['type'];
+
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
 // Message types used by internal command feedback (subset of HistoryItem types)
 export enum MessageType {
   INFO = 'info',
   VERBOSE = 'verbose',
+  DEBUG = 'debug',
+  TRACE = 'trace',
   ERROR = 'error',
   WARNING = 'warning',
   USER = 'user',
@@ -354,7 +370,7 @@ export enum Verbosity {
   TRACE = 5,
 }
 
-export const VERBOSITY_MAPPING: Record<string, Verbosity> = {
+export const VERBOSITY_MAPPING: Record<HistoryItemType, Verbosity> = {
   error: Verbosity.ERROR,
   warning: Verbosity.WARN,
   info: Verbosity.INFO,

@@ -1616,7 +1616,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
-      settings,
     }),
     [
       isThemeDialogOpen,
@@ -1711,7 +1710,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
-      settings,
     ],
   );
 
