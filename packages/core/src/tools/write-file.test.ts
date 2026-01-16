@@ -849,7 +849,7 @@ describe('WriteFileTool', () => {
         errorMessage: 'Generic write error',
         expectedMessagePrefix: 'Error writing to file',
         mockFsExistsSync: false,
-        restoreAllMocks: true,
+        restoreAllMocks: false,
       },
     ])(
       'should return $errorType error when write fails with $errorCode',
