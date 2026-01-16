@@ -7,7 +7,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
-import { CoreToolScheduler } from './coreToolScheduler.js';
+import {
+  CoreToolScheduler,
+  PLAN_MODE_DENIAL_MESSAGE,
+} from './coreToolScheduler.js';
 import type {
   ToolCall,
   WaitingToolCall,
@@ -32,6 +35,7 @@ import {
   ApprovalMode,
   HookSystem,
   PolicyDecision,
+  ToolErrorType,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -2077,5 +2081,54 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(allStatuses).toEqual(['success', 'success']);
 
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Policy Decisions in Plan Mode', () => {
+    it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
+      const mockTool = new MockTool({
+        name: 'dangerous_tool',
+        displayName: 'Dangerous Tool',
+        description: 'Does risky stuff',
+      });
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['dangerous_tool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN,
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.DENY }),
+          }) as unknown as PolicyEngine,
+      });
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'dangerous_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('error');
+      expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
+      expect(result.response.error.message).toBe(PLAN_MODE_DENIAL_MESSAGE);
+    });
   });
 });

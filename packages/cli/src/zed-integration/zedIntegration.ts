@@ -121,7 +121,7 @@ export class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
     // Only clear credentials when switching to a different auth method
     if (selectedAuthType && selectedAuthType !== method) {
@@ -147,7 +147,7 @@ export class GeminiAgent {
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
 
     let isAuthenticated = false;
-    if (this.settings.merged.security?.auth?.selectedType) {
+    if (this.settings.merged.security.auth.selectedType) {
       try {
         await config.refreshAuth(
           this.settings.merged.security.auth.selectedType,
