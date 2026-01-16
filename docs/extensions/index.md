@@ -2,10 +2,10 @@
 
 _This documentation is up-to-date with the v0.4.0 release._
 
-Gemini CLI extensions package prompts, MCP servers, and custom commands into a
-familiar and user-friendly format. With extensions, you can expand the
-capabilities of Gemini CLI and share those capabilities with others. They are
-designed to be easily installable and shareable.
+Gemini CLI extensions package prompts, MCP servers, Agent Skills, and custom
+commands into a familiar and user-friendly format. With extensions, you can
+expand the capabilities of Gemini CLI and share those capabilities with others.
+They're designed to be easily installable and shareable.
 
 To see examples of extensions, you can browse a gallery of
 [Gemini CLI extensions](https://geminicli.com/extensions/browse/).
@@ -262,6 +262,40 @@ Would provide these commands:
 
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
+
+### Agent Skills
+
+_Note: This is an experimental feature enabled via `experimental.skills`._
+
+Extensions can bundle [Agent Skills](../cli/skills.md) to provide on-demand
+expertise and specialized workflows. To include skills in your extension, place
+them in a `skills/` subdirectory within the extension directory. Each skill must
+follow the [Agent Skills structure](../cli/skills.md#folder-structure),
+including a `SKILL.md` file.
+
+**Example**
+
+An extension named `security-toolkit` with the following structure:
+
+```
+.gemini/extensions/security-toolkit/
+├── gemini-extension.json
+└── skills/
+    ├── audit/
+    │   ├── SKILL.md
+    │   └── scripts/
+    │       └── scan.py
+    └── hardening/
+        └── SKILL.md
+```
+
+Upon installation, these skills will be discovered by Gemini CLI and can be
+activated during a session when the model identifies a task matching their
+descriptions.
+
+Extension skills have the lowest precedence and will be overridden by user or
+workspace skills of the same name. They can be viewed and managed (enabled or
+disabled) using the [`/skills` command](../cli/skills.md#managing-skills).
 
 ### Hooks
 
