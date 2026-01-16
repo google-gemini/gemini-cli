@@ -14,8 +14,8 @@ import {
   createHookOutput,
   NotificationType,
   type DefaultHookOutput,
+  type BeforeToolHookOutput,
   type McpToolContext,
-  BeforeToolHookOutput,
 } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 import type {
@@ -164,7 +164,7 @@ export async function fireToolNotificationHook(
  * @param config Config to look up server details
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
-function extractMcpContext(
+export function extractMcpContext(
   invocation: ShellToolInvocation | AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
@@ -208,7 +208,7 @@ export async function fireBeforeToolHook(
   toolName: string,
   toolInput: Record<string, unknown>,
   mcpContext?: McpToolContext,
-): Promise<DefaultHookOutput | undefined> {
+): Promise<BeforeToolHookOutput | undefined> {
   try {
     const response = await messageBus.request<
       HookExecutionRequest,
@@ -227,7 +227,10 @@ export async function fireBeforeToolHook(
     );
 
     return response.output
-      ? createHookOutput('BeforeTool', response.output)
+      ? (createHookOutput(
+          'BeforeTool',
+          response.output,
+        ) as BeforeToolHookOutput)
       : undefined;
   } catch (error) {
     debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
@@ -310,79 +313,6 @@ export async function executeToolWithHooks(
   config?: Config,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
-  let inputWasModified = false;
-  let modifiedKeys: string[] = [];
-
-  // Extract MCP context if this is an MCP tool (only if config is provided)
-  const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
-
-  // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const beforeOutput = await fireBeforeToolHook(
-      messageBus,
-      toolName,
-      toolInput,
-      mcpContext,
-    );
-
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.STOP_EXECUTION,
-          message: reason,
-        },
-      };
-    }
-
-    // Check if hook blocked the tool execution
-    const blockingError = beforeOutput?.getBlockingError();
-    if (blockingError?.blocked) {
-      return {
-        llmContent: `Tool execution blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: blockingError.reason,
-        },
-      };
-    }
-
-    // Check if hook requested to update tool input
-    if (beforeOutput instanceof BeforeToolHookOutput) {
-      const modifiedInput = beforeOutput.getModifiedToolInput();
-      if (modifiedInput) {
-        // We modify the toolInput object in-place, which should be the same reference as invocation.params
-        // We use Object.assign to update properties
-        Object.assign(invocation.params, modifiedInput);
-        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
-        inputWasModified = true;
-        modifiedKeys = Object.keys(modifiedInput);
-
-        // Recreate the invocation with the new parameters
-        // to ensure any derived state (like resolvedPath in ReadFileTool) is updated.
-        try {
-          // We use the tool's build method to validate and create the invocation
-          // This ensures consistent behavior with the initial creation
-          invocation = tool.build(invocation.params);
-        } catch (error) {
-          return {
-            llmContent: `Tool parameter modification by hook failed validation: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            returnDisplay: `Tool parameter modification by hook failed validation.`,
-            error: {
-              type: ToolErrorType.INVALID_TOOL_PARAMS,
-              message: String(error),
-            },
-          };
-        }
-      }
-    }
-  }
 
   // Execute the actual tool
   let toolResult: ToolResult;
@@ -401,26 +331,11 @@ export async function executeToolWithHooks(
     );
   }
 
-  // Append notification if parameters were modified
-  if (inputWasModified) {
-    const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
-      ', ',
-    )}) were modified by a hook before execution.`;
-    if (typeof toolResult.llmContent === 'string') {
-      toolResult.llmContent += modificationMsg;
-    } else if (Array.isArray(toolResult.llmContent)) {
-      toolResult.llmContent.push({ text: modificationMsg });
-    } else if (toolResult.llmContent) {
-      // Handle single Part case by converting to an array
-      toolResult.llmContent = [
-        toolResult.llmContent,
-        { text: modificationMsg },
-      ];
-    }
-  }
-
   // Fire AfterTool hook through MessageBus (only if hooks are enabled)
   if (hooksEnabled && messageBus) {
+    const mcpContext = config
+      ? extractMcpContext(invocation, config)
+      : undefined;
     const afterOutput = await fireAfterToolHook(
       messageBus,
       toolName,

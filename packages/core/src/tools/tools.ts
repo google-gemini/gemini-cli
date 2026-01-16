@@ -668,6 +668,7 @@ export interface DiffStat {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
+  systemMessage?: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,
@@ -690,6 +691,7 @@ export interface ToolConfirmationPayload {
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
@@ -699,6 +701,7 @@ export interface ToolExecuteConfirmationDetails {
 export interface ToolMcpConfirmationDetails {
   type: 'mcp';
   title: string;
+  systemMessage?: string;
   serverName: string;
   toolName: string;
   toolDisplayName: string;
@@ -708,6 +711,7 @@ export interface ToolMcpConfirmationDetails {
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   prompt: string;
   urls?: string[];

@@ -170,6 +170,13 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
+   * Check if this output represents an 'ask' decision
+   */
+  isAskDecision(): boolean {
+    return this.decision === 'ask';
+  }
+
+  /**
    * Check if this output requests to stop execution
    */
   shouldStopExecution(): boolean {
