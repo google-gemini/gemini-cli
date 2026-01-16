@@ -171,6 +171,7 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   disabled?: boolean;
+  enabled?: boolean;
 }
 
 export interface AgentSettings {
@@ -310,6 +311,8 @@ export interface ConfigParameters {
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
     disableFuzzySearch?: boolean;
+    maxFileCount?: number;
+    searchTimeout?: number;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -380,6 +383,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -387,6 +391,7 @@ export interface ConfigParameters {
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
+    agents?: AgentSettings;
   }>;
 }
 
@@ -439,6 +444,8 @@ export class Config {
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
     disableFuzzySearch: boolean;
+    maxFileCount: number;
+    searchTimeout: number;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -518,17 +525,19 @@ export class Config {
     | (() => Promise<{
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
       }>)
     | undefined;
 
   private readonly enableAgents: boolean;
-  private readonly agents: AgentSettings;
+  private agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
@@ -589,6 +598,14 @@ export class Config {
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
+      maxFileCount:
+        params.fileFiltering?.maxFileCount ??
+        DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount ??
+        20000,
+      searchTimeout:
+        params.fileFiltering?.searchTimeout ??
+        DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
+        5000,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -600,6 +617,7 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.planEnabled = params.plan ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -779,12 +797,14 @@ export class Config {
       this,
       this.eventEmitter,
     );
-    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    await Promise.all([
-      await this.mcpClientManager.startConfiguredMcpServers(),
-      await this.getExtensionLoader().start(this),
-    ]);
-    initMcpHandle?.end();
+    // We do not await this promise so that the CLI can start up even if
+    // MCP servers are slow to connect.
+    Promise.all([
+      this.mcpClientManager.startConfiguredMcpServers(),
+      this.getExtensionLoader().start(this),
+    ]).catch((error) => {
+      debugLogger.error('Error initializing MCP clients:', error);
+    });
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -1380,6 +1400,8 @@ export class Config {
     return {
       respectGitIgnore: this.fileFiltering.respectGitIgnore,
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+      maxFileCount: this.fileFiltering.maxFileCount,
+      searchTimeout: this.fileFiltering.searchTimeout,
     };
   }
 
@@ -1465,6 +1487,10 @@ export class Config {
 
   getDisableLLMCorrection(): boolean {
     return this.disableLLMCorrection;
+  }
+
+  isPlanEnabled(): boolean {
+    return this.planEnabled;
   }
 
   isAgentsEnabled(): boolean {
@@ -1632,6 +1658,18 @@ export class Config {
 
     // Notify the client that system instructions might need updating
     await this.updateSystemInstructionIfInitialized();
+  }
+
+  /**
+   * Reloads agent settings.
+   */
+  async reloadAgents(): Promise<void> {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.agents) {
+        this.agents = refreshed.agents;
+      }
+    }
   }
 
   isInteractive(): boolean {
