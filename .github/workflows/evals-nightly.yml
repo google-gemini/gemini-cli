@@ -20,11 +20,14 @@ jobs:
     name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
     outputs:
-      should_run: ${{ steps.check-evals.outputs.should_run }}
+      should_run: '${{ steps.check-evals.outputs.should_run }}'
     strategy:
       fail-fast: false
       matrix:
-        run_attempt: [1, 2, 3]
+        run_attempt:
+          - '1'
+          - '2'
+          - '3'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -32,7 +35,7 @@ jobs:
       # Disable evals if the evals directory isn't present.
       # Avoids breaking hotfix and release branches.
       - name: 'Check for evals directory'
-        id: check-evals
+        id: 'check-evals'
         run: |
           if [ -d "evals" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -41,33 +44,33 @@ jobs:
           fi
 
       - name: 'Set up Node.js'
-        if: steps.check-evals.outputs.should_run == 'true'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: 'Install dependencies'
-        if: steps.check-evals.outputs.should_run == 'true'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         run: 'npm ci'
 
       - name: 'Build project'
-        if: steps.check-evals.outputs.should_run == 'true'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         run: 'npm run build'
 
       - name: 'Create logs directory'
-        if: steps.check-evals.outputs.should_run == 'true'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         run: 'mkdir -p evals/logs'
 
       - name: 'Run Evals'
-        if: steps.check-evals.outputs.should_run == 'true'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
         run: 'npm run test:all_evals'
 
       - name: 'Upload Logs'
-        if: always() && steps.check-evals.outputs.should_run == 'true'
+        if: "always() && steps.check-evals.outputs.should_run == 'true'"
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'eval-logs-${{ matrix.run_attempt }}'
@@ -77,7 +80,7 @@ jobs:
   aggregate-results:
     name: 'Aggregate Results'
     needs: ['evals']
-    if: always() && needs.evals.outputs.should_run == 'true'
+    if: "always() && needs.evals.outputs.should_run == 'true'"
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
