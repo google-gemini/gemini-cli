@@ -895,7 +895,7 @@ describe('DiscoveredMCPTool', () => {
             // Should NOT have called update-policy
             const calls = publishSpy.mock.calls;
             const updatePolicyCalls = calls.filter(
-              (call) => call[0].type === 'update-policy',
+              (call) => (call[0] as any).type === 'update-policy',
             );
             expect(updatePolicyCalls.length).toBe(0);
           }
