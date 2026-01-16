@@ -240,15 +240,17 @@ export async function initializeTelemetry(
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      // Trim trailing slashes
+      const baseUrl = parsedEndpoint.replace(/\/+$/, '');
       spanExporter = new OTLPTraceExporterHttp({
-        url: parsedEndpoint,
+        url: `${baseUrl}/v1/traces`,
       });
       logExporter = new OTLPLogExporterHttp({
-        url: parsedEndpoint,
+        url: `${baseUrl}/v1/logs`,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
-          url: parsedEndpoint,
+          url: `${baseUrl}/v1/metrics`,
         }),
         exportIntervalMillis: 10000,
       });
