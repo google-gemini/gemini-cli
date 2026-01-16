@@ -292,18 +292,30 @@ jobs:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
+      - name: 'Check for evals config'
+        id: 'check-evals'
+        run: |
+          if [ -f "evals/vitest.config.ts" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
 
       - name: 'Install dependencies'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         run: 'npm ci'
 
       - name: 'Build project'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         run: 'npm run build'
 
       - name: 'Run Evals (Required to pass)'
+        if: "steps.check-evals.outputs.should_run == 'true'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'
