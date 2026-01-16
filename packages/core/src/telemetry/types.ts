@@ -300,15 +300,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
           this.result = display;
         } else if (display && typeof display === 'object') {
           if ('fileDiff' in display) {
-            // FileDiff
-            this.result = (display as { fileDiff: string }).fileDiff;
+            this.result = display.fileDiff;
           } else if ('todos' in display) {
-            // TodoList
-            this.result = JSON.stringify(
-              (display as { todos: unknown[] }).todos,
-            );
+            this.result = JSON.stringify(display.todos);
           } else if (Array.isArray(display)) {
-            // AnsiOutput
             this.result = display
               .map((line: Array<{ text: string }>) =>
                 line.map((token) => token.text).join(''),
@@ -334,7 +329,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
               typeof response === 'object' &&
               'output' in response
             ) {
-              const output = (response as { output: unknown }).output;
+              const output = response['output'];
               this.result = String(output);
             }
           }
