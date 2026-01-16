@@ -32,6 +32,11 @@ import { promisify } from 'node:util';
 import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 import { debugLogger, homedir } from '@google/gemini-cli-core';
+import { useEffect } from 'react';
+import { persistentState } from '../../utils/persistentState.js';
+import { requestConsentInteractive } from '../../config/extensions/consent.js';
+import type { ConfirmationRequest } from '../types.js';
+import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
@@ -58,29 +63,24 @@ type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'antigravity';
  * Terminal metadata used for configuration.
  */
 interface TerminalData {
-  /** Display name for the terminal (e.g., "VS Code") */
   terminalName: string;
-  /** Application folder name used in config paths (e.g., "Code") */
   appName: string;
 }
+const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
+  vscode: { terminalName: 'VS Code', appName: 'Code' },
+  cursor: { terminalName: 'Cursor', appName: 'Cursor' },
+  windsurf: { terminalName: 'Windsurf', appName: 'Windsurf' },
+  antigravity: { terminalName: 'Antigravity', appName: 'Antigravity' },
+};
 
 /**
  * Maps a supported terminal ID to its display name and config folder name.
  * Returns null if the terminal is not supported.
  */
-function getTerminalData(terminal: SupportedTerminal): TerminalData | null {
-  switch (terminal) {
-    case 'vscode':
-      return { terminalName: 'VS Code', appName: 'Code' };
-    case 'cursor':
-      return { terminalName: 'Cursor', appName: 'Cursor' };
-    case 'windsurf':
-      return { terminalName: 'Windsurf', appName: 'Windsurf' };
-    case 'antigravity':
-      return { terminalName: 'Antigravity', appName: 'Antigravity' };
-    default:
-      return null;
-  }
+function getSupportedTerminalData(
+  terminal: SupportedTerminal,
+): TerminalData | null {
+  return TERMINAL_DATA[terminal] || null;
 }
 
 /**
@@ -358,7 +358,7 @@ export async function shouldPromptForTerminalSetup(): Promise<boolean> {
     return false;
   }
 
-  const terminalData = getTerminalData(terminal);
+  const terminalData = getSupportedTerminalData(terminal);
   if (!terminalData) {
     return false;
   }
@@ -430,7 +430,7 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     };
   }
 
-  const terminalData = getTerminalData(terminal);
+  const terminalData = getSupportedTerminalData(terminal);
   if (!terminalData) {
     return {
       success: false,
@@ -439,4 +439,68 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
   }
 
   return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
+}
+
+export const TERMINAL_SETUP_CONSENT_MESSAGE =
+  'Gemini CLI works best with Shift+Enter/Ctrl+Enter for multiline input. ' +
+  'Would you like to automatically configure your terminal keybindings?';
+
+export function formatTerminalSetupResultMessage(
+  result: TerminalSetupResult,
+): string {
+  let content = result.message;
+  if (result.requiresRestart) {
+    content +=
+      '\n\nPlease restart your terminal for the changes to take effect.';
+  }
+  return content;
+}
+
+interface UseTerminalSetupPromptParams {
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  historyManager: UseHistoryManagerReturn;
+}
+
+/**
+ * Hook that shows a one-time prompt to run /terminal-setup when it would help.
+ */
+export function useTerminalSetupPrompt({
+  addConfirmUpdateExtensionRequest,
+  historyManager,
+}: UseTerminalSetupPromptParams): void {
+  useEffect(() => {
+    const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
+    if (hasBeenPrompted) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      const shouldPrompt = await shouldPromptForTerminalSetup();
+      if (!shouldPrompt || cancelled) return;
+      persistentState.set('terminalSetupPromptShown', true);
+
+      const confirmed = await requestConsentInteractive(
+        TERMINAL_SETUP_CONSENT_MESSAGE,
+        addConfirmUpdateExtensionRequest,
+      );
+      if (!confirmed || cancelled) return;
+
+      const result = await terminalSetup();
+      if (cancelled) return;
+      historyManager.addItem(
+        {
+          type: result.success ? 'info' : 'error',
+          text: formatTerminalSetupResultMessage(result),
+        },
+        Date.now(),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addConfirmUpdateExtensionRequest, historyManager]);
 }
