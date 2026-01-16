@@ -811,11 +811,10 @@ export class MCPOAuthProvider {
       try {
         const url = new URL(config.redirectUri);
         if (url.port) {
-          preferredPort = parseInt(url.port, 10);
-        } else if (url.protocol === 'http:') {
-          preferredPort = 80;
-        } else if (url.protocol === 'https:') {
-          preferredPort = 443;
+          const parsedPort = parseInt(url.port, 10);
+          if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+            preferredPort = parsedPort;
+          }
         }
       } catch {
         // Ignore invalid URL
