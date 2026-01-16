@@ -52,14 +52,14 @@ export function toCodePoints(str: string): string[] {
   // Cache short strings
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
     const cached = codePointsCache.get(str);
-    if (cached) {
+    if (cached !== undefined) {
       return cached;
     }
   }
 
   const result = Array.from(str);
 
-  // Cache result (unlimited like Ink)
+  // Cache result
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
     codePointsCache.set(str, result);
   }

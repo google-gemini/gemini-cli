@@ -42,7 +42,7 @@ export function parseInputForHighlighting(
 
   const cacheKey = `${index === 0 ? 'F' : 'N'}:${isCursorInsideTransform ? cursorCol : 'NC'}:${text}`;
   const cached = highlightCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   HIGHLIGHT_REGEX.lastIndex = 0;
 
