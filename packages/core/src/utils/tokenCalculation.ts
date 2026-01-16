@@ -20,20 +20,28 @@ const IMAGE_TOKEN_ESTIMATE = 3000;
 // See: https://ai.google.dev/gemini-api/docs/document-processing
 const PDF_TOKEN_ESTIMATE = 25800;
 
+// Maximum number of characters to process with the full character-by-character heuristic.
+// Above this, we use a faster approximation to avoid performance bottlenecks.
+const MAX_CHARS_FOR_FULL_HEURISTIC = 100_000;
+
 /**
  * Estimates token count for parts synchronously using a heuristic.
- * - Text: character-based heuristic (ASCII vs CJK).
+ * - Text: character-based heuristic (ASCII vs CJK) for small strings, length/4 for massive ones.
  * - Non-text (Tools, etc): JSON string length / 4.
  */
 export function estimateTokenCountSync(parts: Part[]): number {
   let totalTokens = 0;
   for (const part of parts) {
     if (typeof part.text === 'string') {
-      for (const char of part.text) {
-        if (char.codePointAt(0)! <= 127) {
-          totalTokens += ASCII_TOKENS_PER_CHAR;
-        } else {
-          totalTokens += NON_ASCII_TOKENS_PER_CHAR;
+      if (part.text.length > MAX_CHARS_FOR_FULL_HEURISTIC) {
+        totalTokens += part.text.length / 4;
+      } else {
+        for (const char of part.text) {
+          if (char.codePointAt(0)! <= 127) {
+            totalTokens += ASCII_TOKENS_PER_CHAR;
+          } else {
+            totalTokens += NON_ASCII_TOKENS_PER_CHAR;
+          }
         }
       }
     } else {
