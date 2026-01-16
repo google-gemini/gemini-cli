@@ -1542,15 +1542,17 @@ export class Config {
   }
 
   async getCompressionThreshold(): Promise<number | undefined> {
+    if (this.compressionThreshold) {
+      return this.compressionThreshold;
+    }
+
     const remoteThreshold =
       this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
         ?.floatValue;
-
-    if (remoteThreshold !== undefined && remoteThreshold !== 0) {
-      return remoteThreshold;
+    if (remoteThreshold === 0) {
+      return undefined;
     }
-
-    return this.compressionThreshold;
+    return remoteThreshold;
   }
 
   async getUserCaching(): Promise<boolean | undefined> {
