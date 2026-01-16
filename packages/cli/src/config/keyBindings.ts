@@ -8,86 +8,79 @@
  * Command enum for all available keyboard shortcuts
  */
 export enum Command {
-  // Basic bindings
-  RETURN = 'return',
-  ESCAPE = 'escape',
+  // Basic Controls
+  RETURN = 'basic.confirm',
+  ESCAPE = 'basic.cancel',
+  QUIT = 'basic.quit',
+  EXIT = 'basic.exit',
 
-  // Cursor movement
-  HOME = 'home',
-  END = 'end',
+  // Cursor Movement
+  HOME = 'cursor.home',
+  END = 'cursor.end',
+  MOVE_UP = 'cursor.up',
+  MOVE_DOWN = 'cursor.down',
+  MOVE_LEFT = 'cursor.left',
+  MOVE_RIGHT = 'cursor.right',
+  MOVE_WORD_LEFT = 'cursor.wordLeft',
+  MOVE_WORD_RIGHT = 'cursor.wordRight',
 
-  // Text deletion
-  KILL_LINE_RIGHT = 'killLineRight',
-  KILL_LINE_LEFT = 'killLineLeft',
-  CLEAR_INPUT = 'clearInput',
-  DELETE_WORD_BACKWARD = 'deleteWordBackward',
-
-  // Screen control
-  CLEAR_SCREEN = 'clearScreen',
+  // Editing
+  KILL_LINE_RIGHT = 'edit.deleteRightAll',
+  KILL_LINE_LEFT = 'edit.deleteLeftAll',
+  CLEAR_INPUT = 'edit.clear',
+  DELETE_WORD_BACKWARD = 'edit.deleteWordLeft',
+  DELETE_WORD_FORWARD = 'edit.deleteWordRight',
+  DELETE_CHAR_LEFT = 'edit.deleteLeft',
+  DELETE_CHAR_RIGHT = 'edit.deleteRight',
+  UNDO = 'edit.undo',
+  REDO = 'edit.redo',
 
   // Scrolling
-  SCROLL_UP = 'scrollUp',
-  SCROLL_DOWN = 'scrollDown',
-  SCROLL_HOME = 'scrollHome',
-  SCROLL_END = 'scrollEnd',
-  PAGE_UP = 'pageUp',
-  PAGE_DOWN = 'pageDown',
+  SCROLL_UP = 'scroll.up',
+  SCROLL_DOWN = 'scroll.down',
+  SCROLL_HOME = 'scroll.home',
+  SCROLL_END = 'scroll.end',
+  PAGE_UP = 'scroll.pageUp',
+  PAGE_DOWN = 'scroll.pageDown',
 
-  // History navigation
-  HISTORY_UP = 'historyUp',
-  HISTORY_DOWN = 'historyDown',
-  NAVIGATION_UP = 'navigationUp',
-  NAVIGATION_DOWN = 'navigationDown',
+  // History & Search
+  HISTORY_UP = 'history.previous',
+  HISTORY_DOWN = 'history.next',
+  REVERSE_SEARCH = 'history.search.start',
+  SUBMIT_REVERSE_SEARCH = 'history.search.submit',
+  ACCEPT_SUGGESTION_REVERSE_SEARCH = 'history.search.accept',
 
-  // Dialog navigation
-  DIALOG_NAVIGATION_UP = 'dialogNavigationUp',
-  DIALOG_NAVIGATION_DOWN = 'dialogNavigationDown',
+  // Navigation
+  NAVIGATION_UP = 'nav.up',
+  NAVIGATION_DOWN = 'nav.down',
+  DIALOG_NAVIGATION_UP = 'nav.dialog.up',
+  DIALOG_NAVIGATION_DOWN = 'nav.dialog.down',
 
-  // Auto-completion
-  ACCEPT_SUGGESTION = 'acceptSuggestion',
-  COMPLETION_UP = 'completionUp',
-  COMPLETION_DOWN = 'completionDown',
+  // Suggestions & Completions
+  ACCEPT_SUGGESTION = 'suggest.accept',
+  COMPLETION_UP = 'suggest.focusPrevious',
+  COMPLETION_DOWN = 'suggest.focusNext',
+  EXPAND_SUGGESTION = 'suggest.expand',
+  COLLAPSE_SUGGESTION = 'suggest.collapse',
 
-  // Text input
-  SUBMIT = 'submit',
-  NEWLINE = 'newline',
+  // Text Input
+  SUBMIT = 'input.submit',
+  NEWLINE = 'input.newline',
+  OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
+  PASTE_CLIPBOARD = 'input.paste',
 
-  // External tools
-  OPEN_EXTERNAL_EDITOR = 'openExternalEditor',
-  PASTE_CLIPBOARD = 'pasteClipboard',
-
-  // App level bindings
-  SHOW_ERROR_DETAILS = 'showErrorDetails',
-  SHOW_FULL_TODOS = 'showFullTodos',
-  SHOW_IDE_CONTEXT_DETAIL = 'showIDEContextDetail',
-  TOGGLE_MARKDOWN = 'toggleMarkdown',
-  TOGGLE_COPY_MODE = 'toggleCopyMode',
-  TOGGLE_YOLO = 'toggleYolo',
-  TOGGLE_AUTO_EDIT = 'toggleAutoEdit',
-  UNDO = 'undo',
-  REDO = 'redo',
-  MOVE_LEFT = 'moveLeft',
-  MOVE_RIGHT = 'moveRight',
-  MOVE_WORD_LEFT = 'moveWordLeft',
-  MOVE_WORD_RIGHT = 'moveWordRight',
-  DELETE_CHAR_LEFT = 'deleteCharLeft',
-  DELETE_CHAR_RIGHT = 'deleteCharRight',
-  DELETE_WORD_FORWARD = 'deleteWordForward',
-  QUIT = 'quit',
-  EXIT = 'exit',
-  SHOW_MORE_LINES = 'showMoreLines',
-  REWIND = 'rewind',
-
-  // Shell commands
-  REVERSE_SEARCH = 'reverseSearch',
-  SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
-  ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
-  FOCUS_SHELL_INPUT = 'focusShellInput',
-  UNFOCUS_SHELL_INPUT = 'unfocusShellInput',
-
-  // Suggestion expansion
-  EXPAND_SUGGESTION = 'expandSuggestion',
-  COLLAPSE_SUGGESTION = 'collapseSuggestion',
+  // App Controls
+  SHOW_ERROR_DETAILS = 'app.showErrorDetails',
+  SHOW_FULL_TODOS = 'app.showFullTodos',
+  SHOW_IDE_CONTEXT_DETAIL = 'app.showIdeContextDetail',
+  TOGGLE_MARKDOWN = 'app.toggleMarkdown',
+  TOGGLE_COPY_MODE = 'app.toggleCopyMode',
+  TOGGLE_YOLO = 'app.toggleYolo',
+  TOGGLE_AUTO_EDIT = 'app.toggleAutoEdit',
+  SHOW_MORE_LINES = 'app.showMoreLines',
+  FOCUS_SHELL_INPUT = 'app.focusShellInput',
+  UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
+  CLEAR_SCREEN = 'app.clearScreen',
 }
 
 /**
@@ -95,17 +88,13 @@ export enum Command {
  */
 export interface KeyBinding {
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
-  key?: string;
-  /** The key sequence (e.g., '\x18' for Ctrl+X) - alternative to key name */
-  sequence?: string;
+  key: string;
   /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   ctrl?: boolean;
   /** Shift key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   shift?: boolean;
   /** Command/meta key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   command?: boolean;
-  /** Paste operation requirement: true=must be paste, false=must not be paste, undefined=ignore */
-  paste?: boolean;
 }
 
 /**
@@ -120,26 +109,17 @@ export type KeyBindingConfig = {
  * Matches the original hard-coded logic exactly
  */
 export const defaultKeyBindings: KeyBindingConfig = {
-  // Basic bindings
+  // Basic Controls
   [Command.RETURN]: [{ key: 'return' }],
   [Command.ESCAPE]: [{ key: 'escape' }],
+  [Command.QUIT]: [{ key: 'c', ctrl: true }],
+  [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
-  // Cursor movement
+  // Cursor Movement
   [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
   [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
-
-  // Text deletion
-  [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
-  [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
-  [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
-  // Added command (meta/alt/option) for mac compatibility
-  [Command.DELETE_WORD_BACKWARD]: [
-    { key: 'backspace', ctrl: true },
-    { key: 'backspace', command: true },
-    { sequence: '\x7f', ctrl: true },
-    { sequence: '\x7f', command: true },
-    { key: 'w', ctrl: true },
-  ],
+  [Command.MOVE_UP]: [{ key: 'up', ctrl: false, command: false }],
+  [Command.MOVE_DOWN]: [{ key: 'down', ctrl: false, command: false }],
   [Command.MOVE_LEFT]: [
     { key: 'left', ctrl: false, command: false },
     { key: 'b', ctrl: true },
@@ -158,19 +138,25 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'right', command: true },
     { key: 'f', command: true },
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    { key: 'backspace' },
-    { sequence: '\x7f' },
-    { key: 'h', ctrl: true },
+
+  // Editing
+  [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
+  [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
+  [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
+  // Added command (meta/alt/option) for mac compatibility
+  [Command.DELETE_WORD_BACKWARD]: [
+    { key: 'backspace', ctrl: true },
+    { key: 'backspace', command: true },
+    { key: 'w', ctrl: true },
   ],
-  [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
     { key: 'delete', command: true },
   ],
-
-  // Screen control
-  [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
+  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
+  [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
+  [Command.UNDO]: [{ key: 'z', ctrl: true, shift: false }],
+  [Command.REDO]: [{ key: 'z', ctrl: true, shift: true }],
 
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
@@ -180,13 +166,17 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.PAGE_UP]: [{ key: 'pageup' }],
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
-  // History navigation
+  // History & Search
   [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
   [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true, shift: false }],
+  [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
+  // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
+  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+
+  // Navigation
   [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
   [Command.NAVIGATION_DOWN]: [{ key: 'down', shift: false }],
-
-  // Dialog navigation
   // Navigation shortcuts appropriate for dialogs where we do not need to accept
   // text input.
   [Command.DIALOG_NAVIGATION_UP]: [
@@ -198,7 +188,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'j', shift: false },
   ],
 
-  // Auto-completion
+  // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
   // Completion navigation (arrow or Ctrl+P/N)
   [Command.COMPLETION_UP]: [
@@ -209,15 +199,16 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'down', shift: false },
     { key: 'n', ctrl: true, shift: false },
   ],
+  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
+  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 
-  // Text input
+  // Text Input
   // Must also exclude shift to allow shift+enter for newline
   [Command.SUBMIT]: [
     {
       key: 'return',
       ctrl: false,
       command: false,
-      paste: false,
       shift: false,
     },
   ],
@@ -226,22 +217,16 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', command: true },
-    { key: 'return', paste: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
   ],
-
-  // External tools
-  [Command.OPEN_EXTERNAL_EDITOR]: [
-    { key: 'x', ctrl: true },
-    { sequence: '\x18', ctrl: true },
-  ],
+  [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
     { key: 'v', command: true },
   ],
 
-  // App level bindings
+  // App Controls
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.SHOW_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
@@ -249,23 +234,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.TOGGLE_AUTO_EDIT]: [{ key: 'tab', shift: true }],
-  [Command.UNDO]: [{ key: 'z', ctrl: true, shift: false }],
-  [Command.REDO]: [{ key: 'z', ctrl: true, shift: true }],
-  [Command.QUIT]: [{ key: 'c', ctrl: true }],
-  [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
-
-  // Shell commands
-  [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
-  // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
-  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
-  // Suggestion expansion
-  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
-  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
-  [Command.REWIND]: [{ key: 'Esc (×2)' }],
+  [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -279,13 +251,15 @@ interface CommandCategory {
 export const commandCategories: readonly CommandCategory[] = [
   {
     title: 'Basic Controls',
-    commands: [Command.RETURN, Command.ESCAPE],
+    commands: [Command.RETURN, Command.ESCAPE, Command.QUIT, Command.EXIT],
   },
   {
     title: 'Cursor Movement',
     commands: [
       Command.HOME,
       Command.END,
+      Command.MOVE_UP,
+      Command.MOVE_DOWN,
       Command.MOVE_LEFT,
       Command.MOVE_RIGHT,
       Command.MOVE_WORD_LEFT,
@@ -307,10 +281,6 @@ export const commandCategories: readonly CommandCategory[] = [
     ],
   },
   {
-    title: 'Screen Control',
-    commands: [Command.CLEAR_SCREEN],
-  },
-  {
     title: 'Scrolling',
     commands: [
       Command.SCROLL_UP,
@@ -329,7 +299,6 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
-      Command.REWIND,
     ],
   },
   {
@@ -353,11 +322,12 @@ export const commandCategories: readonly CommandCategory[] = [
   },
   {
     title: 'Text Input',
-    commands: [Command.SUBMIT, Command.NEWLINE],
-  },
-  {
-    title: 'External Tools',
-    commands: [Command.OPEN_EXTERNAL_EDITOR, Command.PASTE_CLIPBOARD],
+    commands: [
+      Command.SUBMIT,
+      Command.NEWLINE,
+      Command.OPEN_EXTERNAL_EDITOR,
+      Command.PASTE_CLIPBOARD,
+    ],
   },
   {
     title: 'App Controls',
@@ -372,11 +342,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_MORE_LINES,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
+      Command.CLEAR_SCREEN,
     ],
-  },
-  {
-    title: 'Session Control',
-    commands: [Command.QUIT, Command.EXIT],
   },
 ];
 
@@ -384,14 +351,24 @@ export const commandCategories: readonly CommandCategory[] = [
  * Human-readable descriptions for each command, used in docs/tooling.
  */
 export const commandDescriptions: Readonly<Record<Command, string>> = {
+  // Basic Controls
   [Command.RETURN]: 'Confirm the current selection or choice.',
   [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
+  [Command.QUIT]:
+    'Cancel the current request or quit the CLI when input is empty.',
+  [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
+
+  // Cursor Movement
   [Command.HOME]: 'Move the cursor to the start of the line.',
   [Command.END]: 'Move the cursor to the end of the line.',
+  [Command.MOVE_UP]: 'Move the cursor up one line.',
+  [Command.MOVE_DOWN]: 'Move the cursor down one line.',
   [Command.MOVE_LEFT]: 'Move the cursor one character to the left.',
   [Command.MOVE_RIGHT]: 'Move the cursor one character to the right.',
   [Command.MOVE_WORD_LEFT]: 'Move the cursor one word to the left.',
   [Command.MOVE_WORD_RIGHT]: 'Move the cursor one word to the right.',
+
+  // Editing
   [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',
   [Command.KILL_LINE_LEFT]: 'Delete from the cursor to the start of the line.',
   [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
@@ -401,46 +378,54 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.DELETE_CHAR_RIGHT]: 'Delete the character to the right.',
   [Command.UNDO]: 'Undo the most recent text edit.',
   [Command.REDO]: 'Redo the most recent undone text edit.',
-  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+
+  // Scrolling
   [Command.SCROLL_UP]: 'Scroll content up.',
   [Command.SCROLL_DOWN]: 'Scroll content down.',
   [Command.SCROLL_HOME]: 'Scroll to the top.',
   [Command.SCROLL_END]: 'Scroll to the bottom.',
   [Command.PAGE_UP]: 'Scroll up by one page.',
   [Command.PAGE_DOWN]: 'Scroll down by one page.',
+
+  // History & Search
   [Command.HISTORY_UP]: 'Show the previous entry in history.',
   [Command.HISTORY_DOWN]: 'Show the next entry in history.',
+  [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
+  [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
+    'Accept a suggestion while reverse searching.',
+
+  // Navigation
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
   [Command.NAVIGATION_DOWN]: 'Move selection down in lists.',
   [Command.DIALOG_NAVIGATION_UP]: 'Move up within dialog options.',
   [Command.DIALOG_NAVIGATION_DOWN]: 'Move down within dialog options.',
+
+  // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION]: 'Accept the inline suggestion.',
   [Command.COMPLETION_UP]: 'Move to the previous completion option.',
   [Command.COMPLETION_DOWN]: 'Move to the next completion option.',
+  [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
+  [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
+
+  // Text Input
   [Command.SUBMIT]: 'Submit the current prompt.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
+
+  // App Controls
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',
   [Command.SHOW_FULL_TODOS]: 'Toggle the full TODO list.',
   [Command.SHOW_IDE_CONTEXT_DETAIL]: 'Show IDE context details.',
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
-  [Command.TOGGLE_COPY_MODE]:
-    'Toggle copy mode when the terminal is using the alternate buffer.',
+  [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
-  [Command.QUIT]: 'Cancel the current request or quit the CLI.',
-  [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
   [Command.SHOW_MORE_LINES]:
-    'Expand a height-constrained response to show additional lines.',
-  [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
-  [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
-    'Accept a suggestion while reverse searching.',
+    'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
-  [Command.EXPAND_SUGGESTION]: 'Expand an inline suggestion.',
-  [Command.COLLAPSE_SUGGESTION]: 'Collapse an inline suggestion.',
-  [Command.REWIND]: 'Browse and rewind previous interactions.',
+  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
 };

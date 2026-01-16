@@ -20,7 +20,9 @@ import {
   initializeShellParsers,
   stripShellWrapper,
   hasRedirection,
+  resolveExecutable,
 } from './shell-utils.js';
+import path from 'node:path';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -33,6 +35,20 @@ vi.mock('os', () => ({
   homedir: mockHomedir,
 }));
 
+const mockAccess = vi.hoisted(() => vi.fn());
+vi.mock('node:fs', () => ({
+  default: {
+    promises: {
+      access: mockAccess,
+    },
+    constants: { X_OK: 1 },
+  },
+  promises: {
+    access: mockAccess,
+  },
+  constants: { X_OK: 1 },
+}));
+
 const mockSpawnSync = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', () => ({
   spawnSync: mockSpawnSync,
@@ -42,6 +58,16 @@ vi.mock('node:child_process', () => ({
 const mockQuote = vi.hoisted(() => vi.fn());
 vi.mock('shell-quote', () => ({
   quote: mockQuote,
+}));
+
+const mockDebugLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  debug: vi.fn(),
+  log: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock('./debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
 }));
 
 const isWindowsRuntime = process.platform === 'win32';
@@ -160,6 +186,28 @@ describe('getCommandRoots', () => {
     // Fallback: splitting commands depends on parser, so if parser fails, it returns empty
     const roots = shellUtils.getCommandRoots('ls -la');
     expect(roots).toEqual([]);
+  });
+
+  it('should handle bash parser timeouts', () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+    // Mock performance.now() to trigger timeout:
+    // 1st call: start time = 0. deadline = 0 + 1000ms.
+    // 2nd call (and onwards): inside progressCallback, return 2000ms.
+    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
+
+    // Use a very complex command to ensure progressCallback is triggered at least once
+    const complexCommand =
+      'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
+    const roots = getCommandRoots(complexCommand);
+    expect(roots).toEqual([]);
+    expect(nowSpy).toHaveBeenCalled();
+
+    expect(mockDebugLogger.error).toHaveBeenCalledWith(
+      'Bash command parsing timed out for command:',
+      complexCommand,
+    );
+
+    nowSpy.mockRestore();
   });
 });
 
@@ -429,5 +477,67 @@ describe('hasRedirection (PowerShell via mock)', () => {
     });
     // Fallback regex sees '>' in arrow
     expect(hasRedirection('echo "-> arrow"')).toBe(true);
+  });
+});
+
+describe('resolveExecutable', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAccess.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return the absolute path if it exists and is executable', async () => {
+    const absPath = path.resolve('/usr/bin/git');
+    mockAccess.mockResolvedValue(undefined); // success
+    expect(await resolveExecutable(absPath)).toBe(absPath);
+    expect(mockAccess).toHaveBeenCalledWith(absPath, 1);
+  });
+
+  it('should return undefined for absolute path if it does not exist', async () => {
+    const absPath = path.resolve('/usr/bin/nonexistent');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    expect(await resolveExecutable(absPath)).toBeUndefined();
+  });
+
+  it('should resolve executable in PATH', async () => {
+    const binDir = path.resolve('/bin');
+    const usrBinDir = path.resolve('/usr/bin');
+    process.env['PATH'] = `${binDir}${path.delimiter}${usrBinDir}`;
+    mockPlatform.mockReturnValue('linux');
+
+    const targetPath = path.join(usrBinDir, 'ls');
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === targetPath) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('ls')).toBe(targetPath);
+  });
+
+  it('should try extensions on Windows', async () => {
+    const sys32 = path.resolve('C:\\Windows\\System32');
+    process.env['PATH'] = sys32;
+    mockPlatform.mockReturnValue('win32');
+    mockAccess.mockImplementation(async (p: string) => {
+      // Use includes because on Windows path separators might differ
+      if (p.includes('cmd.exe')) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('cmd')).toContain('cmd.exe');
+  });
+
+  it('should return undefined if not found in PATH', async () => {
+    process.env['PATH'] = path.resolve('/bin');
+    mockPlatform.mockReturnValue('linux');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+
+    expect(await resolveExecutable('unknown')).toBeUndefined();
   });
 });
