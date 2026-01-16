@@ -331,22 +331,17 @@ const SETTINGS_SCHEMA = {
           { value: 'json', label: 'JSON' },
         ],
       },
-      // Defined as enum type to support additional of more verbosity levels
+      // Defined as enum type to support the addition of more verbosity levels
       verbosity: {
         type: 'enum',
-        // label: 'Output Verbosity',
         label: 'Verbose Output History',
         category: 'General',
         requiresRestart: false,
-        // default: 'info',
         default: 'verbose',
         description:
-          // 'Controls the detail level of the conversation history. `Verbose` will include autonomous tool calls, additional logs, etc.',
           'Show verbose output history. When enabled, output history will include autonomous tool calls, additional logs, etc.',
         showInDialog: true,
         options: [
-          // { value: 'info', label: 'Standard' },
-          // { value: 'verbose', label: 'Verbose' },
           { value: 'info', label: 'false' },
           { value: 'verbose', label: 'true' },
         ],
