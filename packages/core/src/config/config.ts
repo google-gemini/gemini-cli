@@ -172,6 +172,7 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   disabled?: boolean;
+  enabled?: boolean;
 }
 
 export interface AgentSettings {
