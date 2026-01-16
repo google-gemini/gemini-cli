@@ -17,7 +17,6 @@ import {
   coreEvents,
   homedir,
   type FetchAdminControlsResponse,
-  debugLogger,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -689,9 +688,6 @@ export function migrateDeprecatedSettings(
           }
         } else {
           const oldValue = newGeneral['disableAutoUpdate'];
-          debugLogger.log(
-            `Migrating deprecated general.disableAutoUpdate to general.enableAutoUpdate from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-          );
           newGeneral['enableAutoUpdate'] = !oldValue;
           if (removeDeprecated) {
             delete newGeneral['disableAutoUpdate'];
@@ -709,9 +705,6 @@ export function migrateDeprecatedSettings(
           }
         } else {
           const oldValue = newGeneral['disableUpdateNag'];
-          debugLogger.log(
-            `Migrating deprecated general.disableUpdateNag to general.enableAutoUpdateNotification from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-          );
           newGeneral['enableAutoUpdateNotification'] = !oldValue;
           if (removeDeprecated) {
             delete newGeneral['disableUpdateNag'];
@@ -753,9 +746,6 @@ export function migrateDeprecatedSettings(
           }
         } else {
           const oldValue = accessibilitySettings['disableLoadingPhrases'];
-          debugLogger.log(
-            `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.enableLoadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-          );
           newAccessibility['enableLoadingPhrases'] = !oldValue;
           if (removeDeprecated) {
             delete newAccessibility['disableLoadingPhrases'];
@@ -796,9 +786,6 @@ export function migrateDeprecatedSettings(
           }
         } else {
           const oldValue = fileFilteringSettings['disableFuzzySearch'];
-          debugLogger.log(
-            `Migrating deprecated context.fileFiltering.disableFuzzySearch to context.fileFiltering.enableFuzzySearch from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-          );
           newFileFiltering['enableFuzzySearch'] = !oldValue;
           if (removeDeprecated) {
             delete newFileFiltering['disableFuzzySearch'];
