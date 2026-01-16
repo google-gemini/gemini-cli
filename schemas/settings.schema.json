@@ -1537,6 +1537,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Agent Skills",
+          "description": "Enable Agent Skills.",
+          "markdownDescription": "Enable Agent Skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Skills",
           "description": "List of disabled skills.",
