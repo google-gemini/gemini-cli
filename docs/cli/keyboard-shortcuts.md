@@ -8,10 +8,12 @@ available combinations.
 
 #### Basic Controls
 
-| Action                                       | Keys    |
-| -------------------------------------------- | ------- |
-| Confirm the current selection or choice.     | `Enter` |
-| Dismiss dialogs or cancel the current focus. | `Esc`   |
+| Action                                                          | Keys       |
+| --------------------------------------------------------------- | ---------- |
+| Confirm the current selection or choice.                        | `Enter`    |
+| Dismiss dialogs or cancel the current focus.                    | `Esc`      |
+| Cancel the current request or quit the CLI when input is empty. | `Ctrl + C` |
+| Exit the CLI when the input buffer is empty.                    | `Ctrl + D` |
 
 #### Cursor Movement
 
@@ -39,12 +41,6 @@ available combinations.
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
 | Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
 | Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
-
-#### Screen Control
-
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Clear the terminal screen and redraw the UI. | `Ctrl + L` |
 
 #### Scrolling
 
@@ -88,39 +84,28 @@ available combinations.
 
 #### Text Input
 
-| Action                               | Keys                                                                   |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
-| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
-
-#### External Tools
-
-| Action                                         | Keys                      |
-| ---------------------------------------------- | ------------------------- |
-| Open the current prompt in an external editor. | `Ctrl + X`                |
-| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V` |
+| Action                                         | Keys                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Submit the current prompt.                     | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
+| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Open the current prompt in an external editor. | `Ctrl + X`                                                             |
+| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`                                              |
 
 #### App Controls
 
-| Action                                                            | Keys             |
-| ----------------------------------------------------------------- | ---------------- |
-| Toggle detailed error information.                                | `F12`            |
-| Toggle the full TODO list.                                        | `Ctrl + T`       |
-| Show IDE context details.                                         | `Ctrl + G`       |
-| Toggle Markdown rendering.                                        | `Cmd + M`        |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
-| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
-| Focus the Gemini input from the shell input.                      | `Tab`            |
-
-#### Session Control
-
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Cancel the current request or quit the CLI.  | `Ctrl + C` |
-| Exit the CLI when the input buffer is empty. | `Ctrl + D` |
+| Action                                                                                           | Keys             |
+| ------------------------------------------------------------------------------------------------ | ---------------- |
+| Toggle detailed error information.                                                               | `F12`            |
+| Toggle the full TODO list.                                                                       | `Ctrl + T`       |
+| Show IDE context details.                                                                        | `Ctrl + G`       |
+| Toggle Markdown rendering.                                                                       | `Cmd + M`        |
+| Toggle copy mode when in alternate buffer mode.                                                  | `Ctrl + S`       |
+| Toggle YOLO (auto-approval) mode for tool calls.                                                 | `Ctrl + Y`       |
+| Toggle Auto Edit (auto-accept edits) mode.                                                       | `Shift + Tab`    |
+| Expand a height-constrained response to show additional lines when not in alternate buffer mode. | `Ctrl + S`       |
+| Focus the shell input from the gemini input.                                                     | `Tab (no Shift)` |
+| Focus the Gemini input from the shell input.                                                     | `Tab`            |
+| Clear the terminal screen and redraw the UI.                                                     | `Ctrl + L`       |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
