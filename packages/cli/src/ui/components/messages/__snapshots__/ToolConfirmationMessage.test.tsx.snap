@@ -1,5 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ToolConfirmationMessage > should display multiple commands for exec type when provided 1`] = `
+"echo "hello"
+ls -la
+whoami
+
+Allow execution of 3 commands?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
 exports[`ToolConfirmationMessage > should display urls if prompt and url are different 1`] = `
 "fetch https://github.com/google/gemini-react/blob/main/README.md
 
