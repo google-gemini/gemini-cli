@@ -93,12 +93,12 @@ describe('BaseSelectionList', () => {
       expect(mockRenderItem).toHaveBeenCalledWith(items[0], expect.any(Object));
     });
 
-    it('should render the selection indicator (● or space) and layout', () => {
+    it('should render the selection indicator (• or space) and layout', () => {
       const { lastFrame } = renderComponent({}, 0);
       const output = lastFrame();
 
       // Use regex to assert the structure: Indicator + Whitespace + Number + Label
-      expect(output).toMatch(/●\s+1\.\s+Item A/);
+      expect(output).toMatch(/•\s+1\.\s+Item A/);
       expect(output).toMatch(/\s+2\.\s+Item B/);
       expect(output).toMatch(/\s+3\.\s+Item C/);
     });
@@ -459,8 +459,8 @@ describe('BaseSelectionList', () => {
       });
       const output = lastFrame();
 
-      expect(output).not.toContain('▲');
-      expect(output).not.toContain('▼');
+      expect(output).not.toContain('▴');
+      expect(output).not.toContain('▾');
     });
 
     it('should show arrows with correct colors when enabled (at the top)', async () => {
@@ -480,8 +480,8 @@ describe('BaseSelectionList', () => {
         expect(output).toContain('Item 3');
         expect(output).not.toContain('Item 4');
         // Both arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(output).toContain('▴');
+        expect(output).toContain('▾');
       });
     });
 
@@ -499,8 +499,8 @@ describe('BaseSelectionList', () => {
         expect(output).not.toContain('Item 3');
         expect(output).not.toContain('Item 7');
         // Both scroll arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(output).toContain('▴');
+        expect(output).toContain('▾');
       });
     });
 
@@ -517,8 +517,8 @@ describe('BaseSelectionList', () => {
         expect(output).toContain('Item 10');
         expect(output).not.toContain('Item 7');
         // Both arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(output).toContain('▴');
+        expect(output).toContain('▾');
       });
     });
 
@@ -535,8 +535,8 @@ describe('BaseSelectionList', () => {
       expect(output).toContain('Item B');
       expect(output).toContain('Item C');
       // Both arrows should be visible but dimmed (this test doesn't need waitFor since no scrolling occurs)
-      expect(output).toContain('▲');
-      expect(output).toContain('▼');
+      expect(output).toContain('▴');
+      expect(output).toContain('▾');
     });
   });
 });

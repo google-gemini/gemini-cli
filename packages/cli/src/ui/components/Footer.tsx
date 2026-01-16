@@ -167,11 +167,11 @@ export const Footer: React.FC = () => {
               <Box paddingLeft={1} flexDirection="row">
                 <Text>
                   <Text color={theme.ui.symbol}>| </Text>
-                  <Text color={theme.status.error}>▼</Text>
+                  <Text color={theme.status.error}>▾</Text>
                   <Text color={theme.text.primary}>(´</Text>
                   <Text color={theme.status.error}>ᴥ</Text>
                   <Text color={theme.text.primary}>`)</Text>
-                  <Text color={theme.status.error}>▼</Text>
+                  <Text color={theme.status.error}>▾</Text>
                 </Text>
               </Box>
             )}

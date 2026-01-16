@@ -308,7 +308,7 @@ const SessionListHeader = ({
 const NavigationHelp = (): React.JSX.Element => (
   <Box flexDirection="column">
     <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
+      <Kbd name="Navigate" shortcut="￪/￬" />
       {'   '}
       <Kbd name="Resume" shortcut="Enter" />
       {'   '}
@@ -337,7 +337,7 @@ const SessionTableHeader = ({
   state: SessionBrowserState;
 }): React.JSX.Element => (
   <Box flexDirection="row" marginTop={1}>
-    <Text>{state.scrollOffset > 0 ? <Text>▲ </Text> : '  '}</Text>
+    <Text>{state.scrollOffset > 0 ? <Text>▴ </Text> : '  '}</Text>
 
     <Box width={5} flexShrink={0}>
       <Text color={Colors.Gray} bold>
@@ -556,7 +556,7 @@ const SessionList = ({
     ))}
 
     <Text color={Colors.Gray}>
-      {state.endIndex < state.totalSessions ? <>▼</> : <Text dimColor>▼</Text>}
+      {state.endIndex < state.totalSessions ? <>▾</> : <Text dimColor>▾</Text>}
     </Text>
   </Box>
 );
