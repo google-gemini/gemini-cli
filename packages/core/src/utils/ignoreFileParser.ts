@@ -7,33 +7,44 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore from 'ignore';
+import { debugLogger } from './debugLogger.js';
 
-export interface GeminiIgnoreFilter {
+export interface IgnoreFileFilter {
   isIgnored(filePath: string): boolean;
   getPatterns(): string[];
   getIgnoreFilePath(): string | null;
   hasPatterns(): boolean;
 }
 
-export class GeminiIgnoreParser implements GeminiIgnoreFilter {
+/**
+ * An ignore file parser that reads the ignore file from the project root.
+ */
+export class IgnoreFileParser implements IgnoreFileFilter {
   private projectRoot: string;
   private patterns: string[] = [];
   private ig = ignore();
 
-  constructor(projectRoot: string) {
+  constructor(
+    projectRoot: string,
+    readonly fileName: string,
+  ) {
     this.projectRoot = path.resolve(projectRoot);
     this.loadPatterns();
   }
 
   private loadPatterns(): void {
-    const patternsFilePath = path.join(this.projectRoot, '.geminiignore');
+    const patternsFilePath = path.join(this.projectRoot, this.fileName);
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
     } catch (_error) {
-      // ignore file not found
+      debugLogger.debug(
+        `Ignore file not found: ${patternsFilePath}, continue without it.`,
+      );
       return;
     }
+
+    debugLogger.debug(`Loading ignore patterns from: ${patternsFilePath}`);
 
     this.patterns = (content ?? '')
       .split('\n')
@@ -89,7 +100,7 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
     if (!this.hasPatterns()) {
       return null;
     }
-    return path.join(this.projectRoot, '.geminiignore');
+    return path.join(this.projectRoot, this.fileName);
   }
 
   /**
@@ -99,7 +110,7 @@ export class GeminiIgnoreParser implements GeminiIgnoreFilter {
     if (this.patterns.length === 0) {
       return false;
     }
-    const ignoreFilePath = path.join(this.projectRoot, '.geminiignore');
+    const ignoreFilePath = path.join(this.projectRoot, this.fileName);
     return fs.existsSync(ignoreFilePath);
   }
 }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -59,6 +59,53 @@ describe('FileDiscoveryService', () => {
 
       expect(service.shouldIgnoreFile('secrets.txt')).toBe(true);
       expect(service.shouldIgnoreFile('src/index.js')).toBe(false);
+    });
+
+    it('should call applyFilterFilesOptions in constructor', () => {
+      const resolveSpy = vi.spyOn(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        FileDiscoveryService.prototype as any,
+        'applyFilterFilesOptions',
+      );
+      const options = { respectGitIgnore: false };
+      new FileDiscoveryService(projectRoot, options);
+      expect(resolveSpy).toHaveBeenCalledWith(options);
+    });
+
+    it('should correctly resolve options passed to constructor', () => {
+      const options = {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePath: 'custom/.ignore',
+      };
+      const service = new FileDiscoveryService(projectRoot, options);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(false);
+      expect(defaults.respectGeminiIgnore).toBe(false);
+      expect(defaults.customIgnoreFilePath).toBe('custom/.ignore');
+    });
+
+    it('should use defaults when options are not provided', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(true);
+      expect(defaults.respectGeminiIgnore).toBe(true);
+      expect(defaults.customIgnoreFilePath).toBeUndefined();
+    });
+
+    it('should partially override defaults', () => {
+      const service = new FileDiscoveryService(projectRoot, {
+        respectGitIgnore: false,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defaults = (service as any).defaultFilterFileOptions;
+
+      expect(defaults.respectGitIgnore).toBe(false);
+      expect(defaults.respectGeminiIgnore).toBe(true);
     });
   });
 
@@ -326,6 +373,45 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual(
         ['file.txt', 'important.txt'].map((f) => path.join(projectRoot, f)),
       );
+    });
+  });
+
+  describe('custom ignore file', () => {
+    it('should respect patterns from a custom ignore file', async () => {
+      const customIgnoreName = '.customignore';
+      await createTestFile(customIgnoreName, '*.secret');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePath: customIgnoreName,
+      });
+
+      const files = ['file.txt', 'file.secret'].map((f) =>
+        path.join(projectRoot, f),
+      );
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'file.txt')]);
+    });
+
+    it('should prioritize custom ignore patterns over .geminiignore patterns in git repo', async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile('.gitignore', 'node_modules/');
+      await createTestFile('.geminiignore', '*.log');
+
+      const customIgnoreName = '.customignore';
+      // .geminiignore ignores *.log, custom un-ignores debug.log
+      await createTestFile(customIgnoreName, '!debug.log');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePath: customIgnoreName,
+      });
+
+      const files = ['debug.log', 'error.log'].map((f) =>
+        path.join(projectRoot, f),
+      );
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'debug.log')]);
     });
   });
 });

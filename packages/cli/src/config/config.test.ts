@@ -637,6 +637,9 @@ describe('loadCliConfig', () => {
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
+    expect(config.getCustomIgnoreFilePath()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePath,
+    );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 });

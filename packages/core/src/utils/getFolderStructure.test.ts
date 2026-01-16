@@ -285,6 +285,7 @@ ${testRootDir}${path.sep}
         fileFilteringOptions: {
           respectGeminiIgnore: false,
           respectGitIgnore: false,
+          customIgnoreFilePath: undefined,
         },
       });
 
@@ -331,6 +332,7 @@ ${testRootDir}${path.sep}
         fileFilteringOptions: {
           respectGeminiIgnore: false,
           respectGitIgnore: true, // Explicitly disable gemini ignore only
+          customIgnoreFilePath: undefined,
         },
       });
       expect(structure).toContain('ignored.txt');
