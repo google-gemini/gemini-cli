@@ -511,13 +511,11 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly hooks:
-    | { [K in HookEventName]?: HookDefinition[] }
-    | undefined;
-  private readonly projectHooks:
+  private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+  private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
-  private readonly disabledHooks: string[];
+  private disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -1928,6 +1926,20 @@ export class Config {
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined {
     return this.projectHooks;
+  }
+
+  /**
+   * Update hooks configuration dynamically
+   */
+  updateHooks(
+    hooks: { [K in HookEventName]?: HookDefinition[] } & {
+      disabled?: string[];
+    },
+  ): void {
+    this.hooks = hooks;
+    if (Array.isArray(hooks.disabled)) {
+      this.disabledHooks = hooks.disabled;
+    }
   }
 
   /**

@@ -1842,6 +1842,45 @@ describe('Availability Service Integration', () => {
   });
 });
 
+describe('Hooks configuration', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+    hooks: { disabled: ['initial-hook'] },
+  };
+
+  it('updateHooks should update hooks and disabled list', () => {
+    const config = new Config(baseParams);
+    expect(config.getDisabledHooks()).toEqual(['initial-hook']);
+
+    const newHooks = {
+      disabled: ['new-hook-1', 'new-hook-2'],
+      BeforeAgent: [],
+    };
+
+    config.updateHooks(newHooks);
+
+    expect(config.getDisabledHooks()).toEqual(['new-hook-1', 'new-hook-2']);
+    expect(config.getHooks()).toEqual(newHooks);
+  });
+
+  it('updateHooks should handle missing disabled property gracefully', () => {
+    const config = new Config(baseParams);
+    const newHooks = {
+      BeforeAgent: [],
+    };
+
+    config.updateHooks(newHooks);
+
+    // Should keep previous disabled hooks if not provided in new object
+    expect(config.getDisabledHooks()).toEqual(['initial-hook']);
+    expect(config.getHooks()).toEqual(newHooks);
+  });
+});
+
 describe('Config Quota & Preview Model Access', () => {
   let config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
