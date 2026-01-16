@@ -1597,6 +1597,23 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getNumericalRoutingEnabled(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+
+    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
+      ?.boolValue;
+  }
+
+  async getClassifierThreshold(): Promise<number | undefined> {
+    await this.ensureExperimentsLoaded();
+
+    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    if (flag?.intValue !== undefined) {
+      return parseInt(flag.intValue, 10);
+    }
+    return flag?.floatValue;
+  }
+
   async getBannerTextNoCapacityIssues(): Promise<string> {
     await this.ensureExperimentsLoaded();
     return (
