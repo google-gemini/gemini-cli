@@ -21,6 +21,7 @@ import type {
   DefaultHookOutput,
   BeforeModelHookOutput,
   AfterModelHookOutput,
+  BeforeToolSelectionHookOutput,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
@@ -30,6 +31,7 @@ import type {
 import type {
   AfterModelHookResult,
   BeforeModelHookResult,
+  BeforeToolSelectionHookResult,
 } from '../core/geminiChatHookTriggers.js';
 /**
  * Main hook system that coordinates all hook-related functionality
@@ -223,6 +225,34 @@ export class HookSystem {
     } catch (error) {
       debugLogger.debug(`AfterModelHookEvent failed:`, error);
       return { response: chunk };
+    }
+  }
+
+  async fireBeforeToolSelectionEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<BeforeToolSelectionHookResult> {
+    try {
+      const result =
+        await this.hookEventHandler.fireBeforeToolSelectionEvent(llmRequest);
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput) {
+        const toolSelectionOutput = hookOutput as BeforeToolSelectionHookOutput;
+        const modifiedConfig = toolSelectionOutput.applyToolConfigModifications(
+          {
+            toolConfig: llmRequest.config?.toolConfig,
+            tools: llmRequest.config?.tools,
+          },
+        );
+        return {
+          toolConfig: modifiedConfig.toolConfig,
+          tools: modifiedConfig.tools,
+        };
+      }
+      return {};
+    } catch (error) {
+      debugLogger.debug(`BeforeToolSelectionEvent failed:`, error);
+      return {};
     }
   }
 }

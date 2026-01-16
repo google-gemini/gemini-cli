@@ -27,13 +27,7 @@ import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
-import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
-
-// Mock hook triggers
-vi.mock('./geminiChatHookTriggers.js', () => ({
-  fireBeforeToolSelectionHook: vi.fn().mockResolvedValue({}),
-}));
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -2282,10 +2276,9 @@ describe('GeminiChat', () => {
       mockHookSystem = {
         fireBeforeModelEvent: vi.fn().mockResolvedValue({ blocked: false }),
         fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
+        fireBeforeToolSelectionEvent: vi.fn().mockResolvedValue({}),
       } as unknown as HookSystem;
       mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
-
-      vi.mocked(fireBeforeToolSelectionHook).mockResolvedValue({});
     });
 
     it('should yield AGENT_EXECUTION_STOPPED when BeforeModel hook stops execution', async () => {

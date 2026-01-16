@@ -49,7 +49,6 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { fireBeforeToolSelectionHook } from './geminiChatHookTriggers.js';
 import { coreEvents } from '../utils/events.js';
 
 export enum StreamEventType {
@@ -541,21 +540,14 @@ export class GeminiChat {
         ) {
           contentsToUse = beforeModelResult.modifiedContents as Content[];
         }
-      }
 
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus) {
-        const toolSelectionResult = await fireBeforeToolSelectionHook(
-          messageBus,
-          {
+        const toolSelectionResult =
+          await hookSystem.fireBeforeToolSelectionEvent({
             model: modelToUse,
             config,
             contents: contentsToUse,
-          },
-        );
+          });
 
-        // Apply tool configuration modifications
         if (toolSelectionResult.toolConfig) {
           config.toolConfig = toolSelectionResult.toolConfig;
         }
