@@ -10,7 +10,7 @@ exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `"Mock C
 
 exports[`StatusDisplay > renders Ctrl+D prompt 1`] = `"Press Ctrl+D again to exit."`;
 
-exports[`StatusDisplay > renders Escape prompt 1`] = `"Press Esc again to clear."`;
+exports[`StatusDisplay > renders Escape prompt 1`] = `"Press Esc again to rewind."`;
 
 exports[`StatusDisplay > renders HookStatusDisplay when hooks are active 1`] = `"Mock Hook Status Display"`;
 

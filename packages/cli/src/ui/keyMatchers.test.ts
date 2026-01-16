@@ -16,7 +16,6 @@ describe('keyMatchers', () => {
     ctrl: false,
     meta: false,
     shift: false,
-    paste: false,
     insertable: false,
     sequence: name,
     ...mods,
@@ -102,11 +101,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.DELETE_CHAR_LEFT,
-      positive: [
-        createKey('backspace'),
-        { ...createKey('\x7f'), sequence: '\x7f' },
-        createKey('h', { ctrl: true }),
-      ],
+      positive: [createKey('backspace'), createKey('h', { ctrl: true })],
       negative: [createKey('h'), createKey('x', { ctrl: true })],
     },
     {
@@ -119,8 +114,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
-        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
-        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
         createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
@@ -249,7 +242,6 @@ describe('keyMatchers', () => {
       negative: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
     },
     {
@@ -257,7 +249,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
       negative: [createKey('return'), createKey('n')],
     },
@@ -265,10 +256,7 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
-      positive: [
-        createKey('x', { ctrl: true }),
-        { ...createKey('\x18'), sequence: '\x18', ctrl: true },
-      ],
+      positive: [createKey('x', { ctrl: true })],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
     {

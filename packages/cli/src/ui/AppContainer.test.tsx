@@ -82,7 +82,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 import ansiEscapes from 'ansi-escapes';
-import type { LoadedSettings } from '../config/settings.js';
+import { type LoadedSettings, mergeSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -390,14 +390,17 @@ describe('AppContainer State Management', () => {
     );
 
     // Mock LoadedSettings
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
       merged: {
+        ...defaultMergedSettings,
         hideBanner: false,
         hideFooter: false,
         hideTips: false,
         showMemoryUsage: false,
         theme: 'default',
         ui: {
+          ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
         },
@@ -517,8 +520,10 @@ describe('AppContainer State Management', () => {
 
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsAllHidden = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: true,
           hideFooter: true,
           hideTips: true,
@@ -536,8 +541,10 @@ describe('AppContainer State Management', () => {
     });
 
     it('handles settings with memory usage enabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsWithMemory = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: false,
           hideFooter: false,
           hideTips: false,
@@ -584,7 +591,7 @@ describe('AppContainer State Management', () => {
 
     it('handles undefined settings gracefully', async () => {
       const undefinedSettings = {
-        merged: {},
+        merged: mergeSettings({}, {}, {}, {}, true),
       } as LoadedSettings;
 
       let unmount: () => void;
@@ -1001,12 +1008,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithShowStatusFalse = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: false,
             hideWindowTitle: false,
           },
@@ -1103,12 +1111,13 @@ describe('AppContainer State Management', () => {
 
     it('should not update terminal title when hideWindowTitle is true', () => {
       // Arrange: Set up mock settings with hideWindowTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithHideTitleTrue = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: true,
           },
@@ -1131,12 +1140,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with thought subject when in active state', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1183,12 +1193,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with default text when in Idle state and no thought subject', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1234,12 +1245,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title when in WaitingForConfirmation state with thought subject', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1479,12 +1491,13 @@ describe('AppContainer State Management', () => {
 
     it('should pad title to exactly 80 characters', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1532,12 +1545,13 @@ describe('AppContainer State Management', () => {
 
     it('should use correct ANSI escape code format', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1948,12 +1962,13 @@ describe('AppContainer State Management', () => {
 
     const setupCopyModeTest = async (isAlternateMode = false) => {
       // Update settings for this test run
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             useAlternateBuffer: isAlternateMode,
           },
         },
@@ -2004,7 +2019,6 @@ describe('AppContainer State Management', () => {
             ctrl: true,
             meta: false,
             shift: false,
-            paste: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -2031,7 +2045,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -2046,7 +2059,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });
@@ -2067,7 +2079,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -2083,7 +2094,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });

@@ -34,6 +34,9 @@ import {
   ToolConfirmationOutcome,
   tokenLimit,
   debugLogger,
+  coreEvents,
+  CoreEvent,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -179,6 +182,11 @@ describe('useGeminiStream', () => {
       return clientInstance;
     });
 
+    const mockMcpClientManager = {
+      getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+      getMcpServerCount: vi.fn().mockReturnValue(0),
+    };
+
     const contentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
@@ -212,6 +220,7 @@ describe('useGeminiStream', () => {
       getProjectRoot: vi.fn(() => '/test/dir'),
       getCheckpointingEnabled: vi.fn(() => false),
       getGeminiClient: mockGetGeminiClient,
+      getMcpClientManager: () => mockMcpClientManager as any,
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -256,6 +265,7 @@ describe('useGeminiStream', () => {
       .mockClear()
       .mockReturnValue((async function* () {})());
     handleAtCommandSpy = vi.spyOn(atCommandProcessor, 'handleAtCommand');
+    vi.spyOn(coreEvents, 'emitFeedback');
   });
 
   const mockLoadedSettings: LoadedSettings = {
@@ -1337,6 +1347,66 @@ describe('useGeminiStream', () => {
     });
   });
 
+  describe('Retry Handling', () => {
+    it('should update retryStatus when CoreEvent.RetryAttempt is emitted', async () => {
+      const { result } = renderHookWithDefaults();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 1000,
+      };
+
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+    });
+
+    it('should reset retryStatus when isResponding becomes false', async () => {
+      const { result } = renderTestHook();
+
+      const retryPayload = {
+        model: 'gemini-2.5-pro',
+        attempt: 2,
+        maxAttempts: 3,
+        delayMs: 1000,
+      };
+
+      // Start a query to make isResponding true
+      const mockStream = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Emit retry event
+      await act(async () => {
+        coreEvents.emit(CoreEvent.RetryAttempt, retryPayload);
+      });
+
+      expect(result.current.retryStatus).toEqual(retryPayload);
+
+      // Cancel to make isResponding false
+      await act(async () => {
+        result.current.cancelOngoingRequest();
+      });
+
+      expect(result.current.retryStatus).toBeNull();
+    });
+  });
+
   describe('Slash Command Handling', () => {
     it('should schedule a tool call when the command processor returns a schedule_tool action', async () => {
       const clientToolRequest: SlashCommandProcessorResult = {
@@ -1893,6 +1963,73 @@ describe('useGeminiStream', () => {
       // Only the awaiting_approval tool should be processed
       expect(mockOnConfirmAwaiting).toHaveBeenCalledTimes(1);
       expect(mockOnConfirmExecuting).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('MCP Discovery State', () => {
+    it('should block non-slash command queries when discovery is in progress and servers exist', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+    });
+
+    it('should NOT block queries when discovery is NOT_STARTED but there are no servers', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.NOT_STARTED),
+        getMcpServerCount: vi.fn().mockReturnValue(0),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+      expect(mockSendMessageStream).toHaveBeenCalled();
+    });
+
+    it('should NOT block slash commands even when discovery is in progress', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/help');
+      });
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
     });
   });
 
@@ -2955,6 +3092,70 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
+    });
+  });
+
+  describe('MCP Server Initialization', () => {
+    it('should allow slash commands to run while MCP servers are initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/help');
+      });
+
+      // Slash command should be handled, and no Gemini call should be made.
+      expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+
+    it('should block normal prompts and provide feedback while MCP servers are initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi
+          .fn()
+          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('a normal prompt');
+      });
+
+      // No slash command, no Gemini call, but feedback should be emitted.
+      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Waiting for MCP servers to initialize... Slash commands are still available.',
+      );
+    });
+
+    it('should allow normal prompts to run when MCP servers are finished initializing', async () => {
+      const mockMcpClientManager = {
+        getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+        getMcpServerCount: vi.fn().mockReturnValue(1),
+      };
+      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('a normal prompt');
+      });
+
+      // Prompt should be sent to Gemini.
+      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalled();
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });

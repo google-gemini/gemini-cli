@@ -147,6 +147,7 @@ export interface UIState {
   activeBackgroundShellPid: number | null;
   backgroundShellHeight: number;
   isBackgroundShellListOpen: boolean;
+  adminSettingsChanged: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
