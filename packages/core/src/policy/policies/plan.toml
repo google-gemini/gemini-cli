@@ -21,34 +21,48 @@
 #
 # TOML policy priorities (before transformation):
 #   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
-#   15: Auto-edit tool override (becomes 1.015 in default tier)
+#   20: Plan mode catch-all DENY override (becomes 1.020 in default tier)
 #   50: Read-only tools (becomes 1.050 in default tier)
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
+
+# Catch-All: Deny everything by default in Plan mode.
+
+[[rule]]
+decision = "deny"
+priority = 20
+modes = ["plan"]
+
+# Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
 toolName = "glob"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "search_file_content"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "list_directory"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "read_file"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "google_web_search"
 decision = "allow"
 priority = 50
+modes = ["plan"]
 
 [[rule]]
 toolName = "SubagentInvocation"
