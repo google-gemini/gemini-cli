@@ -13,8 +13,16 @@ import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent } from '../telemetry/types.js';
+import {
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
+} from '../utils/fileUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
-import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
+import {
+  calculateRequestTokenCount,
+  estimateTokenCountSync,
+} from '../utils/tokenCalculation.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -35,6 +43,16 @@ export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
  * means that only the last 30% of the chat history will be kept after compression.
  */
 export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
+
+/**
+ * The budget for function response tokens in the preserved history.
+ */
+export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 40_000;
+
+/**
+ * The number of lines to keep when truncating a function response during compression.
+ */
+export const COMPRESSION_TRUNCATE_LINES = 30;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -101,6 +119,103 @@ export function modelStringToModelConfigAlias(model: string): string {
   }
 }
 
+/**
+ * Processes the chat history to ensure function responses don't exceed a specific token budget.
+ *
+ * This function implements a "Reverse Token Budget" strategy:
+ * 1. It iterates through the history from the most recent turn to the oldest.
+ * 2. It keeps a running tally of tokens used by function responses.
+ * 3. Recent tool outputs are preserved in full to maintain high-fidelity context for the current turn.
+ * 4. Once the budget (COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET) is exceeded, any older large
+ *    tool responses are truncated to their last 30 lines and saved to a temporary file.
+ *
+ * This ensures that compression effectively reduces context size even when recent turns
+ * contain massive tool outputs (like large grep results or logs).
+ */
+async function truncateHistoryToBudget(
+  history: Content[],
+  config: Config,
+): Promise<Content[]> {
+  let functionResponseTokenCounter = 0;
+  const truncatedHistory: Content[] = [];
+
+  // Iterate backwards: newest messages first to prioritize their context.
+  for (let i = history.length - 1; i >= 0; i--) {
+    const content = history[i];
+    const newParts = [];
+
+    if (content.parts) {
+      // Process parts of the message backwards as well.
+      for (let j = content.parts.length - 1; j >= 0; j--) {
+        const part = content.parts[j];
+
+        if (part.functionResponse) {
+          const responseObj = part.functionResponse.response;
+          // Use pretty-printing for JSON objects to ensure we can accurately count lines
+          // and provide a readable snippet of the tail.
+          const contentStr =
+            typeof responseObj === 'string'
+              ? responseObj
+              : JSON.stringify(responseObj, null, 2);
+
+          const tokens = estimateTokenCountSync([{ text: contentStr }]);
+
+          if (
+            functionResponseTokenCounter + tokens >
+            COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET
+          ) {
+            try {
+              // Budget exceeded: Truncate this response.
+              const { outputFile } = await saveTruncatedToolOutput(
+                contentStr,
+                part.functionResponse.name ?? 'unknown_tool',
+                config.getNextCompressionTruncationId(),
+                config.storage.getProjectTempDir(),
+              );
+
+              // Prepare a honest, readable snippet of the tail.
+              const truncatedMessage = formatTruncatedToolOutput(
+                contentStr,
+                outputFile,
+                COMPRESSION_TRUNCATE_LINES,
+              );
+
+              newParts.unshift({
+                functionResponse: {
+                  ...part.functionResponse,
+                  response: { content: truncatedMessage },
+                },
+              });
+
+              // Count the small truncated placeholder towards the budget.
+              functionResponseTokenCounter += estimateTokenCountSync([
+                { text: truncatedMessage },
+              ]);
+            } catch (error) {
+              // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
+              debugLogger.debug('Failed to truncate history to budget:', error);
+              newParts.unshift(part);
+              functionResponseTokenCounter += tokens;
+            }
+          } else {
+            // Within budget: keep the full response.
+            functionResponseTokenCounter += tokens;
+            newParts.unshift(part);
+          }
+        } else {
+          // Non-tool response part: always keep.
+          newParts.unshift(part);
+        }
+      }
+    }
+
+    // Reconstruct the message with processed (potentially truncated) parts.
+    truncatedHistory.unshift({ ...content, parts: newParts });
+  }
+
+  return truncatedHistory;
+}
+
 export class ChatCompressionService {
   async compress(
     chat: GeminiChat,
@@ -157,7 +272,7 @@ export class ChatCompressionService {
     );
 
     const historyToCompress = curatedHistory.slice(0, splitPoint);
-    const historyToKeep = curatedHistory.slice(splitPoint);
+    let historyToKeep = curatedHistory.slice(splitPoint);
 
     if (historyToCompress.length === 0) {
       return {
@@ -169,6 +284,9 @@ export class ChatCompressionService {
         },
       };
     }
+
+    // Apply token-based truncation to the history we're keeping.
+    historyToKeep = await truncateHistoryToBudget(historyToKeep, config);
 
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },

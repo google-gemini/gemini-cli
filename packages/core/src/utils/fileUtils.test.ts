@@ -682,7 +682,7 @@ describe('fileUtils', () => {
     });
 
     it('should read a text file successfully', async () => {
-      const content = 'Line 1\\nLine 2\\nLine 3';
+      const content = 'Line 1\nLine 2\nLine 3';
       actualNodeFs.writeFileSync(testTextFilePath, content);
       const result = await processSingleFileContent(
         testTextFilePath,

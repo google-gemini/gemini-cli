@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ChatCompressionService,
+  COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET,
+  COMPRESSION_TRUNCATE_LINES,
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
 } from './chatCompressionService.js';
@@ -15,11 +17,21 @@ import { CompressionStatus } from '../core/turn.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
+import {
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
+} from '../utils/fileUtils.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+import {
+  calculateRequestTokenCount,
+  estimateTokenCountSync,
+} from '../utils/tokenCalculation.js';
 
 vi.mock('../core/tokenLimits.js');
 vi.mock('../telemetry/loggers.js');
 vi.mock('../utils/environmentContext.js');
+vi.mock('../utils/fileUtils.js');
+vi.mock('../utils/tokenCalculation.js');
 
 describe('findCompressSplitPoint', () => {
   it('should throw an error for non-positive numbers', () => {
@@ -160,11 +172,20 @@ describe('ChatCompressionService', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getHookSystem: () => undefined,
+      getNextCompressionTruncationId: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn(),
+      },
     } as unknown as Config;
 
     vi.mocked(tokenLimit).mockReturnValue(1000);
     vi.mocked(getInitialChatHistory).mockImplementation(
       async (_config, extraHistory) => extraHistory || [],
+    );
+    vi.mocked(calculateRequestTokenCount).mockResolvedValue(100);
+    vi.mocked(mockConfig.getNextCompressionTruncationId).mockReturnValue(1);
+    vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+      '/tmp/test',
     );
   });
 
@@ -293,9 +314,7 @@ describe('ChatCompressionService', () => {
     } as unknown as GenerateContentResponse);
 
     // Override mock to simulate high token count for this specific test
-    vi.mocked(mockConfig.getContentGenerator().countTokens).mockResolvedValue({
-      totalTokens: 10000,
-    });
+    vi.mocked(calculateRequestTokenCount).mockResolvedValue(10000);
 
     const result = await service.compress(
       mockChat,
@@ -310,5 +329,303 @@ describe('ChatCompressionService', () => {
       CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
     );
     expect(result.newHistory).toBeNull();
+  });
+
+  describe('Reverse Token Budget Truncation', () => {
+    it('should truncate older function responses when budget is exceeded', async () => {
+      vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.5);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      // Large response part (~25k tokens if mocked that way)
+      const largeResponse = 'a'.repeat(1000);
+
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'old msg' }] },
+        { role: 'model', parts: [{ text: 'old resp' }] },
+        // History to keep
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'grep',
+                response: { content: largeResponse },
+              },
+            },
+          ],
+        },
+        { role: 'model', parts: [{ text: 'resp 2' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'grep',
+                response: { content: largeResponse },
+              },
+            },
+          ],
+        },
+      ];
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+
+      vi.mocked(estimateTokenCountSync).mockReturnValue(
+        COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET - 1,
+      );
+
+      vi.mocked(saveTruncatedToolOutput).mockResolvedValue({
+        outputFile: '/tmp/test/grep_1.txt',
+        totalLines: 100,
+      });
+
+      // Mock formatTruncatedToolOutput to return the expected string for the test
+      vi.mocked(formatTruncatedToolOutput).mockReturnValue(
+        'Output too large. Showing the last 3 of 3 lines. For full output see: /tmp/test/grep_1.txt',
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+
+      // Verify saveTruncatedToolOutput was called for the older response
+      expect(saveTruncatedToolOutput).toHaveBeenCalledTimes(1);
+      expect(saveTruncatedToolOutput).toHaveBeenCalledWith(
+        JSON.stringify({ content: largeResponse }, null, 2),
+        'grep',
+        1,
+        '/tmp/test',
+      );
+
+      // Verify the new history contains the truncated message
+      const keptHistory = result.newHistory!.slice(2); // After summary and 'Got it'
+      const truncatedPart = keptHistory[1].parts![0].functionResponse;
+      expect(truncatedPart?.response?.['content']).toContain(
+        'Output too large.',
+      );
+      expect(truncatedPart?.response?.['content']).toContain(
+        '/tmp/test/grep_1.txt',
+      );
+    });
+
+    it('should correctly handle massive single-line strings inside JSON by using multi-line Elephant Line logic', async () => {
+      vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.5);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      // 100,000 chars on a single line
+      const massiveSingleLine = 'a'.repeat(100000);
+
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'old msg 1' }] },
+        { role: 'model', parts: [{ text: 'old resp 1' }] },
+        { role: 'user', parts: [{ text: 'old msg 2' }] },
+        { role: 'model', parts: [{ text: 'old resp 2' }] },
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'shell',
+                response: { output: massiveSingleLine },
+              },
+            },
+          ],
+        },
+      ];
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(estimateTokenCountSync).mockReturnValue(
+        COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET + 1,
+      );
+      vi.mocked(saveTruncatedToolOutput).mockResolvedValue({
+        outputFile: '/tmp/test/shell_1.txt',
+        totalLines: 1,
+      });
+      vi.mocked(formatTruncatedToolOutput).mockReturnValue(
+        'Output too large. Showing the last 3 of 3 lines (some long lines truncated). For full output see: /tmp/test/shell_1.txt\n...\n... [LINE WIDTH TRUNCATED]',
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      // Verify it compressed
+      expect(result.newHistory).not.toBeNull();
+      // Find the shell response in the kept history (it was at the end)
+      const keptHistory = result.newHistory!.slice(2); // after summary and 'Got it'
+      const shellResponse = keptHistory.find((h) =>
+        h.parts?.some((p) => p.functionResponse?.name === 'shell'),
+      );
+      const truncatedPart = shellResponse!.parts![0].functionResponse;
+      const content = truncatedPart?.response?.['content'] as string;
+
+      // Since the output is an object, it gets pretty-printed into 3 lines.
+      // Line 1: {
+      // Line 2:   "output": "aaaa..." (truncated to 1000 chars)
+      // Line 3: }
+      expect(content).toContain(
+        'Output too large. Showing the last 3 of 3 lines (some long lines truncated).',
+      );
+      expect(content).toContain('/tmp/test/shell_1.txt');
+      expect(content).toContain('... [LINE WIDTH TRUNCATED]');
+
+      // Verify dependencies called
+      expect(saveTruncatedToolOutput).toHaveBeenCalledWith(
+        expect.stringContaining('"output": "aaaa'),
+        'shell',
+        expect.any(Number),
+        expect.any(String),
+      );
+      expect(formatTruncatedToolOutput).toHaveBeenCalledWith(
+        expect.stringContaining('"output": "aaaa'),
+        '/tmp/test/shell_1.txt',
+        COMPRESSION_TRUNCATE_LINES,
+      );
+    });
+
+    it('should use character-based truncation for massive single-line raw strings', async () => {
+      vi.mocked(mockConfig.getCompressionThreshold).mockResolvedValue(0.5);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const massiveRawString = 'c'.repeat(50000);
+
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'old msg 1' }] },
+        { role: 'model', parts: [{ text: 'old resp 1' }] },
+        { role: 'user', parts: [{ text: 'old msg 2' }] },
+        { role: 'model', parts: [{ text: 'old resp 2' }] },
+        { role: 'user', parts: [{ text: 'msg 1' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'raw_tool',
+                response: { content: massiveRawString },
+              },
+            },
+          ],
+        },
+      ];
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(estimateTokenCountSync).mockReturnValue(
+        COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET + 1,
+      );
+      vi.mocked(saveTruncatedToolOutput).mockResolvedValue({
+        outputFile: '/tmp/test/raw_1.txt',
+        totalLines: 1,
+      });
+      vi.mocked(formatTruncatedToolOutput).mockReturnValue(
+        'Output too large. Showing the last 30,000 characters of the output.\n...' +
+          massiveRawString.slice(-30000),
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      const keptHistory = result.newHistory!.slice(2);
+      const rawResponse = keptHistory.find((h) =>
+        h.parts?.some((p) => p.functionResponse?.name === 'raw_tool'),
+      );
+      const truncatedPart = rawResponse!.parts![0].functionResponse;
+      const content = truncatedPart?.response?.['content'] as string;
+
+      expect(content).toContain(
+        'Output too large. Showing the last 30,000 characters of the output.',
+      );
+
+      // Verify dependencies called
+      expect(saveTruncatedToolOutput).toHaveBeenCalledWith(
+        expect.stringContaining(massiveRawString.slice(0, 100)), // Check for a chunk of it
+        'raw_tool',
+        expect.any(Number),
+        expect.any(String),
+      );
+      expect(formatTruncatedToolOutput).toHaveBeenCalledWith(
+        expect.stringContaining(massiveRawString.slice(0, 100)),
+        '/tmp/test/raw_1.txt',
+        COMPRESSION_TRUNCATE_LINES,
+      );
+    });
+
+    it('should fallback to original content and still update budget if truncation fails', async () => {
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+
+      const largeResponse = 'd'.repeat(1000);
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'very old msg' }] },
+        { role: 'model', parts: [{ text: 'very old resp' }] },
+        { role: 'user', parts: [{ text: 'old msg' }] },
+        { role: 'model', parts: [{ text: 'old resp' }] },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'grep',
+                response: { content: largeResponse },
+              },
+            },
+          ],
+        },
+      ];
+
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      // Trigger truncation
+      vi.mocked(estimateTokenCountSync).mockReturnValue(
+        COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET + 1,
+      );
+
+      // Simulate failure in saving the truncated output
+      vi.mocked(saveTruncatedToolOutput).mockRejectedValue(
+        new Error('Disk Full'),
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+
+      // Verify the new history contains the ORIGINAL message (not truncated)
+      const toolResponseTurn = result.newHistory!.find((h) =>
+        h.parts?.some((p) => p.functionResponse?.name === 'grep'),
+      );
+      const preservedPart = toolResponseTurn!.parts![0].functionResponse;
+      expect(preservedPart?.response).toEqual({ content: largeResponse });
+
+      // Verify saveTruncatedToolOutput was actually attempted
+      expect(saveTruncatedToolOutput).toHaveBeenCalled();
+    });
   });
 });

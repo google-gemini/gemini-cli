@@ -449,9 +449,7 @@ export async function processSingleFileContent(
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
         if (contentRangeTruncated) {
-          returnDisplay = `Read lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          returnDisplay = `Read lines ${actualStartLine + 1}-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
           if (linesWereTruncatedInLength) {
             returnDisplay += ' (some lines were shortened)';
           }
