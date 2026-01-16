@@ -611,7 +611,10 @@ Would you like to attempt to install via "git clone" instead?`,
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (this.settings.tools.enableHooks && this.settings.hooks.enabled) {
+      if (
+        this.settings.tools.enableHooks &&
+        this.settings.hooksConfig.enabled
+      ) {
         hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
           extensionPath: effectiveExtensionPath,
           workspacePath: this.workspaceDir,

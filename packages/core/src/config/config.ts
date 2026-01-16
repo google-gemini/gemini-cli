@@ -379,10 +379,9 @@ export interface ConfigParameters {
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
-  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
-    disabled?: string[];
-  };
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
+  disabledHooks?: string[];
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -678,10 +677,7 @@ export class Config {
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? false;
-    this.disabledHooks =
-      (params.hooks && 'disabled' in params.hooks
-        ? params.hooks.disabled
-        : undefined) ?? [];
+    this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
@@ -1990,9 +1986,7 @@ export class Config {
   /**
    * Get project-specific hooks configuration
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.projectHooks;
   }
 

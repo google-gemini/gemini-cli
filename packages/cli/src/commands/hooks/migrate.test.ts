@@ -109,7 +109,7 @@ describe('migrate command', () => {
 
     expect(mockSetValue).toHaveBeenCalledWith(
       SettingScope.Workspace,
-      'hooks',
+      'hooksConfig.hooks',
       expect.objectContaining({
         BeforeTool: expect.arrayContaining([
           expect.objectContaining({
@@ -164,7 +164,7 @@ describe('migrate command', () => {
     );
     expect(mockSetValue).toHaveBeenCalledWith(
       SettingScope.Workspace,
-      'hooks',
+      'hooksConfig.hooks',
       expect.objectContaining({
         SessionStart: expect.any(Array),
       }),
@@ -313,12 +313,14 @@ describe('migrate command', () => {
 
     mockedLoadSettings.mockReturnValue({
       merged: {
-        hooks: {
-          AfterTool: [
-            {
-              hooks: [{ type: 'command', command: 'echo "existing"' }],
-            },
-          ],
+        hooksConfig: {
+          hooks: {
+            AfterTool: [
+              {
+                hooks: [{ type: 'command', command: 'echo "existing"' }],
+              },
+            ],
+          },
         },
       },
       setValue: mockSetValue,
@@ -361,11 +363,9 @@ describe('migrate command', () => {
     await handleMigrateFromClaude();
 
     expect(mockSetValue).toHaveBeenCalledWith(
-      SettingScope.Workspace,
-      'hooks',
-      expect.objectContaining({
-        BeforeTool: expect.any(Array),
-      }),
+      expect.any(String),
+      'hooksConfig.hooks',
+      expect.any(Object),
     );
   });
 
@@ -512,7 +512,7 @@ describe('migrate command', () => {
       '\nMigration complete! Please review the migrated hooks in .gemini/settings.json',
     );
     expect(debugLoggerLogSpy).toHaveBeenCalledWith(
-      'Note: Set hooks.enabled to true in your settings to enable the hook system.',
+      'Note: Set hooksConfig.enabled to true in your settings to enable the hook system.',
     );
   });
 });

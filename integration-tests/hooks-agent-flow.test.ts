@@ -53,19 +53,21 @@ describe('Hooks Agent Flow', () => {
 
       await rig.setup('should inject additional context via BeforeAgent hook', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeAgent: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -116,19 +118,21 @@ describe('Hooks Agent Flow', () => {
 
       await rig.setup('should receive prompt and response in AfterAgent hook', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            AfterAgent: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              AfterAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -163,30 +167,32 @@ describe('Hooks Agent Flow', () => {
             'hooks-agent-flow-multistep.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node -e "console.log('BeforeAgent Fired')"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              AfterAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node -e "console.log('AfterAgent Fired')"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                BeforeAgent: [
+                  {
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node -e "console.log('BeforeAgent Fired')"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+                AfterAgent: [
+                  {
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node -e "console.log('AfterAgent Fired')"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
