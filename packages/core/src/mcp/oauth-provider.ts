@@ -245,7 +245,8 @@ export class MCPOAuthProvider {
    */
   private generatePKCEParams(): PKCEParams {
     // Generate code verifier (43-128 characters)
-    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    // using 64 bytes results in ~86 characters, safely above the minimum of 43
+    const codeVerifier = crypto.randomBytes(64).toString('base64url');
 
     // Generate code challenge using SHA256
     const codeChallenge = crypto
@@ -266,7 +267,10 @@ export class MCPOAuthProvider {
    * @param expectedState The state parameter to validate
    * @returns Object containing the port (available immediately) and a promise for the auth response
    */
-  private startCallbackServer(expectedState: string): {
+  private startCallbackServer(
+    expectedState: string,
+    port?: number,
+  ): {
     port: Promise<number>;
     response: Promise<OAuthAuthorizationResponse>;
   } {
@@ -353,9 +357,10 @@ export class MCPOAuthProvider {
           reject(error);
         });
 
-        // Determine which port to use (env var or OS-assigned)
-        const portStr = process.env['OAUTH_CALLBACK_PORT'];
+        // Determine which port to use (env var, argument, or OS-assigned)
         let listenPort = 0; // Default to OS-assigned port
+
+        const portStr = process.env['OAUTH_CALLBACK_PORT'];
         if (portStr) {
           const envPort = parseInt(portStr, 10);
           if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
@@ -367,6 +372,8 @@ export class MCPOAuthProvider {
             return;
           }
           listenPort = envPort;
+        } else if (port !== undefined) {
+          listenPort = port;
         }
 
         server.listen(listenPort, () => {
@@ -798,9 +805,29 @@ export class MCPOAuthProvider {
     // Generate PKCE parameters
     const pkceParams = this.generatePKCEParams();
 
+    // Determine preferred port from redirectUri if available
+    let preferredPort: number | undefined;
+    if (config.redirectUri) {
+      try {
+        const url = new URL(config.redirectUri);
+        if (url.port) {
+          preferredPort = parseInt(url.port, 10);
+        } else if (url.protocol === 'http:') {
+          preferredPort = 80;
+        } else if (url.protocol === 'https:') {
+          preferredPort = 443;
+        }
+      } catch {
+        // Ignore invalid URL
+      }
+    }
+
     // Start callback server first to allocate port
     // This ensures we only create one server and eliminates race conditions
-    const callbackServer = this.startCallbackServer(pkceParams.state);
+    const callbackServer = this.startCallbackServer(
+      pkceParams.state,
+      preferredPort,
+    );
 
     // Wait for server to start and get the allocated port
     // We need this port for client registration and auth URL building

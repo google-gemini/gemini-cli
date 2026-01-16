@@ -1006,6 +1006,58 @@ describe('MCPOAuthProvider', () => {
 
       global.setTimeout = originalSetTimeout;
     });
+
+    it('should use port from redirectUri if provided', async () => {
+      const configWithPort: MCPOAuthConfig = {
+        ...mockConfig,
+        redirectUri: 'http://localhost:12345/oauth/callback',
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+      mockHttpServer.address.mockReturnValue({
+        port: 12345,
+        address: '127.0.0.1',
+        family: 'IPv4',
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', configWithPort);
+
+      expect(mockHttpServer.listen).toHaveBeenCalledWith(
+        12345,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('refreshAccessToken', () => {
@@ -1286,7 +1338,7 @@ describe('MCPOAuthProvider', () => {
       const authProvider = new MCPOAuthProvider();
       await authProvider.authenticate('test-server', mockConfig);
 
-      expect(crypto.randomBytes).toHaveBeenCalledWith(32); // code verifier
+      expect(crypto.randomBytes).toHaveBeenCalledWith(64); // code verifier
       expect(crypto.randomBytes).toHaveBeenCalledWith(16); // state
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
     });
