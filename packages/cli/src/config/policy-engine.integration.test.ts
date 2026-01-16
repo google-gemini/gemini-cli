@@ -296,7 +296,7 @@ describe('Policy Engine Integration Tests', () => {
       );
       const engine = new PolicyEngine(config);
 
-      // Safe tools should be allowed
+      // Read and search tools should be allowed
       expect(
         (await engine.check({ name: 'read_file' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
@@ -307,7 +307,7 @@ describe('Policy Engine Integration Tests', () => {
         (await engine.check({ name: 'list_directory' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
 
-      // Write/Dangerous tools should be denied
+      // Other tools should be denied via catch all
       expect(
         (await engine.check({ name: 'replace' }, undefined)).decision,
       ).toBe(PolicyDecision.DENY);
