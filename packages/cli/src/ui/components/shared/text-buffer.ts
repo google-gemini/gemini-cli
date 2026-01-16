@@ -728,8 +728,6 @@ export function getTransformedImagePath(filePath: string): string {
   return `[Image ${truncatedBase}${extension}]`;
 }
 
-// Memoization for transformations and layout to improve performance with large buffers.
-// These caches are simple because the inputs are typically many identical strings across renders.
 const transformationsCache = new LruCache<string, Transformation[]>(
   LRU_CACHE_LIMIT,
 );

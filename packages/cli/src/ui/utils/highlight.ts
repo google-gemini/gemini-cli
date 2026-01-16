@@ -30,8 +30,6 @@ export function parseInputForHighlighting(
   transformations: Transformation[] = [],
   cursorCol?: number,
 ): readonly HighlightToken[] {
-  // Simple cache key. Transformations are omitted from key because they are derived from text.
-  // We include cursorCol only if it's within a transformation range.
   let isCursorInsideTransform = false;
   if (cursorCol !== undefined) {
     for (const transform of transformations) {

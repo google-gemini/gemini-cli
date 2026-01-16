@@ -30,7 +30,7 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
-// Cache for code points to reduce GC pressure
+// Cache for code points
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 const codePointsCache = new LruCache<string, string[]>(LRU_CACHE_LIMIT);
 
@@ -121,12 +121,10 @@ export function stripUnsafeCharacters(str: string): string {
     .join('');
 }
 
-// String width caching for performance optimization
 const stringWidthCache = new LruCache<string, number>(LRU_CACHE_LIMIT);
 
 /**
  * Cached version of stringWidth function for better performance
- * Follows Ink's approach with unlimited cache (no eviction)
  */
 export const getCachedStringWidth = (str: string): number => {
   // ASCII printable chars (32-126) have width 1.

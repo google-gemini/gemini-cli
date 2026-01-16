@@ -293,7 +293,6 @@ export function renderHook<Result, Props>(
     renderCallback: (props: Props) => Result;
     props: Props;
   }) {
-    // Execute the callback on every render to capture latest state/result
     result.current = renderCallback(props);
     return null;
   }
@@ -355,7 +354,6 @@ export function renderHookWithProviders<Result, Props>(
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
     setPropsFn = setProps;
-    // Execute the callback on every render to capture latest state/result
     result.current = renderCallback(props);
     return null;
   }
