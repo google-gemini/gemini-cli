@@ -1111,10 +1111,10 @@ describe('loggers', () => {
           decision: ToolCallDecision.ACCEPT,
           prompt_id: 'prompt-id-1',
           tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
           mcp_server_name: undefined,
-          extension_name: undefined,
           extension_id: undefined,
-          result: 'diff',
           metadata: {
             model_added_lines: 1,
             model_removed_lines: 2,
