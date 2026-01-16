@@ -1,7 +1,5 @@
 name: 'Bug Report'
 description: 'Report a bug to help us improve Gemini CLI'
-labels:
-  - 'status/need-triage'
 body:
   - type: 'markdown'
     attributes:
