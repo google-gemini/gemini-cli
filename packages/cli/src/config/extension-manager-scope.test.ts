@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
-import type { Settings } from './settings.js';
+import { createTestMergedSettings } from './settings.js';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
@@ -105,11 +105,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -144,11 +143,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -181,11 +179,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();

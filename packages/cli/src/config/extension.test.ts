@@ -26,7 +26,11 @@ import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
 } from '@google/gemini-cli-core';
-import { loadSettings, SettingScope } from './settings.js';
+import {
+  loadSettings,
+  createTestMergedSettings,
+  SettingScope,
+} from './settings.js';
 import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
@@ -200,11 +204,13 @@ describe('extension tests', () => {
       source: undefined,
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+    const settings = loadSettings(tempWorkspaceDir).merged;
+    settings.experimental.extensionConfig = true;
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
-      settings: loadSettings(tempWorkspaceDir).merged,
+      settings,
     });
     resetTrustedFoldersForTesting();
   });
@@ -626,11 +632,9 @@ describe('extension tests', () => {
         },
       });
 
-      const blockGitExtensionsSetting = {
-        security: {
-          blockGitExtensions: true,
-        },
-      };
+      const blockGitExtensionsSetting = createTestMergedSettings({
+        security: { blockGitExtensions: true },
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -650,7 +654,6 @@ describe('extension tests', () => {
         version: '1.0.0',
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).extensions ??= {};
       loadedSettings.admin.extensions.enabled = false;
 
       extensionManager = new ExtensionManager({
@@ -674,7 +677,6 @@ describe('extension tests', () => {
         },
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).mcp ??= {};
       loadedSettings.admin.mcp.enabled = false;
 
       extensionManager = new ExtensionManager({
@@ -699,7 +701,6 @@ describe('extension tests', () => {
         },
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).mcp ??= {};
       loadedSettings.admin.mcp.enabled = true;
 
       extensionManager = new ExtensionManager({
@@ -835,7 +836,6 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.hooks) settings.hooks = {};
         settings.hooks.enabled = true;
 
         extensionManager = new ExtensionManager({
@@ -871,7 +871,6 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.hooks) settings.hooks = {};
         settings.hooks.enabled = false;
 
         extensionManager = new ExtensionManager({
@@ -1096,11 +1095,9 @@ describe('extension tests', () => {
 
     it('should not install a github extension if blockGitExtensions is set', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
-      const blockGitExtensionsSetting = {
-        security: {
-          blockGitExtensions: true,
-        },
-      };
+      const blockGitExtensionsSetting = createTestMergedSettings({
+        security: { blockGitExtensions: true },
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -1296,10 +1293,11 @@ describe('extension tests', () => {
 
       expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
-${INSTALL_WARNING_MESSAGE}
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
-  * test-server-2 (remote): https://google.com`,
+  * test-server-2 (remote): https://google.com
+
+${INSTALL_WARNING_MESSAGE}`,
       );
     });
 

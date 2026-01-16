@@ -547,9 +547,9 @@ describe('CoreToolScheduler', () => {
     )) as WaitingToolCall;
 
     // Cancel the first tool via its confirmation handler
-    await awaitingCall.confirmationDetails.onConfirm(
-      ToolConfirmationOutcome.Cancel,
-    );
+    const confirmationDetails =
+      awaitingCall.confirmationDetails as ToolCallConfirmationDetails;
+    await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
     abortController.abort(); // User cancelling often involves an abort signal
 
     await vi.waitFor(() => {
@@ -749,7 +749,7 @@ describe('CoreToolScheduler with payload', () => {
 
     if (confirmationDetails) {
       const payload: ToolConfirmationPayload = { newContent: 'final version' };
-      await confirmationDetails.onConfirm(
+      await (confirmationDetails as ToolCallConfirmationDetails).onConfirm(
         ToolConfirmationOutcome.ProceedOnce,
         payload,
       );
@@ -762,9 +762,9 @@ describe('CoreToolScheduler with payload', () => {
     )) as WaitingToolCall;
 
     // Now confirm for real to execute.
-    await updatedAwaitingCall.confirmationDetails.onConfirm(
-      ToolConfirmationOutcome.ProceedOnce,
-    );
+    await (
+      updatedAwaitingCall.confirmationDetails as ToolCallConfirmationDetails
+    ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
 
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
@@ -897,7 +897,9 @@ describe('CoreToolScheduler edit cancellation', () => {
     // Cancel the edit
     const confirmationDetails = awaitingCall.confirmationDetails;
     if (confirmationDetails) {
-      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
+      await (confirmationDetails as ToolCallConfirmationDetails).onConfirm(
+        ToolConfirmationOutcome.Cancel,
+      );
     }
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
@@ -1245,6 +1247,7 @@ describe('CoreToolScheduler request queueing', () => {
           title: 'Confirm Shell Command',
           command: String(params['command'] ?? ''),
           rootCommand: 'git',
+          rootCommands: ['git'],
           onConfirm: async () => {},
         }),
       execute: () => executeFn({}),
@@ -1446,14 +1449,14 @@ describe('CoreToolScheduler request queueing', () => {
         toolCalls.forEach((call) => {
           if (call.status === 'awaiting_approval') {
             const waitingCall = call;
-            if (waitingCall.confirmationDetails?.onConfirm) {
+            const details =
+              waitingCall.confirmationDetails as ToolCallConfirmationDetails;
+            if (details?.onConfirm) {
               const originalHandler = pendingConfirmations.find(
-                (h) => h === waitingCall.confirmationDetails.onConfirm,
+                (h) => h === details.onConfirm,
               );
               if (!originalHandler) {
-                pendingConfirmations.push(
-                  waitingCall.confirmationDetails.onConfirm,
-                );
+                pendingConfirmations.push(details.onConfirm);
               }
             }
           }
