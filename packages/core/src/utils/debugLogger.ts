@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable no-console */
 import * as fs from 'node:fs';
 import * as util from 'node:util';
 

@@ -31,13 +31,16 @@ export interface MultiFolderTrustDialogProps {
     config: Config,
     addItem: (
       itemData: Omit<HistoryItem, 'id'>,
-      baseTimestamp: number,
+      baseTimestamp?: number,
     ) => number,
     added: string[],
     errors: string[],
   ) => Promise<void>;
   config: Config;
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number;
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number;
 }
 
 export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
@@ -95,13 +98,10 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     setSubmitted(true);
 
     if (!config) {
-      addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Configuration is not available.',
-        },
-        Date.now(),
-      );
+      addItem({
+        type: MessageType.ERROR,
+        text: 'Configuration is not available.',
+      });
       onComplete();
       return;
     }
@@ -138,14 +138,14 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   };
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width="100%">
       <Box
         flexDirection="column"
         borderStyle="round"
         borderColor={theme.status.warning}
         padding={1}
-        width="100%"
         marginLeft={1}
+        marginRight={1}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>

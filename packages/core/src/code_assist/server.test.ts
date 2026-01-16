@@ -184,6 +184,9 @@ describe('CodeAssistServer', () => {
                 firstMessageLatency: expect.stringMatching(/\d+s/),
               }),
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -244,6 +247,9 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -266,6 +272,9 @@ describe('CodeAssistServer', () => {
         metrics: expect.arrayContaining([
           expect.objectContaining({
             conversationInteraction: interaction,
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -421,6 +430,31 @@ describe('CodeAssistServer', () => {
       expect.any(Object),
     );
     expect(response.name).toBe('operations/123');
+  });
+
+  it('should call the getOperation endpoint', async () => {
+    const { server } = createTestServer();
+
+    const mockResponse = {
+      name: 'operations/123',
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'test-project',
+          name: 'projects/test-project',
+        },
+      },
+    };
+    vi.spyOn(server, 'requestGetOperation').mockResolvedValue(mockResponse);
+
+    const response = await server.getOperation('operations/123');
+
+    expect(server.requestGetOperation).toHaveBeenCalledWith('operations/123');
+    expect(response.name).toBe('operations/123');
+    expect(response.response?.cloudaicompanionProject?.id).toBe('test-project');
+    expect(response.response?.cloudaicompanionProject?.name).toBe(
+      'projects/test-project',
+    );
   });
 
   it('should call the loadCodeAssist endpoint', async () => {

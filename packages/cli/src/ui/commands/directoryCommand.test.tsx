@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { directoryCommand } from './directoryCommand.js';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import {
+  expandHomeDir,
+  getDirectorySuggestions,
+} from '../utils/directoryUtils.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
 import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
 import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
@@ -16,6 +19,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+
+vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/directoryUtils.js')>();
+  return {
+    ...actual,
+    getDirectorySuggestions: vi.fn(),
+  };
+});
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;
@@ -82,7 +94,6 @@ describe('directoryCommand', () => {
             '/home/user/project1',
           )}\n- ${path.normalize('/home/user/project2')}`,
         }),
-        expect.any(Number),
       );
     });
   });
@@ -109,7 +120,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: 'Please provide at least one path to add.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -123,7 +133,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -139,7 +148,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath1}\n- ${newPath2}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -156,7 +164,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${newPath}': ${error.message}`,
         }),
-        expect.any(Number),
       );
     });
 
@@ -179,7 +186,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `The following directories are already in the workspace:\n- ${existingPath}`,
         }),
-        expect.any(Number),
       );
       expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalledWith(
         existingPath,
@@ -206,7 +212,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${validPath}`,
         }),
-        expect.any(Number),
       );
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -214,8 +219,48 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${invalidPath}': ${error.message}`,
         }),
-        expect.any(Number),
       );
+    });
+
+    describe('completion', () => {
+      const completion = addCommand!.completion!;
+
+      it('should return empty suggestions for an empty path', async () => {
+        const results = await completion(mockContext, '');
+        expect(results).toEqual([]);
+      });
+
+      it('should return empty suggestions for whitespace only path', async () => {
+        const results = await completion(mockContext, '  ');
+        expect(results).toEqual([]);
+      });
+
+      it('should return suggestions for a single path', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['docs/', 'src/']);
+
+        const results = await completion(mockContext, 'd');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('d');
+        expect(results).toEqual(['docs/', 'src/']);
+      });
+
+      it('should return suggestions for multiple paths', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/,s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/,src/']);
+      });
+
+      it('should handle leading whitespace in suggestions', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/, s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/, src/']);
+      });
     });
   });
 
@@ -264,7 +309,6 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: expect.stringContaining('explicitly untrusted'),
         }),
-        expect.any(Number),
       );
     });
 

@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as processUtils from '../../utils/processUtils.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 describe('IdeTrustChangeDialog', () => {
   beforeEach(() => {
@@ -39,8 +40,8 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('renders a generic message and logs an error for NONE reason', () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, 'error')
+    const debugLoggerWarnSpy = vi
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const { lastFrame } = renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
@@ -48,7 +49,7 @@ describe('IdeTrustChangeDialog', () => {
 
     const frameText = lastFrame();
     expect(frameText).toContain('Workspace trust has changed.');
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
       'IdeTrustChangeDialog rendered with unexpected reason "NONE"',
     );
   });

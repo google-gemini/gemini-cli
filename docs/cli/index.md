@@ -25,8 +25,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore
   snapshots of your session and files.
-- **[Enterprise configuration](./enterprise.md):** Deploying and manage Gemini
-  CLI in an enterprise environment.
+- **[Enterprise configuration](./enterprise.md):** Deploy and manage Gemini CLI
+  in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
 - **[Telemetry](./telemetry.md):** Configure observability to monitor usage and
@@ -38,6 +38,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
   files and directories from being accessed by tools.
 - **[Context files (GEMINI.md)](./gemini-md.md):** Provide persistent,
   hierarchical context to the model.
+- **[System prompt override](./system-prompt.md):** Replace the built‑in system
+  instructions using `GEMINI_SYSTEM_MD`.
 
 ## Non-interactive mode
 

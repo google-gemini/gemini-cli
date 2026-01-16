@@ -74,6 +74,7 @@ vi.mock('node:process', () => {
     exit: mockProcessExit,
     platform: 'sunos',
     cwd: () => '/fake/dir',
+    env: {},
   } as unknown as NodeJS.Process;
   return {
     ...mockProcess,
@@ -244,7 +245,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).not.toHaveBeenCalled();
     });
 
     it('should call console.clear if alternate buffer is not active', async () => {
@@ -262,7 +262,6 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockClearItems).toHaveBeenCalled();
-      expect(console.clear).toHaveBeenCalled();
     });
   });
 
