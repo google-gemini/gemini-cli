@@ -14,6 +14,7 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  AgentOverride,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -799,7 +800,7 @@ const SETTINGS_SCHEMA = {
         label: 'Agent Overrides',
         category: 'Advanced',
         requiresRestart: true,
-        default: {},
+        default: {} as Record<string, AgentOverride>,
         description:
           'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
         showInDialog: false,
@@ -1540,6 +1541,15 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'boolean',
+        label: 'Plan',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
     },
   },
 
@@ -2083,6 +2093,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+      enabled: {
+        type: 'boolean',
+        description: 'Whether to enable the agent.',
+      },
       disabled: {
         type: 'boolean',
         description: 'Whether to disable the agent.',
@@ -2253,12 +2267,17 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default'];
 };
 
+type InferMergedSettings<T extends SettingsSchema> = {
+  -readonly [K in keyof T]-?: T[K] extends { properties: SettingsSchema }
+    ? InferMergedSettings<T[K]['properties']>
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
+};
+
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export function getEnableHooksUI(settings: Settings): boolean {
-  return settings.tools?.enableHooks ?? true;
-}
-
-export function getEnableHooks(settings: Settings): boolean {
-  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
-}
+export type MergedSettings = InferMergedSettings<SettingsSchemaType>;
