@@ -6,12 +6,6 @@ on:
   schedule:
     - cron: '0 * * * *' # Run every hour
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Run in dry-run mode (no labels applied)'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   issues: 'write'
@@ -60,5 +54,4 @@ jobs:
       - name: 'Run Multi-Repo Sync Script'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          DRY_RUN: '${{ inputs.dry_run }}'
         run: 'node .github/scripts/sync-maintainer-labels.cjs'
