@@ -104,6 +104,7 @@ available combinations.
 
 | Action                                                            | Keys             |
 | ----------------------------------------------------------------- | ---------------- |
+| Restart the application.                                          | `R`              |
 | Toggle detailed error information.                                | `F12`            |
 | Toggle the full TODO list.                                        | `Ctrl + T`       |
 | Show IDE context details.                                         | `Ctrl + G`       |
