@@ -120,6 +120,85 @@ describe('Hooks System Integration', () => {
       const hookTelemetryFound = await rig.waitForTelemetryEvent('hook_call');
       expect(hookTelemetryFound).toBeTruthy();
     });
+
+    it('should block BeforeModel execution when exit code is 0 and output contains deny decision', async () => {
+      await rig.setup(
+        'should block BeforeModel execution when exit code is 0 and output contains deny decision',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.blocking-repro.responses',
+          ),
+          settings: {
+            hooks: {
+              enabled: true,
+              BeforeModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command:
+                        'echo \'Some text before\' && echo \'{"decision":"deny","reason":"Denied by hook"}\'',
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const result = await rig.run({
+        args: 'Hello',
+      });
+
+      // Check if the model was NOT called.
+      const apiRequest = rig.readLastApiRequest();
+      expect(apiRequest).toBeNull();
+
+      // Check if the reason is present in the output
+      expect(result).toContain('Denied by hook');
+    });
+
+    it('should block BeforeModel execution when exit code is 2', async () => {
+      await rig.setup(
+        'should block BeforeModel execution when exit code is 2',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.blocking-repro.responses',
+          ),
+          settings: {
+            hooks: {
+              enabled: true,
+              BeforeModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: "echo 'Blocking error' >&2 && exit 2",
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const result = await rig.run({
+        args: 'Hello',
+      });
+
+      // Check if the model was NOT called.
+      const apiRequest = rig.readLastApiRequest();
+      expect(apiRequest).toBeNull();
+
+      // Check if the reason is present in the output (from stderr)
+      expect(result).toContain('Blocking error');
+    });
   });
 
   describe('Command Hooks - Additional Context', () => {
