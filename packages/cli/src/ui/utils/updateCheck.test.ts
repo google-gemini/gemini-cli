@@ -46,7 +46,7 @@ describe('checkForUpdates', () => {
   });
 
   it('should return null if disableUpdateNag is true', async () => {
-    mockSettings.merged.general!.disableUpdateNag = true;
+    mockSettings.merged.general.disableUpdateNag = true;
     const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
     expect(getPackageJson).not.toHaveBeenCalled();

@@ -39,13 +39,13 @@ export async function initializeApp(
   const authHandle = startupProfiler.start('authenticate');
   const authError = await performInitialAuth(
     config,
-    settings.merged.security?.auth?.selectedType,
+    settings.merged.security.auth.selectedType,
   );
   authHandle?.end();
   const themeError = validateTheme(settings);
 
   const shouldOpenAuthDialog =
-    settings.merged.security?.auth?.selectedType === undefined || !!authError;
+    settings.merged.security.auth.selectedType === undefined || !!authError;
 
   logCliConfiguration(
     config,

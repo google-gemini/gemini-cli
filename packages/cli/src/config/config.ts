@@ -38,8 +38,12 @@ import {
   type OutputFormat,
   GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
-import { saveModelChange, loadSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  saveModelChange,
+  loadSettings,
+} from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -54,7 +58,6 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -82,7 +85,9 @@ export interface CliArgs {
   recordResponses: string | undefined;
 }
 
-export async function parseArguments(settings: Settings): Promise<CliArgs> {
+export async function parseArguments(
+  settings: MergedSettings,
+): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
   const yargsInstance = yargs(rawArgv)
     .locale('en')
@@ -138,9 +143,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('approval-mode', {
           type: 'string',
           nargs: 1,
-          choices: ['default', 'auto_edit', 'yolo'],
+          choices: ['default', 'auto_edit', 'yolo', 'plan'],
           description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -280,16 +285,16 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       return true;
     });
 
-  if (settings?.experimental?.extensionManagement ?? true) {
+  if (settings.experimental.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings?.experimental?.skills ?? false) {
+  if (settings.experimental.skills) {
     yargsInstance.command(skillsCommand);
   }
 
   // Register hooks command if hooks are enabled
-  if (getEnableHooksUI(settings)) {
+  if (settings.tools.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -392,7 +397,7 @@ export interface LoadCliConfigOptions {
 }
 
 export async function loadCliConfig(
-  settings: Settings,
+  settings: MergedSettings,
   sessionId: string,
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
@@ -487,12 +492,20 @@ export async function loadCliConfig(
       case 'auto_edit':
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
+      case 'plan':
+        if (!(settings.experimental?.plan ?? false)) {
+          throw new Error(
+            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          );
+        }
+        approvalMode = ApprovalMode.PLAN;
+        break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, plan, default`,
         );
     }
   } else {
@@ -573,6 +586,11 @@ export async function loadCliConfig(
     );
 
     switch (approvalMode) {
+      case ApprovalMode.PLAN:
+        // In plan non-interactive mode, all tools that require approval are excluded.
+        // TODO(#16625): Replace this default exclusion logic with specific rules for plan mode.
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        break;
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
         extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
@@ -590,10 +608,7 @@ export async function loadCliConfig(
     }
   }
 
-  const excludeTools = mergeExcludeTools(
-    settings,
-    extraExcludes.length > 0 ? extraExcludes : undefined,
-  );
+  const excludeTools = mergeExcludeTools(settings, extraExcludes);
 
   // Create a settings object that includes CLI overrides for policy generation
   const effectiveSettings: Settings = {
@@ -742,15 +757,17 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: getEnableHooks(settings),
-    enableHooksUI: getEnableHooksUI(settings),
+    enableHooks:
+      (settings.tools?.enableHooks ?? true) &&
+      (settings.hooks?.enabled ?? false),
+    enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
-        disabledSkills: refreshedSettings.merged.skills?.disabled,
+        disabledSkills: refreshedSettings.merged.skills.disabled,
         agents: refreshedSettings.merged.agents,
       };
     },
@@ -758,12 +775,12 @@ export async function loadCliConfig(
 }
 
 function mergeExcludeTools(
-  settings: Settings,
-  extraExcludes?: string[] | undefined,
+  settings: MergedSettings,
+  extraExcludes: string[] = [],
 ): string[] {
   const allExcludeTools = new Set([
-    ...(settings.tools?.exclude || []),
-    ...(extraExcludes || []),
+    ...(settings.tools.exclude || []),
+    ...extraExcludes,
   ]);
-  return [...allExcludeTools];
+  return Array.from(allExcludeTools);
 }

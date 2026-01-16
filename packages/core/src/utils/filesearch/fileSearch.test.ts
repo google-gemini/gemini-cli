@@ -7,6 +7,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
+import * as crawler from './crawler.js';
 
 describe('FileSearch', () => {
   let tmpDir: string;
@@ -479,6 +480,33 @@ describe('FileSearch', () => {
     const results = await fileSearch.search('');
 
     expect(results).toEqual(['src/', 'src/main.js']);
+  });
+
+  it('should respect default maxFiles budget of 20000 in RecursiveFileSearch', async () => {
+    const crawlSpy = vi.spyOn(crawler, 'crawl');
+
+    tmpDir = await createTmpDir({
+      'file1.js': '',
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
+    });
+
+    await fileSearch.initialize();
+
+    expect(crawlSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxFiles: 20000,
+      }),
+    );
   });
 
   it('should be cancellable via AbortSignal', async () => {

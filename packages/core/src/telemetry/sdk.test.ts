@@ -312,7 +312,8 @@ describe('Telemetry SDK', () => {
     expect(GcpTraceExporter).not.toHaveBeenCalled();
 
     // 2. Set project ID and emit post_auth event
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'test-project';
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', 'test-project');
 
     const mockCredentials = {
       client_email: 'test@example.com',

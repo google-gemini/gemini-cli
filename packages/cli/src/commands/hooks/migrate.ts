@@ -230,8 +230,7 @@ export async function handleMigrateFromClaude() {
   const settings = loadSettings(workingDir);
 
   // Merge migrated hooks with existing hooks
-  const existingHooks =
-    (settings.merged.hooks as Record<string, unknown>) || {};
+  const existingHooks = settings.merged.hooks as Record<string, unknown>;
   const mergedHooks = { ...existingHooks, ...migratedHooks };
 
   // Update settings (setValue automatically saves)

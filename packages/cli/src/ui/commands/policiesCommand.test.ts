@@ -72,6 +72,7 @@ describe('policiesCommand', () => {
         {
           decision: PolicyDecision.ALLOW,
           argsPattern: /safe/,
+          source: 'test.toml',
         },
         {
           decision: PolicyDecision.ASK_USER,
@@ -101,7 +102,9 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '1. **DENY** tool: `dangerousTool` [Priority: 10]',
       );
-      expect(content).toContain('2. **ALLOW** all tools (args match: `safe`)');
+      expect(content).toContain(
+        '2. **ALLOW** all tools (args match: `safe`) [Source: `test.toml`]',
+      );
       expect(content).toContain('3. **ASK_USER** all tools');
     });
   });

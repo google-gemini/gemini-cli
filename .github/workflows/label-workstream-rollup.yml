@@ -1,0 +1,94 @@
+name: 'Label Workstream Rollup'
+
+on:
+  issues:
+    types: ['opened', 'edited', 'reopened']
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  labeler:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      issues: 'write'
+    steps:
+      - name: 'Check for Parent Workstream and Apply Label'
+        uses: 'actions/github-script@v7'
+        with:
+          script: |
+            const labelToAdd = 'workstream-rollup';
+
+            // Allow-list of parent issue URLs
+            const allowedParentUrls = [
+              'https://github.com/google-gemini/gemini-cli/issues/15374',
+              'https://github.com/google-gemini/gemini-cli/issues/15456',
+              'https://github.com/google-gemini/gemini-cli/issues/15324'
+            ];
+
+            async function getIssueParent(owner, repo, number) {
+              const query = `
+                query($owner:String!, $repo:String!, $number:Int!) {
+                  repository(owner:$owner, name:$repo) {
+                    issue(number:$number) {
+                      parent {
+                        url
+                      }
+                    }
+                  }
+                }
+              `;
+              try {
+                const result = await github.graphql(query, { owner, repo, number });
+                return result.repository.issue.parent ? result.repository.issue.parent.url : null;
+              } catch (error) {
+                console.error(`Failed to fetch parent for #${number}:`, error);
+                return null;
+              }
+            }
+
+            // Determine which issues to process
+            let issuesToProcess = [];
+
+            if (context.eventName === 'issues') {
+               // Context payload for 'issues' event already has the issue object
+               issuesToProcess.push({
+                 number: context.payload.issue.number,
+                 owner: context.repo.owner,
+                 repo: context.repo.repo
+               });
+            } else {
+              // For schedule/dispatch, fetch open issues (lightweight list)
+              console.log(`Running for event: ${context.eventName}. Fetching open issues...`);
+              const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open'
+              });
+              issuesToProcess = openIssues.map(i => ({
+                number: i.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              }));
+            }
+
+            console.log(`Processing ${issuesToProcess.length} issue(s)...`);
+
+            for (const issue of issuesToProcess) {
+              const parentUrl = await getIssueParent(issue.owner, issue.repo, issue.number);
+
+              if (parentUrl && allowedParentUrls.includes(parentUrl)) {
+                console.log(`SUCCESS: Issue #${issue.number} is a direct child of ${parentUrl}. Adding label.`);
+                await github.rest.issues.addLabels({
+                  owner: issue.owner,
+                  repo: issue.repo,
+                  issue_number: issue.number,
+                  labels: [labelToAdd]
+                });
+              } else {
+                 // logging only for single execution to avoid spam
+                 if (context.eventName === 'issues') {
+                    console.log(`Issue #${issue.number} parent is ${parentUrl || 'None'}. No action.`);
+                 }
+              }
+            }

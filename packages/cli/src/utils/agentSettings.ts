@@ -10,7 +10,6 @@ import {
   type LoadedSettings,
 } from '../config/settings.js';
 import type { ModifiedScope } from './skillSettings.js';
-import type { AgentOverride } from '@google/gemini-cli-core';
 
 export type AgentActionStatus = 'success' | 'no-op' | 'error';
 
@@ -44,8 +43,8 @@ export function enableAgent(
   for (const scope of writableScopes) {
     if (isLoadableSettingScope(scope)) {
       const scopePath = settings.forScope(scope).path;
-      const agentOverrides = settings.forScope(scope).settings.agents
-        ?.overrides as Record<string, AgentOverride> | undefined;
+      const agentOverrides =
+        settings.forScope(scope).settings.agents?.overrides;
       const isDisabled = agentOverrides?.[agentName]?.disabled === true;
 
       if (isDisabled) {
@@ -105,9 +104,7 @@ export function disableAgent(
   }
 
   const scopePath = settings.forScope(scope).path;
-  const agentOverrides = settings.forScope(scope).settings.agents?.overrides as
-    | Record<string, AgentOverride>
-    | undefined;
+  const agentOverrides = settings.forScope(scope).settings.agents?.overrides;
   const isDisabled = agentOverrides?.[agentName]?.disabled === true;
 
   if (isDisabled) {
@@ -128,8 +125,8 @@ export function disableAgent(
   const alreadyDisabledInOther: ModifiedScope[] = [];
 
   if (isLoadableSettingScope(otherScope)) {
-    const otherOverrides = settings.forScope(otherScope).settings.agents
-      ?.overrides as Record<string, AgentOverride> | undefined;
+    const otherOverrides =
+      settings.forScope(otherScope).settings.agents?.overrides;
     if (otherOverrides?.[agentName]?.disabled === true) {
       alreadyDisabledInOther.push({
         scope: otherScope,

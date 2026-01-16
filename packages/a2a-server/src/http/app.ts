@@ -326,9 +326,9 @@ export async function createApp() {
 export async function main() {
   try {
     const expressApp = await createApp();
-    const port = process.env['CODER_AGENT_PORT'] || 0;
+    const port = Number(process.env['CODER_AGENT_PORT'] || 0);
 
-    const server = expressApp.listen(port, () => {
+    const server = expressApp.listen(port, 'localhost', () => {
       const address = server.address();
       let actualPort;
       if (process.env['CODER_AGENT_PORT']) {

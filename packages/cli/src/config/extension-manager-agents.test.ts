@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { type Settings } from './settings.js';
+import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 
@@ -52,10 +52,9 @@ describe('ExtensionManager agents loading', () => {
     fs.mkdirSync(extensionsDir, { recursive: true });
 
     extensionManager = new ExtensionManager({
-      settings: {
+      settings: createTestMergedSettings({
         telemetry: { enabled: false },
-        trustedFolders: [tempDir],
-      } as unknown as Settings,
+      }),
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,

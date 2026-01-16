@@ -16,6 +16,8 @@ export interface CrawlOptions {
   cwd: string;
   // The fdir maxDepth option.
   maxDepth?: number;
+  // Maximum number of files to return.
+  maxFiles?: number;
   // A pre-configured Ignore instance.
   ignore: Ignore;
   // Caching options.
@@ -43,6 +45,9 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
 
   const posixCwd = toPosixPath(options.cwd);
   const posixCrawlDirectory = toPosixPath(options.crawlDirectory);
+  const maxFiles = options.maxFiles ?? Infinity;
+  let fileCount = 0;
+  let truncated = false;
 
   let results: string[];
   try {
@@ -51,7 +56,21 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
       .withRelativePaths()
       .withDirs()
       .withPathSeparator('/') // Always use unix style paths
+      .filter((path, isDirectory) => {
+        if (!isDirectory) {
+          fileCount++;
+          if (fileCount > maxFiles) {
+            truncated = true;
+            return false;
+          }
+        }
+        return true;
+      })
       .exclude((_, dirPath) => {
+        if (fileCount > maxFiles) {
+          truncated = true;
+          return true;
+        }
         const relativePath = path.posix.relative(posixCrawlDirectory, dirPath);
         return dirFilter(`${relativePath}/`);
       });
@@ -72,7 +91,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     path.posix.join(relativeToCrawlDir, p),
   );
 
-  if (options.cache) {
+  if (options.cache && !truncated) {
     const cacheKey = cache.getCacheKey(
       options.crawlDirectory,
       options.ignore.getFingerprint(),

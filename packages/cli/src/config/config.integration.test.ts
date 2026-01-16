@@ -22,8 +22,9 @@ import {
   Config,
   DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settingsSchema.js';
+import { createTestMergedSettings } from './settings.js';
 import { http, HttpResponse } from 'msw';
+
 import { setupServer } from 'msw/node';
 
 export const server = setupServer();
@@ -212,7 +213,7 @@ describe('Configuration Integration Tests', () => {
       const originalArgv = process.argv;
       try {
         process.argv = argv;
-        const parsedArgs = await parseArguments({} as Settings);
+        const parsedArgs = await parseArguments(createTestMergedSettings());
         expect(parsedArgs.approvalMode).toBe(expected.approvalMode);
         expect(parsedArgs.prompt).toBe(expected.prompt);
         expect(parsedArgs.yolo).toBe(expected.yolo);
@@ -235,7 +236,9 @@ describe('Configuration Integration Tests', () => {
       const originalArgv = process.argv;
       try {
         process.argv = argv;
-        await expect(parseArguments({} as Settings)).rejects.toThrow();
+        await expect(
+          parseArguments(createTestMergedSettings()),
+        ).rejects.toThrow();
       } finally {
         process.argv = originalArgv;
       }

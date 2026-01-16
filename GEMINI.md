@@ -15,6 +15,17 @@ project. While you can run the individual steps (`build`, `test`, `typecheck`,
 `lint`) separately, it is highly recommended to use `npm run preflight` to
 ensure a comprehensive validation.
 
+## Running Tests in Workspaces\*\*: To run a specific test file within a
+
+workspace, use the command:
+`npm test -w <workspace-name> -- <path/to/test-file.test.ts>`. **CRITICAL**: The
+`<path/to/test-file.test.ts>` MUST be relative to the workspace directory root,
+NOT the project root.
+
+- _Example (Core package)_:
+  `npm test -w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`
+- _Common workspaces_: `@google/gemini-cli`, `@google/gemini-cli-core`.
+
 ## Writing Tests
 
 This project uses **Vitest** as its primary testing framework. When writing

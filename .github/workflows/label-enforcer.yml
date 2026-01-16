@@ -10,7 +10,7 @@ jobs:
   enforce-label:
     # Run this job only when restricted labels are changed
     if: |-
-      ${{ (github.event.label.name == 'help wanted' || github.event.label.name == 'status/need-triage') &&
+      ${{ (github.event.label.name == 'help wanted' || github.event.label.name == 'status/need-triage' || github.event.label.name == '🔒 maintainer only') &&
           (github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli') }}
     runs-on: 'ubuntu-latest'
     permissions:
@@ -39,28 +39,34 @@ jobs:
             const labelName = context.payload.label.name;
 
             // Skip if the change was made by a bot to avoid infinite loops
-            if (username === 'github-actions[bot]') {
+            if (username === 'github-actions[bot]' || username === 'gemini-cli[bot]' || username.endsWith('[bot]')) {
               core.info('Change made by a bot. Skipping.');
               return;
             }
 
             try {
-              // This will succeed with a 204 status if the user is a member,
-              // and fail with a 404 error if they are not.
-              await github.rest.teams.getMembershipForUserInOrg ({
-                org,
-                team_slug,
+              // Check repository permission level directly.
+              // This is more robust than team membership as it doesn't require Org-level read permissions
+              // and correctly handles Repo Admins/Writers who might not be in the specific team.
+              const { data: { permission } } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: org,
+                repo: context.repo.repo,
                 username,
               });
-              core.info(`${username} is a member of the ${team_slug} team. No action needed.`);
-            } catch (error) {
-              // If the error is not 404, rethrow it to fail the action
-              if (error.status !== 404) {
-                throw error;
+
+              if (permission === 'admin' || permission === 'write') {
+                core.info(`${username} has '${permission}' permission. Allowed.`);
+                return;
               }
 
-              core.info(`${username} is not a member. Reverting '${action}' action for '${labelName}' label.`);
+              core.info(`${username} has '${permission}' permission (needs 'write' or 'admin'). Reverting '${action}' action for '${labelName}' label.`);
+            } catch (error) {
+              core.error(`Failed to check permissions for ${username}: ${error.message}`);
+              // Fall through to revert logic if we can't verify permissions (fail safe)
+            }
 
+            // If we are here, the user is NOT authorized.
+            if (true) { // wrapping block to preserve variable scope if needed
               if (action === 'labeled') {
                 // 1. Remove the label if added by a non-maintainer
                 await github.rest.issues.removeLabel ({

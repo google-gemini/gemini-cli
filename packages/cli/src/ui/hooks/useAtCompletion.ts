@@ -5,12 +5,15 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
+import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
 import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
+
+const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -257,6 +260,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             config?.getEnableRecursiveFileSearch() ?? true,
           disableFuzzySearch:
             config?.getFileFilteringDisableFuzzySearch() ?? false,
+          maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
         });
         await searcher.initialize();
         fileSearch.current = searcher;
@@ -284,6 +288,22 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       slowSearchTimer.current = setTimeout(() => {
         dispatch({ type: 'SET_LOADING', payload: true });
       }, 200);
+
+      const timeoutMs =
+        config?.getFileFilteringOptions()?.searchTimeout ??
+        DEFAULT_SEARCH_TIMEOUT_MS;
+
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      (async () => {
+        try {
+          await setTimeoutPromise(timeoutMs, undefined, {
+            signal: controller.signal,
+          });
+          controller.abort();
+        } catch {
+          // ignore
+        }
+      })();
 
       try {
         const results = await fileSearch.current.search(state.pattern, {
@@ -332,6 +352,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         if (!(error instanceof Error && error.name === 'AbortError')) {
           dispatch({ type: 'ERROR' });
         }
+      } finally {
+        controller.abort();
       }
     };
 

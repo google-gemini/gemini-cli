@@ -35,7 +35,7 @@ async function getMcpServersFromConfig(): Promise<
     requestSetting: promptForSetting,
   });
   const extensions = await extensionManager.loadExtensions();
-  const mcpServers = { ...(settings.merged.mcpServers || {}) };
+  const mcpServers = { ...settings.merged.mcpServers };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
@@ -63,8 +63,7 @@ async function testMCPConnection(
   const sanitizationConfig = {
     enableEnvironmentVariableRedaction: true,
     allowedEnvironmentVariables: [],
-    blockedEnvironmentVariables:
-      settings.merged.advanced?.excludedEnvVars || [],
+    blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
   };
 
   let transport;

@@ -46,7 +46,7 @@ describe('theme', () => {
   });
 
   it('should return null if theme is undefined', () => {
-    mockSettings.merged.ui!.theme = undefined;
+    mockSettings.merged.ui.theme = undefined;
     const result = validateTheme(mockSettings);
     expect(result).toBeNull();
     expect(themeManager.findThemeByName).not.toHaveBeenCalled();

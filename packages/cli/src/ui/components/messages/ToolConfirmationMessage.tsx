@@ -42,7 +42,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const settings = useSettings();
   const allowPermanentApproval =
-    settings.merged.security?.enablePermanentToolApproval ?? false;
+    settings.merged.security.enablePermanentToolApproval;
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);

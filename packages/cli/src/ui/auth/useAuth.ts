@@ -20,11 +20,11 @@ export function validateAuthMethodWithSettings(
   authType: AuthType,
   settings: LoadedSettings,
 ): string | null {
-  const enforcedType = settings.merged.security?.auth?.enforcedType;
+  const enforcedType = settings.merged.security.auth.enforcedType;
   if (enforcedType && enforcedType !== authType) {
     return `Authentication is enforced to be ${enforcedType}, but you are currently using ${authType}.`;
   }
-  if (settings.merged.security?.auth?.useExternal) {
+  if (settings.merged.security.auth.useExternal) {
     return null;
   }
   // If using Gemini API key, we don't validate it here as we might need to prompt for it.
@@ -80,7 +80,7 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
         return;
       }
 
-      const authType = settings.merged.security?.auth?.selectedType;
+      const authType = settings.merged.security.auth.selectedType;
       if (!authType) {
         if (process.env['GEMINI_API_KEY']) {
           onAuthError(
