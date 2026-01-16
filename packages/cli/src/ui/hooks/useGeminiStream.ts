@@ -42,6 +42,7 @@ import type {
   ServerGeminiStreamEvent as GeminiEvent,
   ThoughtSummary,
   ToolCallRequestInfo,
+  ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
   ToolCallConfirmationDetails,

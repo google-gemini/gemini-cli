@@ -55,7 +55,8 @@ vi.mock('./AnsiOutput.js', () => ({
 }));
 
 // Mock useKeypress
-let keypressHandlers: Array<{ handler: KeypressHandler; isActive: boolean }> = [];
+let keypressHandlers: Array<{ handler: KeypressHandler; isActive: boolean }> =
+  [];
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn((handler, { isActive }) => {
     keypressHandlers.push({ handler, isActive });
@@ -106,7 +107,6 @@ const createMockKey = (overrides: Partial<Key>): Key => ({
   ctrl: false,
   meta: false,
   shift: false,
-  paste: false,
   insertable: false,
   sequence: '',
   ...overrides,
