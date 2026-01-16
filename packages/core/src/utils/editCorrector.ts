@@ -15,7 +15,6 @@ import {
   READ_MANY_FILES_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { LruCache } from './LruCache.js';
 import {
   isFunctionResponse,
   isFunctionCall,
@@ -23,6 +22,7 @@ import {
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { LRUCache } from 'mnemonist';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -39,12 +39,12 @@ function getPromptId(): string {
 const MAX_CACHE_SIZE = 50;
 
 // Cache for ensureCorrectEdit results
-const editCorrectionCache = new LruCache<string, CorrectedEditResult>(
+const editCorrectionCache = new LRUCache<string, CorrectedEditResult>(
   MAX_CACHE_SIZE,
 );
 
 // Cache for ensureCorrectFileContent results
-const fileContentCorrectionCache = new LruCache<string, string>(MAX_CACHE_SIZE);
+const fileContentCorrectionCache = new LRUCache<string, string>(MAX_CACHE_SIZE);
 
 /**
  * Defines the structure of the parameters within CorrectedEditResult
