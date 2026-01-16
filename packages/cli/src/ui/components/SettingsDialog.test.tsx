@@ -1266,6 +1266,9 @@ describe('SettingsDialog', () => {
             disableAutoUpdate: true,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
+            sessionRetention: {
+              enabled: true,
+            },
           },
           ui: {
             hideWindowTitle: true,
@@ -1412,6 +1415,9 @@ describe('SettingsDialog', () => {
             disableAutoUpdate: false,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
+            sessionRetention: {
+              enabled: false,
+            },
           },
           ui: {
             hideWindowTitle: false,
