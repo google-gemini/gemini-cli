@@ -1474,7 +1474,7 @@ export class ClearcutLogger {
   logApprovalModeSwitchEvent(event: ApprovalModeSwitchEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_FROM,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
         value: event.from_mode,
       },
       {
@@ -1492,7 +1492,7 @@ export class ClearcutLogger {
   logApprovalModeDurationEvent(event: ApprovalModeDurationEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_FROM,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
         value: event.mode,
       },
       {

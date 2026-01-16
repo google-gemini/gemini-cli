@@ -534,8 +534,8 @@ export enum EventMetadataKey {
   // Approval Mode Event Keys
   // ==========================================================================
 
-  // Logs the previous approval mode.
-  GEMINI_CLI_APPROVAL_MODE_FROM = 141,
+  // Logs the active approval mode in the session.
+  GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
 
   // Logs the new approval mode.
   GEMINI_CLI_APPROVAL_MODE_TO = 142,
