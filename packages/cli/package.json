@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
-    "start": "node dist/index.js",
+    "start": "node gemini.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
+    "gemini.js",
     "dist"
   ],
   "config": {
