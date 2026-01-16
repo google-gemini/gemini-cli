@@ -12,14 +12,7 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-
-export interface ShellConfirmationRequest {
-  commands: string[];
-  onConfirm: (
-    outcome: ToolConfirmationOutcome,
-    approvedCommands?: string[],
-  ) => void;
-}
+import type { ShellConfirmationRequest } from '../types.js';
 
 export interface ShellConfirmationDialogProps {
   request: ShellConfirmationRequest;
@@ -28,7 +21,8 @@ export interface ShellConfirmationDialogProps {
 export const ShellConfirmationDialog: React.FC<
   ShellConfirmationDialogProps
 > = ({ request }) => {
-  const { commands, onConfirm } = request;
+  const { commands, onConfirm, isTrustedFolder, allowPermanentApproval } =
+    request;
 
   useKeypress(
     (key) => {
@@ -43,8 +37,8 @@ export const ShellConfirmationDialog: React.FC<
     if (item === ToolConfirmationOutcome.Cancel) {
       onConfirm(item);
     } else {
-      // For both ProceedOnce and ProceedAlways, we approve all the
-      // commands that were requested.
+      // For ProceedOnce, ProceedAlways and ProceedAlwaysAndSave, we approve all
+      // the commands that were requested.
       onConfirm(item, commands);
     }
   };
@@ -60,12 +54,21 @@ export const ShellConfirmationDialog: React.FC<
       value: ToolConfirmationOutcome.ProceedAlways,
       key: 'Allow for this session',
     },
-    {
-      label: 'No (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-      key: 'No (esc)',
-    },
   ];
+
+  if (isTrustedFolder && allowPermanentApproval) {
+    options.push({
+      label: 'Allow for all future sessions',
+      value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      key: 'Allow for all future sessions',
+    });
+  }
+
+  options.push({
+    label: 'No (esc)',
+    value: ToolConfirmationOutcome.Cancel,
+    key: 'No (esc)',
+  });
 
   return (
     <Box flexDirection="row" width="100%">

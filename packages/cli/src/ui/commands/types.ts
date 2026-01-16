@@ -81,9 +81,9 @@ export interface CommandContext {
   // Session-specific data
   session: {
     stats: SessionStatsState;
-    /** A transient list of shell commands the user has approved for this session. */
-    sessionShellAllowlist: Set<string>;
   };
+  /** A list of shell commands explicitly allowed for this execution. */
+  allowedShellCommands?: Set<string>;
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
 }

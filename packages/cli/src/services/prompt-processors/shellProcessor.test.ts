@@ -92,9 +92,6 @@ describe('ShellProcessor', () => {
       services: {
         config: mockConfig as Config,
       },
-      session: {
-        sessionShellAllowlist: new Set(),
-      },
     });
 
     mockShellExecute.mockReturnValue({
@@ -354,7 +351,7 @@ describe('ShellProcessor', () => {
     );
 
     // Add commands to the session allowlist (conceptually, in this test we just mock the engine allowing them)
-    context.session.sessionShellAllowlist = new Set(['cmd1', 'cmd2']);
+    context.allowedShellCommands = new Set(['cmd1', 'cmd2']);
 
     // checkCommandPermissions should now pass for these
     mockPolicyEngineCheck.mockResolvedValue({
@@ -397,7 +394,10 @@ describe('ShellProcessor', () => {
     }
 
     // 3. User Approves: Add to session allowlist (simulating UI action)
-    context.session.sessionShellAllowlist.add('echo "once"');
+    if (!context.allowedShellCommands) {
+      context.allowedShellCommands = new Set();
+    }
+    context.allowedShellCommands.add('echo "once"');
 
     // 4. Retry: calling process() again with the same context
     // Reset mocks to ensure we track new calls cleanly

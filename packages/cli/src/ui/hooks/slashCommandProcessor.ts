@@ -31,7 +31,12 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
+  MessageBusType,
+  SHELL_TOOL_NAME,
+  getCommandRoots,
+  stripShellWrapper,
 } from '@google/gemini-cli-core';
+import { ConfirmationRequiredError } from '../../services/prompt-processors/shellProcessor.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
   Message,
@@ -76,6 +81,29 @@ interface SlashCommandProcessorActions {
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
+const notifyPolicyUpdate = (
+  config: Config | null,
+  approvedCommands: string[],
+  persist: boolean,
+) => {
+  const messageBus = config?.getMessageBus();
+  if (!messageBus) return;
+
+  for (const command of approvedCommands) {
+    const stripped = stripShellWrapper(command);
+    const roots = getCommandRoots(stripped);
+    const commandPrefix = roots.length > 0 ? roots : [stripped];
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: SHELL_TOOL_NAME,
+      commandPrefix,
+      persist,
+    });
+  }
+};
+
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
  */
@@ -110,15 +138,14 @@ export const useSlashCommandProcessor = (
         outcome: ToolConfirmationOutcome,
         approvedCommands?: string[],
       ) => void;
+      isTrustedFolder?: boolean;
+      allowPermanentApproval?: boolean;
     }>(null);
   const [confirmationRequest, setConfirmationRequest] = useState<null | {
     prompt: React.ReactNode;
     onConfirm: (confirmed: boolean) => void;
   }>(null);
 
-  const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
-    new Set<string>(),
-  );
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -232,7 +259,6 @@ export const useSlashCommandProcessor = (
       },
       session: {
         stats: session.stats,
-        sessionShellAllowlist,
       },
     }),
     [
@@ -249,7 +275,6 @@ export const useSlashCommandProcessor = (
       pendingItem,
       setPendingItem,
       toggleVimEnabled,
-      sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
       setBannerVisible,
@@ -378,15 +403,9 @@ export const useSlashCommandProcessor = (
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
-            // augment the session allowlist for this single execution.
+            // augment the allowedShellCommands for this single execution.
             if (oneTimeShellAllowlist && oneTimeShellAllowlist.size > 0) {
-              fullCommandContext.session = {
-                ...fullCommandContext.session,
-                sessionShellAllowlist: new Set([
-                  ...fullCommandContext.session.sessionShellAllowlist,
-                  ...oneTimeShellAllowlist,
-                ]),
-              };
+              fullCommandContext.allowedShellCommands = oneTimeShellAllowlist;
             }
             const result = await commandToExecute.action(
               fullCommandContext,
@@ -490,6 +509,9 @@ export const useSlashCommandProcessor = (
                   }>((resolve) => {
                     setShellConfirmationRequest({
                       commands: result.commandsToConfirm,
+                      isTrustedFolder: config?.isTrustedFolder(),
+                      allowPermanentApproval:
+                        settings.merged.security.enablePermanentToolApproval,
                       onConfirm: (
                         resolvedOutcome,
                         resolvedApprovedCommands,
@@ -511,9 +533,16 @@ export const useSlashCommandProcessor = (
                     return { type: 'handled' };
                   }
 
-                  if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-                    setSessionShellAllowlist(
-                      (prev) => new Set([...prev, ...approvedCommands]),
+                  if (
+                    outcome === ToolConfirmationOutcome.ProceedAlways ||
+                    outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+                  ) {
+                    // Also notify the global PolicyEngine so prefix matching works
+                    // and subsequent tools calls (not just slash commands) are allowed.
+                    notifyPolicyUpdate(
+                      config,
+                      approvedCommands,
+                      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
                     );
                   }
 
@@ -595,6 +624,53 @@ export const useSlashCommandProcessor = (
 
         return { type: 'handled' };
       } catch (e: unknown) {
+        if (e instanceof ConfirmationRequiredError) {
+          const { outcome, approvedCommands } = await new Promise<{
+            outcome: ToolConfirmationOutcome;
+            approvedCommands?: string[];
+          }>((resolve) => {
+            setShellConfirmationRequest({
+              commands: e.commandsToConfirm,
+              isTrustedFolder: config?.isTrustedFolder(),
+              allowPermanentApproval:
+                settings.merged.security.enablePermanentToolApproval,
+              onConfirm: (resolvedOutcome, resolvedApprovedCommands) => {
+                setShellConfirmationRequest(null); // Close the dialog
+                resolve({
+                  outcome: resolvedOutcome,
+                  approvedCommands: resolvedApprovedCommands,
+                });
+              },
+            });
+          });
+
+          if (
+            outcome === ToolConfirmationOutcome.Cancel ||
+            !approvedCommands ||
+            approvedCommands.length === 0
+          ) {
+            return { type: 'handled' };
+          }
+
+          if (
+            outcome === ToolConfirmationOutcome.ProceedAlways ||
+            outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+          ) {
+            // Also notify the global PolicyEngine so prefix matching works
+            // and subsequent tools calls (not just slash commands) are allowed.
+            notifyPolicyUpdate(
+              config,
+              approvedCommands,
+              outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            );
+          }
+
+          return await handleSlashCommand(
+            trimmed,
+            // Pass the approved commands as a one-time grant for this execution.
+            new Set(approvedCommands),
+          );
+        }
         hasError = true;
         if (config) {
           const event = makeSlashCommandEvent({
@@ -634,10 +710,10 @@ export const useSlashCommandProcessor = (
       commandContext,
       addMessage,
       setShellConfirmationRequest,
-      setSessionShellAllowlist,
       setIsProcessing,
       setConfirmationRequest,
       setCustomDialog,
+      settings,
     ],
   );
 

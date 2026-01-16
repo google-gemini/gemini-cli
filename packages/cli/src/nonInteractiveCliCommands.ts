@@ -19,6 +19,7 @@ import type { CommandContext } from './ui/commands/types.js';
 import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js';
 import type { LoadedSettings } from './config/settings.js';
 import type { SessionStatsState } from './ui/contexts/SessionContext.js';
+import { ConfirmationRequiredError } from './services/prompt-processors/shellProcessor.js';
 
 /**
  * Processes a slash command in a non-interactive environment.
@@ -70,7 +71,6 @@ export const handleSlashCommand = async (
         ui: createNonInteractiveUI(),
         session: {
           stats: sessionStats,
-          sessionShellAllowlist: new Set(),
         },
         invocation: {
           raw: trimmed,
@@ -79,7 +79,17 @@ export const handleSlashCommand = async (
         },
       };
 
-      const result = await commandToExecute.action(context, args);
+      let result;
+      try {
+        result = await commandToExecute.action(context, args);
+      } catch (e) {
+        if (e instanceof ConfirmationRequiredError) {
+          throw new FatalInputError(
+            'Exiting due to a confirmation prompt requested by the command.',
+          );
+        }
+        throw e;
+      }
 
       if (result) {
         switch (result.type) {

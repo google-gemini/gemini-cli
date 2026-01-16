@@ -66,7 +66,6 @@ export const createMockCommandContext = (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     session: {
-      sessionShellAllowlist: new Set<string>(),
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,

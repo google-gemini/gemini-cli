@@ -423,6 +423,8 @@ export interface ShellConfirmationRequest {
     outcome: ToolConfirmationOutcome,
     approvedCommands?: string[],
   ) => void;
+  isTrustedFolder?: boolean;
+  allowPermanentApproval?: boolean;
 }
 
 export interface ConfirmationRequest {
