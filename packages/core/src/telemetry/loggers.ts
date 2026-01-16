@@ -50,6 +50,9 @@ import type {
   ExtensionUpdateEvent,
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
+  HookCallEvent,
+  StartupStatsEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
