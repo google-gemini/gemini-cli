@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
+import Link from 'ink-link';
 import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -117,10 +118,12 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           const linkText = linkMatch[1];
           const url = linkMatch[2];
           renderedNode = (
-            <Text key={key} color={baseColor}>
-              {linkText}
-              <Text color={theme.text.link}> ({url})</Text>
-            </Text>
+            <Link key={key} url={url}>
+              <Text color={baseColor}>
+                {linkText}
+                <Text color={theme.text.link}> ({url})</Text>
+              </Text>
+            </Link>
           );
         }
       } else if (
@@ -139,9 +142,9 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
-          </Text>
+          <Link key={key} url={fullMatch}>
+            <Text color={theme.text.link}>{fullMatch}</Text>
+          </Link>
         );
       }
     } catch (e) {

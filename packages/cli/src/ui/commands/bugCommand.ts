@@ -23,6 +23,7 @@ import {
 } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
+import { strictEncodeURIComponent } from '../utils/uriUtils.js';
 import path from 'node:path';
 
 export const bugCommand: SlashCommand = {
@@ -103,9 +104,9 @@ export const bugCommand: SlashCommand = {
     }
 
     bugReportUrl = bugReportUrl
-      .replace('{title}', encodeURIComponent(bugDescription))
-      .replace('{info}', encodeURIComponent(info))
-      .replace('{problem}', encodeURIComponent(problemValue));
+      .replace('{title}', strictEncodeURIComponent(bugDescription))
+      .replace('{info}', strictEncodeURIComponent(info))
+      .replace('{problem}', strictEncodeURIComponent(problemValue));
 
     context.ui.addItem(
       {
