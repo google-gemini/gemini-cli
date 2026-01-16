@@ -68,7 +68,7 @@ process_pr_optimized() {
             fi
         else
             echo "   ⚠️  No linked issue found for PR #${PR_NUMBER}"
-            if [[ ",${CURRENT_LABELS}," != ",status/need-issue,"* ]]; then
+            if [[ ",${CURRENT_LABELS}," != *",status/need-issue,"* ]]; then
                 echo "      ➕ Adding status/need-issue label"
                 LABELS_TO_ADD="status/need-issue"
             fi
@@ -82,7 +82,7 @@ process_pr_optimized() {
     else
         echo "   🔗 Found linked issue #${ISSUE_NUMBER}"
 
-        if [[ ",${CURRENT_LABELS}," == ",status/need-issue,"* ]]; then
+        if [[ ",${CURRENT_LABELS}," == *",status/need-issue,"* ]]; then
             echo "      ➖ Removing status/need-issue label"
             LABELS_TO_REMOVE="status/need-issue"
         fi
