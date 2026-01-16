@@ -46,6 +46,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     partToString: (part: string | JSON) => partToStringRecursive(part),
+    LruCache: class {
+      get() {
+        return undefined;
+      }
+      set() {}
+      clear() {}
+      has() {
+        return false;
+      }
+    },
+    DEFAULT_MODEL_CONFIGS: { aliases: {}, overrides: [] },
   };
 });
 

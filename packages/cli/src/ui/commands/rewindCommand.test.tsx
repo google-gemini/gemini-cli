@@ -33,23 +33,36 @@ const mockRevertFileChanges = vi.fn();
 const mockGetProjectRoot = vi.fn().mockReturnValue('/mock/root');
 const mockClearTextToast = vi.fn();
 
-vi.mock('@google/gemini-cli-core', () => ({
-  uiTelemetryService: {
-    recordRewind: vi.fn(),
-  },
-  debugLogger: {
-    error: vi.fn(),
-  },
-  coreEvents: {
-    emitFeedback: vi.fn(),
-  },
-  LruCache: class {
-    get() {
-      return undefined;
-    }
-    set() {}
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      ...actual.uiTelemetryService,
+      recordRewind: vi.fn(),
+    },
+    debugLogger: {
+      ...actual.debugLogger,
+      error: vi.fn(),
+    },
+    coreEvents: {
+      ...actual.coreEvents,
+      emitFeedback: vi.fn(),
+    },
+    LruCache: class {
+      get() {
+        return undefined;
+      }
+      set() {}
+      clear() {}
+      has() {
+        return false;
+      }
+    },
+    DEFAULT_MODEL_CONFIGS: { aliases: {}, overrides: [] },
+  };
+});
 
 vi.mock('../components/RewindViewer.js', () => ({
   RewindViewer: () => null,
