@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { LruCache } from '@google/gemini-cli-core';
 import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
 
@@ -18,8 +19,10 @@ export type HighlightToken = {
 // semicolon, common punctuation, and brackets.
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
-const highlightCache = new Map<string, readonly HighlightToken[]>();
 const highlightCacheLimit = 20000;
+const highlightCache = new LruCache<string, readonly HighlightToken[]>(
+  highlightCacheLimit,
+);
 
 export function parseInputForHighlighting(
   text: string,
@@ -112,9 +115,6 @@ export function parseInputForHighlighting(
   const textAfterFinalTransformation = cpSlice(text, column);
   tokens.push(...parseUntransformedInput(textAfterFinalTransformation));
 
-  if (highlightCache.size >= highlightCacheLimit) {
-    highlightCache.clear();
-  }
   highlightCache.set(cacheKey, tokens);
 
   return tokens;

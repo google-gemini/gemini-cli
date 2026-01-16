@@ -23,6 +23,10 @@ export class LruCache<K, V> {
     return value;
   }
 
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
   set(key: K, value: V): void {
     if (this.cache.has(key)) {
       this.cache.delete(key);

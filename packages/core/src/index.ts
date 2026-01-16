@@ -92,6 +92,7 @@ export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
+export * from './utils/LruCache.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

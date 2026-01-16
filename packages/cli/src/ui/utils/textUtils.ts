@@ -8,6 +8,7 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
+import { LruCache } from '@google/gemini-cli-core';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -29,8 +30,9 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  * ---------------------------------------------------------------------- */
 
 // Cache for code points to reduce GC pressure
-const codePointsCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
+const CODE_POINTS_CACHE_LIMIT = 20000;
+const codePointsCache = new LruCache<string, string[]>(CODE_POINTS_CACHE_LIMIT);
 
 export function toCodePoints(str: string): string[] {
   // ASCII fast path - check if all chars are ASCII (0-127)
@@ -120,7 +122,8 @@ export function stripUnsafeCharacters(str: string): string {
 }
 
 // String width caching for performance optimization
-const stringWidthCache = new Map<string, number>();
+const STRING_WIDTH_CACHE_LIMIT = 20000;
+const stringWidthCache = new LruCache<string, number>(STRING_WIDTH_CACHE_LIMIT);
 
 /**
  * Cached version of stringWidth function for better performance
@@ -136,8 +139,9 @@ export const getCachedStringWidth = (str: string): number => {
     }
   }
 
-  if (stringWidthCache.has(str)) {
-    return stringWidthCache.get(str)!;
+  const cached = stringWidthCache.get(str);
+  if (cached !== undefined) {
+    return cached;
   }
 
   let width: number;

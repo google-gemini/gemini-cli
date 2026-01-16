@@ -18,6 +18,7 @@ import {
   type EditorType,
   getEditorCommand,
   isGuiEditor,
+  LruCache,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -728,8 +729,10 @@ export function getTransformedImagePath(filePath: string): string {
 
 // Memoization for transformations and layout to improve performance with large buffers.
 // These caches are simple because the inputs are typically many identical strings across renders.
-const transformationsCache = new Map<string, Transformation[]>();
 const transformationCacheLimit = 20000;
+const transformationsCache = new LruCache<string, Transformation[]>(
+  transformationCacheLimit,
+);
 
 export function calculateTransformationsForLine(
   line: string,
@@ -756,10 +759,6 @@ export function calculateTransformationsForLine(
     });
   }
 
-  if (transformationsCache.size >= transformationCacheLimit) {
-    // Prevent memory leaks by clearing when limit is reached
-    transformationsCache.clear();
-  }
   transformationsCache.set(line, transformations);
 
   return transformations;
@@ -882,8 +881,10 @@ interface LineLayoutResult {
   visualToTransformedMap: number[];
 }
 
-const lineLayoutCache = new Map<string, LineLayoutResult>();
 const lineLayoutCacheLimit = 20000;
+const lineLayoutCache = new LruCache<string, LineLayoutResult>(
+  lineLayoutCacheLimit,
+);
 
 function getLineLayoutCacheKey(
   line: string,
@@ -1050,9 +1051,6 @@ function calculateLayout(
     }
 
     // Cache the result for this line
-    if (lineLayoutCache.size >= lineLayoutCacheLimit) {
-      lineLayoutCache.clear();
-    }
     lineLayoutCache.set(cacheKey, {
       visualLines: lineVisualLines,
       logicalToVisualMap: lineLogicalToVisualMap,
