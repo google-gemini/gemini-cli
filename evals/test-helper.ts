@@ -35,7 +35,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
     try {
-      await rig.setup(evalCase.name, evalCase.params);
+      rig.setup(evalCase.name, evalCase.params);
 
       if (evalCase.files) {
         for (const [filePath, content] of Object.entries(evalCase.files)) {
