@@ -268,6 +268,35 @@ describe('WebFetchTool', () => {
       });
     });
 
+    it('should send Accept: text/markdown header in fallback request', async () => {
+      const fetchSpy = vi
+        .spyOn(fetchUtils, 'fetchWithTimeout')
+        .mockResolvedValue({
+          ok: true,
+          headers: new Headers({ 'content-type': 'text/plain' }),
+          text: () => Promise.resolve('some content'),
+        } as Response);
+
+      mockGenerateContent.mockImplementationOnce(async (_, req) => ({
+        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
+      }));
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { prompt: 'fetch https://example.com' };
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://example.com/',
+        10000,
+        expect.objectContaining({
+          headers: {
+            Accept: 'text/markdown, */*',
+          },
+        }),
+      );
+    });
+
     it.each([
       {
         name: 'HTML content using html-to-text',
@@ -285,6 +314,12 @@ describe('WebFetchTool', () => {
         name: 'raw text for plain text content',
         content: 'Just some text.',
         contentType: 'text/plain',
+        shouldConvert: false,
+      },
+      {
+        name: 'raw text for markdown text content',
+        content: '# Just some text.',
+        contentType: 'text/markdown',
         shouldConvert: false,
       },
       {
