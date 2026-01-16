@@ -36,16 +36,12 @@ jobs:
             const team_slug = 'gemini-cli-maintainers';
 
             // 1. Check if the PR author is a maintainer
-            try {
-              await github.rest.teams.getMembershipForUserInOrg({
-                org,
-                team_slug,
-                username,
-              });
-              core.info(`${username} is a maintainer. No notification needed.`);
+            const authorAssociation = context.payload.pull_request.author_association;
+            const maintainerAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            
+            if (maintainerAssociations.includes(authorAssociation)) {
+              core.info(`${username} is a maintainer (Association: ${authorAssociation}). No notification needed.`);
               return;
-            } catch (error) {
-              if (error.status !== 404) throw error;
             }
 
             // 2. Check if the PR is already associated with an issue
