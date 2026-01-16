@@ -2093,6 +2093,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+      enabled: {
+        type: 'boolean',
+        description: 'Whether to enable the agent.',
+      },
       disabled: {
         type: 'boolean',
         description: 'Whether to disable the agent.',
