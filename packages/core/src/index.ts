@@ -92,6 +92,7 @@ export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
+export * from './utils/LruCache.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -127,6 +128,7 @@ export * from './prompts/mcp-prompts.js';
 // Export agent definitions
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
+export * from './agents/local-executor.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
