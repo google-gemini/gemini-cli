@@ -12,6 +12,7 @@ export const ExperimentFlags = {
   ENABLE_PREVIEW: 45740196,
   ENABLE_NUMERICAL_ROUTING: 45750526,
   CLASSIFIER_THRESHOLD: 45750527,
+  ENABLE_ADMIN_CONTROLS: 45752213,
 } as const;
 
 export type ExperimentFlagName =

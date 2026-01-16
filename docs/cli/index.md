@@ -25,10 +25,12 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore
   snapshots of your session and files.
-- **[Enterprise configuration](./enterprise.md):** Deploying and manage Gemini
-  CLI in an enterprise environment.
+- **[Enterprise configuration](./enterprise.md):** Deploy and manage Gemini CLI
+  in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
+- **[Agent Skills](./skills.md):** (Experimental) Extend the CLI with
+  specialized expertise and procedural workflows.
 - **[Telemetry](./telemetry.md):** Configure observability to monitor usage and
   performance.
 - **[Token caching](./token-caching.md):** Optimize API costs by caching tokens.
