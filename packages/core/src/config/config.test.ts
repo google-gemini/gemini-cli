@@ -315,6 +315,7 @@ describe('Server Config (config.ts)', () => {
         const config = new Config(baseParams);
         expect(await config.getCompressionThreshold()).toBeUndefined();
       });
+    });
 
     describe('getUserCaching', () => {
       it('should return the remote experiment flag when available', async () => {
