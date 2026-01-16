@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
@@ -77,6 +78,18 @@ export function resolvePathFromEnv(envVar?: string): {
   };
 }
 
+function getGlobalSystemMdPath(): string | null {
+  try {
+    return path.join(os.homedir(), GEMINI_DIR, 'system.md');
+  } catch (error) {
+    debugLogger.warn(
+      'Could not resolve home directory for system prompt fallback.',
+      error,
+    );
+    return null;
+  }
+}
+
 export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
@@ -101,7 +114,21 @@ export function getCoreSystemPrompt(
 
     // require file to exist when override is enabled
     if (!fs.existsSync(systemMdPath)) {
-      throw new Error(`missing system prompt file '${systemMdPath}'`);
+      if (!systemMdResolution.isSwitch) {
+        throw new Error(`missing system prompt file '${systemMdPath}'`);
+      }
+      const globalSystemMdPath = getGlobalSystemMdPath();
+      if (!globalSystemMdPath) {
+        throw new Error(
+          `missing system prompt file '${systemMdPath}' (failed to resolve home directory)`,
+        );
+      }
+      if (!fs.existsSync(globalSystemMdPath)) {
+        throw new Error(
+          `missing system prompt file '${systemMdPath}' (also checked '${globalSystemMdPath}')`,
+        );
+      }
+      systemMdPath = globalSystemMdPath;
     }
   }
 
