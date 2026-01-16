@@ -10,6 +10,9 @@ import { evalTest } from './test-helper.js';
 const AGENT_DEFINITION = `---
 name: docs-agent
 description: An agent with expertise in updating documentation.
+tools:
+  - read_file
+  - write_file
 ---
 
 You are the docs agent. Update the documentation.
