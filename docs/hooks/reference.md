@@ -14,11 +14,11 @@ Hooks communicate with Gemini CLI via standard streams and exit codes:
 
 ### Exit Code Behavior
 
-| Exit Code | Meaning            | Behavior                                                                                        |
-| :-------- | :----------------- | :---------------------------------------------------------------------------------------------- |
-| `0`       | **Success**        | `stdout` is parsed as JSON. If parsing fails, it's treated as a `systemMessage`.                |
-| `2`       | **Blocking Error** | Interrupts the current operation. `stderr` is shown to the agent (for tool events) or the user. |
-| Other     | **Warning**        | Execution continues. `stderr` is logged as a non-blocking warning.                              |
+| Exit Code | Meaning            | Behavior                                                                                                                                                                                                     |
+| :-------- | :----------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`       | **Success**        | `stdout` is parsed as JSON. If parsing fails, it's checked for keywords like `"decision":"deny"` or `"decision":"block"`. If found, the decision is respected. Otherwise, it's treated as a `systemMessage`. |
+| `2`       | **Blocking Error** | Interrupts the current operation. `stderr` is shown to the agent (for tool events) or the user.                                                                                                              |
+| Other     | **Warning**        | Execution continues. `stderr` is logged as a non-blocking warning.                                                                                                                                           |
 
 ---
 

@@ -168,7 +168,13 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     hooksConfig: { [K in HookEventName]?: HookDefinition[] },
     source: ConfigSource,
   ): void {
+    const skipFields = ['enabled', 'disabled', 'notifications'];
+
     for (const [eventName, definitions] of Object.entries(hooksConfig)) {
+      if (skipFields.includes(eventName)) {
+        continue;
+      }
+
       if (!this.isValidEventName(eventName)) {
         debugLogger.warn(`Invalid hook event name: ${eventName}`);
         continue;

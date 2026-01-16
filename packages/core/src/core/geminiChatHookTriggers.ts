@@ -91,6 +91,13 @@ export async function fireBeforeModelHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
 
+    if (!response.success) {
+      debugLogger.debug(
+        `BeforeModel hook execution failed: ${response.error?.message || 'Unknown error'}`,
+      );
+      return { blocked: false };
+    }
+
     // Reconstruct result from response
     const beforeResultFinalOutput = response.output
       ? createHookOutput('BeforeModel', response.output)
@@ -168,6 +175,13 @@ export async function fireBeforeToolSelectionHook(
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
 
+    if (!response.success) {
+      debugLogger.debug(
+        `BeforeToolSelection hook execution failed: ${response.error?.message || 'Unknown error'}`,
+      );
+      return {};
+    }
+
     // Reconstruct result from response
     const toolSelectionResultFinalOutput = response.output
       ? createHookOutput('BeforeToolSelection', response.output)
@@ -224,6 +238,13 @@ export async function fireAfterModelHook(
       },
       MessageBusType.HOOK_EXECUTION_RESPONSE,
     );
+
+    if (!response.success) {
+      debugLogger.debug(
+        `AfterModel hook execution failed: ${response.error?.message || 'Unknown error'}`,
+      );
+      return { response: chunk };
+    }
 
     // Reconstruct result from response
     const afterResultFinalOutput = response.output

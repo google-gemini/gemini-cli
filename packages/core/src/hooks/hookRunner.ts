@@ -420,7 +420,38 @@ export class HookRunner {
     text: string,
     exitCode: number,
   ): HookOutput {
+    const trimmedText = text.trim();
+
+    // Check if the plain text contains a structured decision even if it's not valid JSON
+    // This handles cases where hooks might output multiple lines where some are not JSON
+    const isDeny =
+      trimmedText.includes('"decision":"deny"') ||
+      trimmedText.includes("'decision':'deny'") ||
+      trimmedText.includes('decision: deny');
+    const isBlock =
+      trimmedText.includes('"decision":"block"') ||
+      trimmedText.includes("'decision':'block'") ||
+      trimmedText.includes('decision: block');
+    const isAllow =
+      trimmedText.includes('"decision":"allow"') ||
+      trimmedText.includes("'decision':'allow'") ||
+      trimmedText.includes('decision: allow');
+
     if (exitCode === EXIT_CODE_SUCCESS) {
+      if (isDeny || isBlock) {
+        return {
+          decision: isDeny ? 'deny' : 'block',
+          reason: trimmedText,
+        };
+      }
+
+      if (isAllow) {
+        return {
+          decision: 'allow',
+          systemMessage: trimmedText,
+        };
+      }
+
       // Success - treat as system message or additional context
       return {
         decision: 'allow',
