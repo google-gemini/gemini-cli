@@ -32,6 +32,7 @@ import type { Key } from '../../contexts/KeypressContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { LRU_CACHE_LIMIT } from '../../constants.js';
 
 export type Direction =
   | 'left'
@@ -729,16 +730,17 @@ export function getTransformedImagePath(filePath: string): string {
 
 // Memoization for transformations and layout to improve performance with large buffers.
 // These caches are simple because the inputs are typically many identical strings across renders.
-const transformationCacheLimit = 20000;
 const transformationsCache = new LruCache<string, Transformation[]>(
-  transformationCacheLimit,
+  LRU_CACHE_LIMIT,
 );
 
 export function calculateTransformationsForLine(
   line: string,
 ): Transformation[] {
   const cached = transformationsCache.get(line);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
   const transformations: Transformation[] = [];
   let match: RegExpExecArray | null;
@@ -881,10 +883,7 @@ interface LineLayoutResult {
   visualToTransformedMap: number[];
 }
 
-const lineLayoutCacheLimit = 20000;
-const lineLayoutCache = new LruCache<string, LineLayoutResult>(
-  lineLayoutCacheLimit,
-);
+const lineLayoutCache = new LruCache<string, LineLayoutResult>(LRU_CACHE_LIMIT);
 
 function getLineLayoutCacheKey(
   line: string,

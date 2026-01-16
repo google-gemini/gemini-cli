@@ -7,7 +7,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
-import { LruCache } from './LruCache.js';
 
 export interface GitIgnoreFilter {
   isIgnored(filePath: string): boolean;
@@ -15,7 +14,7 @@ export interface GitIgnoreFilter {
 
 export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
-  private cache = new LruCache<string, Ignore>(1000);
+  private cache: Map<string, Ignore> = new Map();
   private globalPatterns: Ignore | undefined;
   private processedExtraPatterns: Ignore;
 

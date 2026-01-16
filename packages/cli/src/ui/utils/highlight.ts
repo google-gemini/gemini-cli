@@ -7,6 +7,7 @@
 import { LruCache } from '@google/gemini-cli-core';
 import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
+import { LRU_CACHE_LIMIT } from '../constants.js';
 
 export type HighlightToken = {
   text: string;
@@ -19,9 +20,8 @@ export type HighlightToken = {
 // semicolon, common punctuation, and brackets.
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
-const highlightCacheLimit = 20000;
 const highlightCache = new LruCache<string, readonly HighlightToken[]>(
-  highlightCacheLimit,
+  LRU_CACHE_LIMIT,
 );
 
 export function parseInputForHighlighting(
@@ -33,7 +33,7 @@ export function parseInputForHighlighting(
   // Simple cache key. Transformations are omitted from key because they are derived from text.
   // We include cursorCol only if it's within a transformation range.
   let isCursorInsideTransform = false;
-  if (typeof cursorCol === 'number') {
+  if (cursorCol !== undefined) {
     for (const transform of transformations) {
       if (cursorCol >= transform.logStart && cursorCol <= transform.logEnd) {
         isCursorInsideTransform = true;
@@ -101,7 +101,7 @@ export function parseInputForHighlighting(
     tokens.push(...parseUntransformedInput(textBeforeTransformation));
 
     const isCursorInside =
-      typeof cursorCol === 'number' &&
+      cursorCol !== undefined &&
       cursorCol >= transformation.logStart &&
       cursorCol <= transformation.logEnd;
     const transformationText = isCursorInside
