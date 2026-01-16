@@ -204,6 +204,23 @@ Slash commands provide meta-level control over the CLI itself.
     modify them as desired. Changes to some settings are applied immediately,
     while others require a restart.
 
+- [**`/skills`**](./skills.md)
+  - **Description:** (Experimental) Manage Agent Skills, which provide on-demand
+    expertise and specialized workflows.
+  - **Sub-commands:**
+    - **`list`**:
+      - **Description:** List all discovered skills and their current status
+        (enabled/disabled).
+    - **`enable`**:
+      - **Description:** Enable a specific skill by name.
+      - **Usage:** `/skills enable <name>`
+    - **`disable`**:
+      - **Description:** Disable a specific skill by name.
+      - **Usage:** `/skills disable <name>`
+    - **`reload`**:
+      - **Description:** Refresh the list of discovered skills from all tiers
+        (workspace, user, and extensions).
+
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI
     session, including token usage, cached token savings (when available), and

@@ -222,9 +222,45 @@ need this for extensions built to expose commands and prompts.
 Restart the CLI again. The model will now have the context from your `GEMINI.md`
 file in every session where the extension is active.
 
-## Step 6: Releasing your extension
+## (Optional) Step 6: Add an Agent Skill
 
-Once you are happy with your extension, you can share it with others. The two
+_Note: This is an experimental feature enabled via `experimental.skills`._
+
+[Agent Skills](../cli/skills.md) let you bundle specialized expertise and
+procedural workflows. Unlike `GEMINI.md`, which provides persistent context,
+skills are activated only when needed, saving context tokens.
+
+1.  Create a `skills` directory and a subdirectory for your skill:
+
+    ```bash
+    mkdir -p skills/security-audit
+    ```
+
+2.  Create a `skills/security-audit/SKILL.md` file:
+
+    ```markdown
+    ---
+    name: security-audit
+    description:
+      Expertise in auditing code for security vulnerabilities. Use when the user
+      asks to "check for security issues" or "audit" their changes.
+    ---
+
+    # Security Auditor
+
+    You are an expert security researcher. When auditing code:
+
+    1. Look for common vulnerabilities (OWASP Top 10).
+    2. Check for hardcoded secrets or API keys.
+    3. Suggest remediation steps for any findings.
+    ```
+
+Skills bundled with your extension are automatically discovered and can be
+activated by the model during a session when it identifies a relevant task.
+
+## Step 7: Release your extension
+
+Once you're happy with your extension, you can share it with others. The two
 primary ways of releasing extensions are via a Git repository or through GitHub
 Releases. Using a public Git repository is the simplest method.
 
@@ -239,6 +275,7 @@ You've successfully created a Gemini CLI extension! You learned how to:
 - Add custom tools with an MCP server.
 - Create convenient custom commands.
 - Provide persistent context to the model.
+- Bundle specialized Agent Skills.
 - Link your extension for local development.
 
 From here, you can explore more advanced features and build powerful new
