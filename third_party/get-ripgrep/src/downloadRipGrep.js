@@ -16,14 +16,16 @@ import { pipeline } from 'node:stream/promises'
 import { temporaryFile } from 'tempy'
 import { fileURLToPath } from 'node:url'
 import { xdgCache } from 'xdg-basedir'
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
+import checksumManifest from '../ripgrep-checksums.json' assert { type: 'json' }
 
-const { mkdir, createWriteStream, move } = fsExtra
+const { mkdir, createWriteStream, move, remove } = fsExtra
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const REPOSITORY = `microsoft/ripgrep-prebuilt`
 const VERSION = process.env.RIPGREP_VERSION || 'v13.0.0-10'
-console.log({ VERSION })
 const BIN_PATH = join(__dirname, '../bin')
 
 const getTarget = () => {
@@ -104,14 +106,55 @@ const untarGz = async (inFile, outDir) => {
   }
 }
 
+const calculateSha256 = async (filePath) => {
+  const hash = createHash('sha256')
+  await pipeline(createReadStream(filePath), hash)
+  return hash.digest('hex')
+}
+
+const verifyChecksum = async (filePath, expectedSha256) => {
+  const actualSha256 = await calculateSha256(filePath)
+  if (actualSha256 !== expectedSha256) {
+    throw new VError(
+      `Checksum mismatch for ${filePath}. Expected ${expectedSha256}, got ${actualSha256}`,
+    )
+  }
+}
+
 export const downloadRipGrep = async (binPath = BIN_PATH) => {
   const target = getTarget()
-  const url = `https://github.com/${REPOSITORY}/releases/download/${VERSION}/ripgrep-${VERSION}-${target}`
+  if (checksumManifest.version !== VERSION) {
+    throw new VError(
+      `Checksum manifest version "${checksumManifest.version}" does not match requested version "${VERSION}". Re-run third_party/get-ripgrep/scripts/generate-checksums.mjs.`,
+    )
+  }
+  const checksumEntry = checksumManifest.assets?.[target]
+  if (!checksumEntry) {
+    throw new VError(`No checksum entry found for target "${target}"`)
+  }
+  const url = checksumEntry.url
   const downloadPath = `${xdgCache}/vscode-ripgrep/ripgrep-${VERSION}-${target}`
-  if (!(await pathExists(downloadPath))) {
-    await downloadFile(url, downloadPath)
-  } else {
+  const fileCached = await pathExists(downloadPath)
+  if (fileCached) {
     console.info(`File ${downloadPath} has been cached`)
+    try {
+      await verifyChecksum(downloadPath, checksumEntry.sha256)
+    } catch (error) {
+      console.warn(
+        `Checksum verification failed for cached ripgrep archive. Re-downloading. ${error}`,
+      )
+      await remove(downloadPath)
+      await downloadFile(url, downloadPath)
+      await verifyChecksum(downloadPath, checksumEntry.sha256)
+    }
+  } else {
+    await downloadFile(url, downloadPath)
+    try {
+      await verifyChecksum(downloadPath, checksumEntry.sha256)
+    } catch (error) {
+      await remove(downloadPath)
+      throw error
+    }
   }
   if (downloadPath.endsWith('.tar.gz')) {
     await untarGz(downloadPath, binPath)
