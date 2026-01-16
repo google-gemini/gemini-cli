@@ -43,7 +43,8 @@ export const DefaultAppLayout: React.FC = () => {
 
       {uiState.backgroundShells.size > 0 &&
         uiState.activeBackgroundShellPid &&
-        uiState.backgroundShellHeight > 0 && (
+        uiState.backgroundShellHeight > 0 &&
+        uiState.streamingState !== StreamingState.WaitingForConfirmation && (
           <Box height={uiState.backgroundShellHeight} flexShrink={0}>
             <BackgroundShellDisplay
               shells={uiState.backgroundShells}
@@ -51,9 +52,7 @@ export const DefaultAppLayout: React.FC = () => {
               width={width}
               height={uiState.backgroundShellHeight}
               isFocused={
-                uiState.embeddedShellFocused &&
-                !uiState.dialogsVisible &&
-                uiState.streamingState !== StreamingState.WaitingForConfirmation
+                uiState.embeddedShellFocused && !uiState.dialogsVisible
               }
               isListOpenProp={uiState.isBackgroundShellListOpen}
             />
