@@ -1532,40 +1532,16 @@ describe('Config getHooks', () => {
   });
 
   it('should return the hooks configuration when provided', () => {
-    const mockHooks: { [K in HookEventName]?: HookDefinition[] } = {
-      [HookEventName.BeforeTool]: [
+    const mockHooks = {
+      BeforeTool: [
         {
-          matcher: 'write_file',
-          hooks: [
-            {
-              type: HookType.Command,
-              command: 'echo "test hook"',
-              timeout: 5000,
-            },
-          ],
-        },
-      ],
-      [HookEventName.AfterTool]: [
-        {
-          hooks: [
-            {
-              type: HookType.Command,
-              command: './hooks/after-tool.sh',
-              timeout: 10000,
-            },
-          ],
+          hooks: [{ type: HookType.Command, command: 'echo 1' }],
         },
       ],
     };
-
-    const config = new Config({
-      ...baseParams,
-      hooks: mockHooks,
-    });
-
+    const config = new Config({ ...baseParams, hooks: mockHooks });
     const retrievedHooks = config.getHooks();
     expect(retrievedHooks).toEqual(mockHooks);
-    expect(retrievedHooks).toBe(mockHooks); // Should return the same reference
   });
 
   it('should return hooks with all supported event types', () => {
@@ -1852,32 +1828,30 @@ describe('Hooks configuration', () => {
     hooks: { disabled: ['initial-hook'] },
   };
 
-  it('updateHooks should update hooks and disabled list', () => {
+  it('updateDisabledHooks should update the disabled list', () => {
     const config = new Config(baseParams);
     expect(config.getDisabledHooks()).toEqual(['initial-hook']);
 
-    const newHooks = {
-      disabled: ['new-hook-1', 'new-hook-2'],
-      BeforeAgent: [],
-    };
-
-    config.updateHooks(newHooks);
+    const newDisabled = ['new-hook-1', 'new-hook-2'];
+    config.updateDisabledHooks(newDisabled);
 
     expect(config.getDisabledHooks()).toEqual(['new-hook-1', 'new-hook-2']);
-    expect(config.getHooks()).toEqual(newHooks);
   });
 
-  it('updateHooks should handle missing disabled property gracefully', () => {
-    const config = new Config(baseParams);
-    const newHooks = {
-      BeforeAgent: [],
+  it('updateDisabledHooks should only update disabled list and not definitions', () => {
+    const initialHooks = {
+      BeforeAgent: [
+        {
+          hooks: [{ type: HookType.Command, command: 'initial' }],
+        },
+      ],
     };
+    const config = new Config({ ...baseParams, hooks: initialHooks });
 
-    config.updateHooks(newHooks);
+    config.updateDisabledHooks(['some-hook']);
 
-    // Should keep previous disabled hooks if not provided in new object
-    expect(config.getDisabledHooks()).toEqual(['initial-hook']);
-    expect(config.getHooks()).toEqual(newHooks);
+    expect(config.getDisabledHooks()).toEqual(['some-hook']);
+    expect(config.getHooks()).toEqual(initialHooks);
   });
 });
 

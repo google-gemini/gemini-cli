@@ -22,7 +22,7 @@ describe('hooksCommand', () => {
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
     getEnableHooks: ReturnType<typeof vi.fn>;
-    updateHooks: ReturnType<typeof vi.fn>;
+    updateDisabledHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
@@ -52,7 +52,7 @@ describe('hooksCommand', () => {
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
       getEnableHooks: vi.fn().mockReturnValue(true),
-      updateHooks: vi.fn(),
+      updateDisabledHooks: vi.fn(),
     };
 
     // Create mock settings
@@ -449,7 +449,7 @@ describe('hooksCommand', () => {
         'test-hook',
         false,
       );
-      expect(mockConfig.updateHooks).toHaveBeenCalled();
+      expect(mockConfig.updateDisabledHooks).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',

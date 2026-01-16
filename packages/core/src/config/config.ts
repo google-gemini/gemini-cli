@@ -708,8 +708,15 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.hooks = params.hooks;
-    this.projectHooks = params.projectHooks;
+
+    if (params.hooks) {
+      const { disabled: _, ...restOfHooks } = params.hooks;
+      this.hooks = restOfHooks;
+    }
+    if (params.projectHooks) {
+      this.projectHooks = params.projectHooks;
+    }
+
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
@@ -1929,16 +1936,13 @@ export class Config {
   }
 
   /**
-   * Update hooks configuration dynamically
+   * Update the list of disabled hooks dynamically.
+   * This is used to keep the running system in sync with settings changes
+   * without risk of loading new hook definitions into memory.
    */
-  updateHooks(
-    hooks: { [K in HookEventName]?: HookDefinition[] } & {
-      disabled?: string[];
-    },
-  ): void {
-    this.hooks = hooks;
-    if (Array.isArray(hooks.disabled)) {
-      this.disabledHooks = hooks.disabled;
+  updateDisabledHooks(disabledHooks: string[]): void {
+    if (Array.isArray(disabledHooks)) {
+      this.disabledHooks = disabledHooks;
     }
   }
 

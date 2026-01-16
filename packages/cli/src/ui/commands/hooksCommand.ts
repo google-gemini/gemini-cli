@@ -90,7 +90,7 @@ async function enableAction(
     settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
 
     // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateHooks(settings.merged.hooks);
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     // Enable in hook system
     hookSystem.setHookEnabled(hookName, true);
@@ -158,7 +158,7 @@ async function disableAction(
     }
 
     // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateHooks(settings.merged.hooks);
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     // Always disable in hook system to ensure in-memory state matches settings
     hookSystem.setHookEnabled(hookName, false);
@@ -253,7 +253,7 @@ async function enableAllAction(
     settings.setValue(scope, 'hooks.disabled', []);
 
     // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateHooks(settings.merged.hooks);
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     for (const hook of disabledHooks) {
       const hookName = getHookDisplayName(hook);
@@ -326,7 +326,7 @@ async function disableAllAction(
     settings.setValue(scope, 'hooks.disabled', allHookNames);
 
     // Update core config so re-initialization (e.g. extension reload) respects the change
-    config.updateHooks(settings.merged.hooks);
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     for (const hook of enabledHooks) {
       const hookName = getHookDisplayName(hook);
