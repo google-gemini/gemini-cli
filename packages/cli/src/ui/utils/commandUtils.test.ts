@@ -33,6 +33,7 @@ vi.mock('child_process');
 // fs (for /dev/tty)
 const mockFs = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
+  constants: { W_OK: 2 },
 }));
 vi.mock('node:fs', () => ({
   default: mockFs,
@@ -63,10 +64,12 @@ const makeWritable = (opts?: { isTTY?: boolean; writeReturn?: boolean }) => {
     once: EventEmitter.prototype.once,
     on: EventEmitter.prototype.on,
     off: EventEmitter.prototype.off,
+    removeAllListeners: EventEmitter.prototype.removeAllListeners,
   }) as unknown as EventEmitter & {
     write: Mock;
     end: Mock;
     isTTY?: boolean;
+    removeAllListeners: Mock;
   };
   return stream;
 };
@@ -125,9 +128,11 @@ describe('commandUtils', () => {
     // Setup clipboardy mock
     mockClipboardyWrite = clipboardy.write as Mock;
 
-    // default: no /dev/tty available
+    // default: /dev/tty creation succeeds and emits 'open'
     mockFs.createWriteStream.mockImplementation(() => {
-      throw new Error('ENOENT');
+      const tty = makeWritable({ isTTY: true });
+      setTimeout(() => tty.emit('open'), 0);
+      return tty;
     });
 
     // default: stdio are not TTY for tests unless explicitly set
@@ -224,7 +229,10 @@ describe('commandUtils', () => {
     it('writes OSC-52 to /dev/tty when in SSH', async () => {
       const testText = 'abc';
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
       process.env['SSH_CONNECTION'] = '1';
 
@@ -242,7 +250,10 @@ describe('commandUtils', () => {
     it('wraps OSC-52 for tmux when in SSH', async () => {
       const testText = 'tmux-copy';
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
       process.env['SSH_CONNECTION'] = '1';
       process.env['TMUX'] = '1';
@@ -262,7 +273,10 @@ describe('commandUtils', () => {
       // ensure payload > chunk size (240) so there are multiple chunks
       const testText = 'x'.repeat(1200);
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
       process.env['SSH_CONNECTION'] = '1';
       process.env['STY'] = 'screen-session';
@@ -290,6 +304,13 @@ describe('commandUtils', () => {
 
       process.env['SSH_TTY'] = '/dev/pts/1';
 
+      // Simulate /dev/tty access failure
+      mockFs.createWriteStream.mockImplementation(() => {
+        const tty = makeWritable({ isTTY: true });
+        setTimeout(() => tty.emit('error', new Error('EACCES')), 0);
+        return tty;
+      });
+
       await copyToClipboard(testText);
 
       const b64 = Buffer.from(testText, 'utf8').toString('base64');
@@ -303,7 +324,11 @@ describe('commandUtils', () => {
       const testText = 'no-tty';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
-      // /dev/tty throws; stderr/stdout are non-TTY by default
+      // /dev/tty throws or errors
+      mockFs.createWriteStream.mockImplementation(() => {
+        throw new Error('ENOENT');
+      });
+
       process.env['SSH_CLIENT'] = 'client';
 
       await copyToClipboard(testText);
@@ -313,7 +338,10 @@ describe('commandUtils', () => {
 
     it('resolves on drain when backpressure occurs', async () => {
       const tty = makeWritable({ isTTY: true, writeReturn: false });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       process.env['SSH_CONNECTION'] = '1';
 
       const p = copyToClipboard('drain-test');
@@ -325,7 +353,10 @@ describe('commandUtils', () => {
 
     it('propagates errors from OSC-52 write path', async () => {
       const tty = makeWritable({ isTTY: true, writeReturn: false });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       process.env['SSH_CONNECTION'] = '1';
 
       const p = copyToClipboard('err-test');
@@ -349,7 +380,10 @@ describe('commandUtils', () => {
 
     it('uses clipboardy when not in eligible env even if /dev/tty exists', async () => {
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       const text = 'local-terminal';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
@@ -360,9 +394,31 @@ describe('commandUtils', () => {
       expect(tty.end).not.toHaveBeenCalled();
     });
 
+    it('falls back if /dev/tty emits error (e.g. sandbox)', async () => {
+      const testText = 'access-denied-fallback';
+      process.env['SSH_CONNECTION'] = '1'; // normally would trigger OSC52 on TTY
+
+      mockFs.createWriteStream.mockImplementation(() => {
+        const stream = makeWritable({ isTTY: true });
+        // Emit error instead of open
+        setTimeout(() => stream.emit('error', new Error('EACCES')), 0);
+        return stream;
+      });
+
+      // Fallback to clipboardy since stdio isn't configured as TTY in this test (default from beforeEach)
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard(testText);
+
+      expect(mockFs.createWriteStream).toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
     it('uses clipboardy in tmux when not in SSH/WSL', async () => {
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       const text = 'tmux-local';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
@@ -373,6 +429,24 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('falls back if /dev/tty hangs (timeout)', async () => {
+      const testText = 'timeout-fallback';
+      process.env['SSH_CONNECTION'] = '1';
+
+      mockFs.createWriteStream.mockImplementation(() =>
+        // Stream that never emits open or error
+        makeWritable({ isTTY: true }),
+      );
+
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      // Should complete even though stream hangs
+      await copyToClipboard(testText);
+
+      expect(mockFs.createWriteStream).toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
     });
 
     it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
