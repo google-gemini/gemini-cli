@@ -59,12 +59,6 @@ priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "read_many_files"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
 toolName = "google_web_search"
 decision = "allow"
 priority = 50
