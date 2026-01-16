@@ -1835,7 +1835,7 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
   });
 
   it('should be interactive if positional prompt words are provided with multiple flags', async () => {
@@ -1854,10 +1854,10 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     // Verify the question is preserved for one-shot execution
-    expect(argv.prompt).toBe('Hello world');
-    expect(argv.promptInteractive).toBeUndefined();
+    expect(argv.prompt).toBeUndefined();
+    expect(argv.promptInteractive).toBe('Hello world');
   });
 
   it('should be interactive if positional prompt words are provided with extensions flag', async () => {
@@ -1869,7 +1869,7 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello');
     expect(argv.promptInteractive).toBe('hello');
     expect(argv.extensions).toEqual(['none']);
@@ -1884,7 +1884,7 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
     expect(argv.promptInteractive).toBe('hello world how are you');
   });
@@ -1909,7 +1909,7 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('write a function to sort array');
     expect(argv.promptInteractive).toBe('write a function to sort array');
     expect(argv.model).toBe('gemini-2.5-pro');
