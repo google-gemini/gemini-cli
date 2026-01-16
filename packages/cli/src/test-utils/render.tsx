@@ -109,7 +109,7 @@ export const mockSettings = new LoadedSettings(
   { path: '', settings: {}, originalSettings: {} },
   { path: '', settings: {}, originalSettings: {} },
   true,
-  new Set(),
+  [],
 );
 
 export const createMockSettings = (
@@ -122,7 +122,7 @@ export const createMockSettings = (
     { path: '', settings, originalSettings: settings },
     { path: '', settings: {}, originalSettings: {} },
     true,
-    new Set(),
+    [],
   );
 };
 
@@ -133,6 +133,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
 };
@@ -171,6 +172,7 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  setAuthContext: vi.fn(),
 };
 
 export const renderWithProviders = (

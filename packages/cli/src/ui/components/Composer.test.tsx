@@ -24,6 +24,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
+import { mergeSettings } from '../../config/settings.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -154,6 +155,7 @@ const createMockConfig = (overrides = {}) => ({
   }),
   getSkillManager: () => ({
     getSkills: () => [],
+    getDisplayableSkills: () => [],
   }),
   getMcpClientManager: () => ({
     getMcpServers: () => ({}),
@@ -162,13 +164,20 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hideFooter: false,
-    showMemoryUsage: false,
-    ...merged,
-  },
-});
+const createMockSettings = (merged = {}) => {
+  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+  return {
+    merged: {
+      ...defaultMergedSettings,
+      ui: {
+        ...defaultMergedSettings.ui,
+        hideFooter: false,
+        showMemoryUsage: false,
+        ...merged,
+      },
+    },
+  };
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
@@ -384,7 +393,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Esc again to clear');
+      expect(lastFrame()).toContain('Press Esc again to rewind');
     });
   });
 

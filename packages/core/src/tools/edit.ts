@@ -639,6 +639,17 @@ class EditToolInvocation
       };
     }
 
+    if (this.config.getDisableLLMCorrection()) {
+      return {
+        currentContent,
+        newContent: currentContent,
+        occurrences: replacementResult.occurrences,
+        isNewFile: false,
+        error: initialError,
+        originalLineEnding,
+      };
+    }
+
     // If there was an error, try to self-correct.
     return this.attemptSelfCorrection(
       params,
@@ -818,9 +829,11 @@ class EditToolInvocation
         displayResult = {
           fileDiff,
           fileName,
+          filePath: this.params.file_path,
           originalContent: editData.currentContent,
           newContent: editData.newContent,
           diffStat,
+          isNewFile: editData.isNewFile,
         };
       }
 
