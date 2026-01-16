@@ -40,7 +40,7 @@
     "color-convert": "^2.0.1",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
-    "diff": "^7.0.0",
+    "diff": "^8.0.3",
     "dotenv": "^17.1.0",
     "extract-zip": "^2.0.1",
     "fzf": "^0.5.2",

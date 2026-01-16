@@ -45,7 +45,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
-    "diff": "^7.0.0",
+    "diff": "^8.0.3",
     "fast-levenshtein": "^2.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
