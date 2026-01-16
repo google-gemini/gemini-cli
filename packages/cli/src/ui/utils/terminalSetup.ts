@@ -75,7 +75,6 @@ const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
 
 /**
  * Maps a supported terminal ID to its display name and config folder name.
- * Returns null if the terminal is not supported.
  */
 function getSupportedTerminalData(
   terminal: SupportedTerminal,
@@ -83,9 +82,6 @@ function getSupportedTerminalData(
   return TERMINAL_DATA[terminal] || null;
 }
 
-/**
- * Type for a keybinding entry in keybindings.json
- */
 type Keybinding = {
   key?: string;
   command?: string;
@@ -94,10 +90,6 @@ type Keybinding = {
 
 /**
  * Checks if a keybindings array contains our specific binding for a given key.
- * Our bindings are identified by:
- * - The key ('shift+enter' or 'ctrl+enter')
- * - The command 'workbench.action.terminal.sendSequence'
- * - The args.text value matching VSCODE_SHIFT_ENTER_SEQUENCE
  */
 function hasOurBinding(
   keybindings: unknown[],
