@@ -1,4 +1,4 @@
-name: 'Label Child Issues for Project Rollup'
+name: 'Label Workstream Rollup'
 
 on:
   issues:
