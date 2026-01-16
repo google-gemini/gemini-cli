@@ -68,6 +68,10 @@ type AgentTurnResult =
       finalResult: string | null;
     };
 
+export function createUnauthorizedToolError(toolName: string): string {
+  return `Unauthorized tool call: '${toolName}' is not available to this agent.`;
+}
+
 /**
  * Executes an agent loop based on an {@link AgentDefinition}.
  *
@@ -883,7 +887,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Handle standard tools
       if (!allowedToolNames.has(functionCall.name as string)) {
-        const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
+        const error = createUnauthorizedToolError(functionCall.name as string);
 
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
