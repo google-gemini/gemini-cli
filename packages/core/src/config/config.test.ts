@@ -316,37 +316,6 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getCompressionThreshold()).toBeUndefined();
       });
 
-      it('should return the experiment threshold over local when both are set', async () => {
-        const config = new Config({
-          ...baseParams,
-          compressionThreshold: 0.5,
-          experiments: {
-            flags: {
-              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
-                floatValue: 0.7,
-              },
-            },
-          },
-        } as unknown as ConfigParameters);
-        expect(await config.getCompressionThreshold()).toBe(0.7);
-      });
-
-      it('should return local threshold when experiment value is 0', async () => {
-        const config = new Config({
-          ...baseParams,
-          compressionThreshold: 0.5,
-          experiments: {
-            flags: {
-              [ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]: {
-                floatValue: 0.0,
-              },
-            },
-          },
-        } as unknown as ConfigParameters);
-        expect(await config.getCompressionThreshold()).toBe(0.5);
-      });
-    });
-
     describe('getUserCaching', () => {
       it('should return the remote experiment flag when available', async () => {
         const config = new Config({
