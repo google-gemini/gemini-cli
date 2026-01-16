@@ -37,7 +37,7 @@ jobs:
       - name: 'Check for evals directory'
         id: 'check-evals'
         run: |
-          if [ -d "evals" ]; then
+          if [ -f "evals/vitest.config.ts" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
