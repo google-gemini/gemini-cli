@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import { type Settings, SettingScope } from './settings.js';
+import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
 import {
@@ -68,11 +68,10 @@ import {
   ExtensionSettingScope,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
-import { getEnableHooks } from './settingsSchema.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
-  settings: Settings;
+  settings: MergedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
@@ -86,7 +85,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
-  private settings: Settings;
+  private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
     | ((setting: ExtensionSetting) => Promise<string>)
@@ -143,7 +142,7 @@ export class ExtensionManager extends ExtensionLoader {
     if (
       (installMetadata.type === 'git' ||
         installMetadata.type === 'github-release') &&
-      this.settings.security?.blockGitExtensions
+      this.settings.security.blockGitExtensions
     ) {
       throw new Error(
         'Installing extensions from remote sources is disallowed by your current settings.',
@@ -287,10 +286,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
-        if (
-          this.requestSetting &&
-          (this.settings.experimental?.extensionConfig ?? false)
-        ) {
+        if (this.requestSetting && this.settings.experimental.extensionConfig) {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
@@ -308,14 +304,13 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         }
 
-        const missingSettings =
-          (this.settings.experimental?.extensionConfig ?? false)
-            ? await getMissingSettings(
-                newExtensionConfig,
-                extensionId,
-                this.workspaceDir,
-              )
-            : [];
+        const missingSettings = this.settings.experimental.extensionConfig
+          ? await getMissingSettings(
+              newExtensionConfig,
+              extensionId,
+              this.workspaceDir,
+            )
+          : [];
         if (missingSettings.length > 0) {
           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
             .map((s) => s.name)
@@ -475,7 +470,7 @@ Would you like to attempt to install via "git clone" instead?`,
       throw new Error('Extensions already loaded, only load extensions once.');
     }
 
-    if (this.settings.admin?.extensions?.enabled === false) {
+    if (this.settings.admin.extensions.enabled === false) {
       this.loadedExtensions = [];
       return this.loadedExtensions;
     }
@@ -550,7 +545,7 @@ Would you like to attempt to install via "git clone" instead?`,
     if (
       (installMetadata?.type === 'git' ||
         installMetadata?.type === 'github-release') &&
-      this.settings.security?.blockGitExtensions
+      this.settings.security.blockGitExtensions
     ) {
       return null;
     }
@@ -574,7 +569,7 @@ Would you like to attempt to install via "git clone" instead?`,
       let userSettings: Record<string, string> = {};
       let workspaceSettings: Record<string, string> = {};
 
-      if (this.settings.experimental?.extensionConfig ?? false) {
+      if (this.settings.experimental.extensionConfig) {
         userSettings = await getScopedEnvContents(
           config,
           extensionId,
@@ -592,10 +587,7 @@ Would you like to attempt to install via "git clone" instead?`,
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
-      if (
-        config.settings &&
-        (this.settings.experimental?.extensionConfig ?? false)
-      ) {
+      if (config.settings && this.settings.experimental.extensionConfig) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
           let scope: 'user' | 'workspace' | undefined;
@@ -639,7 +631,7 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        if (this.settings.admin?.mcp?.enabled === false) {
+        if (this.settings.admin.mcp.enabled === false) {
           config.mcpServers = undefined;
         } else {
           config.mcpServers = Object.fromEntries(
@@ -658,7 +650,7 @@ Would you like to attempt to install via "git clone" instead?`,
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (getEnableHooks(this.settings)) {
+      if (this.settings.tools.enableHooks && this.settings.hooks.enabled) {
         hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
           extensionPath: effectiveExtensionPath,
           workspacePath: this.workspaceDir,
