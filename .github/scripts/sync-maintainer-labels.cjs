@@ -23,7 +23,7 @@ const ROOT_ISSUES = [
   { owner: REPO_OWNER, repo: PUBLIC_REPO, number: 15324 },
 ];
 
-const TARGET_LABEL = '🔒 maintainer only';
+const TARGET_LABEL = 'workstream-rollup';
 const isDryRun =
   process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
 
