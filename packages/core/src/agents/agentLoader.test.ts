@@ -83,7 +83,7 @@ System prompt content.`);
         AgentLoadError,
       );
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        'Invalid markdown format',
+        'Missing mandatory YAML frontmatter',
       );
     });
 
@@ -245,10 +245,12 @@ Body`);
         },
         modelConfig: {
           model: 'inherit',
-          top_p: 0.95,
+          generateContentConfig: {
+            topP: 0.95,
+          },
         },
         runConfig: {
-          max_time_minutes: 5,
+          maxTimeMinutes: 5,
         },
         inputConfig: {
           inputs: {

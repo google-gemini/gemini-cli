@@ -137,20 +137,8 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
 }));
 vi.mock('../hooks/hookSystem.js');
 const mockHookSystem = {
-  fireBeforeAgentEvent: vi.fn().mockResolvedValue({
-    success: true,
-    finalOutput: undefined,
-    allOutputs: [],
-    errors: [],
-    totalDuration: 0,
-  }),
-  fireAfterAgentEvent: vi.fn().mockResolvedValue({
-    success: true,
-    finalOutput: undefined,
-    allOutputs: [],
-    errors: [],
-    totalDuration: 0,
-  }),
+  fireBeforeAgentEvent: vi.fn().mockResolvedValue(undefined),
+  fireAfterAgentEvent: vi.fn().mockResolvedValue(undefined),
 };
 
 /**
@@ -689,6 +677,34 @@ describe('Gemini Client (client.ts)', () => {
         type: GeminiEventType.ChatCompressed,
         value: compressionInfo,
       });
+    });
+
+    it('does not emit ModelInfo event if signal is aborted', async () => {
+      // Arrange
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        controller.signal,
+        'prompt-id-1',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).not.toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.ModelInfo,
+        }),
+      );
     });
 
     it.each([
@@ -2812,15 +2828,9 @@ ${JSON.stringify(
 
       it('should stop execution in BeforeAgent when hook returns continue: false', async () => {
         mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
-          success: true,
-          finalOutput: {
-            shouldStopExecution: () => true,
-            getEffectiveReason: () => 'Stopped by hook',
-            systemMessage: undefined,
-          },
-          allOutputs: [],
-          errors: [],
-          totalDuration: 0,
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped by hook',
+          systemMessage: undefined,
         });
 
         const mockChat: Partial<GeminiChat> = {
@@ -2851,16 +2861,10 @@ ${JSON.stringify(
 
       it('should block execution in BeforeAgent when hook returns decision: block', async () => {
         mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
-          success: true,
-          finalOutput: {
-            shouldStopExecution: () => false,
-            isBlockingDecision: () => true,
-            getEffectiveReason: () => 'Blocked by hook',
-            systemMessage: undefined,
-          },
-          allOutputs: [],
-          errors: [],
-          totalDuration: 0,
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => true,
+          getEffectiveReason: () => 'Blocked by hook',
+          systemMessage: undefined,
         });
 
         const mockChat: Partial<GeminiChat> = {
@@ -2890,15 +2894,9 @@ ${JSON.stringify(
 
       it('should stop execution in AfterAgent when hook returns continue: false', async () => {
         mockHookSystem.fireAfterAgentEvent.mockResolvedValue({
-          success: true,
-          finalOutput: {
-            shouldStopExecution: () => true,
-            getEffectiveReason: () => 'Stopped after agent',
-            systemMessage: undefined,
-          },
-          allOutputs: [],
-          errors: [],
-          totalDuration: 0,
+          shouldStopExecution: () => true,
+          getEffectiveReason: () => 'Stopped after agent',
+          systemMessage: undefined,
         });
 
         mockTurnRunFn.mockImplementation(async function* () {
@@ -2923,27 +2921,15 @@ ${JSON.stringify(
       it('should yield AgentExecutionBlocked and recurse in AfterAgent when hook returns decision: block', async () => {
         mockHookSystem.fireAfterAgentEvent
           .mockResolvedValueOnce({
-            success: true,
-            finalOutput: {
-              shouldStopExecution: () => false,
-              isBlockingDecision: () => true,
-              getEffectiveReason: () => 'Please explain',
-              systemMessage: undefined,
-            },
-            allOutputs: [],
-            errors: [],
-            totalDuration: 0,
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Please explain',
+            systemMessage: undefined,
           })
           .mockResolvedValueOnce({
-            success: true,
-            finalOutput: {
-              shouldStopExecution: () => false,
-              isBlockingDecision: () => false,
-              systemMessage: undefined,
-            },
-            allOutputs: [],
-            errors: [],
-            totalDuration: 0,
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            systemMessage: undefined,
           });
 
         mockTurnRunFn.mockImplementation(async function* () {

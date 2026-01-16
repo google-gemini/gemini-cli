@@ -69,7 +69,10 @@ import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type {
+  ModelConfig,
+  ModelConfigServiceConfig,
+} from '../services/modelConfigService.js';
 import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
@@ -101,6 +104,7 @@ import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
+import type { AgentDefinition } from '../agents/types.js';
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
@@ -158,6 +162,22 @@ export interface CliHelpAgentSettings {
   enabled?: boolean;
 }
 
+export interface AgentRunConfig {
+  maxTimeMinutes?: number;
+  maxTurns?: number;
+}
+
+export interface AgentOverride {
+  modelConfig?: ModelConfig;
+  runConfig?: AgentRunConfig;
+  disabled?: boolean;
+  enabled?: boolean;
+}
+
+export interface AgentSettings {
+  overrides?: Record<string, AgentOverride>;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -178,6 +198,7 @@ export interface GeminiCLIExtension {
   settings?: ExtensionSetting[];
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
+  agents?: AgentDefinition[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -290,6 +311,8 @@ export interface ConfigParameters {
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
     disableFuzzySearch?: boolean;
+    maxFileCount?: number;
+    searchTimeout?: number;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -357,12 +380,19 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
+  adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
-  onReload?: () => Promise<{ disabledSkills?: string[] }>;
+  agents?: AgentSettings;
+  onReload?: () => Promise<{
+    disabledSkills?: string[];
+    adminSkillsEnabled?: boolean;
+    agents?: AgentSettings;
+  }>;
 }
 
 export class Config {
@@ -414,6 +444,8 @@ export class Config {
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
     disableFuzzySearch: boolean;
+    maxFileCount: number;
+    searchTimeout: number;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -490,15 +522,22 @@ export class Config {
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
-    | (() => Promise<{ disabledSkills?: string[] }>)
+    | (() => Promise<{
+        disabledSkills?: string[];
+        adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
+      }>)
     | undefined;
 
   private readonly enableAgents: boolean;
+  private agents: AgentSettings;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
+  private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
@@ -559,6 +598,14 @@ export class Config {
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
+      maxFileCount:
+        params.fileFiltering?.maxFileCount ??
+        DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount ??
+        20000,
+      searchTimeout:
+        params.fileFiltering?.searchTimeout ??
+        DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
+        5000,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -568,9 +615,12 @@ export class Config {
     this.model = params.model;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.planEnabled = params.plan ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
+    this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
@@ -747,27 +797,31 @@ export class Config {
       this,
       this.eventEmitter,
     );
-    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    await Promise.all([
-      await this.mcpClientManager.startConfiguredMcpServers(),
-      await this.getExtensionLoader().start(this),
-    ]);
-    initMcpHandle?.end();
+    // We do not await this promise so that the CLI can start up even if
+    // MCP servers are slow to connect.
+    Promise.all([
+      this.mcpClientManager.startConfiguredMcpServers(),
+      this.getExtensionLoader().start(this),
+    ]).catch((error) => {
+      debugLogger.error('Error initializing MCP clients:', error);
+    });
 
-    // Discover skills if enabled
     if (this.skillsSupport) {
-      await this.getSkillManager().discoverSkills(
-        this.storage,
-        this.getExtensions(),
-      );
-      this.getSkillManager().setDisabledSkills(this.disabledSkills);
-
-      // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
-      if (this.getSkillManager().getSkills().length > 0) {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-        this.getToolRegistry().registerTool(
-          new ActivateSkillTool(this, this.messageBus),
+      this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
+      if (this.adminSkillsEnabled) {
+        await this.getSkillManager().discoverSkills(
+          this.storage,
+          this.getExtensions(),
         );
+        this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+        // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
+        if (this.getSkillManager().getSkills().length > 0) {
+          this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+          this.getToolRegistry().registerTool(
+            new ActivateSkillTool(this, this.messageBus),
+          );
+        }
       }
     }
 
@@ -1346,6 +1400,8 @@ export class Config {
     return {
       respectGitIgnore: this.fileFiltering.respectGitIgnore,
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+      maxFileCount: this.fileFiltering.maxFileCount,
+      searchTimeout: this.fileFiltering.searchTimeout,
     };
   }
 
@@ -1433,12 +1489,20 @@ export class Config {
     return this.disableLLMCorrection;
   }
 
+  isPlanEnabled(): boolean {
+    return this.planEnabled;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
 
   getNoBrowser(): boolean {
     return this.noBrowser;
+  }
+
+  getAgentsSettings(): AgentSettings {
+    return this.agents;
   }
 
   isBrowserLaunchSuppressed(): boolean {
@@ -1566,26 +1630,46 @@ export class Config {
     if (this.onReload) {
       const refreshed = await this.onReload();
       this.disabledSkills = refreshed.disabledSkills ?? [];
+      this.getSkillManager().setAdminSettings(
+        refreshed.adminSkillsEnabled ?? this.adminSkillsEnabled,
+      );
     }
 
-    await this.getSkillManager().discoverSkills(
-      this.storage,
-      this.getExtensions(),
-    );
-    this.getSkillManager().setDisabledSkills(this.disabledSkills);
-
-    // Re-register ActivateSkillTool to update its schema with the newly discovered skills
-    if (this.getSkillManager().getSkills().length > 0) {
-      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-      this.getToolRegistry().registerTool(
-        new ActivateSkillTool(this, this.messageBus),
+    if (this.getSkillManager().isAdminEnabled()) {
+      await this.getSkillManager().discoverSkills(
+        this.storage,
+        this.getExtensions(),
       );
+      this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+      // Re-register ActivateSkillTool to update its schema with the newly discovered skills
+      if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+        this.getToolRegistry().registerTool(
+          new ActivateSkillTool(this, this.messageBus),
+        );
+      } else {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+      }
     } else {
+      this.getSkillManager().clearSkills();
       this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
     }
 
     // Notify the client that system instructions might need updating
     await this.updateSystemInstructionIfInitialized();
+  }
+
+  /**
+   * Reloads agent settings.
+   */
+  async reloadAgents(): Promise<void> {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.agents) {
+        this.agents = refreshed.agents;
+      }
+    }
   }
 
   isInteractive(): boolean {

@@ -20,3 +20,4 @@ junit.xml
 .gemini-linters/
 Thumbs.db
 .pytest_cache
+**/SKILL.md
