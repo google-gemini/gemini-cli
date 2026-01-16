@@ -17,6 +17,7 @@ export interface ExpandablePromptProps {
   textColor?: string;
   isExpanded?: boolean;
   maxWidth?: number;
+  maxLines?: number;
 }
 
 const _ExpandablePrompt: React.FC<ExpandablePromptProps> = ({
@@ -26,6 +27,7 @@ const _ExpandablePrompt: React.FC<ExpandablePromptProps> = ({
   textColor = theme.text.primary,
   isExpanded = false,
   maxWidth = DEFAULT_MAX_WIDTH,
+  maxLines,
 }) => {
   const hasMatch =
     matchedIndex !== undefined &&
@@ -35,11 +37,27 @@ const _ExpandablePrompt: React.FC<ExpandablePromptProps> = ({
 
   // Render the plain label if there's no match
   if (!hasMatch) {
-    const display = isExpanded
-      ? label
-      : label.length > maxWidth
-        ? label.slice(0, maxWidth) + '...'
-        : label;
+    let display = label;
+
+    if (!isExpanded) {
+      if (maxLines !== undefined) {
+        const lines = label.split('\n');
+        // 1. Truncate by logical lines
+        let truncated = lines.slice(0, maxLines).join('\n');
+        const hasMoreLines = lines.length > maxLines;
+
+        // 2. Truncate by characters (visual approximation) to prevent massive wrapping
+        if (truncated.length > maxWidth) {
+          truncated = truncated.slice(0, maxWidth) + '...';
+        } else if (hasMoreLines) {
+          truncated += '...';
+        }
+        display = truncated;
+      } else if (label.length > maxWidth) {
+        display = label.slice(0, maxWidth) + '...';
+      }
+    }
+
     return (
       <Text wrap="wrap" color={textColor}>
         {display}

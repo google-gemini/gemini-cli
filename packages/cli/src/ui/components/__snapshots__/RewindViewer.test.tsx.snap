@@ -9,7 +9,7 @@ exports[`RewindViewer > Content Filtering > 'removes reference markers' 1`] = `
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -23,7 +23,7 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -73,7 +73,7 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -93,7 +93,7 @@ exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -113,7 +113,7 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -133,7 +133,7 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] =
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -147,7 +147,7 @@ exports[`RewindViewer > Rendering > renders 'a single interaction' 1`] = `
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -158,16 +158,11 @@ exports[`RewindViewer > Rendering > renders 'full text for selected item' 1`] = 
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
 │ ● 1                                                                                                                  │
-│   2                                                                                                                  │
-│   3                                                                                                                  │
-│   4                                                                                                                  │
-│   5                                                                                                                  │
-│   6                                                                                                                  │
-│   7                                                                                                                  │
+│   2...                                                                                                               │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -178,7 +173,7 @@ exports[`RewindViewer > Rendering > renders 'nothing interesting for empty conve
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -195,7 +190,7 @@ exports[`RewindViewer > updates content when conversation changes (background up
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -209,7 +204,7 @@ exports[`RewindViewer > updates content when conversation changes (background up
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -220,25 +215,15 @@ exports[`RewindViewer > updates selection and expansion on navigation > after-do
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
 │   Line 1                                                                                                             │
-│   Line 2                                                                                                             │
-│   Line 3                                                                                                             │
-│   Line 4                                                                                                             │
-│   Line 5                                                                                                             │
-│   Line 6                                                                                                             │
-│   Line 7                                                                                                             │
+│   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │ ● Line A                                                                                                             │
-│   Line B                                                                                                             │
-│   Line C                                                                                                             │
-│   Line D                                                                                                             │
-│   Line E                                                                                                             │
-│   Line F                                                                                                             │
-│   Line G                                                                                                             │
+│   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -249,25 +234,15 @@ exports[`RewindViewer > updates selection and expansion on navigation > initial-
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
 │ ● Line 1                                                                                                             │
-│   Line 2                                                                                                             │
-│   Line 3                                                                                                             │
-│   Line 4                                                                                                             │
-│   Line 5                                                                                                             │
-│   Line 6                                                                                                             │
-│   Line 7                                                                                                             │
+│   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Line A                                                                                                             │
-│   Line B                                                                                                             │
-│   Line C                                                                                                             │
-│   Line D                                                                                                             │
-│   Line E                                                                                                             │
-│   Line F                                                                                                             │
-│   Line G                                                                                                             │
+│   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │                                                                                                                      │
-│ (Use Enter to select a message, Esc to close)                                                                        │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
