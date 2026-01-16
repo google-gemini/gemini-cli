@@ -140,12 +140,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.sessionRetention.maxAge`** (string):
   - **Description:** Maximum age of sessions to keep (e.g., "30d", "7d", "24h",
     "1w")
-  - **Default:** `undefined`
+  - **Default:** `"30d"`
 
 - **`general.sessionRetention.maxCount`** (number):
   - **Description:** Alternative: Maximum number of sessions to keep (most
