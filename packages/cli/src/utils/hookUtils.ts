@@ -46,6 +46,11 @@ export function renderHookActionFeedback(
     ...result.alreadyInStateScopes,
   ];
 
+  if (totalAffectedScopes.length === 0) {
+    // This case should ideally not happen, but as a safeguard, return a generic message.
+    return `Hook "${hookName}" ${actionVerb}.`;
+  }
+
   if (totalAffectedScopes.length === 2) {
     const s1 = formatScopeItem(totalAffectedScopes[0]);
     const s2 = formatScopeItem(totalAffectedScopes[1]);
