@@ -149,8 +149,14 @@ export interface QuestionOption {
 export interface Question {
   question: string;
   header: string;
-  options: QuestionOption[];
-  multiSelect: boolean;
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input. Defaults to 'choice'. */
+  type?: 'choice' | 'text';
+  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  options?: QuestionOption[];
+  /** Allow multiple selections. Only applies to 'choice' type. */
+  multiSelect?: boolean;
+  /** Placeholder hint text for 'text' type input field. */
+  placeholder?: string;
 }
 
 export interface AskUserQuestionRequest {

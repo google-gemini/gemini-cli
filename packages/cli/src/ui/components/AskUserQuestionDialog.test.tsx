@@ -449,4 +449,263 @@ describe('AskUserQuestionDialog', () => {
     // Should submit with only the first answer
     expect(onSubmit).toHaveBeenCalledWith({ '0': 'Opt1' });
   });
+
+  // Text-type question tests
+  describe('Text type questions', () => {
+    it('renders text input for type: "text"', () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'What should we name this component?',
+          header: 'Name',
+          type: 'text',
+          placeholder: 'e.g., UserProfileCard',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('What should we name this component?');
+      expect(output).toContain('e.g., UserProfileCard');
+      // Should show the prompt indicator
+      expect(output).toContain('>');
+      // Should NOT show option selection UI (checkboxes, numbered options)
+      expect(output).not.toContain('[');
+      expect(output).not.toContain('1.');
+    });
+
+    it('handles text input and submission for text type', async () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter a name:',
+          header: 'Name',
+          type: 'text',
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Type text
+      for (const char of 'MyComponent') {
+        await writeKey(stdin, char, 10);
+      }
+
+      expect(lastFrame()).toContain('MyComponent');
+
+      // Press Enter to submit
+      await writeKey(stdin, '\r', 100);
+
+      expect(onSubmit).toHaveBeenCalledWith({ '0': 'MyComponent' });
+    });
+
+    it('shows default placeholder when none provided', () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter something:',
+          header: 'Input',
+          type: 'text',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      expect(lastFrame()).toContain('Enter your response');
+    });
+
+    it('supports backspace in text mode', async () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter name:',
+          header: 'Name',
+          type: 'text',
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Type "abc"
+      for (const char of 'abc') {
+        await writeKey(stdin, char, 10);
+      }
+      expect(lastFrame()).toContain('abc');
+
+      // Backspace
+      await writeKey(stdin, '\x7f'); // Backspace
+      expect(lastFrame()).toContain('ab');
+      expect(lastFrame()).not.toContain('abc');
+    });
+
+    it('shows correct keyboard hints for text type', () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter name:',
+          header: 'Name',
+          type: 'text',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('Enter to submit');
+      expect(output).toContain('Esc to cancel');
+      // Should NOT mention navigation since it's a single text question
+      expect(output).not.toContain('↑/↓');
+    });
+
+    it('preserves text answer when navigating between questions', async () => {
+      const mixedQuestions: Question[] = [
+        {
+          question: 'What name?',
+          header: 'Name',
+          type: 'text',
+        },
+        {
+          question: 'Which style?',
+          header: 'Style',
+          options: [
+            { label: 'Modern', description: 'Modern style' },
+            { label: 'Classic', description: 'Classic style' },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={mixedQuestions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Type in first question (text type)
+      for (const char of 'TestName') {
+        await writeKey(stdin, char, 10);
+      }
+
+      // Navigate to second question
+      await writeKey(stdin, '\x1b[C'); // Right arrow
+
+      // Should be on choice question
+      expect(lastFrame()).toContain('Which style?');
+
+      // Navigate back
+      await writeKey(stdin, '\x1b[D'); // Left arrow
+
+      // Answer should be preserved
+      expect(lastFrame()).toContain('TestName');
+    });
+
+    it('handles mixed text and choice questions', async () => {
+      const mixedQuestions: Question[] = [
+        {
+          question: 'What name?',
+          header: 'Name',
+          type: 'text',
+          placeholder: 'Enter name',
+        },
+        {
+          question: 'Which color?',
+          header: 'Color',
+          options: [
+            { label: 'Red', description: 'Red color' },
+            { label: 'Blue', description: 'Blue color' },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={mixedQuestions}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Type text answer
+      for (const char of 'MyName') {
+        await writeKey(stdin, char, 10);
+      }
+
+      // Press Enter to submit text and advance
+      await writeKey(stdin, '\r', 100);
+
+      // Should be on choice question
+      expect(lastFrame()).toContain('Which color?');
+
+      // Select first option
+      await writeKey(stdin, '\r', 100);
+
+      // Should be on Review tab
+      expect(lastFrame()).toContain('Review your answers:');
+      expect(lastFrame()).toContain('Name');
+      expect(lastFrame()).toContain('MyName');
+      expect(lastFrame()).toContain('Color');
+      expect(lastFrame()).toContain('Red');
+
+      // Submit from Review
+      await writeKey(stdin, '\r', 100);
+
+      expect(onSubmit).toHaveBeenCalledWith({ '0': 'MyName', '1': 'Red' });
+    });
+
+    it('does not submit empty text', async () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter name:',
+          header: 'Name',
+          type: 'text',
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin } = renderWithProviders(
+        <AskUserQuestionDialog
+          questions={textQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Press Enter without typing anything
+      await writeKey(stdin, '\r', 100);
+
+      // Should not have submitted
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
 });

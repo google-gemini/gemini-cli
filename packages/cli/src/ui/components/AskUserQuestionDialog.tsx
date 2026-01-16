@@ -25,16 +25,6 @@ interface AskUserQuestionDialogProps {
   onActiveTextInputChange?: (active: boolean) => void;
 }
 
-interface QuestionViewProps {
-  question: Question;
-  onAnswer: (answer: string) => void;
-  onSelectionChange?: (answer: string) => void;
-  onEditingOther?: (editing: boolean) => void;
-  initialAnswer?: string;
-  progressHeader?: React.ReactNode;
-  keyboardHints?: React.ReactNode;
-}
-
 interface QuestionProgressHeaderProps {
   questions: Question[];
   currentIndex: number;
@@ -157,15 +147,19 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   );
 };
 
-interface OptionItem {
-  key: string;
-  label: string;
-  description: string;
-  type: 'option' | 'other' | 'done';
-  index: number;
+// ============== Text Question View ==============
+
+interface TextQuestionViewProps {
+  question: Question;
+  onAnswer: (answer: string) => void;
+  onSelectionChange?: (answer: string) => void;
+  onEditingOther?: (editing: boolean) => void;
+  initialAnswer?: string;
+  progressHeader?: React.ReactNode;
+  keyboardHints?: React.ReactNode;
 }
 
-const QuestionView: React.FC<QuestionViewProps> = ({
+const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   question,
   onAnswer,
   onSelectionChange,
@@ -174,6 +168,131 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const [textValue, setTextValue] = useState(initialAnswer || '');
+
+  const handleTextTyping = useCallback(
+    (key: Key) => {
+      // Handle Ctrl+C to clear all text
+      if (key.ctrl && key.name === 'c') {
+        setTextValue('');
+        onSelectionChange?.('');
+        return;
+      }
+
+      // Handle backspace
+      if (key.name === 'backspace' || key.name === 'delete') {
+        const newText = textValue.slice(0, -1);
+        setTextValue(newText);
+        onSelectionChange?.(newText);
+        return;
+      }
+
+      // Handle Enter to submit
+      if (key.name === 'return') {
+        if (textValue.trim()) {
+          onAnswer(textValue.trim());
+        }
+        return;
+      }
+
+      // Handle printable characters
+      if (
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.ctrl &&
+        !key.meta &&
+        key.sequence.charCodeAt(0) >= 32
+      ) {
+        const newText = textValue + key.sequence;
+        setTextValue(newText);
+        onSelectionChange?.(newText);
+        onEditingOther?.(true);
+      }
+    },
+    [textValue, onAnswer, onSelectionChange, onEditingOther],
+  );
+
+  useKeypress(handleTextTyping, { isActive: true });
+
+  // Notify parent that we're in text input mode (for Ctrl+C handling)
+  useEffect(() => {
+    onEditingOther?.(true);
+    return () => {
+      onEditingOther?.(false);
+    };
+  }, [onEditingOther]);
+
+  const placeholder = question.placeholder || 'Enter your response';
+  const showPlaceholder = !textValue;
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      paddingX={1}
+      borderColor={theme.border.default}
+    >
+      {progressHeader}
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.primary}>
+          {question.question}
+        </Text>
+      </Box>
+
+      <Box flexDirection="row" marginBottom={1}>
+        <Text color={theme.text.accent}>{'> '}</Text>
+        {showPlaceholder ? (
+          <Text color={theme.text.secondary} italic>
+            <Text color={theme.text.accent}>{'|'}</Text>
+            {placeholder}
+          </Text>
+        ) : (
+          <Text color={theme.text.primary}>
+            {textValue}
+            <Text color={theme.text.accent}>{'|'}</Text>
+          </Text>
+        )}
+      </Box>
+
+      {keyboardHints}
+    </Box>
+  );
+};
+
+// ============== Choice Question View ==============
+
+interface OptionItem {
+  key: string;
+  label: string;
+  description: string;
+  type: 'option' | 'other' | 'done';
+  index: number;
+}
+
+interface ChoiceQuestionViewProps {
+  question: Question;
+  onAnswer: (answer: string) => void;
+  onSelectionChange?: (answer: string) => void;
+  onEditingOther?: (editing: boolean) => void;
+  initialAnswer?: string;
+  progressHeader?: React.ReactNode;
+  keyboardHints?: React.ReactNode;
+}
+
+const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
+  question,
+  onAnswer,
+  onSelectionChange,
+  onEditingOther,
+  initialAnswer,
+  progressHeader,
+  keyboardHints,
+}) => {
+  const questionOptions = useMemo(
+    () => question.options ?? [],
+    [question.options],
+  );
+
   // Initialize state from initialAnswer if returning to a previously answered question
   const initialState = useMemo(() => {
     if (!initialAnswer) {
@@ -192,7 +311,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
     if (question.multiSelect) {
       const answers = initialAnswer.split(', ');
       answers.forEach((answer) => {
-        const index = question.options.findIndex((opt) => opt.label === answer);
+        const index = questionOptions.findIndex((opt) => opt.label === answer);
         if (index !== -1) {
           selectedIndices.add(index);
         } else {
@@ -201,7 +320,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         }
       });
     } else {
-      const index = question.options.findIndex(
+      const index = questionOptions.findIndex(
         (opt) => opt.label === initialAnswer,
       );
       if (index !== -1) {
@@ -213,7 +332,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
     }
 
     return { selectedIndices, otherText, isOtherSelected };
-  }, [initialAnswer, question.options, question.multiSelect]);
+  }, [initialAnswer, questionOptions, question.multiSelect]);
 
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     initialState.selectedIndices,
@@ -228,7 +347,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   const buildAnswerString = useCallback(
     (indices: Set<number>, includeOther: boolean, other: string) => {
       const answers: string[] = [];
-      question.options.forEach((opt, i) => {
+      questionOptions.forEach((opt, i) => {
         if (indices.has(i)) {
           answers.push(opt.label);
         }
@@ -238,7 +357,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
       }
       return answers.join(', ');
     },
-    [question.options],
+    [questionOptions],
   );
 
   // Handle inline typing when "Other" is focused
@@ -309,8 +428,8 @@ const QuestionView: React.FC<QuestionViewProps> = ({
 
   useKeypress(handleOtherTyping, { isActive: isOtherFocused });
 
-  const options = useMemo((): Array<SelectionListItem<OptionItem>> => {
-    const list: Array<SelectionListItem<OptionItem>> = question.options.map(
+  const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
+    const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(
       (opt, i) => {
         const item: OptionItem = {
           key: `opt-${i}`,
@@ -344,7 +463,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
     }
 
     return list;
-  }, [question, otherText]);
+  }, [questionOptions, question.multiSelect, otherText]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
@@ -395,6 +514,8 @@ const QuestionView: React.FC<QuestionViewProps> = ({
         } else if (itemValue.type === 'other') {
           // Submit the other text if it has content
           if (otherText.trim()) {
+            // Reset editing state before submitting so navigation works on next question
+            onEditingOther?.(false);
             onAnswer(otherText.trim());
           }
         }
@@ -406,6 +527,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
       isOtherSelected,
       otherText,
       onAnswer,
+      onEditingOther,
       onSelectionChange,
       buildAnswerString,
     ],
@@ -432,7 +554,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
       )}
 
       <BaseSelectionList<OptionItem>
-        items={options}
+        items={selectionItems}
         onSelect={handleSelect}
         onHighlight={handleHighlight}
         selectedColor={theme.text.accent}
@@ -582,7 +704,12 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
   // Bidirectional navigation between questions using custom useKeypress for consistency
   const handleNavigation = useCallback(
     (key: Key) => {
-      if (editingOther || submittedRef.current) return;
+      // Allow navigation for text-type questions even when "editing"
+      // (editingOther blocks navigation for choice-type "Other" field, not text-type questions)
+      const currentQuestionIsText =
+        questions[currentQuestionIndex]?.type === 'text';
+      if ((editingOther && !currentQuestionIsText) || submittedRef.current)
+        return;
 
       if (key.name === 'tab' || key.name === 'right') {
         // Allow navigation up to Review tab for multi-question flows
@@ -597,7 +724,7 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
         }
       }
     },
-    [editingOther, currentQuestionIndex, questions.length, reviewTabIndex],
+    [editingOther, currentQuestionIndex, questions, reviewTabIndex],
   );
 
   useKeypress(handleNavigation, {
@@ -696,15 +823,35 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
   const keyboardHints = (
     <Box marginTop={1}>
       <Text color={theme.text.secondary}>
-        {questions.length > 1
-          ? 'Enter to select · ←/→ to switch questions · Esc to cancel'
-          : 'Enter to select · ↑/↓ to navigate · Esc to cancel'}
+        {currentQuestion.type === 'text'
+          ? questions.length > 1
+            ? 'Enter to submit · ←/→ to switch questions · Esc to cancel'
+            : 'Enter to submit · Esc to cancel'
+          : questions.length > 1
+            ? 'Enter to select · ←/→ to switch questions · Esc to cancel'
+            : 'Enter to select · ↑/↓ to navigate · Esc to cancel'}
       </Text>
     </Box>
   );
 
+  // Render text-type or choice-type question view
+  if (currentQuestion.type === 'text') {
+    return (
+      <TextQuestionView
+        key={currentQuestionIndex}
+        question={currentQuestion}
+        onAnswer={handleAnswer}
+        onSelectionChange={handleSelectionChange}
+        onEditingOther={setEditingOther}
+        initialAnswer={answers[currentQuestionIndex]}
+        progressHeader={progressHeader}
+        keyboardHints={keyboardHints}
+      />
+    );
+  }
+
   return (
-    <QuestionView
+    <ChoiceQuestionView
       key={currentQuestionIndex}
       question={currentQuestion}
       onAnswer={handleAnswer}

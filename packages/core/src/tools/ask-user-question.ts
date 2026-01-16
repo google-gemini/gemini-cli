@@ -45,12 +45,12 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
             maxItems: 4,
             items: {
               type: 'object',
-              required: ['question', 'header', 'options', 'multiSelect'],
+              required: ['question', 'header'],
               properties: {
                 question: {
                   type: 'string',
                   description:
-                    'The complete question to ask the user. Should be clear, specific, and end with a question mark. Example: "Which library should we use for date formatting?" If multiSelect is true, phrase it accordingly, e.g. "Which features do you want to enable?"',
+                    'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
                 },
                 header: {
                   type: 'string',
@@ -58,10 +58,16 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
                   description:
                     'Very short label displayed as a chip/tag (max 12 chars). Examples: "Auth method", "Library", "Approach".',
                 },
+                type: {
+                  type: 'string',
+                  enum: ['choice', 'text'],
+                  description:
+                    "Question type. 'choice' (default) shows selectable options, 'text' shows a free-form text input.",
+                },
                 options: {
                   type: 'array',
                   description:
-                    'The available choices for this question. MUST have exactly 2-4 options (no more, no less). If you have more than 4 choices, consolidate them or split into multiple questions. Do NOT include an "Other" option - one is automatically added by the UI.',
+                    "Required for 'choice' type. The available choices (2-4 options). Do NOT include an 'Other' option - one is automatically added.",
                   minItems: 2,
                   maxItems: 4,
                   items: {
@@ -84,7 +90,12 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
                 multiSelect: {
                   type: 'boolean',
                   description:
-                    'Set to true to allow the user to select multiple options instead of just one. Use when choices are not mutually exclusive.',
+                    "Only applies to 'choice' type. Set to true to allow multiple selections.",
+                },
+                placeholder: {
+                  type: 'string',
+                  description:
+                    "Optional hint text for 'text' type input field.",
                 },
               },
             },
