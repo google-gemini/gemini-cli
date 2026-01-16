@@ -271,6 +271,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.accessibility.disableSpinner`** (boolean):
+  - **Description:** Disable the loading spinner to reduce UI updates.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.accessibility.screenReader`** (boolean):
   - **Description:** Render output in plain-text to be more screen reader
     accessible

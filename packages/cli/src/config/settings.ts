@@ -149,6 +149,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+  disableSpinner?: boolean;
   screenReader?: boolean;
 }
 
