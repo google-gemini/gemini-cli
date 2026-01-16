@@ -63,29 +63,6 @@ export enum Command {
   EXPAND_SUGGESTION = 'suggest.expand',
   COLLAPSE_SUGGESTION = 'suggest.collapse',
 
-  // App level bindings
-  RESTART_APP = 'restartApp',
-  SHOW_ERROR_DETAILS = 'showErrorDetails',
-  SHOW_FULL_TODOS = 'showFullTodos',
-  SHOW_IDE_CONTEXT_DETAIL = 'showIDEContextDetail',
-  TOGGLE_MARKDOWN = 'toggleMarkdown',
-  TOGGLE_COPY_MODE = 'toggleCopyMode',
-  TOGGLE_YOLO = 'toggleYolo',
-  TOGGLE_AUTO_EDIT = 'toggleAutoEdit',
-  UNDO = 'undo',
-  REDO = 'redo',
-  MOVE_UP = 'moveUp',
-  MOVE_DOWN = 'moveDown',
-  MOVE_LEFT = 'moveLeft',
-  MOVE_RIGHT = 'moveRight',
-  MOVE_WORD_LEFT = 'moveWordLeft',
-  MOVE_WORD_RIGHT = 'moveWordRight',
-  DELETE_CHAR_LEFT = 'deleteCharLeft',
-  DELETE_CHAR_RIGHT = 'deleteCharRight',
-  DELETE_WORD_FORWARD = 'deleteWordForward',
-  QUIT = 'quit',
-  EXIT = 'exit',
-  SHOW_MORE_LINES = 'showMoreLines',
   // Text Input
   SUBMIT = 'input.submit',
   NEWLINE = 'input.newline',
@@ -104,6 +81,7 @@ export enum Command {
   FOCUS_SHELL_INPUT = 'app.focusShellInput',
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
+  RESTART_APP = 'app.restart',
 }
 
 /**
@@ -249,8 +227,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'v', command: true },
   ],
 
-  // App level bindings
-  [Command.RESTART_APP]: [{ key: 'r' }],
   // App Controls
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
@@ -263,6 +239,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
+  [Command.RESTART_APP]: [{ key: 'r' }],
 };
 
 interface CommandCategory {
@@ -357,7 +334,6 @@ export const commandCategories: readonly CommandCategory[] = [
   {
     title: 'App Controls',
     commands: [
-      Command.RESTART_APP,
       Command.SHOW_ERROR_DETAILS,
       Command.SHOW_FULL_TODOS,
       Command.SHOW_IDE_CONTEXT_DETAIL,
@@ -369,6 +345,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
+      Command.RESTART_APP,
     ],
   },
 ];
@@ -450,14 +427,9 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
   [Command.SHOW_MORE_LINES]:
-    'Expand a height-constrained response to show additional lines.',
-  [Command.RESTART_APP]: 'Restart the application.',
-  [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
-  [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
-    'Accept a suggestion while reverse searching.',
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.RESTART_APP]: 'Restart the application.',
 };

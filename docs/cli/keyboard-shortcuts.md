@@ -93,26 +93,6 @@ available combinations.
 
 #### App Controls
 
-| Action                                                            | Keys             |
-| ----------------------------------------------------------------- | ---------------- |
-| Restart the application.                                          | `R`              |
-| Toggle detailed error information.                                | `F12`            |
-| Toggle the full TODO list.                                        | `Ctrl + T`       |
-| Show IDE context details.                                         | `Ctrl + G`       |
-| Toggle Markdown rendering.                                        | `Cmd + M`        |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
-| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
-| Focus the Gemini input from the shell input.                      | `Tab`            |
-
-#### Session Control
-
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Cancel the current request or quit the CLI.  | `Ctrl + C` |
-| Exit the CLI when the input buffer is empty. | `Ctrl + D` |
 | Action                                                                                           | Keys             |
 | ------------------------------------------------------------------------------------------------ | ---------------- |
 | Toggle detailed error information.                                                               | `F12`            |
@@ -126,6 +106,7 @@ available combinations.
 | Focus the shell input from the gemini input.                                                     | `Tab (no Shift)` |
 | Focus the Gemini input from the shell input.                                                     | `Tab`            |
 | Clear the terminal screen and redraw the UI.                                                     | `Ctrl + L`       |
+| Restart the application.                                                                         | `R`              |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
