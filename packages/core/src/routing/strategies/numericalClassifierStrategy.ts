@@ -15,7 +15,6 @@ import type {
 import { resolveClassifierModel } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
-import { ExperimentFlags } from '../../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 // The number of recent history turns to provide to the router for context.
@@ -135,6 +134,10 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
       const promptId = getPromptIdWithFallback('classifier-router');
 
       const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
@@ -154,26 +157,24 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         return part;
       });
 
-      const [jsonResponse, experiments] = await Promise.all([
-        baseLlmClient.generateJson({
-          modelConfigKey: { model: 'classifier' },
-          contents: [...finalHistory, createUserContent(sanitizedRequest)],
-          schema: RESPONSE_SCHEMA,
-          systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-          abortSignal: context.signal,
-          promptId,
-        }),
-        config.getExperimentsAsync(),
-      ]);
+      const jsonResponse = await baseLlmClient.generateJson({
+        modelConfigKey: { model: 'classifier' },
+        contents: [...finalHistory, createUserContent(sanitizedRequest)],
+        schema: RESPONSE_SCHEMA,
+        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+        abortSignal: context.signal,
+        promptId,
+      });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
       const score = routerResponse.complexity_score;
 
-      const { threshold, groupLabel, modelAlias } = this.getRoutingDecision(
-        score,
-        experiments,
-        config.getSessionId() || 'unknown-session',
-      );
+      const { threshold, groupLabel, modelAlias } =
+        await this.getRoutingDecision(
+          score,
+          config,
+          config.getSessionId() || 'unknown-session',
+        );
 
       const selectedModel = resolveClassifierModel(
         config.getModel(),
@@ -197,23 +198,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     }
   }
 
-  private getRoutingDecision(
+  private async getRoutingDecision(
     score: number,
-    experiments: Awaited<ReturnType<Config['getExperimentsAsync']>> | undefined,
+    config: Config,
     sessionId: string,
-  ): {
+  ): Promise<{
     threshold: number;
     groupLabel: string;
     modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
-  } {
+  }> {
     let threshold: number;
     let groupLabel: string;
 
-    const remoteThresholdFlag =
-      experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-    const remoteThresholdValue = remoteThresholdFlag?.intValue
-      ? parseInt(remoteThresholdFlag.intValue, 10)
-      : remoteThresholdFlag?.floatValue;
+    const remoteThresholdValue = await config.getClassifierThreshold();
 
     if (
       remoteThresholdValue !== undefined &&

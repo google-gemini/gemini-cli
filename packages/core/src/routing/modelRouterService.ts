@@ -8,7 +8,6 @@ import type { Config } from '../config/config.js';
 import type {
   RoutingContext,
   RoutingDecision,
-  RoutingStrategy,
   TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
@@ -20,30 +19,7 @@ import { OverrideStrategy } from './strategies/overrideStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
-import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-class DynamicClassifierStrategy implements RoutingStrategy {
-  readonly name = 'dynamic_classifier';
-  private readonly oldStrategy = new ClassifierStrategy();
-  private readonly newStrategy = new NumericalClassifierStrategy();
-
-  async route(
-    context: RoutingContext,
-    config: Config,
-    client: BaseLlmClient,
-  ): Promise<RoutingDecision | null> {
-    const experiments = await config.getExperimentsAsync();
-    const useNumerical =
-      experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]?.boolValue;
-
-    if (useNumerical) {
-      return this.newStrategy.route(context, config, client);
-    }
-    return this.oldStrategy.route(context, config, client);
-  }
-}
 
 /**
  * A centralized service for making model routing decisions.
@@ -64,7 +40,8 @@ export class ModelRouterService {
       [
         new FallbackStrategy(),
         new OverrideStrategy(),
-        new DynamicClassifierStrategy(),
+        new ClassifierStrategy(),
+        new NumericalClassifierStrategy(),
         new DefaultStrategy(),
       ],
       'agent-router',
@@ -81,19 +58,15 @@ export class ModelRouterService {
     const startTime = Date.now();
     let decision: RoutingDecision;
 
-    const experiments = this.config.getExperiments();
-    const enableNumericalRouting =
-      experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]?.boolValue;
-    const thresholdFlag =
-      experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-    let classifierThreshold: string | undefined;
-    if (thresholdFlag) {
-      classifierThreshold =
-        thresholdFlag.intValue ??
-        (thresholdFlag.floatValue !== undefined
-          ? String(thresholdFlag.floatValue)
-          : undefined);
-    }
+    const [enableNumericalRouting, thresholdValue] = await Promise.all([
+      this.config.getNumericalRoutingEnabled(),
+      this.config.getClassifierThreshold(),
+    ]);
+    const classifierThreshold =
+      thresholdValue !== undefined ? String(thresholdValue) : undefined;
+
+    let failed = false;
+    let error_message: string | undefined;
 
     try {
       decision = await this.strategy.route(
@@ -102,27 +75,12 @@ export class ModelRouterService {
         this.config.getBaseLlmClient(),
       );
 
-      const event = new ModelRoutingEvent(
-        decision.model,
-        decision.metadata.source,
-        decision.metadata.latencyMs,
-        decision.metadata.reasoning,
-        false, // failed
-        undefined, // error_message
-        enableNumericalRouting,
-        classifierThreshold,
-      );
-      logModelRouting(this.config, event);
-
       debugLogger.debug(
-        `[Routing] Selected model: ${decision.model} (Source: ${decision.metadata.source}, Latency: ${decision.metadata.latencyMs}ms)`,
+        `[Routing] Selected model: ${decision.model} (Source: ${decision.metadata.source}, Latency: ${decision.metadata.latencyMs}ms)\n\t[Routing] Reasoning: ${decision.metadata.reasoning}`,
       );
-      debugLogger.debug(`[Routing] Reasoning: ${decision.metadata.reasoning}`);
-
-      return decision;
     } catch (e) {
-      const failed = true;
-      const error_message = e instanceof Error ? e.message : String(e);
+      failed = true;
+      error_message = e instanceof Error ? e.message : String(e);
       // Create a fallback decision for logging purposes
       // We do not actually route here. This should never happen so we should
       // fail loudly to catch any issues where this happens.
@@ -136,25 +94,23 @@ export class ModelRouterService {
         },
       };
 
+      debugLogger.debug(
+        `[Routing] Exception during routing: ${error_message}\n\tFallback model: ${decision.model} (Source: ${decision.metadata.source})`,
+      );
+    } finally {
       const event = new ModelRoutingEvent(
-        decision.model,
-        decision.metadata.source,
-        decision.metadata.latencyMs,
-        decision.metadata.reasoning,
+        decision!.model,
+        decision!.metadata.source,
+        decision!.metadata.latencyMs,
+        decision!.metadata.reasoning,
         failed,
         error_message,
         enableNumericalRouting,
         classifierThreshold,
       );
-
       logModelRouting(this.config, event);
-
-      debugLogger.debug(`[Routing] Exception during routing: ${error_message}`);
-      debugLogger.debug(
-        `[Routing] Fallback model: ${decision.model} (Source: ${decision.metadata.source})`,
-      );
-
-      return decision;
     }
+
+    return decision;
   }
 }

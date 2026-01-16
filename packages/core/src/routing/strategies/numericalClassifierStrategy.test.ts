@@ -18,7 +18,6 @@ import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { ExperimentFlags } from '../../code_assist/experiments/flagNames.js';
 
 vi.mock('../../core/baseLlmClient.js');
 
@@ -50,9 +49,8 @@ describe('NumericalClassifierStrategy', () => {
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       getPreviewFeatures: () => false,
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
-      getExperimentsAsync: vi
-        .fn()
-        .mockResolvedValue({ flags: {}, experimentIds: [] }),
+      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
+      getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
@@ -63,6 +61,19 @@ describe('NumericalClassifierStrategy', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('should return null if numerical routing is disabled', async () => {
+    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(false);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters and wrapped user content', async () => {
@@ -199,15 +210,7 @@ describe('NumericalClassifierStrategy', () => {
 
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            intValue: '70',
-          },
-        },
-        experimentIds: [],
-      });
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(70);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 60,
@@ -233,15 +236,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use the remote CLASSIFIER_THRESHOLD if provided (float value)', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            floatValue: 45.5,
-          },
-        },
-        experimentIds: [],
-      });
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(45.5);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 40,
@@ -267,15 +262,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should use PRO model if score >= remote CLASSIFIER_THRESHOLD', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            intValue: '30',
-          },
-        },
-        experimentIds: [],
-      });
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(30);
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 35,
@@ -301,11 +288,8 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should fall back to A/B testing if CLASSIFIER_THRESHOLD is not present in experiments', async () => {
-      // Mock getExperimentsAsync to return no CLASSIFIER_THRESHOLD flag
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {},
-        experimentIds: [],
-      });
+      // Mock getClassifierThreshold to return undefined
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(undefined);
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Should resolve to Control (50)
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
@@ -331,51 +315,8 @@ describe('NumericalClassifierStrategy', () => {
       });
     });
 
-    it('should fall back to A/B testing if CLASSIFIER_THRESHOLD is malformed', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            stringValue: 'not-a-number', // Malformed value
-          },
-        },
-        experimentIds: [],
-      });
-      vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // Should resolve to Strict (80)
-      const mockApiResponse = {
-        complexity_reasoning: 'Test task',
-        complexity_score: 70,
-      };
-      vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-        mockApiResponse,
-      );
-
-      const decision = await strategy.route(
-        mockContext,
-        mockConfig,
-        mockBaseLlmClient,
-      );
-
-      expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 70 < Default A/B Threshold 80
-        metadata: {
-          source: 'Classifier (Strict)',
-          latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 70 / Threshold: 80'),
-        },
-      });
-    });
-
     it('should fall back to A/B testing if CLASSIFIER_THRESHOLD is out of range (less than 0)', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            intValue: '-10',
-          },
-        },
-        experimentIds: [],
-      });
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(-10);
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
@@ -402,15 +343,7 @@ describe('NumericalClassifierStrategy', () => {
     });
 
     it('should fall back to A/B testing if CLASSIFIER_THRESHOLD is out of range (greater than 100)', async () => {
-      vi.mocked(mockConfig.getExperimentsAsync).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
-            flagId: ExperimentFlags.CLASSIFIER_THRESHOLD,
-            intValue: '110',
-          },
-        },
-        experimentIds: [],
-      });
+      vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(110);
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
         complexity_reasoning: 'Test task',

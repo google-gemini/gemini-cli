@@ -133,6 +133,10 @@ export class ClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      if (await config.getNumericalRoutingEnabled()) {
+        return null;
+      }
+
       const promptId = getPromptIdWithFallback('classifier-router');
 
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
