@@ -139,22 +139,17 @@ function isContributingPart(part: Part): boolean {
 }
 
 function isValidContent(content: Content): boolean {
-  if (content.parts === undefined || content.parts.length === 0) {
+  if (!content.parts || content.parts.length === 0) {
     return false;
   }
-  // A turn is valid if it contains at least one part that is contributing.
-  // This ensures turns with tool calls are preserved even if they
-  // contain empty text parts.
-  let hasContributingPart = false;
-  for (const part of content.parts) {
-    if (!part || Object.keys(part).length === 0) {
-      return false;
-    }
-    if (isContributingPart(part)) {
-      hasContributingPart = true;
-    }
+
+  // A turn is invalid if any part is malformed (null, undefined, or empty object).
+  if (content.parts.some((part) => !part || Object.keys(part).length === 0)) {
+    return false;
   }
-  return hasContributingPart;
+
+  // A turn is valid if it contains at least one part that is contributing.
+  return content.parts.some(isContributingPart);
 }
 
 /**
