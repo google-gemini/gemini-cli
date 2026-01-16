@@ -82,6 +82,7 @@ export function resolvePathFromEnv(envVar?: string): {
 export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
+  interactiveOverride?: boolean,
 ): string {
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
@@ -130,7 +131,7 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
-  const interactiveMode = config.isInteractive();
+  const interactiveMode = interactiveOverride ?? config.isInteractive();
 
   const skills = config.getSkillManager().getSkills();
   let skillsPrompt = '';
