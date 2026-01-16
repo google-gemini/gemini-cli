@@ -20,7 +20,8 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
-  saveTruncatedContent: vi.fn(),
+  saveTruncatedToolOutput: vi.fn(),
+  formatTruncatedToolOutput: vi.fn(),
 }));
 
 // Mock executeToolWithHooks
@@ -40,12 +41,13 @@ describe('ToolExecutor', () => {
     // Reset mocks
     vi.resetAllMocks();
 
-    // Default mock implementation for saveTruncatedContent
-    vi.mocked(fileUtils.saveTruncatedContent).mockImplementation(
-      async (_content, _callId, _tempDir, _threshold, _lines) => ({
-        content: 'TruncatedContent...',
-        outputFile: '/tmp/truncated_output.txt',
-      }),
+    // Default mock implementation
+    vi.mocked(fileUtils.saveTruncatedToolOutput).mockResolvedValue({
+      outputFile: '/tmp/truncated_output.txt',
+      totalLines: 100,
+    });
+    vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
+      'TruncatedContent...',
     );
   });
 
@@ -214,11 +216,16 @@ describe('ToolExecutor', () => {
     });
 
     // 4. Verify Truncation Logic
-    expect(fileUtils.saveTruncatedContent).toHaveBeenCalledWith(
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
       longOutput,
+      SHELL_TOOL_NAME,
       'call-trunc',
       expect.any(String), // temp dir
-      10, // threshold
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      '/tmp/truncated_output.txt',
       5, // lines
     );
 
@@ -226,7 +233,7 @@ describe('ToolExecutor', () => {
     if (result.status === 'success') {
       const response = result.response.responseParts[0]?.functionResponse
         ?.response as Record<string, unknown>;
-      // The content should be the *truncated* version returned by the mock saveTruncatedContent
+      // The content should be the *truncated* version returned by the mock formatTruncatedToolOutput
       expect(response).toEqual({ output: 'TruncatedContent...' });
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
     }
