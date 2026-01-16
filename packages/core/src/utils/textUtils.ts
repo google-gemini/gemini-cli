@@ -53,3 +53,21 @@ export function isBinary(
   // If no NULL bytes were found in the sample, we assume it's text.
   return false;
 }
+
+/**
+ * Truncates a string to a maximum length, appending a suffix if truncated.
+ * @param str The string to truncate.
+ * @param maxLength The maximum length of the string.
+ * @param suffix The suffix to append if truncated (default: '...[TRUNCATED]').
+ * @returns The truncated string.
+ */
+export function truncateString(
+  str: string,
+  maxLength: number,
+  suffix = '...[TRUNCATED]',
+): string {
+  if (str.length <= maxLength) {
+    return str;
+  }
+  return str.slice(0, maxLength) + suffix;
+}
