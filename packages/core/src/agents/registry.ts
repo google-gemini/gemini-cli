@@ -26,6 +26,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -428,7 +429,7 @@ export class AgentRegistry {
     context += `Sub-agents are specialized expert agents that you can use to assist you in
       the completion of all or part of a task.
 
-      ALWAYS use \`delegate_to_agent\` to delegate to a subagent if one
+      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
       exists that has expertise relevant to your task.
 
       For example:
