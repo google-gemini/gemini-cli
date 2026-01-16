@@ -65,6 +65,14 @@ export async function runExitCleanup() {
   }
   cleanupFunctions.length = 0; // Clear the array
 
+  if (configForTelemetry) {
+    try {
+      await configForTelemetry.dispose();
+    } catch (_) {
+      // Ignore errors during disposal
+    }
+  }
+
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed
   if (configForTelemetry && isTelemetrySdkInitialized()) {

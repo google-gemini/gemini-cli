@@ -155,7 +155,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
@@ -164,7 +163,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
     expect(mockBuffer.text).toBe('a');
   });
@@ -182,7 +180,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
@@ -191,7 +188,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
     expect(mockBuffer.text).toBe('tes');
   });
@@ -209,7 +205,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     // Cursor moves from end to before 't'
@@ -230,7 +225,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     expect(mockBuffer.visualCursor[1]).toBe(3);
@@ -249,7 +243,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
 
     expect(onSubmit).toHaveBeenCalledWith('test');
@@ -268,7 +261,6 @@ describe('TextInput', () => {
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
     });
     await vi.runAllTimersAsync();
 

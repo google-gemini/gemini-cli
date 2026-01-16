@@ -6,11 +6,12 @@
 
 import { Storage } from '../config/storage.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import type { Config } from '../config/config.js';
-import type { AgentDefinition } from './types.js';
-import { loadAgentsFromDirectory } from './toml-loader.js';
+import type { AgentOverride, Config } from '../config/config.js';
+import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { GeneralistAgent } from './generalist-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
@@ -22,6 +23,11 @@ import {
   isPreviewModel,
   isAutoModel,
 } from '../config/models.js';
+import {
+  type ModelConfig,
+  ModelConfigService,
+} from '../services/modelConfigService.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -46,26 +52,36 @@ export class AgentRegistry {
    * Discovers and loads agents.
    */
   async initialize(): Promise<void> {
-    coreEvents.on(CoreEvent.ModelChanged, () => {
-      this.refreshAgents().catch((e) => {
-        debugLogger.error(
-          '[AgentRegistry] Failed to refresh agents on model change:',
-          e,
-        );
-      });
-    });
+    coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
   }
+
+  private onModelChanged = () => {
+    this.refreshAgents().catch((e) => {
+      debugLogger.error(
+        '[AgentRegistry] Failed to refresh agents on model change:',
+        e,
+      );
+    });
+  };
 
   /**
    * Clears the current registry and re-scans for agents.
    */
   async reload(): Promise<void> {
     A2AClientManager.getInstance().clearCache();
+    await this.config.reloadAgents();
     this.agents.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
+  }
+
+  /**
+   * Disposes of resources and removes event listeners.
+   */
+  dispose(): void {
+    coreEvents.off(CoreEvent.ModelChanged, this.onModelChanged);
   }
 
   private async loadAgents(): Promise<void> {
@@ -111,6 +127,15 @@ export class AgentRegistry {
       );
     }
 
+    // Load agents from extensions
+    for (const extension of this.config.getExtensions()) {
+      if (extension.isActive && extension.agents) {
+        await Promise.allSettled(
+          extension.agents.map((agent) => this.registerAgent(agent)),
+        );
+      }
+    }
+
     if (this.config.getDebugMode()) {
       debugLogger.log(
         `[AgentRegistry] Loaded with ${this.agents.size} agents.`,
@@ -121,9 +146,14 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
     const cliHelpSettings = this.config.getCliHelpAgentSettings();
+    const agentsSettings = this.config.getAgentsSettings();
+    const agentsOverrides = agentsSettings.overrides ?? {};
 
-    // Only register the agent if it's enabled in the settings.
-    if (investigatorSettings?.enabled) {
+    // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
+    if (
+      investigatorSettings?.enabled &&
+      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
+    ) {
       let model;
       const settingsModel = investigatorSettings.model;
       // Check if the user explicitly set a model in the settings.
@@ -142,27 +172,41 @@ export class AgentRegistry {
         modelConfig: {
           ...CodebaseInvestigatorAgent.modelConfig,
           model,
-          thinkingBudget:
-            investigatorSettings.thinkingBudget ??
-            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+          generateContentConfig: {
+            ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig,
+            thinkingConfig: {
+              ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig
+                ?.thinkingConfig,
+              thinkingBudget:
+                investigatorSettings.thinkingBudget ??
+                CodebaseInvestigatorAgent.modelConfig.generateContentConfig
+                  ?.thinkingConfig?.thinkingBudget,
+            },
+          },
         },
         runConfig: {
           ...CodebaseInvestigatorAgent.runConfig,
-          max_time_minutes:
+          maxTimeMinutes:
             investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
-          max_turns:
+            CodebaseInvestigatorAgent.runConfig.maxTimeMinutes,
+          maxTurns:
             investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.max_turns,
+            CodebaseInvestigatorAgent.runConfig.maxTurns,
         },
       };
       this.registerLocalAgent(agentDef);
     }
 
-    // Register the CLI help agent if it's explicitly enabled.
-    if (cliHelpSettings.enabled) {
+    // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
+    if (
+      cliHelpSettings.enabled &&
+      !agentsOverrides[CliHelpAgent.name]?.disabled
+    ) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
+
+    // Register the generalist agent.
+    this.registerLocalAgent(GeneralistAgent(this.config));
   }
 
   private async refreshAgents(): Promise<void> {
@@ -207,52 +251,44 @@ export class AgentRegistry {
       return;
     }
 
+    const settingsOverrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+
+    if (!this.isAgentEnabled(definition, settingsOverrides)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
+        );
+      }
+      return;
+    }
+
     if (this.agents.has(definition.name) && this.config.getDebugMode()) {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
-    this.agents.set(definition.name, definition);
+    const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
+    this.agents.set(mergedDefinition.name, mergedDefinition);
 
-    // Register model config. We always create a runtime alias. However,
-    // if the user is using `auto` as a model string then we also create
-    // runtime overrides to ensure the subagent generation settings are
-    // respected regardless of the final model string from routing.
-    // TODO(12916): Migrate sub-agents where possible to static configs.
-    const modelConfig = definition.modelConfig;
-    let model = modelConfig.model;
-    if (model === 'inherit') {
-      model = this.config.getModel();
+    this.registerModelConfigs(mergedDefinition);
+  }
+
+  private isAgentEnabled<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): boolean {
+    const isExperimental = definition.experimental === true;
+    let isEnabled = !isExperimental;
+
+    if (overrides) {
+      if (overrides.disabled !== undefined) {
+        isEnabled = !overrides.disabled;
+      } else if (overrides.enabled !== undefined) {
+        isEnabled = overrides.enabled;
+      }
     }
 
-    const generateContentConfig = {
-      temperature: modelConfig.temp,
-      topP: modelConfig.top_p,
-      thinkingConfig: {
-        includeThoughts: true,
-        thinkingBudget: modelConfig.thinkingBudget ?? -1,
-      },
-    };
-
-    this.config.modelConfigService.registerRuntimeModelConfig(
-      getModelConfigAlias(definition),
-      {
-        modelConfig: {
-          model,
-          generateContentConfig,
-        },
-      },
-    );
-
-    if (isAutoModel(model)) {
-      this.config.modelConfigService.registerRuntimeModelOverride({
-        match: {
-          overrideScope: definition.name,
-        },
-        modelConfig: {
-          generateContentConfig,
-        },
-      });
-    }
+    return isEnabled;
   }
 
   /**
@@ -270,6 +306,18 @@ export class AgentRegistry {
       debugLogger.warn(
         `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
       );
+      return;
+    }
+
+    const overrides =
+      this.config.getAgentsSettings().overrides?.[definition.name];
+
+    if (!this.isAgentEnabled(definition, overrides)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
+        );
+      }
       return;
     }
 
@@ -306,6 +354,67 @@ export class AgentRegistry {
         `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
         e,
       );
+    }
+  }
+
+  private applyOverrides<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): LocalAgentDefinition<TOutput> {
+    if (definition.kind !== 'local' || !overrides) {
+      return definition;
+    }
+
+    // Use Object.create to preserve lazy getters on the definition object
+    const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
+
+    if (overrides.runConfig) {
+      merged.runConfig = {
+        ...definition.runConfig,
+        ...overrides.runConfig,
+      };
+    }
+
+    if (overrides.modelConfig) {
+      merged.modelConfig = ModelConfigService.merge(
+        definition.modelConfig,
+        overrides.modelConfig,
+      );
+    }
+
+    return merged;
+  }
+
+  private registerModelConfigs<TOutput extends z.ZodTypeAny>(
+    definition: LocalAgentDefinition<TOutput>,
+  ): void {
+    const modelConfig = definition.modelConfig;
+    let model = modelConfig.model;
+    if (model === 'inherit') {
+      model = this.config.getModel();
+    }
+
+    const agentModelConfig: ModelConfig = {
+      ...modelConfig,
+      model,
+    };
+
+    this.config.modelConfigService.registerRuntimeModelConfig(
+      getModelConfigAlias(definition),
+      {
+        modelConfig: agentModelConfig,
+      },
+    );
+
+    if (agentModelConfig.model && isAutoModel(agentModelConfig.model)) {
+      this.config.modelConfigService.registerRuntimeModelOverride({
+        match: {
+          overrideScope: definition.name,
+        },
+        modelConfig: {
+          generateContentConfig: agentModelConfig.generateContentConfig,
+        },
+      });
     }
   }
 
@@ -357,8 +466,19 @@ export class AgentRegistry {
     }
 
     let context = '## Available Sub-Agents\n';
-    context +=
-      'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
+    context += `Sub-agents are specialized expert agents that you can use to assist you in
+      the completion of all or part of a task.
+
+      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
+      exists that has expertise relevant to your task.
+
+      For example:
+      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
+      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
+      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
+      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+
+      The following are the available sub-agents:\n\n`;
 
     for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;
