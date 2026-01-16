@@ -32,7 +32,7 @@ import type { Key } from '../../contexts/KeypressContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
-import { LRU_CACHE_LIMIT } from '../../constants.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
 export type Direction =
   | 'left'
@@ -729,7 +729,7 @@ export function getTransformedImagePath(filePath: string): string {
 }
 
 const transformationsCache = new LruCache<string, Transformation[]>(
-  LRU_CACHE_LIMIT,
+  LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
 export function calculateTransformationsForLine(
@@ -881,7 +881,9 @@ interface LineLayoutResult {
   visualToTransformedMap: number[];
 }
 
-const lineLayoutCache = new LruCache<string, LineLayoutResult>(LRU_CACHE_LIMIT);
+const lineLayoutCache = new LruCache<string, LineLayoutResult>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
 
 function getLineLayoutCacheKey(
   line: string,

@@ -7,7 +7,7 @@
 import { LruCache } from '@google/gemini-cli-core';
 import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
-import { LRU_CACHE_LIMIT } from '../constants.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
 export type HighlightToken = {
   text: string;
@@ -21,7 +21,7 @@ export type HighlightToken = {
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
 const highlightCache = new LruCache<string, readonly HighlightToken[]>(
-  LRU_CACHE_LIMIT,
+  LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
 export function parseInputForHighlighting(
