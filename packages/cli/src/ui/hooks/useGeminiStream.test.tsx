@@ -232,6 +232,7 @@ describe('useGeminiStream', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       isInteractive: () => false,
+      isPlanEnabled: () => false,
       getExperiments: () => {},
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();

@@ -48,9 +48,8 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
-  LlmLoopCheckEvent,
-  HookCallEvent,
-  StartupStatsEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -668,6 +667,32 @@ export function logLlmLoopCheck(
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
+  });
+}
+
+export function logApprovalModeSwitch(
+  config: Config,
+  event: ApprovalModeSwitchEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: 'Approval Mode Switched',
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logApprovalModeDuration(
+  config: Config,
+  event: ApprovalModeDurationEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: 'Approval Mode Duration',
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
   });
 }
 
