@@ -30,7 +30,7 @@ export const ScreenReaderAppLayout: React.FC = () => {
       <Notifications />
       <Footer />
       <Box flexGrow={1} overflow="hidden">
-        <MainContent />
+        <MainContent composerHeight={0} />
       </Box>
       {uiState.dialogsVisible ? (
         <DialogManager

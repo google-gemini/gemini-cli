@@ -95,7 +95,7 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = render(<MainContent composerHeight={0} />);
     await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
     const output = lastFrame();
 
@@ -105,7 +105,7 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = render(<MainContent composerHeight={0} />);
     await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
     const output = lastFrame();
 
@@ -116,7 +116,7 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = render(<MainContent composerHeight={0} />);
     await waitFor(() => expect(lastFrame()).toContain('HistoryItem: Hello'));
     const output = lastFrame();
 

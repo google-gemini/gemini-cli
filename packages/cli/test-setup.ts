@@ -4,6 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Mock the ResizeObserver API for tests.
+// This needs to be at the top of the file to ensure it's available globally
+// before any other modules (especially React components) are imported.
+// Otherwise, we can get a "ResizeObserver is not defined" error during test runs.
+class ResizeObserver {
+  observe() {
+    // do nothing
+  }
+  unobserve() {
+    // do nothing
+  }
+  disconnect() {
+    // do nothing
+  }
+}
+
+global.ResizeObserver = ResizeObserver;
+
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 

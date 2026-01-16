@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { Box } from 'ink';
+import { type DOMElement, Box } from 'ink';
 import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
@@ -15,10 +14,36 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
+import { useState, useRef, useCallback } from 'react';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const [composerHeight, setComposerHeight] = useState(0);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const onRefChange = useCallback(
+    (node: DOMElement | null) => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+
+      uiState.mainControlsRef.current = node;
+
+      if (node && typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (entry) {
+            setComposerHeight(entry.contentRect.height);
+          }
+        });
+        observer.observe(node as unknown as Element);
+        observerRef.current = observer;
+      }
+    },
+    [uiState.mainControlsRef],
+  );
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -37,14 +62,9 @@ export const DefaultAppLayout: React.FC = () => {
       overflow="hidden"
       ref={uiState.rootUiRef}
     >
-      <MainContent />
+      <MainContent composerHeight={composerHeight} />
 
-      <Box
-        flexDirection="column"
-        ref={uiState.mainControlsRef}
-        flexShrink={0}
-        flexGrow={0}
-      >
+      <Box flexDirection="column" ref={onRefChange} flexShrink={0} flexGrow={0}>
         <Notifications />
         <CopyModeWarning />
 
