@@ -43,6 +43,12 @@ vi.mock('@google/gemini-cli-core', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
   },
+  LruCache: class {
+    get() {
+      return undefined;
+    }
+    set() {}
+  },
 }));
 
 vi.mock('../components/RewindViewer.js', () => ({
