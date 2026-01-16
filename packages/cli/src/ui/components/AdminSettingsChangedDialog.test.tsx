@@ -35,7 +35,7 @@ describe('AdminSettingsChangedDialog', () => {
     expect(handleRestartMock).toHaveBeenCalled();
   });
 
-  it('restarts on "R" key press', async () => {
+  it.each(['r', 'R'])('restarts on "%s" key press', async (key) => {
     const { stdin } = renderWithProviders(<AdminSettingsChangedDialog />, {
       uiActions: {
         handleRestart: handleRestartMock,
@@ -43,7 +43,7 @@ describe('AdminSettingsChangedDialog', () => {
     });
 
     act(() => {
-      stdin.write('R');
+      stdin.write(key);
     });
 
     expect(handleRestartMock).toHaveBeenCalled();
