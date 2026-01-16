@@ -254,6 +254,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.useBackgroundColor`** (boolean):
+  - **Description:** Whether to use background colors in the UI.
+  - **Default:** `true`
+
 - **`ui.incrementalRendering`** (boolean):
   - **Description:** Enable incremental rendering for the UI. This option will
     reduce flickering but may cause rendering artifacts. Only supported when

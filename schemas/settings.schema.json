@@ -316,6 +316,13 @@
           "default": false,
           "type": "boolean"
         },
+        "useBackgroundColor": {
+          "title": "Use Background Color",
+          "description": "Whether to use background colors in the UI.",
+          "markdownDescription": "Whether to use background colors in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",

@@ -545,6 +545,15 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      useBackgroundColor: {
+        type: 'boolean',
+        label: 'Use Background Color',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Whether to use background colors in the UI.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
