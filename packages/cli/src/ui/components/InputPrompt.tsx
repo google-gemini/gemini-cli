@@ -11,6 +11,7 @@ import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { UsePromptStashReturn } from '../hooks/usePromptStash.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
@@ -90,6 +91,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  promptStash: UsePromptStashReturn;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -132,6 +134,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  promptStash,
 }) => {
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
@@ -230,6 +233,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit(submittedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
+
+      // Auto-restore stashed prompt after submit (like Claude Code)
+      if (promptStash.hasStash) {
+        const stashed = promptStash.pop();
+        if (stashed) {
+          // Use setTimeout to restore after the submit is processed
+          setTimeout(() => {
+            buffer.setText(stashed);
+          }, 0);
+        }
+      }
     },
     [
       onSubmit,
@@ -238,6 +252,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      promptStash,
     ],
   );
 
@@ -430,6 +445,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (vimHandleInput && vimHandleInput(key)) {
+        return;
+      }
+
+      // Prompt stashing - Ctrl+Q toggles (Q = Queue for later)
+      // With text: stash it and clear. Empty: pop the stash.
+      if (keyMatchers[Command.STASH_PROMPT](key)) {
+        if (buffer.text.trim()) {
+          // Has text → Stash it
+          if (promptStash.stash(buffer.text)) {
+            buffer.setText('');
+            resetCompletionState();
+            setQueueErrorMessage('(Stashed - auto-restores after submit)');
+          }
+        } else if (promptStash.hasStash) {
+          // Empty → Pop stash
+          const stashed = promptStash.pop();
+          if (stashed) {
+            buffer.setText(stashed);
+            resetCompletionState();
+          }
+        }
         return;
       }
 
@@ -880,6 +916,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
+      promptStash,
+      setQueueErrorMessage,
     ],
   );
 
@@ -1048,8 +1086,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           completion.completionMode === CompletionMode.AT
             ? 'reverse'
             : buffer.text.startsWith('/') &&
-                !reverseSearchActive &&
-                !commandSearchActive
+              !reverseSearchActive &&
+              !commandSearchActive
               ? 'slash'
               : 'reverse'
         }
@@ -1078,6 +1116,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           color={statusColor ?? theme.text.accent}
           aria-label={statusText || undefined}
         >
+          {promptStash.hasStash && <Text color={theme.status.warning}>📌</Text>}
           {shellModeActive ? (
             reverseSearchActive ? (
               <Text

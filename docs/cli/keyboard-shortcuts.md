@@ -39,6 +39,9 @@ available combinations.
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
 | Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
 | Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
+| Stash the current input to restore later.        | `Ctrl + Q`                                                |
+| Restore the previously stashed input.            | `Ctrl + Q`                                                |
+
 
 #### Screen Control
 
