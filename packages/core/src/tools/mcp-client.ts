@@ -356,6 +356,19 @@ export class McpClient {
 
         this.updateResourceRegistry(newResources);
 
+        try {
+          const geminiClient = this.cliConfig.getGeminiClient();
+          if (geminiClient.isInitialized()) {
+            await geminiClient.setTools();
+          }
+        } catch (error) {
+          debugLogger.error(
+            `Failed to refresh tool configuration after resources update for ${this.serverName}: ${getErrorMessage(
+              error,
+            )}`,
+          );
+        }
+
         clearTimeout(timeoutId);
 
         coreEvents.emitFeedback(

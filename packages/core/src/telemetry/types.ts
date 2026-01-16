@@ -553,6 +553,15 @@ function toGenerateContentConfigAttributes(
   if (!config) {
     return {};
   }
+
+  const toolNames =
+    config.tools
+      ?.flatMap((tool) =>
+        'functionDeclarations' in tool ? (tool.functionDeclarations ?? []) : [],
+      )
+      .map((decl) => decl.name)
+      .filter((name): name is string => typeof name === 'string') ?? [];
+
   return {
     'gen_ai.request.temperature': config.temperature,
     'gen_ai.request.top_p': config.topP,
@@ -567,6 +576,7 @@ function toGenerateContentConfigAttributes(
     'gen_ai.system_instructions': JSON.stringify(
       toSystemInstruction(config.systemInstruction),
     ),
+    'gen_ai.request.tool_names': toolNames.length > 0 ? toolNames : undefined,
   };
 }
 
