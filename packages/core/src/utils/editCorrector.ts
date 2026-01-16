@@ -22,6 +22,7 @@ import {
 } from '../utils/messageInspectors.js';
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
+import { debugLogger } from './debugLogger.js';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -90,7 +91,7 @@ async function findLastEditTimestamp(
   filePath: string,
   client: GeminiClient,
 ): Promise<number> {
-  const history = (await client.getHistory()) ?? [];
+  const history = client.getHistory() ?? [];
 
   // Tools that may reference the file path in their FunctionResponse `output`.
   const toolsInResp = new Set([
@@ -166,10 +167,11 @@ async function findLastEditTimestamp(
 export async function ensureCorrectEdit(
   filePath: string,
   currentContent: string,
-  originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
+  originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without 'corrected'
   geminiClient: GeminiClient,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
+  disableLLMCorrection: boolean,
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
   const cachedResult = editCorrectionCache.get(cacheKey);
@@ -188,7 +190,7 @@ export async function ensureCorrectEdit(
   let occurrences = countOccurrences(currentContent, finalOldString);
 
   if (occurrences === expectedReplacements) {
-    if (newStringPotentiallyEscaped) {
+    if (newStringPotentiallyEscaped && !disableLLMCorrection) {
       finalNewString = await correctNewStringEscaping(
         baseLlmClient,
         finalOldString,
@@ -235,7 +237,7 @@ export async function ensureCorrectEdit(
 
     if (occurrences === expectedReplacements) {
       finalOldString = unescapedOldStringAttempt;
-      if (newStringPotentiallyEscaped) {
+      if (newStringPotentiallyEscaped && !disableLLMCorrection) {
         finalNewString = await correctNewString(
           baseLlmClient,
           originalParams.old_string, // original old
@@ -271,6 +273,15 @@ export async function ensureCorrectEdit(
             return result;
           }
         }
+      }
+
+      if (disableLLMCorrection) {
+        const result: CorrectedEditResult = {
+          params: { ...originalParams },
+          occurrences: 0,
+        };
+        editCorrectionCache.set(cacheKey, result);
+        return result;
       }
 
       const llmCorrectedOldString = await correctOldStringMismatch(
@@ -346,6 +357,7 @@ export async function ensureCorrectFileContent(
   content: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
+  disableLLMCorrection: boolean = false,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
   if (cachedResult) {
@@ -357,6 +369,15 @@ export async function ensureCorrectFileContent(
   if (!contentPotentiallyEscaped) {
     fileContentCorrectionCache.set(content, content);
     return content;
+  }
+
+  if (disableLLMCorrection) {
+    // If we can't use LLM, we should at least use the unescaped content
+    // as it's likely better than the original if it was detected as potentially escaped.
+    // unescapeStringForGeminiBug is a heuristic, not an LLM call.
+    const unescaped = unescapeStringForGeminiBug(content);
+    fileContentCorrectionCache.set(content, unescaped);
+    return unescaped;
   }
 
   const correctedContent = await correctStringEscaping(
@@ -434,7 +455,7 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for old string snippet correction:',
       error,
     );
@@ -523,7 +544,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error('Error during LLM call for new_string correction:', error);
+    debugLogger.warn('Error during LLM call for new_string correction:', error);
     return originalNewString;
   }
 }
@@ -593,7 +614,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for new_string escaping correction:',
       error,
     );
@@ -660,7 +681,7 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       throw error;
     }
 
-    console.error(
+    debugLogger.warn(
       'Error during LLM call for string escaping correction:',
       error,
     );

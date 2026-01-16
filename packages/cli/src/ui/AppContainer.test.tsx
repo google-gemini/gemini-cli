@@ -17,7 +17,7 @@ import {
 import { render } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
 import { cleanup } from 'ink-testing-library';
-import { act, useContext } from 'react';
+import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import {
@@ -65,15 +65,24 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       ),
     ),
     patchStdio: vi.fn(() => () => {}),
-    createInkStdio: vi.fn(() => ({
+    createWorkingStdio: vi.fn(() => ({
       stdout: process.stdout,
       stderr: process.stderr,
     })),
     enableMouseEvents: vi.fn(),
     disableMouseEvents: vi.fn(),
+    FileDiscoveryService: vi.fn().mockImplementation(() => ({
+      initialize: vi.fn(),
+    })),
+    startupProfiler: {
+      flush: vi.fn(),
+      start: vi.fn(),
+      end: vi.fn(),
+    },
   };
 });
-import type { LoadedSettings } from '../config/settings.js';
+import ansiEscapes from 'ansi-escapes';
+import { type LoadedSettings, mergeSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -134,6 +143,7 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/useHookDisplayState.js');
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -162,6 +172,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -234,24 +245,18 @@ describe('AppContainer State Management', () => {
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
+  const mockedUseHookDisplayState = useHookDisplayState as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
+
     // Initialize mock stdout for terminal title tests
+
     mocks.mockStdout.write.mockClear();
 
-    // Mock computeWindowTitle function to centralize title logic testing
-    vi.mock('../utils/windowTitle.js', async () => ({
-      computeWindowTitle: vi.fn(
-        (folderName: string) =>
-          // Default behavior: return "Gemini - {folderName}" unless CLI_TITLE is set
-          process.env['CLI_TITLE'] || `Gemini - ${folderName}`,
-      ),
-    }));
-
     capturedUIState = null!;
-    capturedUIActions = null!;
 
     // **Provide a default return value for EVERY mocked hook.**
     mockedUseQuotaAndFallback.mockReturnValue({
@@ -343,7 +348,7 @@ describe('AppContainer State Management', () => {
       // Add other properties if AppContainer uses them
     });
     mockedUseLogger.mockReturnValue({
-      getPreviousUserMessages: vi.fn().mockReturnValue(new Promise(() => {})),
+      getPreviousUserMessages: vi.fn().mockResolvedValue([]),
     });
     mockedUseInputHistoryStore.mockReturnValue({
       inputHistory: [],
@@ -354,12 +359,15 @@ describe('AppContainer State Management', () => {
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
     });
+    mockedUseHookDisplayState.mockReturnValue([]);
 
     // Mock Config
     mockConfig = makeFakeConfig();
 
     // Mock config's getTargetDir to return consistent workspace directory
     vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+    vi.spyOn(mockConfig, 'initialize').mockResolvedValue(undefined);
+    vi.spyOn(mockConfig, 'getDebugMode').mockReturnValue(false);
 
     mockExtensionManager = vi.mockObject({
       getExtensions: vi.fn().mockReturnValue([]),
@@ -372,14 +380,17 @@ describe('AppContainer State Management', () => {
     );
 
     // Mock LoadedSettings
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
       merged: {
+        ...defaultMergedSettings,
         hideBanner: false,
         hideFooter: false,
         hideTips: false,
         showMemoryUsage: false,
         theme: 'default',
         ui: {
+          ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
         },
@@ -398,21 +409,30 @@ describe('AppContainer State Management', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   describe('Basic Rendering', () => {
     it('renders without crashing with minimal props', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('renders with startup warnings', async () => {
       const startupWarnings = ['Warning 1', 'Warning 2'];
 
-      const { unmount } = renderAppContainer({ startupWarnings });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ startupWarnings });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -423,11 +443,15 @@ describe('AppContainer State Management', () => {
         themeError: 'Failed to load theme',
       };
 
-      const { unmount } = renderAppContainer({
-        initResult: initResultWithError,
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          initResult: initResultWithError,
+        });
+        unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('handles debug mode state', () => {
@@ -442,36 +466,54 @@ describe('AppContainer State Management', () => {
 
   describe('Context Providers', () => {
     it('provides AppContext with correct values', async () => {
-      const { unmount } = renderAppContainer({ version: '2.0.0' });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ version: '2.0.0' });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Should render and unmount cleanly
-      expect(() => unmount()).not.toThrow();
+      expect(() => unmount!()).not.toThrow();
     });
 
     it('provides UIStateContext with state management', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('provides UIActionsContext with action handlers', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('provides ConfigContext with config object', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsAllHidden = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: true,
           hideFooter: true,
           hideTips: true,
@@ -479,14 +521,20 @@ describe('AppContainer State Management', () => {
         },
       } as unknown as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: settingsAllHidden });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsAllHidden });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
 
     it('handles settings with memory usage enabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsWithMemory = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: false,
           hideFooter: false,
           hideTips: false,
@@ -494,9 +542,13 @@ describe('AppContainer State Management', () => {
         },
       } as unknown as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: settingsWithMemory });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsWithMemory });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -504,9 +556,13 @@ describe('AppContainer State Management', () => {
     it.each(['1.0.0', '2.1.3-beta', '3.0.0-nightly'])(
       'handles version format: %s',
       async (version) => {
-        const { unmount } = renderAppContainer({ version });
+        let unmount: () => void;
+        await act(async () => {
+          const result = renderAppContainer({ version });
+          unmount = result.unmount;
+        });
         await waitFor(() => expect(capturedUIState).toBeTruthy());
-        unmount();
+        unmount!();
       },
     );
   });
@@ -525,12 +581,16 @@ describe('AppContainer State Management', () => {
 
     it('handles undefined settings gracefully', async () => {
       const undefinedSettings = {
-        merged: {},
+        merged: mergeSettings({}, {}, {}, {}, true),
       } as LoadedSettings;
 
-      const { unmount } = renderAppContainer({ settings: undefinedSettings });
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: undefinedSettings });
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
-      unmount();
+      unmount!();
     });
   });
 
@@ -859,12 +919,16 @@ describe('AppContainer State Management', () => {
   describe('Quota and Fallback Integration', () => {
     it('passes a null proQuotaRequest to UIStateContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert that the context value is as expected
         expect(capturedUIState.proQuotaRequest).toBeNull();
       });
-      unmount();
+      unmount!();
     });
 
     it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
@@ -880,12 +944,16 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert: The mock request is correctly passed through the context
         expect(capturedUIState.proQuotaRequest).toEqual(mockRequest);
       });
-      unmount();
+      unmount!();
     });
 
     it('passes the handleProQuotaChoice function to UIActionsContext', async () => {
@@ -897,7 +965,11 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         // Assert: The action in the context is the mock handler we provided
         expect(capturedUIActions.handleProQuotaChoice).toBe(mockHandler);
@@ -908,7 +980,7 @@ describe('AppContainer State Management', () => {
         capturedUIActions.handleProQuotaChoice('retry_later');
       });
       expect(mockHandler).toHaveBeenCalledWith('retry_later');
-      unmount();
+      unmount!();
     });
   });
 
@@ -924,42 +996,98 @@ describe('AppContainer State Management', () => {
       expect(stdout).toBe(mocks.mockStdout);
     });
 
-    it('should not update terminal title when showStatusInTitle is false', () => {
+    it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithShowStatusFalse = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: false,
             hideWindowTitle: false,
           },
         },
       } as unknown as LoadedSettings;
 
+      // Mock the streaming state as Active
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: 'Some thought' },
+        cancelOngoingRequest: vi.fn(),
+      });
+
       // Act: Render the container
       const { unmount } = renderAppContainer({
         settings: mockSettingsWithShowStatusFalse,
       });
 
-      // Assert: Check that no title-related writes occurred
+      // Assert: Check that title was updated with "Working…"
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
-      expect(titleWrites).toHaveLength(0);
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]0;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
+      );
       unmount();
     });
 
-    it('should not update terminal title when hideWindowTitle is true', () => {
-      // Arrange: Set up mock settings with hideWindowTitle enabled
-      const mockSettingsWithHideTitleTrue = {
+    it('should use legacy terminal title when dynamicWindowTitle is false', () => {
+      // Arrange: Set up mock settings with dynamicWindowTitle disabled
+      const mockSettingsWithDynamicTitleFalse = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
+            dynamicWindowTitle: false,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock the streaming state
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: 'Some thought' },
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      // Act: Render the container
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithDynamicTitleFalse,
+      });
+
+      // Assert: Check that legacy title was used
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]0;'),
+      );
+
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]0;${'Gemini CLI (workspace)'.padEnd(80, ' ')}\x07`,
+      );
+      unmount();
+    });
+
+    it('should not update terminal title when hideWindowTitle is true', () => {
+      // Arrange: Set up mock settings with hideWindowTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithHideTitleTrue = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: true,
           },
@@ -973,7 +1101,7 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that no title-related writes occurred
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(0);
@@ -982,12 +1110,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with thought subject when in active state', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1010,26 +1139,27 @@ describe('AppContainer State Management', () => {
         settings: mockSettingsWithTitleEnabled,
       });
 
-      // Assert: Check that title was updated with thought subject
+      // Assert: Check that title was updated with thought subject and suffix
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${`✦  ${thoughtSubject} (workspace)`.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
 
     it('should update terminal title with default text when in Idle state and no thought subject', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1053,24 +1183,25 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with default Idle text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'◇  Ready (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
 
-    it('should update terminal title when in WaitingForConfirmation state with thought subject', () => {
+    it('should update terminal title when in WaitingForConfirmation state with thought subject', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1080,7 +1211,7 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'waitingForConfirmation',
+        streamingState: 'waiting_for_confirmation',
         submitQuery: vi.fn(),
         initError: null,
         pendingHistoryItems: [],
@@ -1089,30 +1220,197 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer({
-        settings: mockSettingsWithTitleEnabled,
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+        unmount = result.unmount;
       });
 
       // Assert: Check that title was updated with confirmation text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
       );
-      unmount();
+      unmount!();
+    });
+
+    describe('Shell Focus Action Required', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should show Action Required in title after a delay when shell is awaiting focus', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty but not focused
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+          lastOutputTime: 0,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        // Act: Render the container (embeddedShellFocused is false by default in state)
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Initially it should show the working status
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        expect(titleWrites[titleWrites.length - 1][0]).toContain(
+          '✦  Executing shell command',
+        );
+
+        // Fast-forward time by 40 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(40000);
+        });
+
+        // Now it should show Action Required
+        const titleWritesDelayed = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWritesDelayed[titleWritesDelayed.length - 1][0];
+        expect(lastTitle).toContain('✋  Action Required');
+
+        unmount();
+      });
+
+      it('should NOT show Action Required in title if shell is streaming output', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty but not focused
+        let lastOutputTime = 1000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        // Act: Render the container
+        const { unmount, rerender } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 20 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        // Update lastOutputTime to simulate new output
+        lastOutputTime = 21000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        // Rerender to propagate the new lastOutputTime
+        await act(async () => {
+          rerender(getAppContainer({ settings: mockSettingsWithTitleEnabled }));
+        });
+
+        // Fast-forward time by another 20 seconds
+        // Total time elapsed: 40s.
+        // Time since last output: 20s.
+        // It should NOT show Action Required yet.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        const titleWritesAfterOutput = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle =
+          titleWritesAfterOutput[titleWritesAfterOutput.length - 1][0];
+        expect(lastTitle).not.toContain('✋  Action Required');
+        expect(lastTitle).toContain('✦  Executing shell command');
+
+        // Fast-forward another 40 seconds (Total 60s since last output)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(40000);
+        });
+
+        // Now it SHOULD show Action Required
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitleFinal = titleWrites[titleWrites.length - 1][0];
+        expect(lastTitleFinal).toContain('✋  Action Required');
+
+        unmount();
+      });
     });
 
     it('should pad title to exactly 80 characters', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1137,28 +1435,26 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title is padded to exactly 80 characters
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
-      const expectedTitle = shortTitle.padEnd(80, ' ');
-
-      expect(calledWith).toContain(shortTitle);
-      expect(calledWith).toContain('\x1b]2;');
-      expect(calledWith).toContain('\x07');
-      expect(calledWith).toBe('\x1b]2;' + expectedTitle + '\x07');
+      const expectedTitle = `✦  ${shortTitle} (workspace)`.padEnd(80, ' ');
+      const expectedEscapeSequence = `\x1b]0;${expectedTitle}\x07`;
+      expect(calledWith).toBe(expectedEscapeSequence);
       unmount();
     });
 
     it('should use correct ANSI escape code format', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1183,24 +1479,24 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that the correct ANSI escape sequence is used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
-      const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
+      const expectedEscapeSequence = `\x1b]0;${`✦  ${title} (workspace)`.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
       unmount();
     });
 
     it('should use CLI_TITLE environment variable when set', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = {
+      // Arrange: Set up mock settings with showStatusInTitle disabled (so it shows suffix)
+      const mockSettingsWithTitleDisabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
+            showStatusInTitle: false,
             hideWindowTitle: false,
           },
         },
@@ -1209,9 +1505,9 @@ describe('AppContainer State Management', () => {
       // Mock CLI_TITLE environment variable
       vi.stubEnv('CLI_TITLE', 'Custom Gemini Title');
 
-      // Mock the streaming state as Idle with no thought
+      // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
+        streamingState: 'responding',
         submitQuery: vi.fn(),
         initError: null,
         pendingHistoryItems: [],
@@ -1221,17 +1517,17 @@ describe('AppContainer State Management', () => {
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
-        settings: mockSettingsWithTitleEnabled,
+        settings: mockSettingsWithTitleDisabled,
       });
 
       // Assert: Check that title was updated with CLI_TITLE value
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1244,6 +1540,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('should set and clear the queue error message after a timeout', async () => {
@@ -1326,13 +1623,17 @@ describe('AppContainer State Management', () => {
         activePtyId: 'some-id',
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
       const lastCall =
         resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
       // Check the height argument specifically
       expect(lastCall[2]).toBe(1);
-      unmount();
+      unmount!();
     });
   });
 
@@ -1408,6 +1709,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe('CTRL+C', () => {
@@ -1514,12 +1816,13 @@ describe('AppContainer State Management', () => {
 
     const setupCopyModeTest = async (isAlternateMode = false) => {
       // Update settings for this test run
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             useAlternateBuffer: isAlternateMode,
           },
         },
@@ -1545,6 +1848,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe.each([
@@ -1569,7 +1873,6 @@ describe('AppContainer State Management', () => {
             ctrl: true,
             meta: false,
             shift: false,
-            paste: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -1596,7 +1899,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1611,7 +1913,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1632,7 +1933,6 @@ describe('AppContainer State Management', () => {
               ctrl: true,
               meta: false,
               shift: false,
-              paste: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1648,7 +1948,6 @@ describe('AppContainer State Management', () => {
               ctrl: false,
               meta: false,
               shift: false,
-              paste: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1671,11 +1970,15 @@ describe('AppContainer State Management', () => {
         closeModelDialog: vi.fn(),
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(capturedUIState.isModelDialogOpen).toBe(true);
-      unmount();
+      unmount!();
     });
 
     it('should provide model dialog actions in the UIActionsContext', async () => {
@@ -1687,7 +1990,11 @@ describe('AppContainer State Management', () => {
         closeModelDialog: mockCloseModelDialog,
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Verify that the actions are correctly passed through context
@@ -1695,13 +2002,17 @@ describe('AppContainer State Management', () => {
         capturedUIActions.closeModelDialog();
       });
       expect(mockCloseModelDialog).toHaveBeenCalled();
-      unmount();
+      unmount!();
     });
   });
 
   describe('CoreEvents Integration', () => {
     it('subscribes to UserFeedback and drains backlog on mount', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(mockCoreEvents.on).toHaveBeenCalledWith(
@@ -1709,14 +2020,18 @@ describe('AppContainer State Management', () => {
         expect.any(Function),
       );
       expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
-      unmount();
+      unmount!();
     });
 
     it('unsubscribes from UserFeedback on unmount', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
-      unmount();
+      unmount!();
 
       expect(mockCoreEvents.off).toHaveBeenCalledWith(
         CoreEvent.UserFeedback,
@@ -1725,7 +2040,11 @@ describe('AppContainer State Management', () => {
     });
 
     it('adds history item when UserFeedback event is received', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Get the registered handler
@@ -1750,14 +2069,18 @@ describe('AppContainer State Management', () => {
         }),
         expect.any(Number),
       );
-      unmount();
+      unmount!();
     });
 
     it('updates currentModel when ModelChanged event is received', async () => {
       // Arrange: Mock initial model
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('initial-model');
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         expect(capturedUIState?.currentModel).toBe('initial-model');
       });
@@ -1769,13 +2092,32 @@ describe('AppContainer State Management', () => {
       expect(handler).toBeDefined();
 
       // Act: Simulate ModelChanged event
+      // Update config mock to return new model since the handler reads from config
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('new-model');
       act(() => {
         handler({ model: 'new-model' });
       });
 
       // Assert: Verify model is updated
-      expect(capturedUIState.currentModel).toBe('new-model');
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState.currentModel).toBe('new-model');
+      });
+      unmount!();
+    });
+
+    it('provides activeHooks from useHookDisplayState', async () => {
+      const mockHooks = [{ name: 'hook1', eventName: 'event1' }];
+      mockedUseHookDisplayState.mockReturnValue(mockHooks);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.activeHooks).toEqual(mockHooks);
+      unmount!();
     });
   });
 
@@ -1798,10 +2140,14 @@ describe('AppContainer State Management', () => {
       });
 
       // The main assertion is that the render does not throw.
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
       await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      unmount();
+      unmount!();
     });
   });
   describe('Banner Text', () => {
@@ -1811,10 +2157,14 @@ describe('AppContainer State Management', () => {
         authType: AuthType.USE_GEMINI,
         apiKey: 'fake-key',
       });
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => {
         expect(capturedUIState.bannerData.defaultText).toBeDefined();
-        unmount();
+        unmount!();
       });
     });
   });
@@ -1837,7 +2187,11 @@ describe('AppContainer State Management', () => {
     });
 
     it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
@@ -1850,7 +2204,7 @@ describe('AppContainer State Management', () => {
 
       expect(mockSetText).toHaveBeenCalledWith('');
 
-      unmount();
+      unmount!();
     });
 
     it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
@@ -1861,7 +2215,11 @@ describe('AppContainer State Management', () => {
         initializeFromLogger: vi.fn(),
       });
 
-      const { unmount } = renderAppContainer();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
       await waitFor(() =>
         expect(capturedUIState.userMessages).toContain('previous message'),
       );
@@ -1874,9 +2232,11 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(true);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('previous message');
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith('previous message');
+      });
 
-      unmount();
+      unmount!();
     });
 
     it('input history is independent from conversation history (survives /clear)', async () => {
@@ -1889,7 +2249,13 @@ describe('AppContainer State Management', () => {
         initializeFromLogger: vi.fn(),
       });
 
-      const { unmount } = renderAppContainer();
+      let rerender: (tree: ReactElement) => void;
+      let unmount;
+      await act(async () => {
+        const result = renderAppContainer();
+        rerender = result.rerender;
+        unmount = result.unmount;
+      });
 
       // Verify userMessages is populated from inputHistory
       await waitFor(() =>
@@ -1907,12 +2273,52 @@ describe('AppContainer State Management', () => {
         loadHistory: vi.fn(),
       });
 
+      await act(async () => {
+        // Rerender to apply the new mock.
+        rerender(getAppContainer());
+      });
+
       // Verify that userMessages still contains the input history
       // (it should not be affected by clearing conversation history)
       expect(capturedUIState.userMessages).toContain('first prompt');
       expect(capturedUIState.userMessages).toContain('second prompt');
 
-      unmount();
+      unmount!();
+    });
+  });
+
+  describe('Regression Tests', () => {
+    it('does not refresh static on startup if banner text is empty', async () => {
+      // Mock banner text to be empty strings
+      vi.spyOn(mockConfig, 'getBannerTextNoCapacityIssues').mockResolvedValue(
+        '',
+      );
+      vi.spyOn(mockConfig, 'getBannerTextCapacityIssues').mockResolvedValue('');
+
+      // Clear previous calls
+      mocks.mockStdout.write.mockClear();
+
+      let compUnmount: () => void = () => {};
+      await act(async () => {
+        const { unmount } = renderAppContainer();
+        compUnmount = unmount;
+      });
+
+      // Allow async effects to run
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Wait for fetchBannerTexts to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Check that clearTerminal was NOT written to stdout
+      const clearTerminalCalls = mocks.mockStdout.write.mock.calls.filter(
+        (call: unknown[]) => call[0] === ansiEscapes.clearTerminal,
+      );
+
+      expect(clearTerminalCalls).toHaveLength(0);
+      compUnmount();
     });
   });
 });

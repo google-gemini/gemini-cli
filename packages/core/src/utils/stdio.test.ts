@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { patchStdio, createInkStdio } from './stdio.js';
+import { patchStdio, createWorkingStdio } from './stdio.js';
 import { coreEvents } from './events.js';
 
 vi.mock('./events.js', () => ({
@@ -53,14 +53,14 @@ describe('stdio utils', () => {
     expect(process.stderr.write).toBe(originalStderrWrite);
   });
 
-  it('createInkStdio writes to real stdout/stderr bypassing patch', () => {
+  it('createWorkingStdio writes to real stdout/stderr bypassing patch', () => {
     const cleanup = patchStdio();
-    const { stdout: inkStdout, stderr: inkStderr } = createInkStdio();
+    const { stdout, stderr } = createWorkingStdio();
 
-    inkStdout.write('ink stdout');
+    stdout.write('working stdout');
     expect(coreEvents.emitOutput).not.toHaveBeenCalled();
 
-    inkStderr.write('ink stderr');
+    stderr.write('working stderr');
     expect(coreEvents.emitOutput).not.toHaveBeenCalled();
 
     cleanup();

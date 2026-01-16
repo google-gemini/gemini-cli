@@ -13,7 +13,8 @@ import {
 import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { convertInputConfigToJsonSchema } from './schema-utils.js';
-import { SubagentInvocation } from './invocation.js';
+import { LocalSubagentInvocation } from './local-invocation.js';
+import { RemoteAgentInvocation } from './remote-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
@@ -37,9 +38,8 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
   constructor(
     private readonly definition: AgentDefinition,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
-    // Dynamically generate the JSON schema required for the tool definition.
     const parameterSchema = convertInputConfigToJsonSchema(
       definition.inputConfig,
     );
@@ -50,9 +50,9 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       definition.description,
       Kind.Think,
       parameterSchema,
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
@@ -67,12 +67,30 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    */
   protected createInvocation(
     params: AgentInputs,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<AgentInputs, ToolResult> {
-    return new SubagentInvocation(
-      params,
-      this.definition,
+    const definition = this.definition;
+    const effectiveMessageBus = messageBus;
+
+    if (definition.kind === 'remote') {
+      return new RemoteAgentInvocation(
+        definition,
+        params,
+        effectiveMessageBus,
+        _toolName,
+        _toolDisplayName,
+      );
+    }
+
+    return new LocalSubagentInvocation(
+      definition,
       this.config,
-      this.messageBus,
+      params,
+      effectiveMessageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }

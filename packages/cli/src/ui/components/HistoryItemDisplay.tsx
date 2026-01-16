@@ -28,8 +28,11 @@ import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
+import { SkillsList } from './views/SkillsList.js';
+import { AgentsStatus } from './views/AgentsStatus.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
+import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 
 interface HistoryItemDisplayProps {
@@ -152,11 +155,26 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           showDescriptions={itemForDisplay.showDescriptions}
         />
       )}
+      {itemForDisplay.type === 'skills_list' && (
+        <SkillsList
+          skills={itemForDisplay.skills}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'agents_list' && (
+        <AgentsStatus
+          agents={itemForDisplay.agents}
+          terminalWidth={terminalWidth}
+        />
+      )}
       {itemForDisplay.type === 'mcp_status' && (
         <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
+      )}
+      {itemForDisplay.type === 'hooks_list' && (
+        <HooksList hooks={itemForDisplay.hooks} />
       )}
     </Box>
   );

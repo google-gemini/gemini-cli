@@ -23,20 +23,20 @@ export function handleAutoUpdate(
     return;
   }
 
-  if (settings.merged.tools?.sandbox || process.env['GEMINI_SANDBOX']) {
+  if (settings.merged.tools.sandbox || process.env['GEMINI_SANDBOX']) {
     updateEventEmitter.emit('update-info', {
       message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
     });
     return;
   }
 
-  if (settings.merged.general?.disableUpdateNag) {
+  if (settings.merged.general.disableUpdateNag) {
     return;
   }
 
   const installationInfo = getInstallationInfo(
     projectRoot,
-    settings.merged.general?.disableAutoUpdate ?? false,
+    settings.merged.general.disableAutoUpdate,
   );
 
   if (
@@ -58,7 +58,7 @@ export function handleAutoUpdate(
 
   if (
     !installationInfo.updateCommand ||
-    settings.merged.general?.disableAutoUpdate
+    settings.merged.general.disableAutoUpdate
   ) {
     return;
   }
@@ -68,11 +68,13 @@ export function handleAutoUpdate(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
   );
-  const updateProcess = spawnFn(updateCommand, { stdio: 'pipe', shell: true });
-  let errorOutput = '';
-  updateProcess.stderr.on('data', (data) => {
-    errorOutput += data.toString();
+  const updateProcess = spawnFn(updateCommand, {
+    stdio: 'ignore',
+    shell: true,
+    detached: true,
   });
+  // Un-reference the child process to allow the parent to exit independently.
+  updateProcess.unref();
 
   updateProcess.on('close', (code) => {
     if (code === 0) {
@@ -82,7 +84,7 @@ export function handleAutoUpdate(
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand}, stderr: ${errorOutput.trim()})`,
+        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
       });
     }
   });

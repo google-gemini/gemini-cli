@@ -23,6 +23,7 @@ import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
+import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -189,8 +190,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
+    private readonly geminiIgnoreParser: GeminiIgnoreParser,
     params: RipGrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -279,7 +281,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         returnDisplay: displayMessage,
       };
     } catch (error) {
-      console.error(`Error during GrepLogic execution: ${error}`);
+      debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
@@ -387,6 +389,14 @@ class GrepToolInvocation extends BaseToolInvocation<
       excludes.forEach((exclude) => {
         rgArgs.push('--glob', `!${exclude}`);
       });
+
+      if (this.config.getFileFilteringRespectGeminiIgnore()) {
+        // Add .geminiignore support (ripgrep natively handles .gitignore)
+        const geminiIgnorePath = this.geminiIgnoreParser.getIgnoreFilePath();
+        if (geminiIgnorePath) {
+          rgArgs.push('--ignore-file', geminiIgnorePath);
+        }
+      }
     }
 
     rgArgs.push('--threads', '4');
@@ -445,7 +455,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       return this.parseRipgrepJsonOutput(output, absolutePath);
     } catch (error: unknown) {
-      console.error(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
+      debugLogger.debug(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -483,10 +493,11 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
+  private readonly geminiIgnoreParser: GeminiIgnoreParser;
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       RipGrepTool.Name,
@@ -544,10 +555,11 @@ export class RipGrepTool extends BaseDeclarativeTool<
         required: ['pattern'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
+    this.geminiIgnoreParser = new GeminiIgnoreParser(config.getTargetDir());
   }
 
   /**
@@ -578,14 +590,15 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
+      this.geminiIgnoreParser,
       params,
-      messageBus,
+      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

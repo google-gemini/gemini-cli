@@ -8,8 +8,10 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Configuration](#configuration)
   - [Google Cloud telemetry](#google-cloud-telemetry)
     - [Prerequisites](#prerequisites)
+    - [Authenticating with CLI Credentials](#authenticating-with-cli-credentials)
     - [Direct export (recommended)](#direct-export-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced)
+    - [Monitoring Dashboards](#monitoring-dashboards)
   - [Local telemetry](#local-telemetry)
     - [File-based output (recommended)](#file-based-output-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced-1)
@@ -74,15 +76,16 @@ observability framework — Gemini CLI's observability system provides:
 All telemetry behavior is controlled through your `.gemini/settings.json` file.
 Environment variables can be used to override the settings in the file.
 
-| Setting        | Environment Variable             | Description                                       | Values            | Default                 |
-| -------------- | -------------------------------- | ------------------------------------------------- | ----------------- | ----------------------- |
-| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                       | `true`/`false`    | `false`                 |
-| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                      | `"gcp"`/`"local"` | `"local"`               |
-| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                           | URL string        | `http://localhost:4317` |
-| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                           | `"grpc"`/`"http"` | `"grpc"`                |
-| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`) | file path         | -                       |
-| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                 | `true`/`false`    | `true`                  |
-| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)            | `true`/`false`    | `false`                 |
+| Setting        | Environment Variable             | Description                                         | Values            | Default                 |
+| -------------- | -------------------------------- | --------------------------------------------------- | ----------------- | ----------------------- |
+| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | Enable or disable telemetry                         | `true`/`false`    | `false`                 |
+| `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
+| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
+| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
+| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
+| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
+| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
+| `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`  | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
 
 **Note on boolean environment variables:** For the boolean settings (`enabled`,
 `logPrompts`, `useCollector`), setting the corresponding environment variable to
@@ -129,6 +132,34 @@ Before using either method below, complete these steps:
      logging.googleapis.com \
      --project="$OTLP_GOOGLE_CLOUD_PROJECT"
    ```
+
+### Authenticating with CLI Credentials
+
+By default, the telemetry collector for Google Cloud uses Application Default
+Credentials (ADC). However, you can configure it to use the same OAuth
+credentials that you use to log in to the Gemini CLI. This is useful in
+environments where you don't have ADC set up.
+
+To enable this, set the `useCliAuth` property in your `telemetry` settings to
+`true`:
+
+```json
+{
+  "telemetry": {
+    "enabled": true,
+    "target": "gcp",
+    "useCliAuth": true
+  }
+}
+```
+
+**Important:**
+
+- This setting requires the use of **Direct Export** (in-process exporters).
+- It **cannot** be used with `useCollector: true`. If you enable both, telemetry
+  will be disabled and an error will be logged.
+- The CLI will automatically use your credentials to authenticate with Google
+  Cloud Trace, Metrics, and Logging APIs.
 
 ### Direct export (recommended)
 
@@ -183,6 +214,24 @@ forward data to Google Cloud.
      - Traces: https://console.cloud.google.com/traces/list
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
+
+### Monitoring Dashboards
+
+Gemini CLI provides a pre-configured
+[Google Cloud Monitoring](https://cloud.google.com/monitoring) dashboard to
+visualize your telemetry.
+
+This dashboard can be found under **Google Cloud Monitoring Dashboard
+Templates** as "**Gemini CLI Monitoring**".
+
+![Gemini CLI Monitoring Dashboard Overview](/docs/assets/monitoring-dashboard-overview.png)
+
+![Gemini CLI Monitoring Dashboard Metrics](/docs/assets/monitoring-dashboard-metrics.png)
+
+![Gemini CLI Monitoring Dashboard Logs](/docs/assets/monitoring-dashboard-logs.png)
+
+To learn more, check out this blog post:
+[Instant insights: Gemini CLI’s new pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
 
 ## Local telemetry
 
@@ -268,7 +317,7 @@ Captures startup configuration and user prompt submissions.
 
 #### Tools
 
-Captures tool executions, output truncation, and Smart Edit behavior.
+Captures tool executions, output truncation, and Edit behavior.
 
 - `gemini_cli.tool_call`: Emitted for each tool (function) call.
   - **Attributes**:
@@ -296,11 +345,11 @@ Captures tool executions, output truncation, and Smart Edit behavior.
     - `lines` (int)
     - `prompt_id` (string)
 
-- `gemini_cli.smart_edit_strategy`: Smart Edit strategy chosen.
+- `gemini_cli.edit_strategy`: Edit strategy chosen.
   - **Attributes**:
     - `strategy` (string)
 
-- `gemini_cli.smart_edit_correction`: Smart Edit correction result.
+- `gemini_cli.edit_correction`: Edit correction result.
   - **Attributes**:
     - `correction` ("success" | "failure")
 

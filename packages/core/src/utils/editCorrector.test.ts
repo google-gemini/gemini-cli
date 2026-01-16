@@ -22,6 +22,10 @@ let mockSendMessageStream: any;
 vi.mock('fs', () => ({
   statSync: vi.fn(),
   mkdirSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    write: vi.fn(),
+    on: vi.fn(),
+  })),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -160,7 +164,10 @@ describe('editCorrector', () => {
     const abortSignal = new AbortController().signal;
 
     beforeEach(() => {
-      mockToolRegistry = new ToolRegistry({} as Config) as Mocked<ToolRegistry>;
+      mockToolRegistry = new ToolRegistry(
+        {} as Config,
+        {} as any,
+      ) as Mocked<ToolRegistry>;
       const configParams = {
         apiKey: 'test-api-key',
         model: 'test-model',
@@ -233,7 +240,7 @@ describe('editCorrector', () => {
       mockGeminiClientInstance = new GeminiClient(
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
-      mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
+      mockGeminiClientInstance.getHistory = vi.fn().mockReturnValue([]);
       mockBaseLlmClientInstance = {
         generateJson: mockGenerateJson,
         config: {
@@ -266,6 +273,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -286,6 +294,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -309,6 +318,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -329,6 +339,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -353,6 +364,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -373,6 +385,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -393,6 +406,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with foobar');
@@ -418,6 +432,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe(llmNewString);
@@ -442,6 +457,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
         expect(result.params.new_string).toBe(llmNewString);
@@ -464,6 +480,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -488,6 +505,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe(newStringForLLMAndReturnedByLLM);
@@ -511,6 +529,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params).toEqual(originalParams);
@@ -531,6 +550,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params).toEqual(originalParams);
@@ -556,6 +576,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
         expect(result.params.old_string).toBe(currentContent);
@@ -602,9 +623,7 @@ describe('editCorrector', () => {
             ],
           },
         ];
-        (mockGeminiClientInstance.getHistory as Mock).mockResolvedValue(
-          history,
-        );
+        (mockGeminiClientInstance.getHistory as Mock).mockReturnValue(history);
 
         const result = await ensureCorrectEdit(
           filePath,
@@ -613,6 +632,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
 
         expect(result.occurrences).toBe(0);
@@ -660,6 +680,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
       expect(result).toBe(content);
       expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -676,6 +697,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);
@@ -696,6 +718,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);
@@ -711,6 +734,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(content);
@@ -731,6 +755,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);

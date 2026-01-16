@@ -11,7 +11,7 @@ Before using sandboxing, you need to install and set up the Gemini CLI:
 npm install -g @google/gemini-cli
 ```
 
-To verify the installation
+To verify the installation:
 
 ```bash
 gemini --version

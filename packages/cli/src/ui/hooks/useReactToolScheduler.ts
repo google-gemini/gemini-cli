@@ -17,6 +17,7 @@ import type {
   AllToolCallsCompleteHandler,
   ToolCallsUpdateHandler,
   ToolCall,
+  ToolCallConfirmationDetails,
   Status as CoreStatus,
   EditorType,
 } from '@google/gemini-cli-core';
@@ -99,7 +100,7 @@ export function useReactToolScheduler(
       setToolCallsForDisplay((prevCalls) =>
         prevCalls.map((tc) => {
           if (tc.request.callId === toolCallId && tc.status === 'executing') {
-            const executingTc = tc as TrackedExecutingToolCall;
+            const executingTc = tc;
             return { ...executingTc, liveOutput: outputChunk };
           }
           return tc;
@@ -137,7 +138,7 @@ export function useReactToolScheduler(
               ...coreTc,
               responseSubmittedToGemini,
               liveOutput,
-              pid: (coreTc as ExecutingToolCall).pid,
+              pid: coreTc.pid,
             };
           } else {
             return {
@@ -306,16 +307,16 @@ export function mapToDisplay(
             ...baseDisplayProperties,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: undefined,
-            confirmationDetails: trackedCall.confirmationDetails,
+            confirmationDetails:
+              trackedCall.confirmationDetails as ToolCallConfirmationDetails,
           };
         case 'executing':
           return {
             ...baseDisplayProperties,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
-            resultDisplay:
-              (trackedCall as TrackedExecutingToolCall).liveOutput ?? undefined,
+            resultDisplay: trackedCall.liveOutput ?? undefined,
             confirmationDetails: undefined,
-            ptyId: (trackedCall as TrackedExecutingToolCall).pid,
+            ptyId: trackedCall.pid,
           };
         case 'validating': // Fallthrough
         case 'scheduled':

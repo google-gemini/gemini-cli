@@ -36,6 +36,7 @@ describe('McpStatus', () => {
       },
     ],
     prompts: [],
+    resources: [],
     blockedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},
@@ -147,6 +148,24 @@ describe('McpStatus', () => {
     unmount();
   });
 
+  it('renders correctly with resources', () => {
+    const { lastFrame, unmount } = render(
+      <McpStatus
+        {...baseProps}
+        resources={[
+          {
+            serverName: 'server-1',
+            name: 'resource-1',
+            uri: 'file:///tmp/resource-1.txt',
+            description: 'A test resource',
+          },
+        ]}
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
   it('renders correctly with a blocked server', () => {
     const { lastFrame, unmount } = render(
       <McpStatus
@@ -163,6 +182,20 @@ describe('McpStatus', () => {
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('truncates resources when exceeding limit', () => {
+    const manyResources = Array.from({ length: 25 }, (_, i) => ({
+      serverName: 'server-1',
+      name: `resource-${i + 1}`,
+      uri: `file:///tmp/resource-${i + 1}.txt`,
+    }));
+
+    const { lastFrame, unmount } = render(
+      <McpStatus {...baseProps} resources={manyResources} />,
+    );
+    expect(lastFrame()).toContain('15 resources hidden');
     unmount();
   });
 });

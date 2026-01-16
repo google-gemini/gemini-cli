@@ -24,6 +24,7 @@ export interface FileSearchOptions {
   enableRecursiveFileSearch: boolean;
   disableFuzzySearch: boolean;
   maxDepth?: number;
+  maxFiles?: number;
 }
 
 export class AbortError extends Error {
@@ -109,7 +110,9 @@ class RecursiveFileSearch implements FileSearch {
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
       maxDepth: this.options.maxDepth,
+      maxFiles: this.options.maxFiles ?? 20000,
     });
+
     this.buildResultCache();
   }
 
@@ -129,7 +132,7 @@ class RecursiveFileSearch implements FileSearch {
 
     let filteredCandidates;
     const { files: candidates, isExactMatch } =
-      await this.resultCache!.get(pattern);
+      await this.resultCache.get(pattern);
 
     if (isExactMatch) {
       // Use the cached result.
@@ -151,7 +154,7 @@ class RecursiveFileSearch implements FileSearch {
       }
 
       if (shouldCache) {
-        this.resultCache!.set(pattern, filteredCandidates);
+        this.resultCache.set(pattern, filteredCandidates);
       }
     }
 

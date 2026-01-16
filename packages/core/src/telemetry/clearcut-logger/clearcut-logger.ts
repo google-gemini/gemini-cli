@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
+import * as os from 'node:os';
+import si from 'systeminformation';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type {
   StartSessionEvent,
@@ -30,14 +33,15 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
+  HookCallEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -55,6 +59,7 @@ import {
   isCloudShell,
 } from '../../ide/detect-ide.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -87,13 +92,14 @@ export enum EventNames {
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
-  SMART_EDIT_STRATEGY = 'smart_edit_strategy',
-  SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  EDIT_STRATEGY = 'edit_strategy',
+  EDIT_CORRECTION = 'edit_correction',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
   RECOVERY_ATTEMPT = 'recovery_attempt',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
   LLM_LOOP_CHECK = 'llm_loop_check',
+  HOOK_CALL = 'hook_call',
 }
 
 export interface LogResponse {
@@ -103,6 +109,9 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
+  exp?: {
+    gws_experiment: number[];
+  };
 }
 
 export interface EventValue {
@@ -156,6 +165,13 @@ function determineGHWorkflowName(): string | undefined {
 }
 
 /**
+ * Determines the GitHub repository name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHRepositoryName(): string | undefined {
+  return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
  * Clearcut URL to send logging events to.
  */
 const CLEARCUT_URL = 'https://play.googleapis.com/log?format=json&hasfast=true';
@@ -177,6 +193,35 @@ const MAX_EVENTS = 1000;
  */
 const MAX_RETRY_EVENTS = 100;
 
+const NO_GPU = 'NA';
+
+let cachedGpuInfo: string | undefined;
+
+async function refreshGpuInfo(): Promise<void> {
+  try {
+    const graphics = await si.graphics();
+    if (graphics.controllers && graphics.controllers.length > 0) {
+      cachedGpuInfo = graphics.controllers.map((c) => c.model).join(', ');
+    } else {
+      cachedGpuInfo = NO_GPU;
+    }
+  } catch (error) {
+    cachedGpuInfo = 'FAILED';
+    debugLogger.error(
+      'Failed to get GPU information for telemetry',
+      getErrorMessage(error),
+    );
+  }
+}
+
+async function getGpuInfo(): Promise<string> {
+  if (!cachedGpuInfo) {
+    await refreshGpuInfo();
+  }
+
+  return cachedGpuInfo ?? NO_GPU;
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -186,6 +231,7 @@ export class ClearcutLogger {
   private promptId: string = '';
   private readonly installationManager: InstallationManager;
   private readonly userAccountManager: UserAccountManager;
+  private readonly hashedGHRepositoryName?: string;
 
   /**
    * Queue of pending events that need to be flushed to the server.  New events
@@ -215,6 +261,13 @@ export class ClearcutLogger {
     this.promptId = config?.getSessionId() ?? '';
     this.installationManager = new InstallationManager();
     this.userAccountManager = new UserAccountManager();
+
+    const ghRepositoryName = determineGHRepositoryName();
+    if (ghRepositoryName) {
+      this.hashedGHRepositoryName = createHash('sha256')
+        .update(ghRepositoryName)
+        .digest('hex');
+    }
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -232,7 +285,7 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
-  enqueueHelper(event: LogEvent): void {
+  enqueueHelper(event: LogEvent, experimentIds?: number[]): void {
     // Manually handle overflow for FixedDeque, which throws when full.
     const wasAtCapacity = this.events.size >= MAX_EVENTS;
 
@@ -240,12 +293,18 @@ export class ClearcutLogger {
       this.events.shift(); // Evict oldest element to make space.
     }
 
-    this.events.push([
-      {
-        event_time_ms: Date.now(),
-        source_extension_json: safeJsonStringify(event),
-      },
-    ]);
+    const logEventEntry: LogEventEntry = {
+      event_time_ms: Date.now(),
+      source_extension_json: safeJsonStringify(event),
+    };
+
+    if (experimentIds !== undefined) {
+      logEventEntry.exp = {
+        gws_experiment: experimentIds,
+      };
+    }
+
+    this.events.push([logEventEntry]);
 
     if (wasAtCapacity && this.config?.getDebugMode()) {
       debugLogger.debug(
@@ -259,7 +318,7 @@ export class ClearcutLogger {
       this.enqueueHelper(event);
     } catch (error) {
       if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
+        debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
       }
     }
   }
@@ -268,6 +327,7 @@ export class ClearcutLogger {
     event: LogEvent,
   ): Promise<void> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.config?.getExperimentsAsync().then((experiments) => {
         if (experiments) {
           const exp_id_data: EventValue[] = [
@@ -279,12 +339,10 @@ export class ClearcutLogger {
           event.event_metadata = [[...event.event_metadata[0], ...exp_id_data]];
         }
 
-        this.enqueueHelper(event);
+        this.enqueueHelper(event, experiments?.experimentIds);
       });
     } catch (error) {
-      if (this.config?.getDebugMode()) {
-        console.error('ClearcutLogger: Failed to enqueue log event.', error);
-      }
+      debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
     }
   }
 
@@ -295,7 +353,6 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
-
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -320,6 +377,13 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
         value: ghWorkflowName,
+      });
+    }
+
+    if (this.hashedGHRepositoryName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
+        value: this.hashedGHRepositoryName,
       });
     }
 
@@ -409,7 +473,7 @@ export class ClearcutLogger {
         };
       } else {
         if (this.config?.getDebugMode()) {
-          console.error(
+          debugLogger.warn(
             `Error flushing log events: HTTP ${response.status}: ${response.statusText}`,
           );
         }
@@ -419,7 +483,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
-        console.error('Error flushing log events:', e as Error);
+        debugLogger.warn('Error flushing log events:', e as Error);
       }
 
       // Re-queue failed events for retry
@@ -442,7 +506,7 @@ export class ClearcutLogger {
     return result;
   }
 
-  logStartSessionEvent(event: StartSessionEvent): void {
+  async logStartSessionEvent(event: StartSessionEvent): Promise<void> {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,
@@ -531,9 +595,33 @@ export class ClearcutLogger {
         value: event.extension_ids.toString(),
       },
     ];
+
+    // Add hardware information only to the start session event
+    const cpus = os.cpus();
+    data.push(
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
+        value: cpus[0].model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
+        value: cpus.length.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
+        value: (os.totalmem() / 1024 ** 3).toFixed(2).toString(),
+      },
+    );
+
+    const gpuInfo = await getGpuInfo();
+    data.push({
+      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GPU_INFO,
+      value: gpuInfo,
+    });
     this.sessionData = data;
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
@@ -877,6 +965,7 @@ export class ClearcutLogger {
     ];
 
     // Flush after experiments finish loading from CCPA server
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.enqueueLogEventAfterExperimentsLoadAsync(
       this.createLogEvent(EventNames.START_SESSION, data),
     ).then(() => {
@@ -991,7 +1080,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1025,7 +1114,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1049,7 +1138,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1149,7 +1238,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1188,7 +1277,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
-        value: event.extension_name,
+        value: event.hashed_extension_name,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
@@ -1209,31 +1298,27 @@ export class ClearcutLogger {
     });
   }
 
-  logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
+  logEditStrategyEvent(event: EditStrategyEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_STRATEGY,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_STRATEGY,
         value: event.strategy,
       },
     ];
 
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.SMART_EDIT_STRATEGY, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_STRATEGY, data));
     this.flushIfNeeded();
   }
 
-  logSmartEditCorrectionEvent(event: SmartEditCorrectionEvent): void {
+  logEditCorrectionEvent(event: EditCorrectionEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_CORRECTION,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EDIT_CORRECTION,
         value: event.correction,
       },
     ];
 
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
-    );
+    this.enqueueLogEvent(this.createLogEvent(EventNames.EDIT_CORRECTION, data));
     this.flushIfNeeded();
   }
 
@@ -1352,6 +1437,33 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.LLM_LOOP_CHECK, data));
+    this.flushIfNeeded();
+  }
+
+  logHookCallEvent(event: HookCallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_EVENT_NAME,
+        value: event.hook_event_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_SUCCESS,
+        value: event.success.toString(),
+      },
+    ];
+
+    if (event.exit_code !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_HOOK_EXIT_CODE,
+        value: event.exit_code.toString(),
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.HOOK_CALL, data));
     this.flushIfNeeded();
   }
 
@@ -1475,4 +1587,8 @@ export class ClearcutLogger {
 export const TEST_ONLY = {
   MAX_RETRY_EVENTS,
   MAX_EVENTS,
+  refreshGpuInfo,
+  resetCachedGpuInfoForTesting: () => {
+    cachedGpuInfo = undefined;
+  },
 };

@@ -11,8 +11,10 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import EventEmitter from 'node:events';
+import type { ChildProcess } from 'node:child_process';
 import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
+import { mergeSettings } from '../config/settings.js';
 
 vi.mock('./installationInfo.js', async () => {
   const actual = await vi.importActual('./installationInfo.js');
@@ -26,22 +28,13 @@ vi.mock('./updateEventEmitter.js', async (importOriginal) =>
   importOriginal<typeof import('./updateEventEmitter.js')>(),
 );
 
-interface MockChildProcess extends EventEmitter {
-  stdin: EventEmitter & {
-    write: Mock;
-    end: Mock;
-  };
-  stderr: EventEmitter;
-}
-
 const mockGetInstallationInfo = vi.mocked(getInstallationInfo);
-// updateEventEmitter is now real, but we will spy on it
 
 describe('handleAutoUpdate', () => {
   let mockSpawn: Mock;
   let mockUpdateInfo: UpdateObject;
   let mockSettings: LoadedSettings;
-  let mockChildProcess: MockChildProcess;
+  let mockChildProcess: ChildProcess;
 
   beforeEach(() => {
     mockSpawn = vi.fn();
@@ -57,12 +50,9 @@ describe('handleAutoUpdate', () => {
       message: 'An update is available!',
     };
 
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
-      merged: {
-        general: {
-          disableAutoUpdate: false,
-        },
-      },
+      merged: defaultMergedSettings,
     } as LoadedSettings;
 
     mockChildProcess = Object.assign(new EventEmitter(), {
@@ -70,8 +60,8 @@ describe('handleAutoUpdate', () => {
         write: vi.fn(),
         end: vi.fn(),
       }),
-      stderr: new EventEmitter(),
-    }) as MockChildProcess;
+      unref: vi.fn(),
+    }) as unknown as ChildProcess;
 
     mockSpawn.mockReturnValue(
       mockChildProcess as unknown as ReturnType<typeof mockSpawn>,
@@ -90,7 +80,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should do nothing if update nag is disabled', () => {
-    mockSettings.merged.general!.disableUpdateNag = true;
+    mockSettings.merged.general.disableUpdateNag = true;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
@@ -98,7 +88,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should emit "update-received" but not update if auto-updates are disabled', () => {
-    mockSettings.merged.general!.disableAutoUpdate = true;
+    mockSettings.merged.general.disableAutoUpdate = true;
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'Please update manually.',
@@ -194,7 +184,6 @@ describe('handleAutoUpdate', () => {
 
       // Simulate failed execution
       setTimeout(() => {
-        mockChildProcess.stderr.emit('data', 'An error occurred');
         mockChildProcess.emit('close', 1);
         resolve();
       }, 0);
@@ -204,7 +193,7 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
-        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0, stderr: An error occurred)',
+        'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
     });
   });
 
@@ -253,7 +242,8 @@ describe('handleAutoUpdate', () => {
       'npm i -g @google/gemini-cli@nightly',
       {
         shell: true,
-        stdio: 'pipe',
+        stdio: 'ignore',
+        detached: true,
       },
     );
   });

@@ -34,8 +34,9 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
             ? line.map((token: AnsiToken, tokenIndex: number) => (
                 <Text
                   key={tokenIndex}
-                  color={token.inverse ? token.bg : token.fg}
-                  backgroundColor={token.inverse ? token.fg : token.bg}
+                  color={token.fg}
+                  backgroundColor={token.bg}
+                  inverse={token.inverse}
                   dimColor={token.dim}
                   bold={token.bold}
                   italic={token.italic}
