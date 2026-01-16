@@ -29,7 +29,7 @@ import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { SkillsList } from './views/SkillsList.js';
-import { AgentsStatus } from './views/AgentsStatus.js';
+import { AgentsManager } from './views/AgentsManager.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
@@ -162,7 +162,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'agents_list' && (
-        <AgentsStatus
+        <AgentsManager
           agents={itemForDisplay.agents}
           terminalWidth={terminalWidth}
         />

@@ -7,9 +7,9 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, ToolActionReturn } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import type { SlashCommand, ToolActionReturn } from './types.js';
+import type { SlashCommand } from './types.js';
 
 describe('agentsCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -72,17 +72,39 @@ describe('agentsCommand', () => {
         displayName: 'Agent One',
         description: 'desc1',
         kind: 'local',
+        promptConfig: { systemPrompt: 'sys' },
+        toolConfig: { tools: ['tool1'] },
+        runConfig: { maxTimeMinutes: 10 },
       },
-      { name: 'agent2', description: 'desc2', kind: 'remote' },
+      { name: 'agent2', description: 'desc2', kind: 'remote', agentCardUrl: 'http://example.com' },
     ];
     mockConfig.getAgentRegistry().getAllDefinitions.mockReturnValue(mockAgents);
+
+    const expectedAgents = [
+      {
+        name: 'agent1',
+        displayName: 'Agent One',
+        description: 'desc1',
+        kind: 'local',
+        systemPrompt: 'sys',
+        tools: ['tool1'],
+        maxTimeMinutes: 10,
+        maxTurns: undefined,
+      },
+      {
+        name: 'agent2',
+        description: 'desc2',
+        kind: 'remote',
+        agentCardUrl: 'http://example.com',
+      },
+    ];
 
     await agentsCommand.action!(mockContext, '');
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageType.AGENTS_LIST,
-        agents: mockAgents,
+        agents: expectedAgents,
       }),
     );
   });
@@ -209,7 +231,7 @@ describe('agentsCommand', () => {
         agent_definition: expect.stringContaining('Name: test-agent'),
         problem_description: 'prompt failure',
       });
-      expect(result.toolArgs.agent_definition).toContain('You are a helper.');
+      expect(result.toolArgs['agent_definition']).toContain('You are a helper.');
     });
   });
 });

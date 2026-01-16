@@ -14,7 +14,6 @@ import type {
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
   SkillDefinition,
-  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -216,10 +215,17 @@ export type HistoryItemSkillsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
-export type AgentDefinitionJson = Pick<
-  AgentDefinition,
-  'name' | 'displayName' | 'description' | 'kind'
->;
+export type AgentDefinitionJson = {
+  name: string;
+  displayName?: string;
+  description: string;
+  kind: 'local' | 'remote';
+  systemPrompt?: string;
+  tools?: string[];
+  maxTimeMinutes?: number;
+  maxTurns?: number;
+  agentCardUrl?: string;
+};
 
 export type HistoryItemAgentsList = HistoryItemBase & {
   type: 'agents_list';

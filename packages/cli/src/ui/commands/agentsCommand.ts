@@ -32,12 +32,36 @@ const agentsListCommand: SlashCommand = {
       };
     }
 
-    const agents = agentRegistry.getAllDefinitions().map((def) => ({
-      name: def.name,
-      displayName: def.displayName,
-      description: def.description,
-      kind: def.kind,
-    }));
+    const agents = agentRegistry.getAllDefinitions().map((def) => {
+      const base = {
+        name: def.name,
+        displayName: def.displayName,
+        description: def.description,
+        kind: def.kind,
+      };
+
+      if (def.kind === 'local') {
+        const tools = def.toolConfig?.tools
+          .map((t) => {
+            if (typeof t === 'string') return t;
+            return t.name;
+          })
+          .filter((t): t is string => t !== undefined);
+
+        return {
+          ...base,
+          systemPrompt: def.promptConfig.systemPrompt,
+          tools,
+          maxTimeMinutes: def.runConfig.maxTimeMinutes,
+          maxTurns: def.runConfig.maxTurns,
+        };
+      } else {
+        return {
+          ...base,
+          agentCardUrl: def.agentCardUrl,
+        };
+      }
+    });
 
     const agentsListItem: HistoryItemAgentsList = {
       type: MessageType.AGENTS_LIST,
