@@ -76,7 +76,7 @@ jobs:
 
             for (const issue of issuesToProcess) {
               const parentUrl = await getIssueParent(issue.owner, issue.repo, issue.number);
-              
+
               if (parentUrl && allowedParentUrls.includes(parentUrl)) {
                 console.log(`SUCCESS: Issue #${issue.number} is a direct child of ${parentUrl}. Adding label.`);
                 await github.rest.issues.addLabels({
