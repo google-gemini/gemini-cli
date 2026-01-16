@@ -65,11 +65,11 @@ export const clearCommand: SlashCommand = {
     uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
 
-    if (result?.finalOutput?.systemMessage) {
+    if (result?.systemMessage) {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: result.finalOutput.systemMessage,
+          text: result.systemMessage,
         },
         Date.now(),
       );
