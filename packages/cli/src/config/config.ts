@@ -759,9 +759,10 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooks?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? false),
     enableHooksUI: settings.tools?.enableHooks ?? true,
-    hooks: settings.hooks || {},
+    hooks: settings.hooksConfig?.hooks || {},
+    disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {

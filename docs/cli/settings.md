@@ -122,10 +122,10 @@ they appear in the UI.
 | Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                          | `true`  |
 | Plan                                | `experimental.plan`                                     | Enable planning features (Plan Mode and tools).                                     | `false` |
 
-### Hooks
+### HooksConfig
 
-| UI Label           | Setting               | Description                                      | Default |
-| ------------------ | --------------------- | ------------------------------------------------ | ------- |
-| Hook Notifications | `hooks.notifications` | Show visual indicators when hooks are executing. | `true`  |
+| UI Label           | Setting                     | Description                                      | Default |
+| ------------------ | --------------------------- | ------------------------------------------------ | ------- |
+| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing. | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

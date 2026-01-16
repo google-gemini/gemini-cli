@@ -76,7 +76,7 @@ async function enableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks.disabled;
+  const disabledHooks = settings.merged.hooksConfig.disabled;
   // Remove from disabled list if present
   const newDisabledHooks = disabledHooks.filter(
     (name: string) => name !== hookName,
@@ -87,7 +87,7 @@ async function enableAction(
     const scope = settings.workspace
       ? SettingScope.Workspace
       : SettingScope.User;
-    settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
+    settings.setValue(scope, 'hooksConfig.disabled', newDisabledHooks);
 
     // Enable in hook system
     hookSystem.setHookEnabled(hookName, true);
@@ -142,7 +142,7 @@ async function disableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks.disabled;
+  const disabledHooks = settings.merged.hooksConfig.disabled;
   // Add to disabled list if not already present
   if (!disabledHooks.includes(hookName)) {
     const newDisabledHooks = [...disabledHooks, hookName];
@@ -152,7 +152,7 @@ async function disableAction(
       const scope = settings.workspace
         ? SettingScope.Workspace
         : SettingScope.User;
-      settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
+      settings.setValue(scope, 'hooksConfig.disabled', newDisabledHooks);
 
       // Disable in hook system
       hookSystem.setHookEnabled(hookName, false);
@@ -251,7 +251,7 @@ async function enableAllAction(
     const scope = settings.workspace
       ? SettingScope.Workspace
       : SettingScope.User;
-    settings.setValue(scope, 'hooks.disabled', []);
+    settings.setValue(scope, 'hooksConfig.disabled', []);
 
     for (const hook of disabledHooks) {
       const hookName = getHookDisplayName(hook);
@@ -321,7 +321,7 @@ async function disableAllAction(
     const scope = settings.workspace
       ? SettingScope.Workspace
       : SettingScope.User;
-    settings.setValue(scope, 'hooks.disabled', allHookNames);
+    settings.setValue(scope, 'hooksConfig.disabled', allHookNames);
 
     for (const hook of enabledHooks) {
       const hookName = getHookDisplayName(hook);

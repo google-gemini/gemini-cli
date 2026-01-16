@@ -32,22 +32,24 @@ describe('Hooks System Integration', () => {
             'hooks-system.block-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  sequential: true,
-                  hooks: [
-                    {
-                      type: 'command',
-                      command:
-                        "node -e \"console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))\"",
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                BeforeTool: [
+                  {
+                    matcher: 'write_file',
+                    sequential: true,
+                    hooks: [
+                      {
+                        type: 'command',
+                        command:
+                          "node -e \"console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))\"",
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -84,21 +86,23 @@ describe('Hooks System Integration', () => {
             'hooks-system.allow-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command:
-                        "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))\"",
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                BeforeTool: [
+                  {
+                    matcher: 'write_file',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command:
+                          "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))\"",
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -132,20 +136,22 @@ describe('Hooks System Integration', () => {
           'hooks-system.after-tool-context.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            AfterTool: [
-              {
-                matcher: 'read_file',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: command,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              AfterTool: [
+                {
+                  matcher: 'read_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: command,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -205,19 +211,21 @@ console.log(JSON.stringify({
 
       await rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeModel: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -286,19 +294,21 @@ console.log(JSON.stringify({
 
         await rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              AfterModel: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                AfterModel: [
+                  {
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node "${scriptPath}"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         });
@@ -337,19 +347,21 @@ console.log(JSON.stringify({
         {
           settings: {
             debugMode: true,
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeToolSelection: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: hookCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                BeforeToolSelection: [
+                  {
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: hookCommand,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -403,19 +415,21 @@ console.log(JSON.stringify({
 
       await rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeAgent: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -449,20 +463,22 @@ console.log(JSON.stringify({
             approval: 'ASK', // Disable YOLO mode to show permission prompts
             confirmationRequired: ['run_shell_command'],
           },
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            Notification: [
-              {
-                matcher: 'ToolPermission',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: hookCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              Notification: [
+                {
+                  matcher: 'ToolPermission',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: hookCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -540,25 +556,27 @@ console.log(JSON.stringify({
           'hooks-system.sequential-execution.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeAgent: [
-              {
-                sequential: true,
-                hooks: [
-                  {
-                    type: 'command',
-                    command: hook1Command,
-                    timeout: 5000,
-                  },
-                  {
-                    type: 'command',
-                    command: hook2Command,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeAgent: [
+                {
+                  sequential: true,
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: hook1Command,
+                      timeout: 5000,
+                    },
+                    {
+                      type: 'command',
+                      command: hook2Command,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -620,19 +638,21 @@ try {
 
       await rig.setup('should provide correct input format to hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeTool: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeTool: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -671,43 +691,45 @@ try {
           'hooks-system.multiple-events.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeAgent: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: beforeAgentCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
-            BeforeTool: [
-              {
-                matcher: 'write_file',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: beforeToolCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
-            AfterTool: [
-              {
-                matcher: 'write_file',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: afterToolCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: beforeAgentCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: beforeToolCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              AfterTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: afterToolCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -784,24 +806,26 @@ try {
 
       await rig.setup('should handle hook failures gracefully', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeTool: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: failingCommand,
-                    timeout: 5000,
-                  },
-                  {
-                    type: 'command',
-                    command: workingCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeTool: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: failingCommand,
+                      timeout: 5000,
+                    },
+                    {
+                      type: 'command',
+                      command: workingCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -836,19 +860,21 @@ try {
           'hooks-system.telemetry.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeTool: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: hookCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeTool: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: hookCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -877,20 +903,22 @@ try {
           'hooks-system.session-startup.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            SessionStart: [
-              {
-                matcher: 'startup',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: sessionStartCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionStartCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -948,20 +976,22 @@ console.log(JSON.stringify({
 
       await rig.setup('should fire SessionStart hook and inject context', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            SessionStart: [
-              {
-                matcher: 'startup',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${scriptPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -1031,20 +1061,22 @@ console.log(JSON.stringify({
         'should fire SessionStart hook and display systemMessage in interactive mode',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              SessionStart: [
-                {
-                  matcher: 'startup',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                SessionStart: [
+                  {
+                    matcher: 'startup',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node "${scriptPath}"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -1099,32 +1131,34 @@ console.log(JSON.stringify({
             'hooks-system.session-clear.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              SessionEnd: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionEndCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              SessionStart: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionStartCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                SessionEnd: [
+                  {
+                    matcher: '*',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: sessionEndCommand,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+                SessionStart: [
+                  {
+                    matcher: '*',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: sessionStartCommand,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -1271,20 +1305,22 @@ console.log(JSON.stringify({
           'hooks-system.compress-auto.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            PreCompress: [
-              {
-                matcher: 'auto',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: preCompressCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              PreCompress: [
+                {
+                  matcher: 'auto',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: preCompressCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
           // Configure automatic compression with a very low threshold
           // This will trigger auto-compression after the first response
@@ -1336,20 +1372,22 @@ console.log(JSON.stringify({
           'hooks-system.session-startup.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            SessionEnd: [
-              {
-                matcher: 'exit',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: sessionEndCommand,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              SessionEnd: [
+                {
+                  matcher: 'exit',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionEndCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -1434,25 +1472,27 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
 
       await rig.setup('should not execute hooks disabled in settings file', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeTool: [
-              {
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${enabledPath}"`,
-                    timeout: 5000,
-                  },
-                  {
-                    type: 'command',
-                    command: `node "${disabledPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
             disabled: [`node "${disabledPath}"`], // Disable the second hook
+            hooks: {
+              BeforeTool: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${enabledPath}"`,
+                      timeout: 5000,
+                    },
+                    {
+                      type: 'command',
+                      command: `node "${disabledPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });
@@ -1514,25 +1554,27 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         'should respect disabled hooks across multiple operations',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${activePath}"`,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: `node "${disabledPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
               disabled: [`node "${disabledPath}"`], // Disable the second hook
+              hooks: {
+                BeforeTool: [
+                  {
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node "${activePath}"`,
+                        timeout: 5000,
+                      },
+                      {
+                        type: 'command',
+                        command: `node "${disabledPath}"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -1624,20 +1666,22 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
             'hooks-system.input-modification.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${commandPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+              hooks: {
+                BeforeTool: [
+                  {
+                    matcher: 'write_file',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node "${commandPath}"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
         },
@@ -1709,20 +1753,22 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           'hooks-system.before-tool-stop.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
-            BeforeTool: [
-              {
-                matcher: 'write_file',
-                hooks: [
-                  {
-                    type: 'command',
-                    command: `node "${commandPath}"`,
-                    timeout: 5000,
-                  },
-                ],
-              },
-            ],
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${commandPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
           },
         },
       });

@@ -365,7 +365,7 @@ export async function main() {
   }
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
-    projectHooks: settings.workspace.settings.hooks,
+    projectHooks: settings.workspace.settings.hooksConfig?.hooks,
   });
   adminControlsListner.setConfig(partialConfig);
 
@@ -471,7 +471,7 @@ export async function main() {
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
-      projectHooks: settings.workspace.settings.hooks,
+      projectHooks: settings.workspace.settings.hooksConfig?.hooks,
     });
     loadConfigHandle?.end();
     adminControlsListner.setConfig(config);
