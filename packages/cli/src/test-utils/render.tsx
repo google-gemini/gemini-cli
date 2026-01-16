@@ -174,6 +174,7 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
   onClearTextToastChange: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (

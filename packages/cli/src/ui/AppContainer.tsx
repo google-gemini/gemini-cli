@@ -186,6 +186,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
+  const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -364,9 +365,18 @@ export const AppContainer = (props: AppContainerProps) => {
       setSettingsNonce((prev) => prev + 1);
     };
 
+    const handleAdminSettingsChanged = () => {
+      setAdminSettingsChanged(true);
+    };
+
     coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
+    coreEvents.on(CoreEvent.AdminSettingsChanged, handleAdminSettingsChanged);
     return () => {
       coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
+      coreEvents.off(
+        CoreEvent.AdminSettingsChanged,
+        handleAdminSettingsChanged,
+      );
     };
   }, []);
 
@@ -1473,6 +1483,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const dialogsVisible =
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
+    adminSettingsChanged ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
     !!customDialog ||
@@ -1638,6 +1649,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      adminSettingsChanged,
     }),
     [
       isThemeDialogOpen,
@@ -1733,6 +1745,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      adminSettingsChanged,
     ],
   );
 
@@ -1778,6 +1791,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
+      handleRestart: async () => {
+        await runExitCleanup();
+        process.exit(RELAUNCH_EXIT_CODE);
+      },
     }),
     [
       handleThemeSelect,

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { LruCache } from '@google/gemini-cli-core';
+import { LRUCache } from 'mnemonist';
 import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
@@ -20,7 +20,7 @@ export type HighlightToken = {
 // semicolon, common punctuation, and brackets.
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
-const highlightCache = new LruCache<string, readonly HighlightToken[]>(
+const highlightCache = new LRUCache<string, readonly HighlightToken[]>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
