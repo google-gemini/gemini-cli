@@ -19,7 +19,6 @@ import type {
   ToolCall,
   ToolCallConfirmationDetails,
   Status as CoreStatus,
-  EditorType,
 } from '@google/gemini-cli-core';
 import { CoreToolScheduler, debugLogger } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
@@ -68,7 +67,7 @@ export type CancelAllFn = (signal: AbortSignal) => void;
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
   config: Config,
-  getPreferredEditor: () => EditorType | undefined,
+  getPreferredEditor: () => string | undefined,
 ): [
   TrackedToolCall[],
   ScheduleFn,

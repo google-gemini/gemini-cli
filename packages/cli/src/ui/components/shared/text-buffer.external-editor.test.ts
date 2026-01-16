@@ -87,7 +87,7 @@ describe('useTextBuffer - openInExternalEditor', () => {
       name: 'VISUAL takes precedence over EDITOR',
       env: { VISUAL: 'code', EDITOR: 'vim' },
       expectedCmd: 'code',
-      expectedArgs: [expectedFilePath],
+      expectedArgs: ['--wait', expectedFilePath],
     },
   ])(
     'should launch editor for $name with file path',

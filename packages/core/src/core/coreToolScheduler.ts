@@ -12,7 +12,12 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import type { EditorType } from '../utils/editor.js';
+import {
+  type EditorType,
+  isValidEditorType,
+  getEditorTypeFromCommand,
+} from '../utils/editor.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
@@ -91,7 +96,7 @@ interface CoreToolSchedulerOptions {
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
-  getPreferredEditor: () => EditorType | undefined;
+  getPreferredEditor: () => string | undefined;
 }
 
 export class CoreToolScheduler {
@@ -106,7 +111,7 @@ export class CoreToolScheduler {
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
-  private getPreferredEditor: () => EditorType | undefined;
+  private getPreferredEditor: () => string | undefined;
   private config: Config;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
@@ -754,8 +759,27 @@ export class CoreToolScheduler {
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
 
-      const editorType = this.getPreferredEditor();
+      const preferredEditor = this.getPreferredEditor();
+      let editorType: EditorType | null = null;
+
+      if (preferredEditor) {
+        if (isValidEditorType(preferredEditor)) {
+          editorType = preferredEditor;
+        } else {
+          // Try to map command string (e.g., 'code') to EditorType (e.g., 'vscode')
+          editorType = getEditorTypeFromCommand(preferredEditor);
+        }
+      }
+
       if (!editorType) {
+        // Invalid or missing editor: restore status and continue scheduling
+        debugLogger.warn(
+          `ModifyWithEditor: invalid or missing preferredEditor "${preferredEditor}"`,
+        );
+        this.setStatusInternal(callId, 'awaiting_approval', signal, {
+          ...waitingToolCall.confirmationDetails,
+          isModifying: false,
+        } as ToolCallConfirmationDetails);
         return;
       }
 
