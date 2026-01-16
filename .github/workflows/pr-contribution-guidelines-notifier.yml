@@ -37,15 +37,19 @@ jobs:
 
             // 1. Check if the PR author is a maintainer
             try {
-              await github.rest.teams.getMembershipForUserInOrg({
-                org,
-                team_slug,
+              const { data: { permission } } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: org,
+                repo: repo,
                 username,
               });
-              core.info(`${username} is a maintainer. No notification needed.`);
-              return;
+
+              if (permission === 'admin' || permission === 'write') {
+                core.info(`${username} has '${permission}' permission (maintainer). No notification needed.`);
+                return;
+              }
             } catch (error) {
-              if (error.status !== 404) throw error;
+              core.warning(`Failed to check permissions for ${username}: ${error.message}`);
+              // Fall through to proceed with notification if check fails (fail safe)
             }
 
             // 2. Check if the PR is already associated with an issue
