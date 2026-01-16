@@ -10,6 +10,7 @@ import os from 'node:os';
 import pathMod from 'node:path';
 import * as path from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
   CoreEvent,
@@ -18,7 +19,6 @@ import {
   type EditorType,
   getEditorCommand,
   isGuiEditor,
-  LruCache,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -728,7 +728,7 @@ export function getTransformedImagePath(filePath: string): string {
   return `[Image ${truncatedBase}${extension}]`;
 }
 
-const transformationsCache = new LruCache<string, Transformation[]>(
+const transformationsCache = new LRUCache<string, Transformation[]>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
@@ -881,7 +881,7 @@ interface LineLayoutResult {
   visualToTransformedMap: number[];
 }
 
-const lineLayoutCache = new LruCache<string, LineLayoutResult>(
+const lineLayoutCache = new LRUCache<string, LineLayoutResult>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
