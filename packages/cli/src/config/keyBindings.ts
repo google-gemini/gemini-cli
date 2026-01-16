@@ -57,6 +57,7 @@ export enum Command {
   PASTE_CLIPBOARD = 'pasteClipboard',
 
   // App level bindings
+  RESTART_APP = 'restartApp',
   SHOW_ERROR_DETAILS = 'showErrorDetails',
   SHOW_FULL_TODOS = 'showFullTodos',
   SHOW_IDE_CONTEXT_DETAIL = 'showIDEContextDetail',
@@ -230,6 +231,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
 
   // App level bindings
+  [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.SHOW_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
@@ -350,6 +352,7 @@ export const commandCategories: readonly CommandCategory[] = [
   {
     title: 'App Controls',
     commands: [
+      Command.RESTART_APP,
       Command.SHOW_ERROR_DETAILS,
       Command.SHOW_FULL_TODOS,
       Command.SHOW_IDE_CONTEXT_DETAIL,
@@ -424,6 +427,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines.',
+  [Command.RESTART_APP]: 'Restart the application.',
   [Command.REVERSE_SEARCH]: 'Start reverse search through history.',
   [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:

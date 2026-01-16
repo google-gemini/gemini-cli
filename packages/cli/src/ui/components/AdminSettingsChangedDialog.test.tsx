@@ -34,4 +34,18 @@ describe('AdminSettingsChangedDialog', () => {
 
     expect(handleRestartMock).toHaveBeenCalled();
   });
+
+  it('restarts on "R" key press', async () => {
+    const { stdin } = renderWithProviders(<AdminSettingsChangedDialog />, {
+      uiActions: {
+        handleRestart: handleRestartMock,
+      },
+    });
+
+    act(() => {
+      stdin.write('R');
+    });
+
+    expect(handleRestartMock).toHaveBeenCalled();
+  });
 });

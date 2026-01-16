@@ -129,7 +129,6 @@ import {
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
-import { AdminSettingsChangedDialog } from './components/AdminSettingsChangedDialog.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1463,6 +1462,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const dialogsVisible =
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
+    adminSettingsChanged ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
     !!customDialog ||
@@ -1627,6 +1627,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      adminSettingsChanged,
     }),
     [
       isThemeDialogOpen,
@@ -1721,6 +1722,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      adminSettingsChanged,
     ],
   );
 
@@ -1830,7 +1832,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           >
             <ShellFocusContext.Provider value={isFocused}>
-              {adminSettingsChanged ? <AdminSettingsChangedDialog /> : <App />}
+              <App />
             </ShellFocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
