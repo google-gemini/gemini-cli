@@ -471,6 +471,7 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+    adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
@@ -789,7 +790,6 @@ function setupAdminControlsListener() {
       config = newConfig;
       if (pendingSettings) {
         config.setRemoteAdminSettings(pendingSettings);
-        pendingSettings = undefined;
       }
     },
     cleanup: () => {
