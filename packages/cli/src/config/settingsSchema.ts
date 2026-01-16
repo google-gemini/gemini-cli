@@ -280,7 +280,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Session Age',
             category: 'General',
             requiresRestart: false,
-            default: '30d',
+            default: '30d' as string,
             description:
               'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: false,
