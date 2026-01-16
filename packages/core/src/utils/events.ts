@@ -119,6 +119,7 @@ export enum CoreEvent {
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
   AgentsRefreshed = 'agents-refreshed',
+  AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
 }
 
@@ -133,6 +134,7 @@ export interface CoreEvents {
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
   [CoreEvent.AgentsRefreshed]: never[];
+  [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
 }
 
@@ -240,6 +242,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitAgentsRefreshed(): void {
     this.emit(CoreEvent.AgentsRefreshed);
+  }
+
+  /**
+   * Notifies subscribers that admin settings have changed.
+   */
+  emitAdminSettingsChanged(): void {
+    this.emit(CoreEvent.AdminSettingsChanged);
   }
 
   /**
