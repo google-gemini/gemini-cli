@@ -39,7 +39,6 @@ const createKey = (partial: Partial<Key>): Key => ({
   ctrl: partial.ctrl || false,
   meta: partial.meta || false,
   shift: partial.shift || false,
-  paste: partial.paste || false,
   insertable: partial.insertable || false,
   ...partial,
 });
@@ -59,15 +58,17 @@ const createMockTextBufferState = (
     selectionAnchor: null,
     viewportWidth: 80,
     viewportHeight: 24,
+    transformationsByLine: lines.map(() => []),
     visualLayout: {
       visualLines: lines,
       logicalToVisualMap: lines.map((_, i) => [[i, 0]]),
       visualToLogicalMap: lines.map((_, i) => [i, 0]),
+      transformedToLogicalMaps: lines.map(() => []),
+      visualToTransformedMap: [],
     },
     ...partial,
   };
 };
-
 // Test constants
 const TEST_SEQUENCES = {
   ESCAPE: createKey({ sequence: '\u001b', name: 'escape' }),
@@ -174,6 +175,10 @@ describe('useVim hook', () => {
           cursorState.pos = [row, col - 1];
         }
       }),
+      // Additional properties for transformations
+      transformedToLogicalMaps: lines.map(() => []),
+      visualToTransformedMap: [],
+      transformationsByLine: lines.map(() => []),
     };
   };
 

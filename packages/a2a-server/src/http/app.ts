@@ -25,7 +25,7 @@ import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
-import { SimpleExtensionLoader } from '@google/gemini-cli-core';
+import { debugLogger, SimpleExtensionLoader } from '@google/gemini-cli-core';
 import type { Command, CommandArgument } from '../commands/types.js';
 import { GitService } from '@google/gemini-cli-core';
 
@@ -239,7 +239,7 @@ export async function createApp() {
         ): CommandResponse | undefined => {
           const commandName = command.name;
           if (visited.includes(commandName)) {
-            console.warn(
+            debugLogger.warn(
               `Command ${commandName} already inserted in the response, skipping`,
             );
             return undefined;
@@ -326,9 +326,9 @@ export async function createApp() {
 export async function main() {
   try {
     const expressApp = await createApp();
-    const port = process.env['CODER_AGENT_PORT'] || 0;
+    const port = Number(process.env['CODER_AGENT_PORT'] || 0);
 
-    const server = expressApp.listen(port, () => {
+    const server = expressApp.listen(port, 'localhost', () => {
       const address = server.address();
       let actualPort;
       if (process.env['CODER_AGENT_PORT']) {

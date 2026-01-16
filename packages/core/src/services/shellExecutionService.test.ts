@@ -83,6 +83,11 @@ const shellExecutionConfig: ShellExecutionConfig = {
   pager: 'cat',
   showColor: false,
   disableDynamicLineTrimming: true,
+  sanitizationConfig: {
+    enableEnvironmentVariableRedaction: false,
+    allowedEnvironmentVariables: [],
+    blockedEnvironmentVariables: [],
+  },
 };
 
 const createMockSerializeTerminalToObjectReturnValue = (
@@ -551,7 +556,13 @@ describe('ShellExecutionService', () => {
         onOutputEventMock,
         new AbortController().signal,
         true,
-        {},
+        {
+          sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
+            allowedEnvironmentVariables: [],
+            blockedEnvironmentVariables: [],
+          },
+        },
       );
       const result = await handle.result;
 
@@ -1070,7 +1081,13 @@ describe('ShellExecutionService child_process fallback', () => {
         onOutputEventMock,
         abortController.signal,
         true,
-        {},
+        {
+          sanitizationConfig: {
+            enableEnvironmentVariableRedaction: true,
+            allowedEnvironmentVariables: [],
+            blockedEnvironmentVariables: [],
+          },
+        },
       );
 
       abortController.abort();
@@ -1258,7 +1275,13 @@ describe('ShellExecutionService execution method selection', () => {
       onOutputEventMock,
       abortController.signal,
       false, // shouldUseNodePty
-      {},
+      {
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
+      },
     );
 
     // Simulate exit to allow promise to resolve
@@ -1399,7 +1422,72 @@ describe('ShellExecutionService environment variables', () => {
       vi.fn(),
       new AbortController().signal,
       true,
+      {
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: false,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
+      },
+    );
+
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(cpEnv).toHaveProperty('PATH', '/test/path');
+    expect(cpEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+  });
+
+  it('should use a sanitized environment when in a GitHub run (SURFACE=Github)', async () => {
+    // Mock the environment to simulate a GitHub Actions run via SURFACE variable
+    vi.stubEnv('SURFACE', 'Github');
+    vi.stubEnv('MY_SENSITIVE_VAR', 'secret-value'); // This should be stripped out
+    vi.stubEnv('PATH', '/test/path'); // An essential var that should be kept
+    vi.stubEnv('GEMINI_CLI_TEST_VAR', 'test-value'); // A test var that should be kept
+
+    vi.resetModules();
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    // Test pty path
+    await ShellExecutionService.execute(
+      'test-pty-command-surface',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
       shellExecutionConfig,
+    );
+
+    const ptyEnv = mockPtySpawn.mock.calls[0][2].env;
+    expect(ptyEnv).not.toHaveProperty('MY_SENSITIVE_VAR');
+    expect(ptyEnv).toHaveProperty('PATH', '/test/path');
+    expect(ptyEnv).toHaveProperty('GEMINI_CLI_TEST_VAR', 'test-value');
+
+    // Ensure pty process exits for next test
+    mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+    await new Promise(process.nextTick);
+
+    // Test child_process path
+    mockGetPty.mockResolvedValue(null); // Force fallback
+    await ShellExecutionService.execute(
+      'test-cp-command-surface',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true,
+      {
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: false,
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+        },
+      },
     );
 
     const cpEnv = mockCpSpawn.mock.calls[0][2].env;

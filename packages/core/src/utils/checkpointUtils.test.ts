@@ -16,7 +16,7 @@ import {
 } from './checkpointUtils.js';
 import type { GitService } from '../services/gitService.js';
 import type { GeminiClient } from '../core/client.js';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 describe('checkpoint utils', () => {
   describe('getToolCallDataSchema', () => {
@@ -149,7 +149,7 @@ describe('checkpoint utils', () => {
       ] as ToolCallRequestInfo[];
 
       (mockGitService.createFileSnapshot as Mock).mockResolvedValue('hash123');
-      (mockGeminiClient.getHistory as Mock).mockResolvedValue([
+      (mockGeminiClient.getHistory as Mock).mockReturnValue([
         { role: 'user', parts: [] },
       ]);
 

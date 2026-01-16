@@ -64,7 +64,6 @@ export const DialogManager = ({
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
-        userTier={uiState.userTier}
       />
     );
   }
@@ -188,6 +187,7 @@ export const DialogManager = ({
           setAuthState={uiActions.setAuthState}
           authError={uiState.authError}
           onAuthError={uiActions.onAuthError}
+          setAuthContext={uiActions.setAuthContext}
         />
       </Box>
     );

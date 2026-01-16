@@ -312,7 +312,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       ctrl: key.ctrl || false,
       meta: key.meta || false,
       shift: key.shift || false,
-      paste: key.paste || false,
       insertable: key.insertable || false,
     }),
     [],

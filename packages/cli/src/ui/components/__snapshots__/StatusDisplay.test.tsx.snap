@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`StatusDisplay > does NOT render HookStatusDisplay if notifications are disabled in settings 1`] = `"Mock Context Summary Display (Skills: 2)"`;
+
+exports[`StatusDisplay > prioritizes Ctrl+C prompt over everything else (except system md) 1`] = `"Press Ctrl+C again to exit."`;
+
+exports[`StatusDisplay > prioritizes warning over Ctrl+D 1`] = `"Warning"`;
+
+exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `"Mock Context Summary Display (Skills: 2)"`;
+
+exports[`StatusDisplay > renders Ctrl+D prompt 1`] = `"Press Ctrl+D again to exit."`;
+
+exports[`StatusDisplay > renders Escape prompt 1`] = `"Press Esc again to rewind."`;
+
+exports[`StatusDisplay > renders HookStatusDisplay when hooks are active 1`] = `"Mock Hook Status Display"`;
+
+exports[`StatusDisplay > renders Queue Error Message 1`] = `"Queue Error"`;
+
+exports[`StatusDisplay > renders system md indicator if env var is set 1`] = `"|⌐■_■|"`;
+
+exports[`StatusDisplay > renders warning message 1`] = `"This is a warning"`;

@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  createElement,
+} from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -22,6 +28,9 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
+  addMCPStatusChangeListener,
+  removeMCPStatusChangeListener,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -44,7 +53,11 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
-import { useAlternateBuffer } from './useAlternateBuffer.js';
+import {
+  LogoutConfirmationDialog,
+  LogoutChoice,
+} from '../components/LogoutConfirmationDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -85,7 +98,6 @@ export const useSlashCommandProcessor = (
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
-  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -201,9 +213,6 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          if (!alternateBuffer) {
-            console.clear();
-          }
           refreshStatic();
           setBannerVisible(false);
         },
@@ -227,7 +236,6 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
-      alternateBuffer,
       config,
       settings,
       gitService,
@@ -264,6 +272,10 @@ export const useSlashCommandProcessor = (
       ideClient.addStatusChangeListener(listener);
     })();
 
+    // Listen for MCP server status changes (e.g. connection, discovery completion)
+    // to reload slash commands (since they may include MCP prompts).
+    addMCPStatusChangeListener(listener);
+
     // TODO: Ideally this would happen more directly inside the ExtensionLoader,
     // but the CommandService today is not conducive to that since it isn't a
     // long lived service but instead gets fully re-created based on reload
@@ -284,6 +296,7 @@ export const useSlashCommandProcessor = (
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
       })();
+      removeMCPStatusChangeListener(listener);
       appEvents.off('extensionsStarting', extensionEventListener);
       appEvents.off('extensionsStopping', extensionEventListener);
     };
@@ -398,6 +411,22 @@ export const useSlashCommandProcessor = (
                       text: result.content,
                     },
                     Date.now(),
+                  );
+                  return { type: 'handled' };
+                case 'logout':
+                  // Show logout confirmation dialog with Login/Exit options
+                  setCustomDialog(
+                    createElement(LogoutConfirmationDialog, {
+                      onSelect: async (choice: LogoutChoice) => {
+                        setCustomDialog(null);
+                        if (choice === LogoutChoice.LOGIN) {
+                          actions.openAuthDialog();
+                        } else {
+                          await runExitCleanup();
+                          process.exit(0);
+                        }
+                      },
+                    }),
                   );
                   return { type: 'handled' };
                 case 'dialog':
@@ -551,9 +580,16 @@ export const useSlashCommandProcessor = (
           }
         }
 
+        const isMcpLoading =
+          config?.getMcpClientManager()?.getDiscoveryState() ===
+          MCPDiscoveryState.IN_PROGRESS;
+        const errorMessage = isMcpLoading
+          ? `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`
+          : `Unknown command: ${trimmed}`;
+
         addMessage({
           type: MessageType.ERROR,
-          content: `Unknown command: ${trimmed}`,
+          content: errorMessage,
           timestamp: new Date(),
         });
 

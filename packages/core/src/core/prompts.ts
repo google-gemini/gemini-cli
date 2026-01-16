@@ -6,7 +6,6 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
@@ -17,15 +16,16 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import { getEffectiveModel, PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import { resolveModel, isPreviewModel } from '../config/models.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -52,7 +52,7 @@ export function resolvePathFromEnv(envVar?: string): {
   // Safely expand the tilde (~) character to the user's home directory.
   if (customPath.startsWith('~/') || customPath === '~') {
     try {
-      const home = os.homedir(); // This is the call that can throw an error.
+      const home = homedir(); // This is the call that can throw an error.
       if (customPath === '~') {
         customPath = home;
       } else {
@@ -106,17 +106,16 @@ export function getCoreSystemPrompt(
   }
 
   // TODO(joshualitt): Replace with system instructions on model configs.
-  const desiredModel = getEffectiveModel(
-    config.isInFallbackMode(),
-    config.getModel(),
+  const desiredModel = resolveModel(
+    config.getActiveModel(),
     config.getPreviewFeatures(),
   );
 
-  const isGemini3 = desiredModel === PREVIEW_GEMINI_MODEL;
+  const isGemini3 = isPreviewModel(desiredModel);
 
   const mandatesVariant = isGemini3
     ? `
-- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.`
     : ``;
 
   const enableCodebaseInvestigator = config
@@ -129,7 +128,31 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
-  const interactiveMode = config.isInteractiveShellEnabled();
+  const interactiveMode = config.isInteractive();
+
+  const skills = config.getSkillManager().getSkills();
+  let skillsPrompt = '';
+  if (skills.length > 0) {
+    const skillsXml = skills
+      .map(
+        (skill) => `  <skill>
+    <name>${skill.name}</name>
+    <description>${skill.description}</description>
+    <location>${skill.location}</location>
+  </skill>`,
+      )
+      .join('\n');
+
+    skillsPrompt = `
+# Available Agent Skills
+
+You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the \`${ACTIVATE_SKILL_TOOL_NAME}\` tool with the skill's name.
+
+<available_skills>
+${skillsXml}
+</available_skills>
+`;
+  }
 
   let basePrompt: string;
   if (systemMdEnabled) {
@@ -148,20 +171,25 @@ export function getCoreSystemPrompt(
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - ${interactiveMode ? `**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.` : `**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request.`}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandatesVariant}${
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${
+        skills.length > 0
+          ? `
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`
+          : ''
+      }${mandatesVariant}${
         !interactiveMode
           ? `
   - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`
           : ''
       }
 
-${config.getAgentRegistry().getDirectoryContext()}`,
+${config.getAgentRegistry().getDirectoryContext()}${skillsPrompt}`,
       primaryWorkflows_prefix: `
 # Primary Workflows
 
 ## Software Engineering Tasks
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
-1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. 
+1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
 Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
 
@@ -188,9 +216,8 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
-      primaryWorkflows_suffix: `3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core 
-Mandates').
-4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands.
+      primaryWorkflows_suffix: `3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
+4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards.${interactiveMode ? " If unsure about these commands, you can ask the user if they'd like you to run them and if so how to." : ''}
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
 
@@ -244,7 +271,8 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.${(function () {
         if (isGemini3) {
-          return '';
+          return `
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.`;
         } else {
           return `
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
@@ -264,7 +292,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 ${(function () {
   if (interactiveMode) {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Prefer non-interactive commands when it makes sense; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes) unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
   } else {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
 - **Interactive Commands:** Only execute non-interactive commands.`;
@@ -368,7 +396,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     process.env['GEMINI_WRITE_SYSTEM_MD'],
   );
 
-  // Check if the feature is enabled. This proceeds only if the environment
+  // Write the base prompt to a file if the GEMINI_WRITE_SYSTEM_MD environment
   // variable is set and is not explicitly '0' or 'false'.
   if (writeSystemMdResolution.value && !writeSystemMdResolution.isDisabled) {
     const writePath = writeSystemMdResolution.isSwitch
@@ -378,6 +406,8 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
     fs.mkdirSync(path.dirname(writePath), { recursive: true });
     fs.writeFileSync(writePath, basePrompt);
   }
+
+  basePrompt = basePrompt.trim();
 
   const memorySuffix =
     userMemory && userMemory.trim().length > 0
@@ -416,7 +446,7 @@ The structure MUST be as follows:
          - Build Command: \`npm run build\`
          - Testing: Tests are run with \`npm test\`. Test files must end in \`.test.ts\`.
          - API Endpoint: The primary API endpoint is \`https://api.example.com/v2\`.
-         
+
         -->
     </key_knowledge>
 
