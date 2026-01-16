@@ -83,6 +83,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  autoConfirmMcpSampling: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -247,6 +248,11 @@ export async function parseArguments(
         .option('record-responses', {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
+          hidden: true,
+        })
+        .option('auto-confirm-mcp-sampling', {
+          type: 'boolean',
+          description: 'Automatically confirm all MCP sampling requests.',
           hidden: true,
         }),
     )
@@ -756,6 +762,7 @@ export async function loadCliConfig(
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     modelConfigServiceConfig: settings.modelConfigs,
+    autoConfirmMcpSampling: argv.autoConfirmMcpSampling,
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&

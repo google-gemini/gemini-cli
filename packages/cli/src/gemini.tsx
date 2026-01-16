@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render } from 'ink';
+import { render, type RenderOptions } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -264,7 +264,7 @@ export async function startInteractiveUI(
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false && useAlternateBuffer,
-    },
+    } as RenderOptions & { incrementalRendering?: boolean },
   );
 
   checkForUpdates(settings)
