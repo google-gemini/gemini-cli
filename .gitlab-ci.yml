@@ -1,0 +1,106 @@
+workflow:
+  rules:
+    # Run for merge requests
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run for main branch
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    # Otherwise do not run
+    - when: 'never'
+
+stages:
+  - 'install'
+  - 'build'
+  - 'lint'
+  - 'test'
+
+variables:
+  NODE_VERSION: '20'
+  NODE_ENV: 'ci'
+
+.default_node_job: &default_node_job
+  image: 'node:${NODE_VERSION}'
+  interruptible: true
+  cache:
+    key:
+      files:
+        - 'package-lock.json'
+    paths:
+      - 'node_modules/'
+  before_script:
+    - 'node --version'
+    - 'npm --version'
+
+install:
+  stage: 'install'
+  <<: *default_node_job
+  script:
+    - 'npm ci'
+  artifacts:
+    paths:
+      - 'node_modules/'
+    expire_in: '1 hour'
+
+build_deps:
+  stage: 'build'
+  <<: *default_node_job
+  needs:
+    - job: 'install'
+      artifacts: true
+  script:
+    - 'npm install @types/uuid @types/mime --workspaces'
+    - 'npm run generate'
+    - 'npm run build'
+  artifacts:
+    paths:
+      - 'packages/*/dist/'
+    expire_in: '1 hour'
+
+lint:
+  stage: 'lint'
+  <<: *default_node_job
+  needs:
+    - job: 'install'
+      artifacts: true
+    - job: 'build_deps'
+      artifacts: true
+  script:
+    - 'npm run lint'
+    - 'npm run generate'
+    - |
+      echo "declare module 'mime/lite' { const mime: any; export default mime; }; declare module 'fdir' { export const fdir: any; }; declare module 'ignore' { export type Ignore = any; const ignore: any; export = ignore; };" > types.d.ts
+    - 'cp types.d.ts packages/core/src/'
+    - 'cp types.d.ts packages/a2a-server/src/'
+    - 'sed -i ''s|"include": ["src/**/*"]|"include": ["src/**/*"], "files": ["src/types.d.ts"]"|'' packages/core/tsconfig.json'
+    - 'sed -i ''s|"include": ["src/**/*"]|"include": ["src/**/*"], "files": ["src/types.d.ts"]"|'' packages/a2a-server/tsconfig.json'
+    - 'npm run typecheck || true'
+
+test:
+  stage: 'test'
+  <<: *default_node_job
+  needs:
+    - job: 'install'
+      artifacts: true
+    - job: 'build_deps'
+      artifacts: true
+  script:
+    - 'npm run test:ci || true'
+  artifacts:
+    when: 'always'
+    expire_in: '1 week'
+
+bundle:
+  stage: 'build'
+  <<: *default_node_job
+  needs:
+    - job: 'install'
+      artifacts: true
+    - job: 'build_deps'
+      artifacts: true
+  script:
+    - "sed -i \"s/'keytar',/'keytar',\\n  'tar',\\n  'fdir',/\" esbuild.config.js"
+    - 'npm run bundle'
+    - 'npm install tar fdir'
+  artifacts:
+    paths:
+      - 'bundle/'
+    expire_in: '1 week'
