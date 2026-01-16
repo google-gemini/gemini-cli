@@ -282,6 +282,33 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
     );
 
+    it.each(['1', 'true'])(
+      'should fall back to home system.md when GEMINI_SYSTEM_MD is "%s" and project file is missing',
+      (value) => {
+        const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
+        const homeDir = '/Users/test';
+        const homePath = path.resolve(
+          path.join(homeDir, GEMINI_DIR, 'system.md'),
+        );
+        vi.stubEnv('GEMINI_SYSTEM_MD', value);
+        vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
+        vi.mocked(fs.existsSync).mockImplementation((targetPath) => {
+          if (targetPath === defaultPath) {
+            return false;
+          }
+          if (targetPath === homePath) {
+            return true;
+          }
+          return false;
+        });
+        vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
+
+        const prompt = getCoreSystemPrompt(mockConfig);
+        expect(fs.readFileSync).toHaveBeenCalledWith(homePath, 'utf8');
+        expect(prompt).toBe('custom system prompt');
+      },
+    );
+
     it('should read from custom path when GEMINI_SYSTEM_MD provides one, preserving case', () => {
       const customPath = path.resolve('/custom/path/SyStEm.Md');
       vi.stubEnv('GEMINI_SYSTEM_MD', customPath);
