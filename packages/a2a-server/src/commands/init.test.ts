@@ -26,10 +26,21 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-  writeFileSync: vi.fn(),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mocks = {
+    existsSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  };
+  return {
+    ...actual,
+    ...mocks,
+    default: {
+      ...actual.default,
+      ...mocks,
+    },
+  };
+});
 
 vi.mock('../agent/executor.js', () => ({
   CoderAgentExecutor: vi.fn().mockImplementation(() => ({

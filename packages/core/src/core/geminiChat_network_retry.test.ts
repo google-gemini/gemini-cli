@@ -16,8 +16,9 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 
 // Mock fs module
-vi.mock('node:fs', () => ({
-  default: {
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mocks = {
     mkdirSync: vi.fn(),
     writeFileSync: vi.fn(),
     readFileSync: vi.fn(() => {
@@ -26,8 +27,16 @@ vi.mock('node:fs', () => ({
       throw error;
     }),
     existsSync: vi.fn(() => false),
-  },
-}));
+  };
+  return {
+    ...actual,
+    ...mocks,
+    default: {
+      ...actual.default,
+      ...mocks,
+    },
+  };
+});
 
 const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
