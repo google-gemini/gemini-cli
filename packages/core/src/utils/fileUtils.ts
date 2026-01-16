@@ -517,7 +517,7 @@ export async function fileExists(filePath: string): Promise<boolean> {
 }
 
 const MAX_TRUNCATED_LINE_WIDTH = 1000;
-const MAX_TRUNCATED_CHARS = 30000;
+const MAX_TRUNCATED_CHARS = 10000;
 
 /**
  * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
