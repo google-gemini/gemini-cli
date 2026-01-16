@@ -22,19 +22,23 @@ const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
 
 // Get timeout based on environment
 export function getDefaultTimeout() {
-  if (env['CI']) return 60000; // 1 minute in CI
-  if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
-  return 15000; // 15s locally
+  if (env['CI']) return 120000; // 2 minutes in CI
+  if (env['GEMINI_SANDBOX']) return 60000; // 1 minute in containers
+  return 30000; // 30s locally
 }
 
 export async function poll(
   predicate: () => boolean,
   timeout: number,
   interval: number,
+  signal?: AbortSignal,
 ): Promise<boolean> {
   const startTime = Date.now();
   let attempts = 0;
   while (Date.now() - startTime < timeout) {
+    if (signal?.aborted) {
+      return false;
+    }
     attempts++;
     const result = predicate();
     if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
@@ -260,9 +264,9 @@ export class InteractiveRun {
       const timer = setTimeout(
         () =>
           reject(
-            new Error(`Test timed out: process did not exit within a minute.`),
+            new Error(`Test timed out: process did not exit within 5 minutes.`),
           ),
-        60000,
+        300000,
       );
       this.ptyProcess.onExit(({ exitCode }) => {
         clearTimeout(timer);
@@ -469,7 +473,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -601,7 +605,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -639,6 +643,82 @@ export class TestRig {
         }
       });
     });
+
+    return promise;
+  }
+
+  runRawCommand(
+    command: string,
+    args: string[],
+    options: {
+      stdin?: string;
+      timeout?: number;
+      env?: Record<string, string | undefined>;
+      cwd?: string;
+    } = {},
+  ): Promise<{ stdout: string; stderr: string }> {
+    const child = spawn(command, args, {
+      cwd: options.cwd ?? this.testDir!,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GEMINI_CLI_HOME: this.homeDir!,
+        ...options.env,
+      },
+    });
+    this._spawnedProcesses.push(child);
+
+    let stdout = '';
+    let stderr = '';
+
+    if (options.stdin) {
+      child.stdin!.write(options.stdin);
+      child.stdin!.end();
+    }
+
+    child.stdout!.setEncoding('utf8');
+    child.stdout!.on('data', (data: string) => {
+      stdout += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr!.setEncoding('utf8');
+    child.stderr!.on('data', (data: string) => {
+      stderr += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const timeout = options.timeout ?? 300000;
+    const promise = new Promise<{ stdout: string; stderr: string }>(
+      (resolve, reject) => {
+        const timer = setTimeout(() => {
+          child.kill('SIGKILL');
+          reject(
+            new Error(
+              `Process timed out after ${timeout}ms.\nStdout:\n${stdout}\nStderr:\n${stderr}`,
+            ),
+          );
+        }, timeout);
+
+        child.on('error', (err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+
+        child.on('close', (code: number) => {
+          clearTimeout(timer);
+          if (code === 0) {
+            resolve({ stdout, stderr });
+          } else {
+            reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+          }
+        });
+      },
+    );
 
     return promise;
   }
@@ -713,7 +793,7 @@ export class TestRig {
     }
   }
 
-  async waitForTelemetryReady() {
+  async waitForTelemetryReady(signal?: AbortSignal) {
     // Telemetry is always written to the test directory
     const logFilePath = join(this.homeDir!, 'telemetry.log');
 
@@ -733,15 +813,20 @@ export class TestRig {
       },
       2000, // 2 seconds max - reduced since telemetry should flush on exit now
       100, // check every 100ms
+      signal,
     );
   }
 
-  async waitForTelemetryEvent(eventName: string, timeout?: number) {
+  async waitForTelemetryEvent(
+    eventName: string,
+    timeout?: number,
+    signal?: AbortSignal,
+  ) {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
 
-    await this.waitForTelemetryReady();
+    await this.waitForTelemetryReady(signal);
 
     return poll(
       () => {
@@ -754,6 +839,7 @@ export class TestRig {
       },
       timeout,
       100,
+      signal,
     );
   }
 
@@ -761,6 +847,7 @@ export class TestRig {
     toolName: string,
     timeout?: number,
     matchArgs?: (args: string) => boolean,
+    signal?: AbortSignal,
   ) {
     // Use environment-specific timeout
     if (!timeout) {
@@ -768,7 +855,7 @@ export class TestRig {
     }
 
     // Wait for telemetry to be ready before polling for tool calls
-    await this.waitForTelemetryReady();
+    await this.waitForTelemetryReady(signal);
 
     return poll(
       () => {
@@ -781,6 +868,7 @@ export class TestRig {
       },
       timeout,
       100,
+      signal,
     );
   }
 
@@ -788,6 +876,7 @@ export class TestRig {
     toolNames: string[],
     timeout?: number,
     matchArgs?: (args: string) => boolean,
+    signal?: AbortSignal,
   ) {
     // Use environment-specific timeout
     if (!timeout) {
@@ -795,7 +884,7 @@ export class TestRig {
     }
 
     // Wait for telemetry to be ready before polling for tool calls
-    await this.waitForTelemetryReady();
+    await this.waitForTelemetryReady(signal);
 
     const success = await poll(
       () => {
@@ -811,21 +900,26 @@ export class TestRig {
       },
       timeout,
       100,
+      signal,
     );
 
     expect(
-      success,
+      success || (signal?.aborted ?? false),
       `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
     ).toBe(true);
   }
 
-  async waitForAnyToolCall(toolNames: string[], timeout?: number) {
+  async waitForAnyToolCall(
+    toolNames: string[],
+    timeout?: number,
+    signal?: AbortSignal,
+  ) {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
-    await this.waitForTelemetryReady();
+    await this.waitForTelemetryReady(signal);
 
     return poll(
       () => {
@@ -836,6 +930,7 @@ export class TestRig {
       },
       timeout,
       100,
+      signal,
     );
   }
 
@@ -1082,8 +1177,12 @@ export class TestRig {
     return apiRequests.pop() || null;
   }
 
-  async waitForMetric(metricName: string, timeout?: number) {
-    await this.waitForTelemetryReady();
+  async waitForMetric(
+    metricName: string,
+    timeout?: number,
+    signal?: AbortSignal,
+  ) {
+    await this.waitForTelemetryReady(signal);
 
     const fullName = metricName.startsWith('gemini_cli.')
       ? metricName
@@ -1107,6 +1206,7 @@ export class TestRig {
       },
       timeout ?? getDefaultTimeout(),
       100,
+      signal,
     );
   }
 

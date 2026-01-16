@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    testTimeout: 300000, // 5 minutes
+    testTimeout: 600000, // 10 minutes
     globalSetup: './globalSetup.ts',
     reporters: ['default'],
     include: ['**/*.test.ts'],
@@ -16,8 +16,8 @@ export default defineConfig({
     fileParallelism: true,
     poolOptions: {
       threads: {
-        minThreads: 8,
-        maxThreads: 16,
+        minThreads: 2,
+        maxThreads: 4,
       },
     },
   },

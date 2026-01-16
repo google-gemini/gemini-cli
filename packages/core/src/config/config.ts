@@ -770,6 +770,7 @@ export class Config {
 
   /**
    * Must only be called once, throws if called again.
+   * Returns a promise that resolves when discovery (MCP and extensions) is complete.
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -800,7 +801,7 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const discoveryPromise = Promise.all([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).catch((error) => {
@@ -836,6 +837,9 @@ export class Config {
       this.contextManager = new ContextManager(this);
       await this.contextManager.refresh();
     }
+
+    // Await discovery before initializing GeminiClient so tools are available
+    await discoveryPromise;
 
     await this.geminiClient.initialize();
   }

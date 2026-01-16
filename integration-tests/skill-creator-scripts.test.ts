@@ -5,10 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
+import fs from 'node:fs';
 import { TestRig } from './test-helper.js';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { execSync } from 'node:child_process';
 
 describe('skill-creator scripts e2e', () => {
   let rig: TestRig;
@@ -36,9 +35,13 @@ describe('skill-creator scripts e2e', () => {
     const tempDir = rig.testDir!;
 
     // 1. Initialize
-    execSync(`node "${initScript}" ${skillName} --path "${tempDir}"`, {
-      stdio: 'inherit',
-    });
+    await rig.runRawCommand(
+      'node',
+      [initScript, skillName, '--path', tempDir],
+      {
+        timeout: 60000,
+      },
+    );
     const skillDir = path.join(tempDir, skillName);
 
     expect(fs.existsSync(skillDir)).toBe(true);
@@ -48,20 +51,21 @@ describe('skill-creator scripts e2e', () => {
     ).toBe(true);
 
     // 2. Validate (should have warning initially due to TODOs)
-    const validateOutputInitial = execSync(
-      `node "${validateScript}" "${skillDir}" 2>&1`,
-      { encoding: 'utf8' },
-    );
+    const { stdout: stdoutInitial, stderr: stderrInitial } =
+      await rig.runRawCommand('node', [validateScript, skillDir], {
+        timeout: 30000,
+      });
+    const validateOutputInitial = stdoutInitial + stderrInitial;
     expect(validateOutputInitial).toContain('⚠️  Found unresolved TODO');
 
     // 3. Package (should fail due to TODOs)
     try {
-      execSync(`node "${packageScript}" "${skillDir}" "${tempDir}"`, {
-        stdio: 'pipe',
+      await rig.runRawCommand('node', [packageScript, skillDir, tempDir], {
+        timeout: 30000,
       });
       throw new Error('Packaging should have failed due to TODOs');
     } catch (err: unknown) {
-      expect((err as Error).message).toContain('Command failed');
+      expect((err as Error).message).toContain('Process exited with code 1');
     }
 
     // 4. Fix SKILL.md (remove TODOs)
@@ -77,20 +81,29 @@ describe('skill-creator scripts e2e', () => {
     fs.writeFileSync(exampleScriptPath, scriptContent);
 
     // 4. Validate again (should pass now)
-    const validateOutput = execSync(`node "${validateScript}" "${skillDir}"`, {
-      encoding: 'utf8',
-    });
+    const { stdout: stdoutVal, stderr: stderrVal } = await rig.runRawCommand(
+      'node',
+      [validateScript, skillDir],
+      { timeout: 30000 },
+    );
+    const validateOutput = stdoutVal + stderrVal;
     expect(validateOutput).toContain('Skill is valid!');
 
     // 5. Package
-    execSync(`node "${packageScript}" "${skillDir}" "${tempDir}"`, {
-      stdio: 'inherit',
+    await rig.runRawCommand('node', [packageScript, skillDir, tempDir], {
+      timeout: 60000,
     });
     const skillFile = path.join(tempDir, `${skillName}.skill`);
     expect(fs.existsSync(skillFile)).toBe(true);
 
     // 6. Verify zip content (should NOT have nested directory)
-    const zipList = execSync(`unzip -l "${skillFile}"`, { encoding: 'utf8' });
+    const { stdout: zipList } = await rig.runRawCommand(
+      'unzip',
+      ['-l', skillFile],
+      {
+        timeout: 30000,
+      },
+    );
     expect(zipList).toContain('SKILL.md');
     expect(zipList).not.toContain(`${skillName}/SKILL.md`);
   });

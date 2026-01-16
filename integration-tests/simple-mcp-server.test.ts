@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll, validateModelOutput } from './test-helper.js';
+import { TestRig, poll } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -27,12 +27,11 @@ const serverScript = `#!/usr/bin/env node
 const readline = require('readline');
 const fs = require('fs');
 
-// Debug logging to stderr (only when MCP_DEBUG or VERBOSE is set)
-const debugEnabled = process.env['MCP_DEBUG'] === 'true' || process.env['VERBOSE'] === 'true';
+// Debug logging to stderr
 function debug(msg) {
-  if (debugEnabled) {
+  try {
     fs.writeSync(2, \`[MCP-DEBUG] \${msg}\\n\`);
-  }
+  } catch (e) {}
 }
 
 debug('MCP server starting...');
@@ -48,10 +47,10 @@ class SimpleJSONRPC {
     });
     
     this.rl.on('line', (line) => {
+      if (!line.trim()) return;
       debug(\`Received line: \${line}\`);
       try {
         const message = JSON.parse(line);
-        debug(\`Parsed message: \${JSON.stringify(message)}\`);
         this.handleMessage(message);
       } catch (e) {
         debug(\`Parse error: \${e.message}\`);
@@ -77,6 +76,7 @@ class SimpleJSONRPC {
           });
         }
       } catch (error) {
+        debug(\`Handler error: \${error.message}\`);
         if (message.id !== undefined) {
           this.send({
             jsonrpc: '2.0',
@@ -88,15 +88,18 @@ class SimpleJSONRPC {
           });
         }
       }
-    } else if (message.id !== undefined) {
-      this.send({
-        jsonrpc: '2.0',
-        id: message.id,
-        error: {
-          code: -32601,
-          message: 'Method not found'
-        }
-      });
+    } else {
+      debug(\`No handler for method: \${message.method}\`);
+      if (message.id !== undefined) {
+        this.send({
+          jsonrpc: '2.0',
+          id: message.id,
+          error: {
+            code: -32601,
+            message: 'Method not found: ' + message.method
+          }
+        });
+      }
     }
   }
   
@@ -121,6 +124,12 @@ rpc.on('initialize', async (params) => {
       version: '1.0.0'
     }
   };
+});
+
+// Handle ping
+rpc.on('ping', async () => {
+  debug('Handling ping request');
+  return {};
 });
 
 // Handle tools/list
@@ -157,14 +166,13 @@ rpc.on('tools/call', async (params) => {
   throw new Error('Unknown tool: ' + params.name);
 });
 
-// Send initialization notification
-rpc.send({
-  jsonrpc: '2.0',
-  method: 'initialized'
+// Handle initialized notification
+rpc.on('notifications/initialized', async () => {
+  debug('Received initialized notification');
 });
 `;
 
-describe.skip('simple-mcp-server', () => {
+describe('simple-mcp-server', () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -174,21 +182,48 @@ describe.skip('simple-mcp-server', () => {
   afterEach(async () => await rig.cleanup());
 
   it('should add two numbers', async () => {
+    // Pre-calculate test directory to get absolute path for MCP server
+    const testName = 'simple-mcp-server';
+    const sanitizedName = testName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-');
+    const testFileDir =
+      process.env['INTEGRATION_TEST_FILE_DIR'] ||
+      join(os.tmpdir(), 'gemini-cli-tests');
+    const testDir = join(testFileDir, sanitizedName);
+    const testServerPath = join(testDir, 'mcp-server.cjs');
+
     // Setup test directory with MCP server configuration
-    await rig.setup('simple-mcp-server', {
+    await rig.setup(testName, {
       settings: {
         mcpServers: {
           'addition-server': {
             command: 'node',
-            args: ['mcp-server.cjs'],
+            args: [testServerPath],
           },
         },
+        mcp: {
+          allowed: ['addition-server'],
+        },
+        trustedFolder: true,
         tools: { core: [] },
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: false,
+          },
+          cliHelpAgentSettings: {
+            enabled: false,
+          },
+        },
       },
     });
 
+    // Initialize git repo to make it a project root
+    const { execSync } = await import('node:child_process');
+    execSync('git init', { cwd: testDir });
+
     // Create server script in the test directory
-    const testServerPath = join(rig.testDir!, 'mcp-server.cjs');
     writeFileSync(testServerPath, serverScript);
 
     // Make the script executable (though running with 'node' should work anyway)
@@ -216,21 +251,43 @@ describe.skip('simple-mcp-server', () => {
       throw new Error('MCP server script was not ready in time.');
     }
 
-    // Test directory is already set up in before hook
-    // Just run the command - MCP server config is in settings.json
-    const output = await rig.run({
-      args: 'Use the `add` tool to calculate 5+10 and output only the resulting number.',
+    // Debug: List configured MCP servers
+    try {
+      const listMcpOutput = await rig.runCommand(['mcp', 'list']);
+      console.log('MCP Servers Status:\n', listMcpOutput);
+    } catch (e) {
+      console.log('Failed to list MCP servers:', (e as Error).message);
+    }
+
+    const abortController = new AbortController();
+    const runPromise = rig.run({
+      args: "Use the 'add' tool to calculate 1234.5678 + 8765.4321. You must use the tool for this calculation. DO NOT use any other tool.",
     });
 
-    const foundToolCall = await rig.waitForToolCall('add');
+    // Ensure we stop polling if the run finishes (either success or failure)
+    runPromise.finally(() => abortController.abort());
+
+    // Wait for the tool call with a generous timeout (150s), but stop early if process exits
+    const foundToolCall = await rig.waitForToolCall(
+      'add',
+      150000,
+      undefined,
+      abortController.signal,
+    );
+
+    if (!foundToolCall) {
+      const toolLogs = rig.readToolLogs();
+      console.log(
+        'Actual tool calls found:',
+        JSON.stringify(toolLogs, null, 2),
+      );
+      const result = await runPromise;
+      console.log('Run output:', result);
+    }
 
     expect(foundToolCall, 'Expected to find an add tool call').toBeTruthy();
 
-    // Validate model output - will throw if no output, fail if missing expected content
-    validateModelOutput(output, '15', 'MCP server test');
-    expect(
-      output.includes('15'),
-      'Expected output to contain the sum (15)',
-    ).toBeTruthy();
+    const result = await runPromise;
+    expect(result).toContain('9999.9999');
   });
 });
