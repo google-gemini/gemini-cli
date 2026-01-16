@@ -2085,11 +2085,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
 
   describe('Policy Decisions in Plan Mode', () => {
     it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
-      const mockTool = new MockTool(
-        'dangerous_tool',
-        'Dangerous Tool',
-        'Does risky stuff',
-      );
+      const mockTool = new MockTool({
+        name: 'dangerous_tool',
+        displayName: 'Dangerous Tool',
+        description: 'Does risky stuff',
+      });
       const mockToolRegistry = {
         getTool: () => mockTool,
         getAllToolNames: () => ['dangerous_tool'],
@@ -2100,9 +2100,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const mockConfig = createMockConfig({
         getToolRegistry: () => mockToolRegistry,
         getApprovalMode: () => ApprovalMode.PLAN,
-        getPolicyEngine: () => ({
-          check: async () => ({ decision: PolicyDecision.DENY }),
-        }),
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.DENY }),
+          }) as unknown as PolicyEngine,
       });
 
       const scheduler = new CoreToolScheduler({
