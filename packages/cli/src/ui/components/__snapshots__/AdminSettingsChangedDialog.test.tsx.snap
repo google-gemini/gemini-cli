@@ -2,7 +2,7 @@
 
 exports[`AdminSettingsChangedDialog > renders correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Admin settings have changed. Please restart the session to apply new settings. Press 'r' to restart, or 'Ctrl+C' to  │
-│ exit.                                                                                                                │
+│ Admin settings have changed. Please restart the session to apply new settings. Press 'r' to restart, or 'Ctrl+C'     │
+│ twice to exit.                                                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
