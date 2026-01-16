@@ -164,9 +164,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Values:** `"text"`, `"json"`
 
 - **`output.verbosity`** (enum):
-  - **Description:** Controls the detail level of the conversation history.
-    `Verbose` will include autonomous tool calls, additional logs, etc.
-  - **Default:** `"info"`
+  - **Description:** Show verbose output history. When enabled, output history
+    will include autonomous tool calls, additional logs, etc.
+  - **Default:** `"verbose"`
   - **Values:** `"info"`, `"verbose"`
 
 #### `ui`
