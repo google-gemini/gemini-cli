@@ -80,6 +80,9 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.config.getFileSystemService(),
       this.params.offset,
       this.params.limit,
+      {
+        enableMediaTextExtraction: this.config.getEnableMediaTextExtraction(),
+      },
     );
 
     if (result.error) {
