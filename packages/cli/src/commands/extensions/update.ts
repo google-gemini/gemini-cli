@@ -141,10 +141,15 @@ export const updateCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
-    await handleUpdate({
-      name: argv['name'] as string | undefined,
-      all: argv['all'] as boolean | undefined,
-    });
-    await exitCli();
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleUpdate({
+          name: argv['name'] as string | undefined,
+          all: argv['all'] as boolean | undefined,
+        });
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };

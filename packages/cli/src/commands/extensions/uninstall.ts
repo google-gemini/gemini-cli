@@ -70,9 +70,14 @@ export const uninstallCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
-    await handleUninstall({
-      names: argv['names'] as string[],
-    });
-    await exitCli();
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleUninstall({
+          names: argv['names'] as string[],
+        });
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };

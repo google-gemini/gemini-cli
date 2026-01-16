@@ -42,46 +42,55 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         choices: ['user', 'workspace'],
         default: 'user',
       }),
-  handler: async (args) => {
-    const { name, setting, scope } = args;
-    const settings = loadSettings(process.cwd()).merged;
+  handler: async (argv) => {
+    argv['_deferredCommand'] = {
+      run: async () => {
+        const { name, setting, scope } = argv;
+        const settings = loadSettings(process.cwd()).merged;
 
-    if (!(settings.experimental?.extensionConfig ?? true)) {
-      coreEvents.emitFeedback(
-        'error',
-        'Extension configuration is currently disabled. Enable it by setting "experimental.extensionConfig" to true.',
-      );
-      await exitCli();
-      return;
-    }
+        if (!(settings.experimental?.extensionConfig ?? true)) {
+          coreEvents.emitFeedback(
+            'error',
+            'Extension configuration is currently disabled. Enable it by setting "experimental.extensionConfig" to true.',
+          );
+          await exitCli();
+          return;
+        }
 
-    if (name) {
-      if (name.includes('/') || name.includes('\\') || name.includes('..')) {
-        debugLogger.error(
-          'Invalid extension name. Names cannot contain path separators or "..".',
-        );
-        return;
-      }
-    }
+        if (name) {
+          if (
+            name.includes('/') ||
+            name.includes('\\') ||
+            name.includes('..')
+          ) {
+            debugLogger.error(
+              'Invalid extension name. Names cannot contain path separators or "..".',
+            );
+            return;
+          }
+        }
 
-    // Case 1: Configure specific setting for an extension
-    if (name && setting) {
-      await configureSpecificSetting(
-        name,
-        setting,
-        scope as ExtensionSettingScope,
-      );
-    }
-    // Case 2: Configure all settings for an extension
-    else if (name) {
-      await configureExtension(name, scope as ExtensionSettingScope);
-    }
-    // Case 3: Configure all extensions
-    else {
-      await configureAllExtensions(scope as ExtensionSettingScope);
-    }
+        // Case 1: Configure specific setting for an extension
+        if (name && setting) {
+          await configureSpecificSetting(
+            name,
+            setting,
+            scope as ExtensionSettingScope,
+          );
+        }
+        // Case 2: Configure all settings for an extension
+        else if (name) {
+          await configureExtension(name, scope as ExtensionSettingScope);
+        }
+        // Case 3: Configure all extensions
+        else {
+          await configureAllExtensions(scope as ExtensionSettingScope);
+        }
 
-    await exitCli();
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };
 

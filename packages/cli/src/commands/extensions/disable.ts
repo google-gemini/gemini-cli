@@ -78,10 +78,15 @@ export const disableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
-    await handleDisable({
-      name: argv['name'] as string,
-      scope: argv['scope'] as string,
-    });
-    await exitCli();
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleDisable({
+          name: argv['name'] as string,
+          scope: argv['scope'] as string,
+        });
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };
