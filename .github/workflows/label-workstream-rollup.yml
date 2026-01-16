@@ -18,7 +18,7 @@ jobs:
         with:
           script: |
             const labelToAdd = 'workstream-rollup';
-            
+
             // Allow-list of parent issue URLs
             const allowedParentUrls = [
               'https://github.com/google-gemini/gemini-cli/issues/15374',
@@ -49,7 +49,7 @@ jobs:
 
             // Determine which issues to process
             let issuesToProcess = [];
-            
+
             if (context.eventName === 'issues') {
                // Context payload for 'issues' event already has the issue object
                issuesToProcess.push({
