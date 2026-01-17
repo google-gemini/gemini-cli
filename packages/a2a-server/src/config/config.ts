@@ -53,6 +53,7 @@ export async function loadConfig(
     question: '', // Not used in server mode directly like CLI
 
     coreTools: settings.coreTools || undefined,
+    allowedTools: settings.allowedTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode:
