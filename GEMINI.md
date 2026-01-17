@@ -1,3 +1,5 @@
+# Gemini CLI Development Guide
+
 ## Building and running
 
 Before submitting any changes, it is crucial to validate them by running the
