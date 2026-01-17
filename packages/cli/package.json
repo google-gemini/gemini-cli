@@ -52,7 +52,7 @@
     "latest-version": "^9.0.0",
     "lowlight": "^3.3.0",
     "mnemonist": "^0.40.3",
-    "open": "^10.1.2",
+    "open": "^11.0.0",
     "prompts": "^2.4.2",
     "react": "^19.2.0",
     "read-package-up": "^11.0.0",
