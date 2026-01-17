@@ -83,10 +83,15 @@ export const enableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
-    await handleEnable({
-      name: argv['name'] as string,
-      scope: argv['scope'] as string,
-    });
-    await exitCli();
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleEnable({
+          name: argv['name'] as string,
+          scope: argv['scope'] as string,
+        });
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };

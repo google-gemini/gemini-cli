@@ -44,8 +44,13 @@ export const listCommand: CommandModule = {
   command: 'list',
   describe: 'Lists installed extensions.',
   builder: (yargs) => yargs,
-  handler: async () => {
-    await handleList();
-    await exitCli();
+  handler: async (argv) => {
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleList();
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };

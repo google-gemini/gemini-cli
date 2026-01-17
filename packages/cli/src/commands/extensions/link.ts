@@ -75,10 +75,15 @@ export const linkCommand: CommandModule = {
       })
       .check((_) => true),
   handler: async (argv) => {
-    await handleLink({
-      path: argv['path'] as string,
-      consent: argv['consent'] as boolean | undefined,
-    });
-    await exitCli();
+    argv['_deferredCommand'] = {
+      run: async () => {
+        await handleLink({
+          path: argv['path'] as string,
+          consent: argv['consent'] as boolean | undefined,
+        });
+        await exitCli();
+      },
+      type: 'extensions',
+    };
   },
 };
