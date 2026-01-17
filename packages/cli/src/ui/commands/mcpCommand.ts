@@ -389,6 +389,18 @@ async function handleEnableDisable(
   }
 
   const name = normalizeServerId(serverName);
+
+  // Validate server exists
+  const servers = config.getMcpClientManager()?.getMcpServers() || {};
+  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
+  if (!normalizedServerNames.includes(name)) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
+    };
+  }
+
   const manager = McpServerEnablementManager.getInstance();
 
   if (enable) {
