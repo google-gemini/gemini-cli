@@ -16,6 +16,21 @@ import { AppContext, type AppState } from './contexts/AppContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { LoadedSettings, type SettingsFile } from '../config/settings.js';
 
+// Mock the ResizeObserver API for tests.
+class ResizeObserver {
+  observe() {
+    // do nothing
+  }
+  unobserve() {
+    // do nothing
+  }
+  disconnect() {
+    // do nothing
+  }
+}
+
+global.ResizeObserver = ResizeObserver;
+
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
   return {
