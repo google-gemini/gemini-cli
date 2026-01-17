@@ -6,12 +6,39 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AllowedPathChecker } from './built-in.js';
 import type { SafetyCheckInput } from './protocol.js';
 import { SafetyCheckDecision } from './protocol.js';
 import type { FunctionCall } from '@google/genai';
+
+const canCreateSymlinks = (): boolean => {
+  if (process.platform !== 'win32') {
+    return true; // Non-Windows platforms usually support symlinks
+  }
+
+  // Windows: Attempt to create a test symlink
+  let testDir: string | undefined;
+  try {
+    testDir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'symlink-test-'));
+    const targetFile = path.join(testDir, 'target-file');
+    const testLink = path.join(testDir, 'test-link');
+    fsSync.writeFileSync(targetFile, 'x');
+    fsSync.symlinkSync(targetFile, testLink);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (testDir) {
+      fsSync.rmSync(testDir, { recursive: true, force: true });
+    }
+  }
+};
+
+// Create a conditional it for tests that require symlink support
+const symlinksSupported = canCreateSymlinks();
 
 describe('AllowedPathChecker', () => {
   let checker: AllowedPathChecker;
@@ -117,35 +144,40 @@ describe('AllowedPathChecker', () => {
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
-  it('should deny access if path contains a symlink pointing outside allowed directories', async () => {
-    const symlinkPath = path.join(mockCwd, 'symlink');
-    const targetPath = path.join(testRootDir, 'etc', 'passwd');
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    await fs.writeFile(targetPath, 'secret');
+  it.runIf(symlinksSupported)(
+    'should deny access if path contains a symlink pointing outside allowed directories',
+    async () => {
+      const symlinkPath = path.join(mockCwd, 'symlink');
+      const targetPath = path.join(testRootDir, 'etc', 'passwd');
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.writeFile(targetPath, 'secret');
 
-    // Create symlink: mockCwd/symlink -> targetPath
-    await fs.symlink(targetPath, symlinkPath);
+      // Create symlink: mockCwd/symlink -> targetPath
+      await fs.symlink(targetPath, symlinkPath);
+      const input = createInput({ path: symlinkPath });
+      const result = await checker.check(input);
+      expect(result.decision).toBe(SafetyCheckDecision.DENY);
+      expect(result.reason).toContain(
+        'outside of the allowed workspace directories',
+      );
+    },
+  );
 
-    const input = createInput({ path: symlinkPath });
-    const result = await checker.check(input);
-    expect(result.decision).toBe(SafetyCheckDecision.DENY);
-    expect(result.reason).toContain(
-      'outside of the allowed workspace directories',
-    );
-  });
+  it.runIf(symlinksSupported)(
+    'should allow access if path contains a symlink pointing INSIDE allowed directories',
+    async () => {
+      const symlinkPath = path.join(mockCwd, 'symlink-inside');
+      const realFilePath = path.join(mockCwd, 'real-file');
+      await fs.writeFile(realFilePath, 'real content');
 
-  it('should allow access if path contains a symlink pointing INSIDE allowed directories', async () => {
-    const symlinkPath = path.join(mockCwd, 'symlink-inside');
-    const realFilePath = path.join(mockCwd, 'real-file');
-    await fs.writeFile(realFilePath, 'real content');
+      // Create symlink: mockCwd/symlink-inside -> mockCwd/real-file
+      await fs.symlink(realFilePath, symlinkPath);
 
-    // Create symlink: mockCwd/symlink-inside -> mockCwd/real-file
-    await fs.symlink(realFilePath, symlinkPath);
-
-    const input = createInput({ path: symlinkPath });
-    const result = await checker.check(input);
-    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
-  });
+      const input = createInput({ path: symlinkPath });
+      const result = await checker.check(input);
+      expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
+    },
+  );
 
   it('should check explicitly included arguments', async () => {
     const outsidePath = path.join(testRootDir, 'etc', 'passwd');
