@@ -11,7 +11,6 @@ import { Text } from 'ink';
 import { type UIState } from '../contexts/UIStateContext.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import { type IdeInfo } from '@google/gemini-cli-core';
-import { type ShellConfirmationRequest } from '../types.js';
 
 // Mock child components
 vi.mock('../IdeIntegrationNudge.js', () => ({
@@ -22,9 +21,6 @@ vi.mock('./LoopDetectionConfirmation.js', () => ({
 }));
 vi.mock('./FolderTrustDialog.js', () => ({
   FolderTrustDialog: () => <Text>FolderTrustDialog</Text>,
-}));
-vi.mock('./ShellConfirmationDialog.js', () => ({
-  ShellConfirmationDialog: () => <Text>ShellConfirmationDialog</Text>,
 }));
 vi.mock('./ConsentPrompt.js', () => ({
   ConsentPrompt: () => <Text>ConsentPrompt</Text>,
@@ -79,7 +75,6 @@ describe('DialogManager', () => {
     proQuotaRequest: null,
     shouldShowIdePrompt: false,
     isFolderTrustDialogOpen: false,
-    shellConfirmationRequest: null,
     loopDetectionConfirmationRequest: null,
     confirmationRequest: null,
     isThemeDialogOpen: false,
@@ -130,15 +125,6 @@ describe('DialogManager', () => {
       'IdeIntegrationNudge',
     ],
     [{ isFolderTrustDialogOpen: true }, 'FolderTrustDialog'],
-    [
-      {
-        shellConfirmationRequest: {
-          commands: [],
-          onConfirm: vi.fn(),
-        } as unknown as ShellConfirmationRequest,
-      },
-      'ShellConfirmationDialog',
-    ],
     [
       { loopDetectionConfirmationRequest: { onComplete: vi.fn() } },
       'LoopDetectionConfirmation',

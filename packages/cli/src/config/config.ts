@@ -143,9 +143,9 @@ export async function parseArguments(
         .option('approval-mode', {
           type: 'string',
           nargs: 1,
-          choices: ['default', 'auto_edit', 'yolo'],
+          choices: ['default', 'auto_edit', 'yolo', 'plan'],
           description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -285,16 +285,15 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental.extensionManagement) {
+  if (settings.experimental?.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental.skills) {
+  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
     yargsInstance.command(skillsCommand);
   }
-
   // Register hooks command if hooks are enabled
-  if (settings.tools.enableHooks) {
+  if (settings.tools?.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -492,12 +491,20 @@ export async function loadCliConfig(
       case 'auto_edit':
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
+      case 'plan':
+        if (!(settings.experimental?.plan ?? false)) {
+          throw new Error(
+            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          );
+        }
+        approvalMode = ApprovalMode.PLAN;
+        break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, plan, default`,
         );
     }
   } else {
@@ -578,6 +585,11 @@ export async function loadCliConfig(
     );
 
     switch (approvalMode) {
+      case ApprovalMode.PLAN:
+        // In plan non-interactive mode, all tools that require approval are excluded.
+        // TODO(#16625): Replace this default exclusion logic with specific rules for plan mode.
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        break;
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
         extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
@@ -709,7 +721,8 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    skillsSupport: settings.experimental?.skills,
+    skillsSupport:
+      settings.experimental?.skills || (settings.skills?.enabled ?? true),
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
