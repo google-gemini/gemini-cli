@@ -1992,6 +1992,39 @@ describe('GeminiChat', () => {
       expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
     });
 
+    it('should consider a model turn valid if it contains tool calls even if it has empty text parts', () => {
+      const chat = new GeminiChat(mockConfig, '', [], []);
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Do something' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'tool1', args: {} } },
+            { text: '' },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            { functionResponse: { name: 'tool1', response: { ok: true } } },
+          ],
+        },
+      ];
+
+      chat.setHistory(history);
+      const curated = chat.getHistory(true);
+
+      // The model turn must be preserved to maintain history alignment
+      expect(curated.length).toBe(3);
+      expect(curated[1].role).toBe('model');
+      // The empty text part should be filtered out by extractCuratedHistory
+      expect(curated[1].parts).toHaveLength(1);
+      expect(curated[1].parts![0]).toHaveProperty('functionCall');
+    });
+
     it('should not modify contents if there is no user text message', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
