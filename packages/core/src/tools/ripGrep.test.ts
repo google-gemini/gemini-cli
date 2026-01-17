@@ -1009,10 +1009,10 @@ describe('RipGrepTool', () => {
 
       const result = await invocation.execute(controller.signal);
       expect(result.llmContent).toContain(
-        'Error during grep search operation: ripgrep exited with code null',
+        'Error during grep search operation: ripgrep was terminated by signal:',
       );
       expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code null',
+        'Error: ripgrep was terminated by signal:',
       );
     });
   });
