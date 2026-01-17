@@ -41,6 +41,7 @@ export interface ProQuotaDialogRequest {
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
+import type { BannerData } from '../hooks/useBanner.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -131,10 +132,7 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
-  bannerData: {
-    defaultText: string;
-    warningText: string;
-  };
+  banner: BannerData;
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;

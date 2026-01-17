@@ -53,6 +53,8 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import type { ReceiveEventsResponse } from './events/types.js';
+
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -61,6 +63,8 @@ export interface HttpOptions {
 
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
+
+const METHOD_WITH_PARAMS = 'event:receive?client_type=GEMINI_CLI';
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
@@ -245,6 +249,14 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  async receiveEvents(): Promise<ReceiveEventsResponse> {
+    const response: ReceiveEventsResponse = await this.requestGet(
+      METHOD_WITH_PARAMS,
+      false,
+    );
+    return response;
+  }
+
   async recordConversationOffered(
     conversationOffered: ConversationOffered,
   ): Promise<void> {
@@ -320,8 +332,15 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
-    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  async requestGet<T>(
+    method: string,
+    requiresColonFormat?: boolean,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.makeGetRequest<T>(
+      this.getMethodUrl(method, requiresColonFormat),
+      signal,
+    );
   }
 
   async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
@@ -376,8 +395,10 @@ export class CodeAssistServer implements ContentGenerator {
     return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
   }
 
-  getMethodUrl(method: string): string {
-    return `${this.getBaseUrl()}:${method}`;
+  getMethodUrl(method: string, requiresColonFormat?: boolean): string {
+    return requiresColonFormat !== false
+      ? `${this.getBaseUrl()}:${method}`
+      : `${this.getBaseUrl()}/${method}`;
   }
 
   getOperationUrl(name: string): string {

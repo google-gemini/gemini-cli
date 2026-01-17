@@ -5,23 +5,28 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { persistentState } from '../../utils/persistentState.js';
 import type { Config } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
+import { persistentState } from '../../utils/persistentState.js';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
 
-interface BannerData {
-  defaultText: string;
-  warningText: string;
+interface BannerContent {
+  title: string;
+  body: string;
+}
+
+export interface BannerData {
+  bannerText: BannerContent;
+  isWarning: boolean;
 }
 
 export function useBanner(bannerData: BannerData, config: Config) {
-  const { defaultText, warningText } = bannerData;
-
   const [previewEnabled, setPreviewEnabled] = useState(
     config.getPreviewFeatures(),
   );
+
+  const { title, body } = bannerData.bannerText;
 
   useEffect(() => {
     const isEnabled = config.getPreviewFeatures();
@@ -33,7 +38,7 @@ export function useBanner(bannerData: BannerData, config: Config) {
   const [bannerCounts] = useState(
     () => persistentState.get('defaultBannerShownCount') || {},
   );
-
+  const defaultText = title + ' \n' + body;
   const hashedText = crypto
     .createHash('sha256')
     .update(defaultText)
@@ -41,18 +46,13 @@ export function useBanner(bannerData: BannerData, config: Config) {
 
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
-  const showDefaultBanner =
-    warningText === '' &&
-    !previewEnabled &&
-    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
-
-  const rawBannerText = showDefaultBanner ? defaultText : warningText;
-  const bannerText = rawBannerText.replace(/\\n/g, '\n');
+  const showBanner =
+    !previewEnabled && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
   const lastIncrementedKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (showDefaultBanner && defaultText) {
+    if (showBanner && defaultText) {
       if (lastIncrementedKey.current !== defaultText) {
         lastIncrementedKey.current = defaultText;
 
@@ -65,9 +65,14 @@ export function useBanner(bannerData: BannerData, config: Config) {
         });
       }
     }
-  }, [showDefaultBanner, defaultText, hashedText]);
+  }, [showBanner, defaultText, hashedText]);
+
+  const titleEscaped = showBanner ? title.replace(/\\n/g, '\n') : '';
+
+  const bodyEscaped = showBanner ? body.replace(/\\n/g, '\n') : '';
 
   return {
-    bannerText,
+    title: titleEscaped,
+    body: bodyEscaped,
   };
 }
