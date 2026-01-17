@@ -99,7 +99,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `general`
 
 - **`general.previewFeatures`** (boolean):
-  - **Description:** Enable preview features (e.g., preview models).
+  - **Description:** Access early-access features and experimental models.
   - **Default:** `false`
 
 - **`general.preferredEditor`** (string):
@@ -107,25 +107,25 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
-  - **Description:** Enable Vim keybindings
+  - **Description:** Use Vim-style keybindings for text input.
   - **Default:** `false`
 
 - **`general.autoUpdate`** (boolean):
-  - **Description:** Enable automatic updates.
+  - **Description:** Automatically check for and install application updates.
   - **Default:** `true`
 
 - **`general.autoUpdateNotification`** (boolean):
-  - **Description:** Enable update notification prompts.
+  - **Description:** Show a notification when a new version is available.
   - **Default:** `true`
 
 - **`general.checkpointing.enabled`** (boolean):
-  - **Description:** Enable session checkpointing for recovery
+  - **Description:** Save session state periodically to allow recovery after
+    exits.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`general.promptCompletion`** (boolean):
-  - **Description:** Enable AI-powered prompt completion suggestions while
-    typing.
+  - **Description:** Show AI-powered completion suggestions while typing.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -139,7 +139,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`general.sessionRetention.enabled`** (boolean):
-  - **Description:** Enable automatic session cleanup
+  - **Description:** Automatically delete old or excess sessions.
   - **Default:** `false`
 
 - **`general.sessionRetention.maxAge`** (string):
@@ -175,13 +175,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
 
 - **`ui.hideWindowTitle`** (boolean):
-  - **Description:** Hide the window title bar
+  - **Description:** Hide the window title bar.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI status and thoughts in the terminal window
-    title
+    title.
   - **Default:** `false`
 
 - **`ui.showHomeDirectoryWarning`** (boolean):
@@ -191,11 +191,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI
+  - **Description:** Hide helpful usage tips in the UI.
   - **Default:** `false`
 
 - **`ui.hideBanner`** (boolean):
-  - **Description:** Hide the application banner
+  - **Description:** Hide the application startup banner.
   - **Default:** `false`
 
 - **`ui.hideContextSummary`** (boolean):
@@ -220,15 +220,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
-  - **Description:** Hide the footer from the UI
+  - **Description:** Hide the footer from the UI.
   - **Default:** `false`
 
 - **`ui.showMemoryUsage`** (boolean):
-  - **Description:** Display memory usage information in the UI
+  - **Description:** Display memory usage information in the UI.
   - **Default:** `false`
 
 - **`ui.showLineNumbers`** (boolean):
-  - **Description:** Show line numbers in the chat.
+  - **Description:** Show line numbers in the chat window.
   - **Default:** `true`
 
 - **`ui.showCitations`** (boolean):
@@ -262,13 +262,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`ui.accessibility.loadingPhrases`** (boolean):
-  - **Description:** Enable loading phrases during operations.
+  - **Description:** Display witty phrases while waiting for operations to
+    complete.
   - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.accessibility.screenReader`** (boolean):
-  - **Description:** Render output in plain-text to be more screen reader
-    accessible
+  - **Description:** Render output in plain-text for better screen reader
+    accessibility.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -286,7 +287,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `privacy`
 
 - **`privacy.usageStatisticsEnabled`** (boolean):
-  - **Description:** Enable collection of usage statistics
+  - **Description:** Send anonymous usage data to help improve Gemini CLI.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -608,8 +609,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`tools.shell.interactiveShell`** (boolean):
-  - **Description:** Use node-pty for an interactive shell experience. Fallback
-    to child_process still applies.
+  - **Description:** Provide an interactive terminal for executing shell
+    commands.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -628,8 +629,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `300`
 
 - **`tools.shell.shellOutputEfficiency`** (boolean):
-  - **Description:** Enable shell output efficiency optimizations for better
-    performance.
+  - **Description:** Optimize shell output handling for improved performance.
   - **Default:** `true`
 
 - **`tools.autoAccept`** (boolean):
@@ -670,12 +670,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`tools.useRipgrep`** (boolean):
-  - **Description:** Use ripgrep for file content search instead of the fallback
-    implementation. Provides faster search performance.
+  - **Description:** Use the ripgrep tool for significantly faster file content
+    searching.
   - **Default:** `true`
 
 - **`tools.toolOutputTruncation`** (boolean):
-  - **Description:** Enable truncation of large tool outputs.
+  - **Description:** Truncate excessively large tool outputs to conserve
+    context.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -691,8 +692,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`tools.hooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
+  - **Description:** Experimental system for intercepting and customizing tool
+    behavior.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -716,7 +717,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `useWriteTodos`
 
 - **`useWriteTodos`** (boolean):
-  - **Description:** Enable the write_todos tool.
+  - **Description:** Allow Gemini CLI to create and manage TODO items.
   - **Default:** `true`
 
 #### `security`
@@ -727,8 +728,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`security.permanentToolApproval`** (boolean):
-  - **Description:** Enable the "Allow for all future sessions" option in tool
-    confirmation dialogs.
+  - **Description:** Allow remembering tool approvals across different CLI
+    sessions.
   - **Default:** `false`
 
 - **`security.blockGitExtensions`** (boolean):
@@ -737,7 +738,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`security.folderTrust.enabled`** (boolean):
-  - **Description:** Setting to track whether Folder trust is enabled.
+  - **Description:** Require explicit trust before allowing high-risk tools in a
+    directory.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -752,7 +754,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.enabled`** (boolean):
-  - **Description:** Enable redaction of environment variables that may contain
+  - **Description:** Automatically mask environment variables that may contain
     secrets.
   - **Default:** `false`
   - **Requires restart:** Yes
@@ -800,23 +802,23 @@ their corresponding top-level category object in your `settings.json` file.
 #### `experimental`
 
 - **`experimental.agents`** (boolean):
-  - **Description:** Enable local and remote subagents. Warning: Experimental
-    feature, uses YOLO mode for subagents
+  - **Description:** Allow specialized subagents for complex tasks
+    (Experimental).
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):
-  - **Description:** Enable extension management features.
+  - **Description:** Allow installing, updating, and removing extensions.
   - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
-  - **Description:** Enables extension loading/unloading within the CLI session.
+  - **Description:** Allow extension loading/unloading within the CLI session.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.jitContext`** (boolean):
-  - **Description:** Enable Just-In-Time (JIT) context loading.
+  - **Description:** Load project context dynamically as needed.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -826,7 +828,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
-  - **Description:** Enable the Codebase Investigator agent.
+  - **Description:** Allow specialized codebase analysis agent.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -858,7 +860,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.cliHelpAgentSettings.enabled`** (boolean):
-  - **Description:** Enable the CLI Help Agent.
+  - **Description:** Allow specialized help and guidance agent.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -872,8 +874,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `hooks`
 
 - **`hooks.enabled`** (boolean):
-  - **Description:** Canonical toggle for the hooks system. When disabled, no
-    hooks will be executed.
+  - **Description:** Experimental system for intercepting and customizing tool
+    behavior.
   - **Default:** `false`
 
 - **`hooks.disabled`** (array):
@@ -1078,7 +1080,7 @@ of v0.3.0:
   "context": {
     "fileName": ["CONTEXT.md", "GEMINI.md"],
     "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
-    "loadFromIncludeDirectories": true,
+    "loadMemoryFromIncludeDirectories": true,
     "fileFiltering": {
       "respectGitIgnore": false
     }

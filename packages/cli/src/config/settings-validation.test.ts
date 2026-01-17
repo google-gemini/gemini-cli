@@ -162,7 +162,7 @@ describe('settings-validation', () => {
       const validSettings = {
         general: {
           vimMode: true,
-          disableAutoUpdate: false,
+          autoUpdate: false,
         },
       };
 

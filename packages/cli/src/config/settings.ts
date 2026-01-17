@@ -708,6 +708,7 @@ export function migrateDeprecatedSettings(
         modified = true;
       }
 
+      // Migrate enablePromptCompletion -> promptCompletion
       if (typeof newGeneral['enablePromptCompletion'] === 'boolean') {
         const oldValue = newGeneral['enablePromptCompletion'];
         debugLogger.log(
@@ -814,6 +815,7 @@ export function migrateDeprecatedSettings(
         modified = true;
       }
 
+      // Migrate enableRecursiveFileSearch -> recursiveFileSearch
       if (
         fileFilteringSettings &&
         typeof fileFilteringSettings['enableRecursiveFileSearch'] === 'boolean'

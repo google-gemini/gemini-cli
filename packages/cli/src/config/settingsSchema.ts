@@ -169,7 +169,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: false,
-        description: 'Enable preview features (e.g., preview models).',
+        description: 'Access early-access features and experimental models.',
         showInDialog: true,
       },
       preferredEditor: {
@@ -187,7 +187,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: false,
-        description: 'Enable Vim keybindings',
+        description: 'Use Vim-style keybindings for text input.',
         showInDialog: true,
       },
       autoUpdate: {
@@ -196,7 +196,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: true,
-        description: 'Enable automatic updates.',
+        description: 'Automatically check for and install application updates.',
         showInDialog: true,
       },
       autoUpdateNotification: {
@@ -205,7 +205,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: true,
-        description: 'Enable update notification prompts.',
+        description: 'Show a notification when a new version is available.',
         showInDialog: false,
       },
       checkpointing: {
@@ -223,7 +223,8 @@ const SETTINGS_SCHEMA = {
             category: 'General',
             requiresRestart: true,
             default: false,
-            description: 'Enable session checkpointing for recovery',
+            description:
+              'Save session state periodically to allow recovery after exits.',
             showInDialog: false,
           },
         },
@@ -234,8 +235,7 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: true,
         default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
+        description: 'Show AI-powered completion suggestions while typing.',
         showInDialog: true,
       },
       retryFetchErrors: {
@@ -271,7 +271,7 @@ const SETTINGS_SCHEMA = {
             category: 'General',
             requiresRestart: false,
             default: false,
-            description: 'Enable automatic session cleanup',
+            description: 'Automatically delete old or excess sessions.',
             showInDialog: true,
           },
           maxAge: {
@@ -371,7 +371,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: true,
         default: false,
-        description: 'Hide the window title bar',
+        description: 'Hide the window title bar.',
         showInDialog: true,
       },
       showStatusInTitle: {
@@ -381,7 +381,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Show Gemini CLI status and thoughts in the terminal window title',
+          'Show Gemini CLI status and thoughts in the terminal window title.',
         showInDialog: true,
       },
       showHomeDirectoryWarning: {
@@ -400,7 +400,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description: 'Hide helpful usage tips in the UI.',
         showInDialog: true,
       },
       hideBanner: {
@@ -409,7 +409,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the application banner',
+        description: 'Hide the application startup banner.',
         showInDialog: true,
       },
       hideContextSummary: {
@@ -476,7 +476,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the footer from the UI',
+        description: 'Hide the footer from the UI.',
         showInDialog: true,
       },
       showMemoryUsage: {
@@ -485,7 +485,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Display memory usage information in the UI',
+        description: 'Display memory usage information in the UI.',
         showInDialog: true,
       },
       showLineNumbers: {
@@ -494,7 +494,7 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: true,
-        description: 'Show line numbers in the chat.',
+        description: 'Show line numbers in the chat window.',
         showInDialog: true,
       },
       showCitations: {
@@ -568,11 +568,12 @@ const SETTINGS_SCHEMA = {
         properties: {
           loadingPhrases: {
             type: 'boolean',
-            label: 'Enable Loading Phrases',
+            label: 'Loading Phrases',
             category: 'UI',
             requiresRestart: true,
             default: true,
-            description: 'Enable loading phrases during operations.',
+            description:
+              'Display witty phrases while waiting for operations to complete.',
             showInDialog: true,
           },
           screenReader: {
@@ -582,7 +583,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Render output in plain-text to be more screen reader accessible',
+              'Render output in plain-text for better screen reader accessibility.',
             showInDialog: true,
           },
         },
@@ -635,7 +636,7 @@ const SETTINGS_SCHEMA = {
         category: 'Privacy',
         requiresRestart: true,
         default: true,
-        description: 'Enable collection of usage statistics',
+        description: 'Send anonymous usage data to help improve Gemini CLI.',
         showInDialog: false,
       },
     },
@@ -928,10 +929,8 @@ const SETTINGS_SCHEMA = {
             category: 'Tools',
             requiresRestart: true,
             default: true,
-            description: oneLine`
-              Use node-pty for an interactive shell experience.
-              Fallback to child_process still applies.
-            `,
+            description:
+              'Provide an interactive terminal for executing shell commands.',
             showInDialog: true,
           },
           pager: {
@@ -970,7 +969,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: false,
             default: true,
             description:
-              'Enable shell output efficiency optimizations for better performance.',
+              'Optimize shell output handling for improved performance.',
             showInDialog: false,
           },
         },
@@ -1052,7 +1051,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+          'Use the ripgrep tool for significantly faster file content searching.',
         showInDialog: true,
       },
       toolOutputTruncation: {
@@ -1061,7 +1060,8 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: true,
         default: true,
-        description: 'Enable truncation of large tool outputs.',
+        description:
+          'Truncate excessively large tool outputs to conserve context.',
         showInDialog: true,
       },
       truncateToolOutputThreshold: {
@@ -1090,7 +1090,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
+          'Experimental system for intercepting and customizing tool behavior.',
         showInDialog: false,
       },
     },
@@ -1142,7 +1142,7 @@ const SETTINGS_SCHEMA = {
     category: 'Advanced',
     requiresRestart: false,
     default: true,
-    description: 'Enable the write_todos tool.',
+    description: 'Allow Gemini CLI to create and manage TODO items.',
     showInDialog: false,
   },
   security: {
@@ -1170,7 +1170,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+          'Allow remembering tool approvals across different CLI sessions.',
         showInDialog: true,
       },
       blockGitExtensions: {
@@ -1197,7 +1197,8 @@ const SETTINGS_SCHEMA = {
             category: 'Security',
             requiresRestart: true,
             default: false,
-            description: 'Setting to track whether Folder trust is enabled.',
+            description:
+              'Require explicit trust before allowing high-risk tools in a directory.',
             showInDialog: true,
           },
         },
@@ -1239,7 +1240,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Enable redaction of environment variables that may contain secrets.',
+              'Automatically mask environment variables that may contain secrets.',
             showInDialog: true,
           },
         },
@@ -1353,7 +1354,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
+          'Allow specialized subagents for complex tasks (Experimental).',
         showInDialog: false,
       },
       extensionManagement: {
@@ -1362,7 +1363,7 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: true,
-        description: 'Enable extension management features.',
+        description: 'Allow installing, updating, and removing extensions.',
         showInDialog: false,
       },
       extensionReloading: {
@@ -1372,7 +1373,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description:
-          'Enables extension loading/unloading within the CLI session.',
+          'Allow extension loading/unloading within the CLI session.',
         showInDialog: false,
       },
       jitContext: {
@@ -1381,7 +1382,7 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable Just-In-Time (JIT) context loading.',
+        description: 'Load project context dynamically as needed.',
         showInDialog: false,
       },
       skills: {
@@ -1408,7 +1409,7 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: true,
             default: true,
-            description: 'Enable the Codebase Investigator agent.',
+            description: 'Allow specialized codebase analysis agent.',
             showInDialog: true,
           },
           maxNumTurns: {
@@ -1478,7 +1479,7 @@ const SETTINGS_SCHEMA = {
             category: 'Experimental',
             requiresRestart: true,
             default: true,
-            description: 'Enable the CLI Help Agent.',
+            description: 'Allow specialized help and guidance agent.',
             showInDialog: true,
           },
         },
@@ -1556,12 +1557,12 @@ const SETTINGS_SCHEMA = {
     properties: {
       enabled: {
         type: 'boolean',
-        label: 'Enable Hooks',
+        label: 'Hooks',
         category: 'Advanced',
         requiresRestart: false,
         default: false,
         description:
-          'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
+          'Experimental system for intercepting and customizing tool behavior.',
         showInDialog: false,
       },
       disabled: {
