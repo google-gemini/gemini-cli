@@ -400,7 +400,7 @@ describe('ChatCompressionService', () => {
       // Verify saveTruncatedToolOutput was called for the older response
       expect(saveTruncatedToolOutput).toHaveBeenCalledTimes(1);
       expect(saveTruncatedToolOutput).toHaveBeenCalledWith(
-        JSON.stringify({ content: largeResponse }, null, 2),
+        largeResponse,
         'grep',
         1,
         '/tmp/test',
@@ -409,10 +409,10 @@ describe('ChatCompressionService', () => {
       // Verify the new history contains the truncated message
       const keptHistory = result.newHistory!.slice(2); // After summary and 'Got it'
       const truncatedPart = keptHistory[1].parts![0].functionResponse;
-      expect(truncatedPart?.response?.['content']).toContain(
+      expect(truncatedPart?.response?.['output']).toContain(
         'Output too large.',
       );
-      expect(truncatedPart?.response?.['content']).toContain(
+      expect(truncatedPart?.response?.['output']).toContain(
         '/tmp/test/grep_1.txt',
       );
     });
@@ -473,7 +473,7 @@ describe('ChatCompressionService', () => {
         h.parts?.some((p) => p.functionResponse?.name === 'shell'),
       );
       const truncatedPart = shellResponse!.parts![0].functionResponse;
-      const content = truncatedPart?.response?.['content'] as string;
+      const content = truncatedPart?.response?.['output'] as string;
 
       // Since the output is an object, it gets pretty-printed into 3 lines.
       // Line 1: {
@@ -487,13 +487,13 @@ describe('ChatCompressionService', () => {
 
       // Verify dependencies called
       expect(saveTruncatedToolOutput).toHaveBeenCalledWith(
-        expect.stringContaining('"output": "aaaa'),
+        expect.stringContaining('aaaa'),
         'shell',
         expect.any(Number),
         expect.any(String),
       );
       expect(formatTruncatedToolOutput).toHaveBeenCalledWith(
-        expect.stringContaining('"output": "aaaa'),
+        expect.stringContaining('aaaa'),
         '/tmp/test/shell_1.txt',
         COMPRESSION_TRUNCATE_LINES,
       );
@@ -552,7 +552,7 @@ describe('ChatCompressionService', () => {
         h.parts?.some((p) => p.functionResponse?.name === 'raw_tool'),
       );
       const truncatedPart = rawResponse!.parts![0].functionResponse;
-      const content = truncatedPart?.response?.['content'] as string;
+      const content = truncatedPart?.response?.['output'] as string;
 
       expect(content).toContain(
         'Output too large. Showing the last 30,000 characters of the output.',

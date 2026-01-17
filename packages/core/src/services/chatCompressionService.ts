@@ -151,12 +151,32 @@ async function truncateHistoryToBudget(
 
         if (part.functionResponse) {
           const responseObj = part.functionResponse.response;
-          // Use pretty-printing for JSON objects to ensure we can accurately count lines
-          // and provide a readable snippet of the tail.
-          const contentStr =
-            typeof responseObj === 'string'
-              ? responseObj
-              : JSON.stringify(responseObj, null, 2);
+          // Ensure we have a string representation to truncate.
+          // If the response is an object, we try to extract a primary string field (output or content).
+          let contentStr: string;
+          if (typeof responseObj === 'string') {
+            contentStr = responseObj;
+          } else if (responseObj && typeof responseObj === 'object') {
+            if (
+              'output' in responseObj &&
+              typeof (responseObj).output ===
+                'string'
+            ) {
+              contentStr = (responseObj)
+                .output;
+            } else if (
+              'content' in responseObj &&
+              typeof (responseObj).content ===
+                'string'
+            ) {
+              contentStr = (responseObj)
+                .content;
+            } else {
+              contentStr = JSON.stringify(responseObj, null, 2);
+            }
+          } else {
+            contentStr = JSON.stringify(responseObj, null, 2);
+          }
 
           const tokens = estimateTokenCountSync([{ text: contentStr }]);
 
@@ -183,7 +203,7 @@ async function truncateHistoryToBudget(
               newParts.unshift({
                 functionResponse: {
                   ...part.functionResponse,
-                  response: { content: truncatedMessage },
+                  response: { output: truncatedMessage },
                 },
               });
 
