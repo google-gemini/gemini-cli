@@ -306,11 +306,15 @@ export async function detectFileType(
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
     }
-    if (lookedUpMimeType.startsWith('audio/')) {
-      return 'audio';
-    }
-    if (lookedUpMimeType.startsWith('video/')) {
-      return 'video';
+    // Verify audio/video with content check to avoid MIME misidentification (#16888)
+    if (
+      lookedUpMimeType.startsWith('audio/') ||
+      lookedUpMimeType.startsWith('video/')
+    ) {
+      if (!(await isBinaryFile(filePath))) {
+        return 'text';
+      }
+      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
