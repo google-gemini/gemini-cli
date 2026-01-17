@@ -332,7 +332,14 @@ export const useSlashCommandProcessor = (
       }
 
       const trimmed = rawQuery.trim();
-      if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
+      const parts = trimmed.split(/\s+/);
+      const commandWord = parts[0].toLowerCase();
+      const isExitOrQuit = commandWord === 'exit' || commandWord === 'quit';
+      if (
+        !trimmed.startsWith('/') &&
+        !trimmed.startsWith('?') &&
+        !isExitOrQuit
+      ) {
         return false;
       }
 
@@ -347,11 +354,20 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      let commandToParse = trimmed;
+      if (
+        isExitOrQuit &&
+        !trimmed.startsWith('/') &&
+        !trimmed.startsWith('?')
+      ) {
+        parts[0] = commandWord;
+        commandToParse = `/${parts.join(' ')}`;
+      }
       const {
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
+      } = parseSlashCommand(commandToParse, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1
