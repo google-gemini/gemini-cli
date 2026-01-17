@@ -88,6 +88,13 @@ describe('my_feature', () => {
 
 ## Running Evaluations
 
+First, build the bundled Gemini CLI. You must do this after every code change.
+
+```bash
+npm run build
+npm run bundle
+```
+
 ### Always Passing Evals
 
 To run the evaluations that are expected to always pass (CI safe):
