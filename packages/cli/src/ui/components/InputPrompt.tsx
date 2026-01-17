@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, type DOMElement } from 'ink';
+import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -18,7 +18,10 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
@@ -43,6 +46,7 @@ import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
@@ -129,10 +133,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const { stdout } = useStdout();
+  const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth } = useUIState();
+  const { mainAreaWidth, activePtyId } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -350,13 +356,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      const textToInsert = await clipboardy.read();
-      const offset = buffer.getOffset();
-      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      if (settings.experimental?.useOSC52Paste) {
+        stdout.write('\x1b]52;c;?\x07');
+      } else {
+        const textToInsert = await clipboardy.read();
+        const offset = buffer.getOffset();
+        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      }
     } catch (error) {
-      debugLogger.error('Error handling clipboard image:', error);
+      debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, stdout, settings]);
 
   useMouseClick(
     innerBoxRef,
@@ -386,11 +396,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
       /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && !key.paste) {
+      if (!focus && key.name !== 'paste') {
         return;
       }
 
-      if (key.paste) {
+      if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
@@ -485,11 +495,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for clearing input
+        // Handle double ESC for rewind
         if (escPressCount.current === 0) {
-          if (buffer.text === '') {
-            return;
-          }
           escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
@@ -499,10 +506,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-          // clear input and immediately reset state
-          buffer.setText('');
-          resetCompletionState();
+          // Second ESC triggers rewind
           resetEscapeState();
+          onSubmit('/rewind');
         }
         return;
       }
@@ -822,6 +828,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
+        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
+        if (activePtyId) {
+          setEmbeddedShellFocused(true);
+        }
+        return;
+      }
+
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
 
@@ -863,6 +877,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      onSubmit,
+      activePtyId,
+      setEmbeddedShellFocused,
     ],
   );
 
@@ -1028,11 +1045,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         scrollOffset={activeCompletion.visibleStartIndex}
         userInput={buffer.text}
         mode={
-          buffer.text.startsWith('/') &&
-          !reverseSearchActive &&
-          !commandSearchActive
-            ? 'slash'
-            : 'reverse'
+          completion.completionMode === CompletionMode.AT
+            ? 'reverse'
+            : buffer.text.startsWith('/') &&
+                !reverseSearchActive &&
+                !commandSearchActive
+              ? 'slash'
+              : 'reverse'
         }
         expandedIndex={expandedSuggestionIndex}
       />

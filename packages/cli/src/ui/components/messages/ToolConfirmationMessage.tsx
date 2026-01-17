@@ -19,7 +19,6 @@ import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 
 export interface ToolConfirmationMessageProps {
@@ -41,10 +40,9 @@ export const ToolConfirmationMessage: React.FC<
 }) => {
   const { onConfirm } = confirmationDetails;
 
-  const isAlternateBuffer = useAlternateBuffer();
   const settings = useSettings();
   const allowPermanentApproval =
-    settings.merged.security?.enablePermanentToolApproval ?? false;
+    settings.merged.security.enablePermanentToolApproval;
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
@@ -141,7 +139,11 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
 
-      question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      if (executionProps.commands && executionProps.commands.length > 1) {
+        question = `Allow execution of ${executionProps.commands.length} commands?`;
+      } else {
+        question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      }
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -273,20 +275,24 @@ export const ToolConfirmationMessage: React.FC<
         bodyContentHeight -= 2; // Account for padding;
       }
 
-      const commandBox = (
-        <Box>
-          <Text color={theme.text.link}>{executionProps.command}</Text>
-        </Box>
-      );
-
-      bodyContent = isAlternateBuffer ? (
-        commandBox
-      ) : (
+      bodyContent = (
         <MaxSizedBox
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          {commandBox}
+          <Box flexDirection="column">
+            {executionProps.commands && executionProps.commands.length > 1 ? (
+              executionProps.commands.map((cmd, idx) => (
+                <Text key={idx} color={theme.text.link}>
+                  {cmd}
+                </Text>
+              ))
+            ) : (
+              <Box>
+                <Text color={theme.text.link}>{executionProps.command}</Text>
+              </Box>
+            )}
+          </Box>
         </MaxSizedBox>
       );
     } else if (confirmationDetails.type === 'info') {
@@ -338,7 +344,6 @@ export const ToolConfirmationMessage: React.FC<
     isDiffingEnabled,
     availableTerminalHeight,
     terminalWidth,
-    isAlternateBuffer,
     allowPermanentApproval,
   ]);
 

@@ -46,6 +46,7 @@ export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
+  PLAN = 'plan',
 }
 
 /**
@@ -96,6 +97,11 @@ export type SafetyCheckerConfig =
 
 export interface PolicyRule {
   /**
+   * A unique name for the policy rule, useful for identification and debugging.
+   */
+  name?: string;
+
+  /**
    * The name of the tool this rule applies to.
    * If undefined, the rule applies to all tools.
    */
@@ -123,6 +129,19 @@ export interface PolicyRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * If true, allows command redirection even if the policy engine would normally
+   * downgrade ALLOW to ASK_USER for redirected commands.
+   * Only applies when decision is ALLOW.
+   */
+  allowRedirection?: boolean;
+
+  /**
+   * Effect of the rule's source.
+   * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
+   */
+  source?: string;
 }
 
 export interface SafetyCheckerRule {
