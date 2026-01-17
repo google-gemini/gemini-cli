@@ -110,13 +110,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
-- **`general.disableAutoUpdate`** (boolean):
-  - **Description:** Disable automatic updates
-  - **Default:** `false`
+- **`general.enableAutoUpdate`** (boolean):
+  - **Description:** Enable automatic updates.
+  - **Default:** `true`
 
-- **`general.disableUpdateNag`** (boolean):
-  - **Description:** Disable update notification prompts.
-  - **Default:** `false`
+- **`general.enableAutoUpdateNotification`** (boolean):
+  - **Description:** Enable update notification prompts.
+  - **Default:** `true`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -266,9 +266,9 @@ their corresponding top-level category object in your `settings.json` file.
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
-- **`ui.accessibility.disableLoadingPhrases`** (boolean):
-  - **Description:** Disable loading phrases for accessibility
-  - **Default:** `false`
+- **`ui.accessibility.enableLoadingPhrases`** (boolean):
+  - **Description:** Enable loading phrases during operations.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.accessibility.screenReader`** (boolean):
@@ -607,9 +607,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.disableFuzzySearch`** (boolean):
-  - **Description:** Disable fuzzy search when searching for files.
-  - **Default:** `false`
+- **`context.fileFiltering.enableFuzzySearch`** (boolean):
+  - **Description:** Enable fuzzy search when searching for files.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `tools`
