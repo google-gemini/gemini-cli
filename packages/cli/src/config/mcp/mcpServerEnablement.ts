@@ -186,11 +186,33 @@ const MCP_ENABLEMENT_FILENAME = 'mcp-server-enablement.json';
  * Manages the enabled/disabled state of MCP servers.
  * Uses a simplified format compared to ExtensionEnablementManager.
  * Supports both persistent (file) and session-only (in-memory) states.
+ *
+ * NOTE: Use getInstance() to get the singleton instance. This ensures
+ * session state (sessionDisabled Set) is shared across all code paths.
  */
 export class McpServerEnablementManager {
+  private static instance: McpServerEnablementManager | null = null;
+
   private readonly configFilePath: string;
   private readonly configDir: string;
   private readonly sessionDisabled = new Set<string>();
+
+  /**
+   * Get the singleton instance.
+   */
+  static getInstance(): McpServerEnablementManager {
+    if (!McpServerEnablementManager.instance) {
+      McpServerEnablementManager.instance = new McpServerEnablementManager();
+    }
+    return McpServerEnablementManager.instance;
+  }
+
+  /**
+   * Reset the singleton instance (for testing only).
+   */
+  static resetInstance(): void {
+    McpServerEnablementManager.instance = null;
+  }
 
   constructor() {
     this.configDir = Storage.getGlobalGeminiDir();

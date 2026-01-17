@@ -61,10 +61,14 @@ describe('McpServerEnablementManager', () => {
   beforeEach(() => {
     inMemoryFs = {};
     setupFsMocks();
-    manager = new McpServerEnablementManager();
+    McpServerEnablementManager.resetInstance();
+    manager = McpServerEnablementManager.getInstance();
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    McpServerEnablementManager.resetInstance();
+  });
 
   it('should enable/disable servers with persistence', async () => {
     expect(await manager.isFileEnabled('server')).toBe(true);
@@ -103,6 +107,16 @@ describe('McpServerEnablementManager', () => {
     expect(
       (await manager.getDisplayState('session-disabled')).isSessionDisabled,
     ).toBe(true);
+  });
+
+  it('should share session state across getInstance calls', () => {
+    const instance1 = McpServerEnablementManager.getInstance();
+    const instance2 = McpServerEnablementManager.getInstance();
+
+    instance1.disableForSession('test-server');
+
+    expect(instance2.isSessionDisabled('test-server')).toBe(true);
+    expect(instance1).toBe(instance2);
   });
 });
 

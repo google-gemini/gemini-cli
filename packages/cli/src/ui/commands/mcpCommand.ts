@@ -248,7 +248,7 @@ const listAction = async (
   }
 
   // Get enablement state for all servers
-  const enablementManager = new McpServerEnablementManager();
+  const enablementManager = McpServerEnablementManager.getInstance();
   const enablementState: HistoryItemMcpStatus['enablementState'] = {};
   for (const serverName of serverNames) {
     enablementState[serverName] =
@@ -389,7 +389,7 @@ async function handleEnableDisable(
   }
 
   const name = normalizeServerId(serverName);
-  const manager = new McpServerEnablementManager();
+  const manager = McpServerEnablementManager.getInstance();
 
   if (enable) {
     const settings = loadSettings();
@@ -457,7 +457,7 @@ async function getEnablementCompletion(
   const servers = Object.keys(
     config.getMcpClientManager()?.getMcpServers() || {},
   );
-  const manager = new McpServerEnablementManager();
+  const manager = McpServerEnablementManager.getInstance();
   const results: string[] = [];
   for (const n of servers) {
     const state = await manager.getDisplayState(n);

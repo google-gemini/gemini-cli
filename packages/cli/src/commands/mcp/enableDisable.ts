@@ -25,7 +25,7 @@ interface Args {
 }
 
 async function handleEnable(args: Args): Promise<void> {
-  const manager = new McpServerEnablementManager();
+  const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
   // Check settings blocks
@@ -60,7 +60,7 @@ async function handleEnable(args: Args): Promise<void> {
 }
 
 async function handleDisable(args: Args): Promise<void> {
-  const manager = new McpServerEnablementManager();
+  const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
   if (args.session) {

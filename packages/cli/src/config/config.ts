@@ -653,7 +653,7 @@ export async function loadCliConfig(
   const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
   // Create MCP enablement manager and callbacks
-  const mcpEnablementManager = new McpServerEnablementManager();
+  const mcpEnablementManager = McpServerEnablementManager.getInstance();
   const mcpEnablementCallbacks = mcpEnabled
     ? mcpEnablementManager.getEnablementCallbacks()
     : undefined;
