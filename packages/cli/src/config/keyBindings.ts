@@ -69,6 +69,9 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
+  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+  
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -236,6 +239,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.TOGGLE_AUTO_EDIT]: [{ key: 'tab', shift: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'o', ctrl: true }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
@@ -342,6 +347,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.TOGGLE_AUTO_EDIT,
       Command.SHOW_MORE_LINES,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
@@ -427,7 +434,11 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
   [Command.SHOW_MORE_LINES]:
-    'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+      'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+  [Command.TOGGLE_BACKGROUND_SHELL]:
+    'Move current shell command to background or toggle background shell view.',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
+    'Toggle the list of background shell processes.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',

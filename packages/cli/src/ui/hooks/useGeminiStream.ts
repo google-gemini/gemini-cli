@@ -42,6 +42,7 @@ import type {
   ServerGeminiStreamEvent as GeminiEvent,
   ThoughtSummary,
   ToolCallRequestInfo,
+  ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
   ToolCallConfirmationDetails,
@@ -77,10 +78,32 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
+type ToolResponseWithParts = ToolCallResponseInfo & {
+  llmContent?: PartListUnion;
+};
+
+interface ShellToolData {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+}
+
+function isShellToolData(data: unknown): data is ShellToolData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const d = data as Partial<ShellToolData>;
+  return (
+    (d.pid === undefined || typeof d.pid === 'number') &&
+    (d.command === undefined || typeof d.command === 'string') &&
+    (d.initialOutput === undefined || typeof d.initialOutput === 'string')
+  );
 }
 
 function showCitations(settings: LoadedSettings): boolean {
@@ -237,18 +260,29 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
-    useShellCommandProcessor(
-      addItem,
-      setPendingHistoryItem,
-      onExec,
-      onDebugMessage,
-      config,
-      geminiClient,
-      setShellInputFocused,
-      terminalWidth,
-      terminalHeight,
-    );
+  const {
+    handleShellCommand,
+    activeShellPtyId,
+    lastShellOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    registerBackgroundShell,
+    dismissBackgroundShell,
+    backgroundShells,
+  } = useShellCommandProcessor(
+    addItem,
+    setPendingHistoryItem,
+    onExec,
+    onDebugMessage,
+    config,
+    geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    activeToolPtyId,
+  );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
@@ -1214,6 +1248,25 @@ export const useGeminiStream = (
           !processedMemoryToolsRef.current.has(t.request.callId),
       );
 
+      // Handle backgrounded shell tools
+      completedAndReadyToSubmitTools.forEach((t) => {
+        const isShell = t.request.name === 'run_shell_command';
+        // Access result from the tracked tool call response
+        const response = t.response as ToolResponseWithParts;
+        const rawData = response?.data;
+        const data = isShellToolData(rawData) ? rawData : undefined;
+
+        // Use data.pid or fallback to t.pid (preserved from executing state)
+        const pid = data?.pid ?? (t as { pid?: number }).pid;
+
+        if (isShell && pid) {
+          const command = (data?.['command'] as string) ?? 'shell';
+          const initialOutput = (data?.['initialOutput'] as string) ?? '';
+
+          registerBackgroundShell(pid, command, initialOutput);
+        }
+      });
+
       if (newSuccessfulMemorySaves.length > 0) {
         // Perform the refresh only if there are new ones.
         void performMemoryRefresh();
@@ -1320,6 +1373,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      registerBackgroundShell,
     ],
   );
 
@@ -1409,6 +1463,12 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    backgroundShells,
+    dismissBackgroundShell,
     retryStatus,
   };
 };

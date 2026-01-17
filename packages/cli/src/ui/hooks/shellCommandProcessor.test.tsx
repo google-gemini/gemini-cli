@@ -19,12 +19,23 @@ import {
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellKill = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
+const mockShellSubscribe = vi.hoisted(() => vi.fn(() => vi.fn())); // Returns unsubscribe
+const mockShellOnExit = vi.hoisted(() => vi.fn());
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    ShellExecutionService: { execute: mockShellExecutionService },
+    ShellExecutionService: {
+      execute: mockShellExecutionService,
+      kill: mockShellKill,
+      background: mockShellBackground,
+      subscribe: mockShellSubscribe,
+      onExit: mockShellOnExit,
+    },
     isBinary: mockIsBinary,
   };
 });
@@ -721,6 +732,185 @@ describe('useShellCommandProcessor', () => {
       await act(async () => {});
 
       expect(result.current.activeShellPtyId).toBeNull();
+    });
+  });
+
+  describe('Background Shell Management', () => {
+    it('should register a background shell and update count', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      expect(result.current.backgroundShellCount).toBe(1);
+      const shell = result.current.backgroundShells.get(1001);
+      expect(shell).toEqual(
+        expect.objectContaining({
+          pid: 1001,
+          command: 'bg-cmd',
+          output: 'initial',
+        }),
+      );
+      expect(mockShellOnExit).toHaveBeenCalledWith(1001, expect.any(Function));
+      expect(mockShellSubscribe).toHaveBeenCalledWith(
+        1001,
+        expect.any(Function),
+      );
+    });
+
+    it('should toggle background shell visibility', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(true);
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+    });
+
+    it('should show info message when toggling background shells if none are active', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.toggleBackgroundShell();
+      });
+
+      expect(addItemToHistoryMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'info',
+          text: 'No background shells are currently active.',
+        }),
+        expect.any(Number),
+      );
+      expect(result.current.isBackgroundShellVisible).toBe(false);
+    });
+
+    it('should dismiss a background shell and remove it from state', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+      });
+
+      act(() => {
+        result.current.dismissBackgroundShell(1001);
+      });
+
+      expect(mockShellKill).toHaveBeenCalledWith(1001);
+      expect(result.current.backgroundShellCount).toBe(0);
+      expect(result.current.backgroundShells.has(1001)).toBe(false);
+    });
+
+    it('should handle backgrounding the current shell', async () => {
+      // Simulate an active shell
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
+        mockShellOutputCallback = callback;
+        return Promise.resolve({
+          pid: 555,
+          result: new Promise((resolve) => {
+            resolveExecutionPromise = resolve;
+          }),
+        });
+      });
+
+      const { result } = renderProcessorHook();
+
+      await act(async () => {
+        result.current.handleShellCommand('top', new AbortController().signal);
+      });
+
+      expect(result.current.activeShellPtyId).toBe(555);
+
+      act(() => {
+        result.current.backgroundCurrentShell();
+      });
+
+      expect(mockShellBackground).toHaveBeenCalledWith(555);
+      // The actual state update happens when the promise resolves with backgrounded: true
+      // which is handled in handleShellCommand's .then block.
+      // We simulate that here:
+
+      await act(async () => {
+        resolveExecutionPromise(
+          createMockServiceResult({
+            backgrounded: true,
+            pid: 555,
+            output: 'running...',
+          }),
+        );
+      });
+      // Wait for promise resolution
+      await act(async () => await onExecMock.mock.calls[0][0]);
+
+      expect(result.current.backgroundShellCount).toBe(1);
+      expect(result.current.activeShellPtyId).toBeNull();
+    });
+
+    it('should persist background shell on successful exit and mark as exited', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(888, 'auto-exit', '');
+      });
+
+      // Find the exit callback registered
+      const exitCallback = mockShellOnExit.mock.calls.find(
+        (call) => call[0] === 888,
+      )?.[1];
+      expect(exitCallback).toBeDefined();
+
+      act(() => {
+        exitCallback(0);
+      });
+
+      // Should NOT be removed, but updated
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
+      expect(result.current.backgroundShells.has(888)).toBe(true); // Map has it
+      const shell = result.current.backgroundShells.get(888);
+      expect(shell?.status).toBe('exited');
+      expect(shell?.exitCode).toBe(0);
+    });
+
+    it('should persist background shell on failed exit', async () => {
+      const { result } = renderProcessorHook();
+
+      act(() => {
+        result.current.registerBackgroundShell(999, 'fail-exit', '');
+      });
+
+      const exitCallback = mockShellOnExit.mock.calls.find(
+        (call) => call[0] === 999,
+      )?.[1];
+      expect(exitCallback).toBeDefined();
+
+      act(() => {
+        exitCallback(1);
+      });
+
+      // Should NOT be removed, but updated
+      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
+      const shell = result.current.backgroundShells.get(999);
+      expect(shell?.status).toBe('exited');
+      expect(shell?.exitCode).toBe(1);
+
+      // Now dismiss it
+      act(() => {
+        result.current.dismissBackgroundShell(999);
+      });
+      expect(result.current.backgroundShellCount).toBe(0);
     });
   });
 });

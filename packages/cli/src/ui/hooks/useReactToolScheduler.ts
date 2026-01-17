@@ -50,9 +50,11 @@ export type TrackedExecutingToolCall = ExecutingToolCall & {
 };
 export type TrackedCompletedToolCall = CompletedToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 export type TrackedCancelledToolCall = CancelledToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 
 export type TrackedToolCall =
@@ -130,6 +132,11 @@ export function useReactToolScheduler(
           const responseSubmittedToGemini =
             existingTrackedCall?.responseSubmittedToGemini ?? false;
 
+          // Preserve PID if it existed in the previous state
+          const pid =
+            (coreTc as { pid?: number }).pid ??
+            (existingTrackedCall as { pid?: number } | undefined)?.pid;
+
           if (coreTc.status === 'executing') {
             // Preserve live output if it exists from a previous render.
             const liveOutput = (existingTrackedCall as TrackedExecutingToolCall)
@@ -138,7 +145,17 @@ export function useReactToolScheduler(
               ...coreTc,
               responseSubmittedToGemini,
               liveOutput,
-              pid: coreTc.pid,
+              pid,
+            };
+          } else if (
+            coreTc.status === 'success' ||
+            coreTc.status === 'error' ||
+            coreTc.status === 'cancelled'
+          ) {
+            return {
+              ...coreTc,
+              responseSubmittedToGemini,
+              pid,
             };
           } else {
             return {

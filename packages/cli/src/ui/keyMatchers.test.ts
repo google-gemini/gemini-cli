@@ -269,7 +269,10 @@ describe('keyMatchers', () => {
     {
       command: Command.SHOW_ERROR_DETAILS,
       positive: [createKey('f12')],
-      negative: [createKey('o', { ctrl: true }), createKey('f11')],
+      negative: [
+        createKey('o', { ctrl: true }),
+        createKey('b', { ctrl: true }),
+      ],
     },
     {
       command: Command.SHOW_FULL_TODOS,
@@ -337,6 +340,16 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_AUTO_EDIT,
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL,
+      positive: [createKey('b', { ctrl: true })],
+      negative: [createKey('f10'), createKey('b')],
+    },
+    {
+      command: Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      positive: [createKey('o', { ctrl: true })],
+      negative: [createKey('o')],
     },
   ];
 

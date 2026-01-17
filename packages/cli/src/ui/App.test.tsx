@@ -72,6 +72,7 @@ describe('App', () => {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },
+    backgroundShells: new Map(),
   };
 
   const mockConfig = makeFakeConfig();

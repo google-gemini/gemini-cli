@@ -67,6 +67,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
           config.getMcpClientManager()?.getBlockedMcpServers() ?? []
         }
         skillCount={config.getSkillManager().getDisplayableSkills().length}
+        backgroundProcessCount={uiState.backgroundShellCount}
       />
     );
   }
