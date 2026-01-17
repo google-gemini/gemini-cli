@@ -65,4 +65,150 @@ describe('generate-keybindings-doc', () => {
     expect(markdown).toContain('`Up Arrow (no Shift)`');
     expect(markdown).toContain('`Ctrl + P (no Shift)`');
   });
+
+  it('handles empty bindings array', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Empty Section',
+        commands: [
+          {
+            description: 'Command with no bindings.',
+            bindings: [],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('#### Empty Section');
+    expect(markdown).toContain('Command with no bindings.');
+    expect(markdown).toContain('| Command with no bindings. |  |');
+  });
+
+  it('deduplicates identical bindings', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Deduplication Test',
+        commands: [
+          {
+            description: 'Command with duplicate bindings.',
+            bindings: [
+              { key: 'x', ctrl: true },
+              { key: 'x', ctrl: true },
+              { key: 'x', ctrl: true },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    const ctrlXCount = (markdown.match(/`Ctrl \+ X`/g) || []).length;
+    expect(ctrlXCount).toBe(1);
+  });
+
+  it('handles multiple modifiers correctly', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Multi-Modifier Test',
+        commands: [
+          {
+            description: 'Command with multiple modifiers.',
+            bindings: [
+              { key: 's', ctrl: true, shift: true },
+              { key: 'z', ctrl: true, command: true },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('`Ctrl + Shift + S`');
+    expect(markdown).toContain('`Ctrl + Cmd + Z`');
+  });
+
+  it('handles function keys correctly', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Function Keys Test',
+        commands: [
+          {
+            description: 'Command with function keys.',
+            bindings: [
+              { key: 'f1', ctrl: true },
+              { key: 'f12', shift: true },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('`Ctrl + F1`');
+    expect(markdown).toContain('`Shift + F12`');
+  });
+
+  it('handles single character keys correctly', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Single Character Test',
+        commands: [
+          {
+            description: 'Command with single character keys.',
+            bindings: [
+              { key: 'a', ctrl: true },
+              { key: 'z', shift: true },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('`Ctrl + A`');
+    expect(markdown).toContain('`Shift + Z`');
+  });
+
+  it('handles empty sections gracefully', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'Empty Section',
+        commands: [],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('#### Empty Section');
+    expect(markdown).toContain('| Action | Keys |');
+  });
+
+  it('handles multiple sections correctly', () => {
+    const sections: KeybindingDocSection[] = [
+      {
+        title: 'First Section',
+        commands: [
+          {
+            description: 'First command.',
+            bindings: [{ key: 'a', ctrl: true }],
+          },
+        ],
+      },
+      {
+        title: 'Second Section',
+        commands: [
+          {
+            description: 'Second command.',
+            bindings: [{ key: 'b', shift: true }],
+          },
+        ],
+      },
+    ];
+
+    const markdown = renderDocumentation(sections);
+    expect(markdown).toContain('#### First Section');
+    expect(markdown).toContain('#### Second Section');
+    expect(markdown).toContain('`Ctrl + A`');
+    expect(markdown).toContain('`Shift + B`');
+  });
 });
