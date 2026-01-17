@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 137
+  // Next ID: 144
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -529,4 +529,17 @@ export enum EventMetadataKey {
 
   // Logs total RAM in GB of user machine.
   GEMINI_CLI_RAM_TOTAL_GB = 140,
+
+  // ==========================================================================
+  // Approval Mode Event Keys
+  // ==========================================================================
+
+  // Logs the active approval mode in the session.
+  GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
+
+  // Logs the new approval mode.
+  GEMINI_CLI_APPROVAL_MODE_TO = 142,
+
+  // Logs the duration spent in an approval mode in milliseconds.
+  GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
 }
