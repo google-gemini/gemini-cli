@@ -29,6 +29,7 @@ describe('detectIde', () => {
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
+    vi.stubEnv('TERMINAL_EMULATOR', '');
   });
 
   afterEach(() => {
@@ -126,6 +127,55 @@ describe('detectIde', () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.antigravity);
   });
+
+  it('should detect JetBrains IDE via TERMINAL_EMULATOR', () => {
+    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.jetbrains);
+  });
+
+  describe('JetBrains IDE detection via command', () => {
+    beforeEach(() => {
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    });
+
+    it.each([
+      [
+        'IntelliJ IDEA',
+        '/Applications/IntelliJ IDEA.app',
+        IDE_DEFINITIONS.intellijidea,
+      ],
+      ['WebStorm', '/Applications/WebStorm.app', IDE_DEFINITIONS.webstorm],
+      ['PyCharm', '/Applications/PyCharm.app', IDE_DEFINITIONS.pycharm],
+      ['GoLand', '/Applications/GoLand.app', IDE_DEFINITIONS.goland],
+      [
+        'Android Studio',
+        '/Applications/Android Studio.app',
+        IDE_DEFINITIONS.androidstudio,
+      ],
+      ['CLion', '/Applications/CLion.app', IDE_DEFINITIONS.clion],
+      ['RustRover', '/Applications/RustRover.app', IDE_DEFINITIONS.rustrover],
+      ['DataGrip', '/Applications/DataGrip.app', IDE_DEFINITIONS.datagrip],
+      ['PhpStorm', '/Applications/PhpStorm.app', IDE_DEFINITIONS.phpstorm],
+    ])('should detect %s via command', (_name, command, expectedIde) => {
+      const processInfo = { pid: 123, command };
+      expect(detectIde(processInfo)).toBe(expectedIde);
+    });
+  });
+
+  it('should return generic JetBrains when command does not match specific IDE', () => {
+    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    const genericProcessInfo = {
+      pid: 123,
+      command: '/Applications/SomeJetBrainsApp.app',
+    };
+    expect(detectIde(genericProcessInfo)).toBe(IDE_DEFINITIONS.jetbrains);
+  });
+
+  it('should prioritize JetBrains detection over VS Code when TERMINAL_EMULATOR is set', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.jetbrains);
+  });
 });
 
 describe('detectIde with ideInfoFromFile', () => {
@@ -147,6 +197,7 @@ describe('detectIde with ideInfoFromFile', () => {
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
+    vi.stubEnv('TERMINAL_EMULATOR', '');
   });
 
   it('should use the name and displayName from the file', () => {
