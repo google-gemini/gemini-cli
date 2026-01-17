@@ -400,7 +400,34 @@ export class MCPOAuthProvider {
   }
 
   /**
-   * Build the authorization URL with PKCE parameters.
+   * Extract the port number from a URL string if available and valid.
+   *
+   * @param urlString The URL string to parse
+   * @returns The port number or undefined if not found or invalid
+   */
+  private getPortFromUrl(urlString?: string): number | undefined {
+    if (!urlString) {
+      return undefined;
+    }
+
+    try {
+      const url = new URL(urlString);
+      if (url.port) {
+        const parsedPort = parseInt(url.port, 10);
+        if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+          return parsedPort;
+        }
+      }
+    } catch {
+      // Ignore invalid URL
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Build the authorization URL for the OAuth flow.
+
    *
    * @param config OAuth configuration
    * @param pkceParams PKCE parameters
@@ -806,20 +833,7 @@ export class MCPOAuthProvider {
     const pkceParams = this.generatePKCEParams();
 
     // Determine preferred port from redirectUri if available
-    let preferredPort: number | undefined;
-    if (config.redirectUri) {
-      try {
-        const url = new URL(config.redirectUri);
-        if (url.port) {
-          const parsedPort = parseInt(url.port, 10);
-          if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-            preferredPort = parsedPort;
-          }
-        }
-      } catch {
-        // Ignore invalid URL
-      }
-    }
+    const preferredPort = this.getPortFromUrl(config.redirectUri);
 
     // Start callback server first to allocate port
     // This ensures we only create one server and eliminates race conditions
