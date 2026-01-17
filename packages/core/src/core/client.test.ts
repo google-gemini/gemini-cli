@@ -679,6 +679,34 @@ describe('Gemini Client (client.ts)', () => {
       });
     });
 
+    it('does not emit ModelInfo event if signal is aborted', async () => {
+      // Arrange
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        controller.signal,
+        'prompt-id-1',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).not.toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.ModelInfo,
+        }),
+      );
+    });
+
     it.each([
       {
         compressionStatus:
