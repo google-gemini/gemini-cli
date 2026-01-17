@@ -517,46 +517,59 @@ export async function fileExists(filePath: string): Promise<boolean> {
 }
 
 const MAX_TRUNCATED_LINE_WIDTH = 1000;
-const MAX_TRUNCATED_CHARS = 10000;
+const MAX_TRUNCATED_CHARS = 4000;
 
 /**
- * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ * Formats a truncated message for tool output.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
   truncateLines: number = 30,
 ): string {
-  const physicalLines = contentStr.split('\n');
+  // We prioritize character-based truncation (keeping the tail) to stay within token budgets.
+  const isTruncatedInChars = contentStr.length > MAX_TRUNCATED_CHARS;
+  const charSnippet = isTruncatedInChars
+    ? contentStr.slice(-MAX_TRUNCATED_CHARS)
+    : contentStr;
+
+  const physicalLines = charSnippet.split('\n');
   const totalPhysicalLines = physicalLines.length;
 
-  if (totalPhysicalLines > 1) {
-    // Multi-line case: show last N lines, but protect against "elephant" lines.
-    const lastLines = physicalLines.slice(-truncateLines);
-    let someLinesTruncatedInWidth = false;
-    const processedLines = lastLines.map((line) => {
-      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
-        someLinesTruncatedInWidth = true;
-        return (
-          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
-          '... [LINE WIDTH TRUNCATED]'
-        );
-      }
-      return line;
-    });
+  // Even if we're within char limits, we might have too many lines (e.g. many short lines).
+  // We take the last N lines of our character snippet.
+  const linesToKeep = Math.min(totalPhysicalLines, truncateLines);
+  const lastLines = physicalLines.slice(-linesToKeep);
+  const isTruncatedInLines = totalPhysicalLines > truncateLines;
 
-    const widthWarning = someLinesTruncatedInWidth
-      ? ' (some long lines truncated)'
-      : '';
-    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
+  let someLinesTruncatedInWidth = false;
+  const processedLines = lastLines.map((line) => {
+    if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
+      someLinesTruncatedInWidth = true;
+      return (
+        line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
+        '... [LINE WIDTH TRUNCATED]'
+      );
+    }
+    return line;
+  });
+
+  const widthWarning = someLinesTruncatedInWidth
+    ? ' (some long lines truncated)'
+    : '';
+
+  const truncationType =
+    isTruncatedInChars && isTruncatedInLines
+      ? 'characters and lines'
+      : isTruncatedInChars
+        ? 'characters'
+        : 'lines';
+
+  const truncatedContent = processedLines.join('\n');
+
+  return `Output too large. Showing a tail of the output (${truncationType} truncated)${widthWarning}. For full output see: ${outputFile}
 ...
-${processedLines.join('\n')}`;
-  } else {
-    // Single massive line case: use character-based truncation description.
-    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
-    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
-...${snippet}`;
-  }
+${truncatedContent}`;
 }
 
 /**

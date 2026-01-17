@@ -180,6 +180,7 @@ export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
   compressionStatus: CompressionStatus;
+  isStillAboveThreshold?: boolean;
 }
 
 export type ServerGeminiChatCompressedEvent = {

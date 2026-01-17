@@ -50,11 +50,6 @@ export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 40_000;
 
 /**
- * The number of lines to keep when truncating a function response during compression.
- */
-export const COMPRESSION_TRUNCATE_LINES = 30;
-
-/**
  * Returns the index of the oldest item to keep when compressing. May return
  * contents.length which indicates that everything should be compressed.
  *
@@ -193,7 +188,6 @@ async function truncateHistoryToBudget(
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                COMPRESSION_TRUNCATE_LINES,
               );
 
               newParts.unshift({
@@ -353,6 +347,12 @@ export class ChatCompressionService {
       }),
     );
 
+    const threshold =
+      (await config.getCompressionThreshold()) ??
+      DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+    const isStillAboveThreshold =
+      newTokenCount >= threshold * tokenLimit(model);
+
     if (newTokenCount > originalTokenCount) {
       return {
         newHistory: null,
@@ -361,6 +361,7 @@ export class ChatCompressionService {
           newTokenCount,
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          isStillAboveThreshold,
         },
       };
     } else {
@@ -370,6 +371,7 @@ export class ChatCompressionService {
           originalTokenCount,
           newTokenCount,
           compressionStatus: CompressionStatus.COMPRESSED,
+          isStillAboveThreshold,
         },
       };
     }

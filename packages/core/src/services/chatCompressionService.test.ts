@@ -378,7 +378,7 @@ describe('ChatCompressionService', () => {
       const keptHistory = result.newHistory!.slice(2); // After summary and 'Got it'
       const truncatedPart = keptHistory[1].parts![0].functionResponse;
       expect(truncatedPart?.response?.['output']).toContain(
-        'Output too large.',
+        'Output too large. Showing a tail of the output',
       );
 
       // Verify a file was actually created
@@ -451,7 +451,7 @@ describe('ChatCompressionService', () => {
       const content = truncatedPart?.response?.['output'] as string;
 
       expect(content).toContain(
-        'Output too large. Showing the last 10,000 characters of the output.',
+        'Output too large. Showing a tail of the output',
       );
       // It's a single line, so NO [LINE WIDTH TRUNCATED]
     });
@@ -515,7 +515,7 @@ describe('ChatCompressionService', () => {
       const content = truncatedPart?.response?.['output'] as string;
 
       expect(content).toContain(
-        'Output too large. Showing the last 10,000 characters of the output.',
+        'Output too large. Showing a tail of the output',
       );
     });
 

@@ -986,6 +986,8 @@ export class GeminiClient {
       }
     }
 
+    this.hasFailedCompressionAttempt = !!info.isStillAboveThreshold;
+
     return info;
   }
 }
