@@ -538,4 +538,56 @@ describe('ShellTool', () => {
       expect(shellTool.description).toMatchSnapshot();
     });
   });
+
+  describe('getConfirmationDetails', () => {
+    it('should annotate sub-commands with redirection correctly', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'mkdir -p baz && echo "hello" > baz/test.md && ls';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe('mkdir, echo, redirection (>), ls');
+      }
+    });
+
+    it('should annotate all redirected sub-commands', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'cat < input.txt && grep "foo" > output.txt';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe(
+          'cat, redirection (<), grep, redirection (>)',
+        );
+      }
+    });
+
+    it('should annotate sub-commands with pipes correctly', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'ls | grep "baz"';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe('ls, grep');
+      }
+    });
+  });
 });
