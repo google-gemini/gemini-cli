@@ -18,7 +18,9 @@ import {
   unescapePath,
   type EditorType,
   getEditorCommand,
+  getEditorTypeFromCommand,
   isGuiEditor,
+  isValidEditorType,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -571,7 +573,7 @@ interface UseTextBufferProps {
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
-  getPreferredEditor?: () => EditorType | undefined;
+  getPreferredEditor?: () => string | undefined;
 }
 
 interface UndoHistoryEntry {
@@ -2232,21 +2234,48 @@ export function useTextBuffer({
     let command: string | undefined = undefined;
     const args = [filePath];
 
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
+    const resolveEditor = (
+      candidate: string | undefined,
+    ): { command: string; editorType: EditorType | null } | null => {
+      if (!candidate) {
+        return null;
+      }
+      if (isValidEditorType(candidate)) {
+        return {
+          command: getEditorCommand(candidate),
+          editorType: candidate,
+        };
+      }
+      return {
+        command: candidate,
+        editorType: getEditorTypeFromCommand(candidate),
+      };
+    };
+
+    const preferredEditor = getPreferredEditor?.();
+    if (preferredEditor) {
+      const resolved = resolveEditor(preferredEditor);
+      if (resolved) {
+        command = resolved.command;
+        if (resolved.editorType && isGuiEditor(resolved.editorType)) {
+          args.unshift('--wait');
+        }
       }
     }
 
     if (!command) {
-      command =
-        (process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        process.platform === 'win32')
-          ? 'notepad'
-          : 'vi';
+      const envCommand = process.env['VISUAL'] ?? process.env['EDITOR'];
+      const resolved = resolveEditor(envCommand);
+      if (resolved) {
+        command = resolved.command;
+        if (resolved.editorType && isGuiEditor(resolved.editorType)) {
+          args.unshift('--wait');
+        }
+      }
+    }
+
+    if (!command) {
+      command = process.platform === 'win32' ? 'notepad' : 'vi';
     }
 
     dispatch({ type: 'create_undo_snapshot' });

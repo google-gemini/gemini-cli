@@ -34,7 +34,6 @@ import {
 } from '@google/gemini-cli-core';
 import type {
   Config,
-  EditorType,
   GeminiClient,
   ServerGeminiChatCompressedEvent,
   ServerGeminiContentEvent as ContentEvent,
@@ -106,7 +105,7 @@ export const useGeminiStream = (
     cmd: PartListUnion,
   ) => Promise<SlashCommandProcessorResult | false>,
   shellModeActive: boolean,
-  getPreferredEditor: () => EditorType | undefined,
+  getPreferredEditor: () => string | undefined,
   onAuthError: (error: string) => void,
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,

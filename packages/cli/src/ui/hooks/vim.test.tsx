@@ -208,6 +208,55 @@ describe('useVim hook', () => {
     mockVimContext.setVimMode.mockClear();
   });
 
+  describe('Input handling in INSERT mode', () => {
+    it('should delegate plain Enter to InputPrompt (return false)', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      // Verify we are in INSERT mode
+      expect(result.current.mode).toBe('INSERT');
+
+      const handled = result.current.handleInput(createKey({ name: 'return' }));
+
+      // Should return false to let InputPrompt handle completion or submit
+      expect(handled).toBe(false);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+    });
+
+    it('should NOT submit on Shift+Enter (pass through for newline)', () => {
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      const handled = result.current.handleInput(
+        createKey({ name: 'return', shift: true }),
+      );
+
+      // Should be handled by vim hook (returned true) but NOT submitted
+      expect(handled).toBe(true);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+      // Should trigger newline
+      expect(testBuffer.newline).toHaveBeenCalled();
+    });
+
+    it('should treat "enter" key (Shift+Enter variant) as newline', () => {
+      // Some terminals (like iTerm2 or those with Kitty protocol) report
+      // Shift+Enter as name: 'enter' and sequence: '\n' instead of 'return' with shift modifier.
+      mockVimContext.vimMode = 'INSERT';
+      const testBuffer = createMockBuffer('some text');
+      const { result } = renderVimHook(testBuffer);
+
+      const handled = result.current.handleInput(
+        createKey({ name: 'enter', sequence: '\n' }),
+      );
+
+      expect(handled).toBe(true);
+      expect(mockHandleFinalSubmit).not.toHaveBeenCalled();
+      expect(testBuffer.newline).toHaveBeenCalled();
+    });
+  });
+
   describe('Mode switching', () => {
     it('should start in NORMAL mode', () => {
       const { result } = renderVimHook();
@@ -1342,6 +1391,18 @@ describe('useVim hook', () => {
       expect(nonEmptyBuffer.handleInput).toHaveBeenCalledWith(
         expect.objectContaining(key),
       );
+    });
+
+    it.each([
+      { mode: 'NORMAL' as VimMode, key: { name: 'x', ctrl: true } },
+      { mode: 'INSERT' as VimMode, key: { name: 'x', ctrl: true } },
+    ])('should pass through ctrl+x in $mode mode', ({ mode, key }) => {
+      mockVimContext.vimMode = mode;
+      const { result } = renderVimHook();
+
+      const handled = result.current.handleInput(createKey(key));
+
+      expect(handled).toBe(false);
     });
   });
 

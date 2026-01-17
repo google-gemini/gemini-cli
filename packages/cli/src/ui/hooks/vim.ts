@@ -9,6 +9,7 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -256,6 +257,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true;
       }
 
+      // Handle Shift+Enter explicitly to ensure it inserts a newline.
+      // Note: Some terminals report Shift+Enter as 'enter' (not 'return'),
+      // while others report it as 'return' with shift=true.
+      if (
+        keyMatchers[Command.NEWLINE](normalizedKey) ||
+        normalizedKey.name === 'enter'
+      ) {
+        buffer.newline();
+        return true;
+      }
+
       // In INSERT mode, let InputPrompt handle completion keys and special commands
       if (
         normalizedKey.name === 'tab' ||
@@ -281,7 +293,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       if (
         normalizedKey.name === 'return' &&
         !normalizedKey.ctrl &&
-        !normalizedKey.meta
+        !normalizedKey.meta &&
+        !normalizedKey.shift
       ) {
         if (buffer.text.trim() && onSubmit) {
           // Handle command submission directly
@@ -396,6 +409,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       } catch (error) {
         // Handle malformed key inputs gracefully
         debugLogger.warn('Malformed key input in vim mode:', key, error);
+        return false;
+      }
+
+      // Let InputPrompt handle Ctrl+X for external editor
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](normalizedKey)) {
         return false;
       }
 
