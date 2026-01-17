@@ -347,6 +347,12 @@ export class ChatCompressionService {
       }),
     );
 
+    const threshold =
+      (await config.getCompressionThreshold()) ??
+      DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
+    const isStillAboveThreshold =
+      newTokenCount >= threshold * tokenLimit(model);
+
     if (newTokenCount > originalTokenCount) {
       return {
         newHistory: null,
@@ -355,6 +361,7 @@ export class ChatCompressionService {
           newTokenCount,
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          isStillAboveThreshold,
         },
       };
     } else {
@@ -364,6 +371,7 @@ export class ChatCompressionService {
           originalTokenCount,
           newTokenCount,
           compressionStatus: CompressionStatus.COMPRESSED,
+          isStillAboveThreshold,
         },
       };
     }

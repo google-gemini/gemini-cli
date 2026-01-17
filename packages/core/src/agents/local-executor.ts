@@ -579,9 +579,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
         chat.setHistory(newHistory);
-        this.hasFailedCompressionAttempt = false;
       }
     }
+
+    this.hasFailedCompressionAttempt = !!info.isStillAboveThreshold;
   }
 
   /**
