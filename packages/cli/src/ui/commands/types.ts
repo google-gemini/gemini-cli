@@ -66,8 +66,9 @@ export interface CommandContext {
      * Loads a new set of history items, replacing the current history.
      *
      * @param history The array of history items to load.
+     * @param postLoadInput Optional text to set in the input buffer after loading history.
      */
-    loadHistory: UseHistoryManagerReturn['loadHistory'];
+    loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;
@@ -77,6 +78,8 @@ export interface CommandContext {
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
+    /** Clears the "Ctrl+C to clear text" toast if it is visible. */
+    clearTextToast: () => void;
   };
   // Session-specific data
   session: {

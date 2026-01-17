@@ -82,6 +82,7 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
+  onClearTextToastChange?: (showToast: boolean) => void;
   onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
@@ -132,6 +133,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  onClearTextToastChange,
 }) => {
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
@@ -508,6 +510,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } else {
           // Second ESC triggers rewind
           resetEscapeState();
+          if (onClearTextToastChange) {
+            onClearTextToastChange(true);
+          }
           onSubmit('/rewind');
         }
         return;
@@ -880,6 +885,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
+      onClearTextToastChange,
     ],
   );
 

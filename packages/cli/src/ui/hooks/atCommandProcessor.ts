@@ -24,6 +24,9 @@ import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
+const REF_CONTENT_HEADER = '\n--- Content from referenced files ---';
+const REF_CONTENT_FOOTER = '\n--- End of content ---';
+
 interface HandleAtCommandParams {
   query: string;
   config: Config;
@@ -499,10 +502,17 @@ export async function handleAtCommand({
   const resourceResults = await Promise.all(resourcePromises);
   const resourceReadDisplays: IndividualToolCallDisplay[] = [];
   let resourceErrorOccurred = false;
+  let hasAddedReferenceHeader = false;
 
   for (const result of resourceResults) {
     resourceReadDisplays.push(result.display);
     if (result.success) {
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: REF_CONTENT_HEADER,
+        });
+        hasAddedReferenceHeader = true;
+      }
       processedQueryParts.push({ text: `\nContent from @${result.uri}:\n` });
       processedQueryParts.push(...result.parts);
     } else {
@@ -540,6 +550,9 @@ export async function handleAtCommand({
         userMessageTimestamp,
       );
     }
+    if (hasAddedReferenceHeader) {
+      processedQueryParts.push({ text: REF_CONTENT_FOOTER });
+    }
     return { processedQuery: processedQueryParts };
   }
 
@@ -570,9 +583,12 @@ export async function handleAtCommand({
 
     if (Array.isArray(result.llmContent)) {
       const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
-      processedQueryParts.push({
-        text: '\n--- Content from referenced files ---',
-      });
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: REF_CONTENT_HEADER,
+        });
+        hasAddedReferenceHeader = true;
+      }
       for (const part of result.llmContent) {
         if (typeof part === 'string') {
           const match = fileContentRegex.exec(part);
