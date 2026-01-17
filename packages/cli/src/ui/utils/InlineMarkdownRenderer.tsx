@@ -23,6 +23,48 @@ interface RenderInlineProps {
   defaultColor?: string;
 }
 
+/**
+ * Removes trailing punctuation from URLs.
+ * This prevents trailing punctuation marks (especially Chinese punctuation)
+ * from being included in the URL match, while attempting to preserve punctuation
+ * that is part of the URL itself (e.g., balanced parentheses).
+ *
+ * Examples:
+ * - "https://example.com." → "https://example.com"
+ * - "https://example.com。" → "https://example.com"
+ * - "https://en.wikipedia.org/wiki/State_(computer_science))" → "https://en.wikipedia.org/wiki/State_(computer_science)"
+ * - "https://en.wikipedia.org/wiki/State_(computer_science)" → "https://en.wikipedia.org/wiki/State_(computer_science)"
+ */
+function stripTrailingPunctuation(url: string): string {
+  let strippedUrl = url;
+
+  // Loop to remove trailing punctuation one by one.
+  // This allows checking for balanced pairs like parentheses.
+  while (true) {
+    const lastChar = strippedUrl.slice(-1);
+
+    // Don't strip a closing parenthesis if it's part of a balanced pair in the URL.
+    if (lastChar === ')') {
+      const openParens = (strippedUrl.match(/\(/g) || []).length;
+      const closeParens = (strippedUrl.match(/\)/g) || []).length;
+      if (openParens >= closeParens) {
+        break;
+      }
+    }
+
+    // A comprehensive regex for trailing characters to strip.
+    // ASCII: . , ; : ! ? ) ] > ` ' " { }
+    // Chinese: 。，；！？）」』》‖‧…
+    const trailingCharsRegex = /[.,;:!?)[\]>"、。，；！？）」』》‖‧…{}]$/;
+    if (trailingCharsRegex.test(lastChar)) {
+      strippedUrl = strippedUrl.slice(0, -1);
+    } else {
+      break;
+    }
+  }
+  return strippedUrl;
+}
+
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   text,
   defaultColor,
@@ -138,9 +180,10 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        const cleanUrl = stripTrailingPunctuation(fullMatch);
         renderedNode = (
           <Text key={key} color={theme.text.link}>
-            {fullMatch}
+            {cleanUrl}
           </Text>
         );
       }
