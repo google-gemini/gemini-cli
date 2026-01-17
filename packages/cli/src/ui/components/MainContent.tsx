@@ -16,6 +16,8 @@ import { SCROLL_TO_ITEM_END } from './shared/VirtualizedList.js';
 import { ScrollableList } from './shared/ScrollableList.js';
 import { useMemo, memo, useCallback } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
+import { VERBOSITY_MAPPING, Verbosity } from '../types.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -27,6 +29,7 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
 
   const {
@@ -36,9 +39,24 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
+  const currentVerbosity =
+    VERBOSITY_MAPPING[settings.merged.output?.verbosity ?? 'info'] ??
+    Verbosity.INFO;
+
+  const filteredHistory = useMemo(
+    () =>
+      uiState.history.filter((item) => {
+        const itemType = item.type;
+        const itemVerbosity =
+          item.verbosity ?? VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
+        return itemVerbosity <= currentVerbosity;
+      }),
+    [uiState.history, currentVerbosity],
+  );
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
+      filteredHistory.map((h) => (
         <MemoizedHistoryItemDisplay
           terminalWidth={mainAreaWidth}
           availableTerminalHeight={staticAreaMaxItemHeight}
@@ -50,7 +68,7 @@ export const MainContent = () => {
         />
       )),
     [
-      uiState.history,
+      filteredHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
@@ -96,10 +114,10 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...filteredHistory.map((item) => ({ type: 'history' as const, item })),
       { type: 'pending' as const },
     ],
-    [uiState.history],
+    [filteredHistory],
   );
 
   const renderItem = useCallback(

@@ -163,11 +163,11 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
+  const settings = useSettings();
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
   useMemoryMonitor(historyManager);
-  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -728,7 +728,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(
       {
-        type: MessageType.INFO,
+        type: MessageType.VERBOSE,
         text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
       },
       Date.now(),
@@ -739,7 +739,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       historyManager.addItem(
         {
-          type: MessageType.INFO,
+          type: MessageType.VERBOSE,
           text: `Memory refreshed successfully. ${
             memoryContent.length > 0
               ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`

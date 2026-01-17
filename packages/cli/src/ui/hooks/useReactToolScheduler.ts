@@ -27,7 +27,7 @@ import type {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, Verbosity } from '../types.js';
 
 export type ScheduleFn = (
   request: ToolCallRequestInfo | ToolCallRequestInfo[],
@@ -250,6 +250,9 @@ export function mapToDisplay(
   toolOrTools: TrackedToolCall[] | TrackedToolCall,
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
+  const isClientInitiated = toolCalls.some(
+    (tc) => tc.request.isClientInitiated,
+  );
 
   const toolDisplays = toolCalls.map(
     (trackedCall): IndividualToolCallDisplay => {
@@ -344,6 +347,7 @@ export function mapToDisplay(
 
   return {
     type: 'tool_group',
+    verbosity: isClientInitiated ? Verbosity.INFO : undefined,
     tools: toolDisplays,
   };
 }

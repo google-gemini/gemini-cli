@@ -8,7 +8,7 @@ import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, Verbosity } from '../types.js';
 import { useCallback, useState } from 'react';
 import type {
   AnsiOutput,
@@ -294,6 +294,7 @@ export const useShellCommandProcessor = (
                 addItemToHistory(
                   {
                     type: 'tool_group',
+                    verbosity: Verbosity.INFO,
                     tools: [finalToolDisplay],
                   } as HistoryItemWithoutId,
                   userMessageTimestamp,
