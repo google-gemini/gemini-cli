@@ -11,6 +11,29 @@ import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';
 
 // --- Global Entry Point ---
+
+// Suppress known race condition error in node-pty on Windows
+// Tracking bug: https://github.com/microsoft/node-pty/issues/827
+process.on('uncaughtException', (error) => {
+  if (
+    process.platform === 'win32' &&
+    error instanceof Error &&
+    error.message === 'Cannot resize a pty that has already exited'
+  ) {
+    return;
+  }
+
+  // FIX: Run cleanup before exiting
+  runExitCleanup().finally(() => {
+    if (error instanceof Error) {
+      writeToStderr(error.stack + '\n');
+    } else {
+      writeToStderr(String(error) + '\n');
+    }
+    process.exit(1);
+  });
+});
+
 main().catch(async (error) => {
   await runExitCleanup();
 

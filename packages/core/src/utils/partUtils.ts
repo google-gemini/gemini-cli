@@ -9,6 +9,7 @@ import type {
   PartListUnion,
   Part,
   PartUnion,
+  FunctionCall,
 } from '@google/genai';
 
 /**
@@ -67,6 +68,55 @@ export function partToString(
   }
 
   return part.text ?? '';
+}
+
+/**
+ * Determines if the current set of parts is cumulative relative to the previous set.
+ * In a cumulative stream, the new set of parts includes all parts from the previous
+ * chunk, with the first part potentially being a grown version of the previous first part.
+ */
+export function isCumulative(prev: Part[], curr: Part[]): boolean {
+  if (prev.length === 0 || curr.length === 0) return false;
+  if (curr.length < prev.length) return false;
+
+  const p0 = prev[0];
+  const c0 = curr[0];
+
+  // If the first part is text, check if it's growing
+  if (p0.text !== undefined && c0.text !== undefined) {
+    // Only return true if strictly growing. If lengths are equal, fall through to deep equality check.
+    if (c0.text.length > p0.text.length && c0.text.startsWith(p0.text)) {
+      return true;
+    }
+  }
+
+  // For non-text parts (like functionCall), check if they are identical
+  // (SDKs usually return new objects, so we use stringify for comparison)
+  try {
+    return JSON.stringify(p0) === JSON.stringify(c0);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determines if the current set of function calls is cumulative relative to the previous set.
+ */
+export function isCumulativeFunctionCalls(
+  prev: FunctionCall[],
+  curr: FunctionCall[],
+): boolean {
+  if (prev.length === 0 || curr.length === 0) return false;
+  if (curr.length < prev.length) return false;
+
+  try {
+    // To be truly cumulative, the current array of function calls must start with the previous one.
+    const prevStr = JSON.stringify(prev);
+    const currPrefixStr = JSON.stringify(curr.slice(0, prev.length));
+    return prevStr === currPrefixStr;
+  } catch {
+    return false;
+  }
 }
 
 export function getResponseText(
