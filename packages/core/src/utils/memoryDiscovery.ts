@@ -270,6 +270,16 @@ async function readGeminiMdFiles(
 
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
+          const errorCode =
+            typeof error === 'object' && error !== null && 'code' in error
+              ? (error as NodeJS.ErrnoException).code
+              : undefined;
+          if (errorCode === 'EISDIR') {
+            if (debugMode) {
+              logger.debug(`Skipping directory at ${filePath}`);
+            }
+            return { filePath, content: null };
+          }
           const isTestEnv =
             process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
           if (!isTestEnv) {
