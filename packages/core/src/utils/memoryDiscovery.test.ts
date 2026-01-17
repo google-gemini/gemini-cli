@@ -528,6 +528,42 @@ Extension memory content
     });
   });
 
+  it('should load extension context files BEFORE user/workspace context files', async () => {
+    const extensionFilePath = await createTestFile(
+      path.join(testRootDir, 'extensions/ext1/GEMINI.md'),
+      'Extension memory content',
+    );
+    await createTestFile(
+      path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+      'Workspace memory content',
+    );
+
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      [],
+      false,
+      new FileDiscoveryService(projectRoot),
+      new SimpleExtensionLoader([
+        {
+          contextFiles: [extensionFilePath],
+          isActive: true,
+        } as GeminiCLIExtension,
+      ]),
+      DEFAULT_FOLDER_TRUST,
+    );
+
+    const extensionIndex = result.memoryContent.indexOf(
+      'Extension memory content',
+    );
+    const workspaceIndex = result.memoryContent.indexOf(
+      'Workspace memory content',
+    );
+
+    expect(extensionIndex).toBeGreaterThan(-1);
+    expect(workspaceIndex).toBeGreaterThan(-1);
+    expect(extensionIndex).toBeLessThan(workspaceIndex);
+  });
+
   it('should load memory from included directories', async () => {
     const includedDir = await createEmptyDir(
       path.join(testRootDir, 'included'),
