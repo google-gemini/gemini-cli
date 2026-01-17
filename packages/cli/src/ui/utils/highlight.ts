@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { LRUCache } from 'mnemonist';
 import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
 export type HighlightToken = {
   text: string;
@@ -18,12 +20,30 @@ export type HighlightToken = {
 // semicolon, common punctuation, and brackets.
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
 
+const highlightCache = new LRUCache<string, readonly HighlightToken[]>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
+
 export function parseInputForHighlighting(
   text: string,
   index: number,
   transformations: Transformation[] = [],
   cursorCol?: number,
 ): readonly HighlightToken[] {
+  let isCursorInsideTransform = false;
+  if (cursorCol !== undefined) {
+    for (const transform of transformations) {
+      if (cursorCol >= transform.logStart && cursorCol <= transform.logEnd) {
+        isCursorInsideTransform = true;
+        break;
+      }
+    }
+  }
+
+  const cacheKey = `${index === 0 ? 'F' : 'N'}:${isCursorInsideTransform ? cursorCol : 'NC'}:${text}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   HIGHLIGHT_REGEX.lastIndex = 0;
 
   if (!text) {
@@ -79,7 +99,7 @@ export function parseInputForHighlighting(
     tokens.push(...parseUntransformedInput(textBeforeTransformation));
 
     const isCursorInside =
-      typeof cursorCol === 'number' &&
+      cursorCol !== undefined &&
       cursorCol >= transformation.logStart &&
       cursorCol <= transformation.logEnd;
     const transformationText = isCursorInside
@@ -92,6 +112,9 @@ export function parseInputForHighlighting(
 
   const textAfterFinalTransformation = cpSlice(text, column);
   tokens.push(...parseUntransformedInput(textAfterFinalTransformation));
+
+  highlightCache.set(cacheKey, tokens);
+
   return tokens;
 }
 

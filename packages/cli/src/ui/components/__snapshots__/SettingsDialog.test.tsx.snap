@@ -16,8 +16,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -62,8 +62,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -108,8 +108,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                   false*  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                     true*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                              false*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -154,8 +154,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -200,8 +200,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -246,8 +246,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -292,8 +292,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    true*  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -338,8 +338,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    false  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               false  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │
@@ -384,8 +384,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                                                    true*  │
-│    Disable automatic updates                                                                     │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
 │    Enable Prompt Completion                                                               true*  │
 │    Enable AI-powered prompt completion suggestions while typing.                                 │

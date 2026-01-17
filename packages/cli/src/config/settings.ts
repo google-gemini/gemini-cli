@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type GeminiCodeAssistSetting,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -148,7 +148,7 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -346,7 +346,7 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: GeminiCodeAssistSetting): void {
+  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
     const admin: Settings['admin'] = {};
     const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
@@ -613,7 +613,7 @@ export function loadSettings(
     );
   }
 
-  return new LoadedSettings(
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -641,6 +641,171 @@ export function loadSettings(
     isTrusted,
     settingsErrors,
   );
+
+  // Automatically migrate deprecated settings when loading.
+  migrateDeprecatedSettings(loadedSettings);
+
+  return loadedSettings;
+}
+
+/**
+ * Migrates deprecated settings to their new counterparts.
+ *
+ * TODO: After a couple of weeks (around early Feb 2026), we should start removing
+ * the deprecated settings from the settings files by default.
+ *
+ * @returns true if any changes were made and need to be saved.
+ */
+export function migrateDeprecatedSettings(
+  loadedSettings: LoadedSettings,
+  removeDeprecated = false,
+): boolean {
+  let anyModified = false;
+  const processScope = (scope: LoadableSettingScope) => {
+    const settings = loadedSettings.forScope(scope).settings;
+
+    // Migrate inverted boolean settings (disableX -> enableX)
+    // These settings were renamed and their boolean logic inverted
+    const generalSettings = settings.general as
+      | Record<string, unknown>
+      | undefined;
+    const uiSettings = settings.ui as Record<string, unknown> | undefined;
+    const contextSettings = settings.context as
+      | Record<string, unknown>
+      | undefined;
+
+    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
+    if (generalSettings) {
+      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      let modified = false;
+
+      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableAutoUpdate'];
+          newGeneral['enableAutoUpdate'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+          }
+          modified = true;
+        }
+      }
+
+      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableUpdateNag'];
+          newGeneral['enableAutoUpdateNotification'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+          }
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        anyModified = true;
+      }
+    }
+
+    // Migrate ui settings
+    if (uiSettings) {
+      const newUi: Record<string, unknown> = { ...uiSettings };
+      let modified = false;
+
+      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+      const accessibilitySettings = newUi['accessibility'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        accessibilitySettings &&
+        typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
+      ) {
+        const newAccessibility: Record<string, unknown> = {
+          ...accessibilitySettings,
+        };
+        if (
+          typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
+        ) {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+            newUi['accessibility'] = newAccessibility;
+            modified = true;
+          }
+        } else {
+          const oldValue = accessibilitySettings['disableLoadingPhrases'];
+          newAccessibility['enableLoadingPhrases'] = !oldValue;
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+          }
+          newUi['accessibility'] = newAccessibility;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        anyModified = true;
+      }
+    }
+
+    // Migrate context settings
+    if (contextSettings) {
+      const newContext: Record<string, unknown> = { ...contextSettings };
+      let modified = false;
+
+      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+      const fileFilteringSettings = newContext['fileFiltering'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        fileFilteringSettings &&
+        typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
+      ) {
+        const newFileFiltering: Record<string, unknown> = {
+          ...fileFilteringSettings,
+        };
+        if (typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+            newContext['fileFiltering'] = newFileFiltering;
+            modified = true;
+          }
+        } else {
+          const oldValue = fileFilteringSettings['disableFuzzySearch'];
+          newFileFiltering['enableFuzzySearch'] = !oldValue;
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+          }
+          newContext['fileFiltering'] = newFileFiltering;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'context', newContext);
+        anyModified = true;
+      }
+    }
+  };
+
+  processScope(SettingScope.User);
+  processScope(SettingScope.Workspace);
+
+  return anyModified;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {

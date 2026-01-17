@@ -9,21 +9,16 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import type {
-  CommandContext,
-  ConfirmShellCommandsActionReturn,
-  SlashCommand,
-} from '../commands/types.js';
+import type { SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { MessageType, type SlashCommandProcessorResult } from '../types.js';
+import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   type GeminiClient,
   SlashCommandStatus,
-  ToolConfirmationOutcome,
   makeFakeConfig,
 } from '@google/gemini-cli-core';
 import { appEvents } from '../../utils/events.js';
@@ -635,197 +630,6 @@ describe('useSlashCommandProcessor', () => {
         { type: MessageType.USER, text: '/mcpcmd' },
         expect.any(Number),
       );
-    });
-  });
-
-  describe('Shell Command Confirmation Flow', () => {
-    // Use a generic vi.fn() for the action. We will change its behavior in each test.
-    const mockCommandAction = vi.fn();
-
-    const shellCommand = createTestCommand({
-      name: 'shellcmd',
-      action: mockCommandAction,
-    });
-
-    beforeEach(() => {
-      // Reset the mock before each test
-      mockCommandAction.mockClear();
-
-      // Default behavior: request confirmation
-      mockCommandAction.mockResolvedValue({
-        type: 'confirm_shell_commands',
-        commandsToConfirm: ['rm -rf /'],
-        originalInvocation: { raw: '/shellcmd' },
-      } as ConfirmShellCommandsActionReturn);
-    });
-
-    it('should set confirmation request when action returns confirm_shell_commands', async () => {
-      const result = await setupProcessorHook([shellCommand]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      // Trigger command, don't await it yet as it suspends for confirmation
-      await act(async () => {
-        void result.current.handleSlashCommand('/shellcmd');
-      });
-
-      // We now wait for the state to be updated with the request.
-      await act(async () => {
-        await waitFor(() => {
-          expect(result.current.shellConfirmationRequest).not.toBeNull();
-        });
-      });
-
-      expect(result.current.shellConfirmationRequest?.commands).toEqual([
-        'rm -rf /',
-      ]);
-    });
-
-    it('should do nothing if user cancels confirmation', async () => {
-      const result = await setupProcessorHook([shellCommand]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      await act(async () => {
-        void result.current.handleSlashCommand('/shellcmd');
-      });
-
-      // Wait for the confirmation dialog to be set
-      await act(async () => {
-        await waitFor(() => {
-          expect(result.current.shellConfirmationRequest).not.toBeNull();
-        });
-      });
-
-      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
-      expect(onConfirm).toBeDefined();
-
-      // Change the mock action's behavior for a potential second run.
-      // If the test is flawed, this will be called, and we can detect it.
-      mockCommandAction.mockResolvedValue({
-        type: 'message',
-        messageType: 'info',
-        content: 'This should not be called',
-      });
-
-      await act(async () => {
-        onConfirm!(ToolConfirmationOutcome.Cancel, []); // Pass empty array for safety
-      });
-
-      expect(result.current.shellConfirmationRequest).toBeNull();
-      // Verify the action was only called the initial time.
-      expect(mockCommandAction).toHaveBeenCalledTimes(1);
-    });
-
-    it('should re-run command with one-time allowlist on "Proceed Once"', async () => {
-      const result = await setupProcessorHook([shellCommand]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      let commandPromise:
-        | Promise<false | SlashCommandProcessorResult>
-        | undefined;
-      await act(async () => {
-        commandPromise = result.current.handleSlashCommand('/shellcmd');
-      });
-      await act(async () => {
-        await waitFor(() => {
-          expect(result.current.shellConfirmationRequest).not.toBeNull();
-        });
-      });
-
-      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
-
-      // **Change the mock's behavior for the SECOND run.**
-      // This is the key to testing the outcome.
-      mockCommandAction.mockResolvedValue({
-        type: 'message',
-        messageType: 'info',
-        content: 'Success!',
-      });
-
-      await act(async () => {
-        onConfirm!(ToolConfirmationOutcome.ProceedOnce, ['rm -rf /']);
-      });
-
-      await act(async () => {
-        await commandPromise;
-      });
-
-      expect(result.current.shellConfirmationRequest).toBeNull();
-
-      // The action should have been called twice (initial + re-run).
-      await waitFor(() => {
-        expect(mockCommandAction).toHaveBeenCalledTimes(2);
-      });
-
-      // We can inspect the context of the second call to ensure the one-time list was used.
-      const secondCallContext = mockCommandAction.mock
-        .calls[1][0] as CommandContext;
-      expect(
-        secondCallContext.session.sessionShellAllowlist.has('rm -rf /'),
-      ).toBe(true);
-
-      // Verify the final success message was added.
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.INFO, text: 'Success!' },
-        expect.any(Number),
-      );
-
-      // Verify the session-wide allowlist was NOT permanently updated.
-      // Re-render the hook by calling a no-op command to get the latest context.
-      await act(async () => {
-        await result.current.handleSlashCommand('/no-op');
-      });
-      const finalContext = result.current.commandContext;
-      expect(finalContext.session.sessionShellAllowlist.size).toBe(0);
-    });
-
-    it('should re-run command and update session allowlist on "Proceed Always"', async () => {
-      const result = await setupProcessorHook([shellCommand]);
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
-
-      let commandPromise:
-        | Promise<false | SlashCommandProcessorResult>
-        | undefined;
-      await act(async () => {
-        commandPromise = result.current.handleSlashCommand('/shellcmd');
-      });
-      await act(async () => {
-        await waitFor(() => {
-          expect(result.current.shellConfirmationRequest).not.toBeNull();
-        });
-      });
-
-      const onConfirm = result.current.shellConfirmationRequest?.onConfirm;
-      mockCommandAction.mockResolvedValue({
-        type: 'message',
-        messageType: 'info',
-        content: 'Success!',
-      });
-
-      await act(async () => {
-        onConfirm!(ToolConfirmationOutcome.ProceedAlways, ['rm -rf /']);
-      });
-
-      await act(async () => {
-        await commandPromise;
-      });
-
-      expect(result.current.shellConfirmationRequest).toBeNull();
-      await waitFor(() => {
-        expect(mockCommandAction).toHaveBeenCalledTimes(2);
-      });
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.INFO, text: 'Success!' },
-        expect.any(Number),
-      );
-
-      // Check that the session-wide allowlist WAS updated.
-      await waitFor(() => {
-        const finalContext = result.current.commandContext;
-        expect(finalContext.session.sessionShellAllowlist.has('rm -rf /')).toBe(
-          true,
-        );
-      });
     });
   });
 

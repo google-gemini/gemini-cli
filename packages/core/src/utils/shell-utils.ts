@@ -5,6 +5,8 @@
  */
 
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { quote } from 'shell-quote';
 import {
   spawn,
@@ -35,6 +37,35 @@ export interface ShellConfiguration {
   argsPrefix: string[];
   /** An identifier for the shell type. */
   shell: ShellType;
+}
+
+export async function resolveExecutable(
+  exe: string,
+): Promise<string | undefined> {
+  if (path.isAbsolute(exe)) {
+    try {
+      await fs.promises.access(exe, fs.constants.X_OK);
+      return exe;
+    } catch {
+      return undefined;
+    }
+  }
+  const paths = (process.env['PATH'] || '').split(path.delimiter);
+  const extensions =
+    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+
+  for (const p of paths) {
+    for (const ext of extensions) {
+      const fullPath = path.join(p, exe + ext);
+      try {
+        await fs.promises.access(fullPath, fs.constants.X_OK);
+        return fullPath;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return undefined;
 }
 
 let bashLanguage: Language | null = null;
