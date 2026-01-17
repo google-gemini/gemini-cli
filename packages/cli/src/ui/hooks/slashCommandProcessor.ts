@@ -34,6 +34,7 @@ import {
   MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { useThinkingMode } from '../contexts/ThinkingModeContext.js';
 import type {
   Message,
   HistoryItemWithoutId,
@@ -97,6 +98,7 @@ export const useSlashCommandProcessor = (
   setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
+  const thinkingMode = useThinkingMode();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
@@ -227,6 +229,11 @@ export const useSlashCommandProcessor = (
       session: {
         stats: session.stats,
         sessionShellAllowlist,
+        thinkingMode: {
+          level: thinkingMode.state.level,
+          budget: thinkingMode.state.budget,
+          setLevel: thinkingMode.setThinkingLevel,
+        },
       },
     }),
     [
@@ -248,6 +255,7 @@ export const useSlashCommandProcessor = (
       extensionsUpdateState,
       setBannerVisible,
       setCustomDialog,
+      thinkingMode,
     ],
   );
 

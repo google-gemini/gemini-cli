@@ -71,6 +71,13 @@ export const handleSlashCommand = async (
         session: {
           stats: sessionStats,
           sessionShellAllowlist: new Set(),
+          thinkingMode: {
+            level: 'medium',
+            budget: 8192,
+            setLevel: () => {
+              // No-op for non-interactive mode
+            },
+          },
         },
         invocation: {
           raw: trimmed,

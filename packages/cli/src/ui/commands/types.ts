@@ -83,6 +83,12 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** Session-scoped extended thinking mode configuration. */
+    thinkingMode: {
+      level: 'off' | 'low' | 'medium' | 'high';
+      budget: number;
+      setLevel: (level: 'off' | 'low' | 'medium' | 'high') => void;
+    };
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
