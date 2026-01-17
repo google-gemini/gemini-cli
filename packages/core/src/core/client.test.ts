@@ -2896,6 +2896,7 @@ ${JSON.stringify(
         mockHookSystem.fireAfterAgentEvent.mockResolvedValue({
           shouldStopExecution: () => true,
           getEffectiveReason: () => 'Stopped after agent',
+          shouldClearContext: () => false,
           systemMessage: undefined,
         });
 
@@ -2924,11 +2925,13 @@ ${JSON.stringify(
             shouldStopExecution: () => false,
             isBlockingDecision: () => true,
             getEffectiveReason: () => 'Please explain',
+            shouldClearContext: () => false,
             systemMessage: undefined,
           })
           .mockResolvedValueOnce({
             shouldStopExecution: () => false,
             isBlockingDecision: () => false,
+            shouldClearContext: () => false,
             systemMessage: undefined,
           });
 
@@ -2955,6 +2958,46 @@ ${JSON.stringify(
           [{ text: 'Please explain' }],
           expect.anything(),
         );
+      });
+
+      it('should call resetChat when AfterAgent hook returns shouldClearContext: true', async () => {
+        const resetChatSpy = vi
+          .spyOn(client, 'resetChat')
+          .mockResolvedValue(undefined);
+
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Blocked and clearing context',
+            shouldClearContext: () => true,
+            systemMessage: undefined,
+          })
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            systemMessage: undefined,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked and clearing context' },
+        });
+        expect(resetChatSpy).toHaveBeenCalledTimes(1);
+
+        resetChatSpy.mockRestore();
       });
     });
   });
