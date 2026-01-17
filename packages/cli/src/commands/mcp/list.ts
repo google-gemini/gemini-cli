@@ -144,7 +144,8 @@ export async function listMcpServers(): Promise<void> {
     if (server.httpUrl) {
       serverInfo += `${server.httpUrl} (http)`;
     } else if (server.url) {
-      serverInfo += `${server.url} (sse)`;
+      const type = server.type || 'http';
+      serverInfo += `${server.url} (${type})`;
     } else if (server.command) {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
