@@ -83,7 +83,7 @@
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
-    "@types/minimatch": "^5.1.2",
+    "@types/minimatch": "^6.0.0",
     "@types/mock-fs": "^4.13.4",
     "@types/prompts": "^2.4.9",
     "@types/react": "^19.2.0",
