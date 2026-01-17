@@ -42,9 +42,10 @@ vi.mock('./ui/hooks/atCommandProcessor.js');
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
-  drainBacklogs: vi.fn(),
   emit: vi.fn(),
+  emitConsoleLog: vi.fn(),
   emitFeedback: vi.fn(),
+  drainBacklogs: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -1417,58 +1418,6 @@ describe('runNonInteractive', () => {
     });
   });
 
-  it('should display a deprecation warning if hasDeprecatedPromptArg is true', async () => {
-    const events: ServerGeminiStreamEvent[] = [
-      { type: GeminiEventType.Content, value: 'Final Answer' },
-      {
-        type: GeminiEventType.Finished,
-        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
-      },
-    ];
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents(events),
-    );
-
-    await runNonInteractive({
-      config: mockConfig,
-      settings: mockSettings,
-      input: 'Test input',
-      prompt_id: 'prompt-id-deprecated',
-      hasDeprecatedPromptArg: true,
-    });
-
-    expect(processStderrSpy).toHaveBeenCalledWith(
-      'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n',
-    );
-    expect(processStdoutSpy).toHaveBeenCalledWith('Final Answer');
-  });
-
-  it('should display a deprecation warning for JSON format', async () => {
-    const events: ServerGeminiStreamEvent[] = [
-      { type: GeminiEventType.Content, value: 'Final Answer' },
-      {
-        type: GeminiEventType.Finished,
-        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
-      },
-    ];
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents(events),
-    );
-    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
-
-    await runNonInteractive({
-      config: mockConfig,
-      settings: mockSettings,
-      input: 'Test input',
-      prompt_id: 'prompt-id-deprecated-json',
-      hasDeprecatedPromptArg: true,
-    });
-
-    const deprecateText =
-      'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
-    expect(processStderrSpy).toHaveBeenCalledWith(deprecateText);
-  });
-
   it('should emit appropriate events for streaming JSON output', async () => {
     vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
       OutputFormat.STREAM_JSON,
@@ -1796,5 +1745,64 @@ describe('runNonInteractive', () => {
 
     // The key assertion: sendMessageStream should have been called ONLY ONCE (initial user input).
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Agent Execution Events', () => {
+    it('should handle AgentExecutionStopped event', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop',
+        prompt_id: 'prompt-id-stop',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        'Agent execution stopped: Stopped by hook\n',
+      );
+      // Should exit without calling sendMessageStream again
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle AgentExecutionBlocked event', async () => {
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by hook' },
+        },
+        { type: GeminiEventType.Content, value: 'Final answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block',
+        prompt_id: 'prompt-id-block',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[WARNING] Agent execution blocked: Blocked by hook\n',
+      );
+      // sendMessageStream is called once, recursion is internal to it and transparent to the caller
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+      expect(getWrittenOutput()).toBe('Final answer\n');
+    });
   });
 });

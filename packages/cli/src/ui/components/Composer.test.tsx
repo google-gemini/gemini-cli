@@ -24,6 +24,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
+import { mergeSettings } from '../../config/settings.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -34,6 +35,10 @@ vi.mock('./LoadingIndicator.js', () => ({
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
   ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
+}));
+
+vi.mock('./HookStatusDisplay.js', () => ({
+  HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
 }));
 
 vi.mock('./AutoAcceptIndicator.js', () => ({
@@ -125,6 +130,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     errorCount: 0,
     nightly: false,
     isTrustedFolder: true,
+    activeHooks: [],
     ...overrides,
   }) as UIState;
 
@@ -149,6 +155,7 @@ const createMockConfig = (overrides = {}) => ({
   }),
   getSkillManager: () => ({
     getSkills: () => [],
+    getDisplayableSkills: () => [],
   }),
   getMcpClientManager: () => ({
     getMcpServers: () => ({}),
@@ -157,13 +164,20 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hideFooter: false,
-    showMemoryUsage: false,
-    ...merged,
-  },
-});
+const createMockSettings = (merged = {}) => {
+  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+  return {
+    merged: {
+      ...defaultMergedSettings,
+      ui: {
+        ...defaultMergedSettings.ui,
+        hideFooter: false,
+        showMemoryUsage: false,
+        ...merged,
+      },
+    },
+  };
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
@@ -269,7 +283,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const config = createMockConfig({
-        getAccessibility: vi.fn(() => ({ disableLoadingPhrases: true })),
+        getAccessibility: vi.fn(() => ({ enableLoadingPhrases: false })),
       });
 
       const { lastFrame } = renderComposer(uiState, undefined, config);
@@ -341,6 +355,17 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ContextSummaryDisplay');
     });
 
+    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
+      const uiState = createMockUIState({
+        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('HookStatusDisplay');
+      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
+    });
+
     it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
@@ -368,7 +393,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Esc again to clear');
+      expect(lastFrame()).toContain('Press Esc again to rewind');
     });
   });
 

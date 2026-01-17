@@ -93,11 +93,11 @@ export enum EventMetadataKey {
   // Replace Tool Call Event Keys
   // ===========================================================================
 
-  // Logs a smart edit tool strategy choice.
-  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+  // Logs a edit tool strategy choice.
+  GEMINI_CLI_EDIT_STRATEGY = 109,
 
-  // Logs a smart edit correction event.
-  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+  // Logs a edit correction event.
+  GEMINI_CLI_EDIT_CORRECTION = 110,
 
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
@@ -517,4 +517,16 @@ export enum EventMetadataKey {
 
   // Logs the exit code of the hook script (if applicable).
   GEMINI_CLI_HOOK_EXIT_CODE = 136,
+
+  // Logs CPU information of user machine.
+  GEMINI_CLI_CPU_INFO = 137,
+
+  // Logs number of CPU cores of user machine.
+  GEMINI_CLI_CPU_CORES = 138,
+
+  // Logs GPU information of user machine.
+  GEMINI_CLI_GPU_INFO = 139,
+
+  // Logs total RAM in GB of user machine.
+  GEMINI_CLI_RAM_TOTAL_GB = 140,
 }

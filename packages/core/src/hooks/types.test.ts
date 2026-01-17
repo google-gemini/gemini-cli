@@ -319,45 +319,17 @@ describe('Hook Output Classes', () => {
       expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response if shouldStopExecution is true', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true', () => {
       const output = new AfterModelHookOutput({
         continue: false,
         stopReason: 'stopped by hook',
       });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response with default reason if shouldStopExecution is true and no stopReason', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true and no stopReason', () => {
       const output = new AfterModelHookOutput({ continue: false });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['No reason provided'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
   });
 });
