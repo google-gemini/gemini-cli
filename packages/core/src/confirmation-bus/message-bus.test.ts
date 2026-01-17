@@ -14,6 +14,7 @@ import {
   type ToolConfirmationResponse,
   type ToolPolicyRejection,
   type ToolExecutionSuccess,
+  type HookExecutionRequest,
 } from './types.js';
 
 describe('MessageBus', () => {
@@ -26,6 +27,42 @@ describe('MessageBus', () => {
   });
 
   describe('publish', () => {
+    it('should not dump hook execution payloads in debug logs', async () => {
+      vi.spyOn(policyEngine, 'checkHook').mockResolvedValue(
+        PolicyDecision.DENY,
+      );
+      messageBus = new MessageBus(policyEngine, true);
+
+      const debugSpy = vi
+        .spyOn(console, 'debug')
+         
+        .mockImplementation(() => {});
+
+      const hugeValue = 'x'.repeat(20000);
+      const request: Omit<HookExecutionRequest, 'correlationId'> = {
+        type: MessageBusType.HOOK_EXECUTION_REQUEST,
+        eventName: 'BeforeModel',
+        input: {
+          llm_request: { hugeValue },
+          other: 'field',
+        },
+      };
+
+      await messageBus.request(request, MessageBusType.HOOK_EXECUTION_RESPONSE);
+
+      const loggedStrings = debugSpy.mock.calls
+        .flat()
+        .filter((arg: unknown) => typeof arg === 'string');
+
+      expect(loggedStrings.join('\n')).toContain(
+        '[MESSAGE_BUS] publish: hook-execution-request',
+      );
+      expect(loggedStrings.join('\n')).toContain('eventName=BeforeModel');
+      expect(loggedStrings.join('\n')).not.toContain(hugeValue);
+
+      debugSpy.mockRestore();
+    });
+
     it('should emit error for invalid message', async () => {
       const errorHandler = vi.fn();
       messageBus.on('error', errorHandler);
