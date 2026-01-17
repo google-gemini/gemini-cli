@@ -138,6 +138,10 @@
         "slug": "docs/core"
       },
       {
+        "label": "Sub-agents (experimental)",
+        "slug": "docs/core/subagents"
+      },
+      {
         "label": "Tools API",
         "slug": "docs/core/tools-api"
       },
