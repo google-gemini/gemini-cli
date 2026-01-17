@@ -1028,10 +1028,13 @@ describe('mcp-client', () => {
               if (options?.signal?.aborted) {
                 return reject(new Error('Operation aborted'));
               }
-              options?.signal?.addEventListener('abort', () => {
-                reject(new Error('Operation aborted'));
-              });
-              // Intentionally do not resolve immediately to simulate lag
+              options?.signal?.addEventListener(
+                'abort',
+                () => {
+                  reject(new Error('Operation aborted'));
+                },
+                { once: true },
+              );
             }),
         ),
         listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),

@@ -350,9 +350,13 @@ describe('FixLLMEditWithInstruction', () => {
           if (abortSignal?.aborted) {
             return reject(new DOMException('Aborted', 'AbortError'));
           }
-          abortSignal?.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
+          abortSignal?.addEventListener(
+            'abort',
+            () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            },
+            { once: true },
+          );
         }),
     );
 
