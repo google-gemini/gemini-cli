@@ -75,6 +75,10 @@ export abstract class ExtensionLoader {
       await this.config.getMcpClientManager()!.startExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
 
+      if (!this.isStarting) {
+        await this.config.getAgentRegistry().reload();
+      }
+
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
@@ -165,6 +169,10 @@ export abstract class ExtensionLoader {
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
+
+      if (!this.isStarting) {
+        await this.config.getAgentRegistry().reload();
+      }
 
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
