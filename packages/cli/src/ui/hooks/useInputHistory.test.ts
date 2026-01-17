@@ -158,6 +158,30 @@ describe('useInputHistory', () => {
       expect(mockOnChange).toHaveBeenCalledWith(currentQuery);
     });
 
+    it('should restore original query when navigateUp and navigateDown happen back-to-back', () => {
+      const currentQuery = 'draft prompt';
+      const { result } = renderHook(() =>
+        useInputHistory({
+          userMessages,
+          onSubmit: mockOnSubmit,
+          isActive: true,
+          currentQuery,
+          onChange: mockOnChange,
+        }),
+      );
+
+      mockOnChange.mockClear();
+      act(() => {
+        result.current.navigateUp();
+        result.current.navigateDown();
+      });
+
+      expect(mockOnChange.mock.calls).toEqual([
+        [userMessages[2]],
+        [currentQuery],
+      ]);
+    });
+
     it('should navigate through history messages on subsequent navigateUp calls', () => {
       const { result } = renderHook(() =>
         useInputHistory({
