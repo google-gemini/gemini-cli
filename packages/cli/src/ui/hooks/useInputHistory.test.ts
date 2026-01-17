@@ -131,7 +131,7 @@ describe('useInputHistory', () => {
         result.current.navigateUp();
       });
 
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]); // Last message
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start'); // Last message
     });
 
     it('should store currentQuery as originalQueryBeforeNav on first navigateUp', () => {
@@ -149,13 +149,13 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // historyIndex becomes 0
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
 
       // Navigate down to restore original query
       act(() => {
         result.current.navigateDown(); // historyIndex becomes -1
       });
-      expect(mockOnChange).toHaveBeenCalledWith(currentQuery);
+      expect(mockOnChange).toHaveBeenCalledWith(currentQuery, 'end');
     });
 
     it('should navigate through history messages on subsequent navigateUp calls', () => {
@@ -172,17 +172,17 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 3'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
 
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 2'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1], 'start');
 
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 1'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0], 'start');
     });
   });
 
@@ -250,13 +250,13 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 3', stores 'originalQuery'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
       mockOnChange.mockClear();
 
       act(() => {
         result.current.navigateDown(); // Navigates back to original query
       });
-      expect(mockOnChange).toHaveBeenCalledWith(originalQuery);
+      expect(mockOnChange).toHaveBeenCalledWith(originalQuery, 'end');
     });
   });
 });
