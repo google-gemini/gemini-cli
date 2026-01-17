@@ -51,7 +51,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   if (uiState.showClearTextToast) {
     return (
       <Text color={theme.text.secondary}>
-        Ctrl + C is the new way to clear text.
+        Ctrl + C clears all text in the prompt.
       </Text>
     );
   }

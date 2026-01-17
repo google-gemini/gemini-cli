@@ -6,15 +6,15 @@
 
 import { describe, it, expect } from 'vitest';
 import { render } from '../../../test-utils/render.js';
-import { ExpandablePrompt, DEFAULT_MAX_WIDTH } from './ExpandablePrompt.js';
+import { ExpandableText, MAX_WIDTH } from './ExpandableText.js';
 
-describe('ExpandablePrompt', () => {
+describe('ExpandableText', () => {
   const color = 'white';
   const flat = (s: string | undefined) => (s ?? '').replace(/\n/g, '');
 
   it('renders plain label when no match (short label)', () => {
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label="simple command"
         userInput=""
         matchedIndex={undefined}
@@ -27,9 +27,9 @@ describe('ExpandablePrompt', () => {
   });
 
   it('truncates long label when collapsed and no match', () => {
-    const long = 'x'.repeat(DEFAULT_MAX_WIDTH + 25);
+    const long = 'x'.repeat(MAX_WIDTH + 25);
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={long}
         userInput=""
         textColor={color}
@@ -39,15 +39,15 @@ describe('ExpandablePrompt', () => {
     const out = lastFrame();
     const f = flat(out);
     expect(f.endsWith('...')).toBe(true);
-    expect(f.length).toBe(DEFAULT_MAX_WIDTH + 3);
+    expect(f.length).toBe(MAX_WIDTH + 3);
     expect(out).toMatchSnapshot();
     unmount();
   });
 
   it('shows full long label when expanded and no match', () => {
-    const long = 'y'.repeat(DEFAULT_MAX_WIDTH + 25);
+    const long = 'y'.repeat(MAX_WIDTH + 25);
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={long}
         userInput=""
         textColor={color}
@@ -66,7 +66,7 @@ describe('ExpandablePrompt', () => {
     const userInput = 'commit';
     const matchedIndex = label.indexOf(userInput);
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={label}
         userInput={userInput}
         matchedIndex={matchedIndex}
@@ -86,7 +86,7 @@ describe('ExpandablePrompt', () => {
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={label}
         userInput={core}
         matchedIndex={matchedIndex}
@@ -106,12 +106,12 @@ describe('ExpandablePrompt', () => {
 
   it('truncates match itself when match is very long', () => {
     const prefix = 'find ';
-    const core = 'x'.repeat(DEFAULT_MAX_WIDTH + 25);
+    const core = 'x'.repeat(MAX_WIDTH + 25);
     const suffix = ' in this text';
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={label}
         userInput={core}
         matchedIndex={matchedIndex}
@@ -124,7 +124,7 @@ describe('ExpandablePrompt', () => {
     expect(f.includes('...')).toBe(true);
     expect(f.startsWith('...')).toBe(false);
     expect(f.endsWith('...')).toBe(true);
-    expect(f.length).toBe(DEFAULT_MAX_WIDTH + 2);
+    expect(f.length).toBe(MAX_WIDTH + 2);
     expect(out).toMatchSnapshot();
     unmount();
   });
@@ -133,7 +133,7 @@ describe('ExpandablePrompt', () => {
     const customWidth = 50;
     const long = 'z'.repeat(100);
     const { lastFrame, unmount } = render(
-      <ExpandablePrompt
+      <ExpandableText
         label={long}
         userInput=""
         textColor={color}

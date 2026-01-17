@@ -6,7 +6,7 @@ exports[`StatusDisplay > prioritizes Ctrl+C prompt over everything else (except 
 
 exports[`StatusDisplay > prioritizes warning over Ctrl+D 1`] = `"Warning"`;
 
-exports[`StatusDisplay > renders Clear Text Toast 1`] = `"Ctrl + C is the new way to clear text."`;
+exports[`StatusDisplay > renders Clear Text Toast 1`] = `"Ctrl + C clears all text in the prompt."`;
 
 exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `"Mock Context Summary Display (Skills: 2)"`;
 

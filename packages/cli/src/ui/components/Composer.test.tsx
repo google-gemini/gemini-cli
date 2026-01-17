@@ -403,7 +403,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Ctrl + C is the new way to clear text');
+      expect(lastFrame()).toContain('Ctrl + C clears all text in the prompt');
     });
   });
 

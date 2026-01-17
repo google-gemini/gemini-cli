@@ -513,9 +513,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (onClearTextToastChange) {
             onClearTextToastChange(true);
           }
-          setTimeout(() => {
-            onSubmit('/rewind');
-          }, 1000);
+          onSubmit('/rewind');
         }
         return;
       }

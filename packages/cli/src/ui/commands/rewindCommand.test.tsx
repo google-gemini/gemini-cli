@@ -38,29 +38,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    uiTelemetryService: {
-      ...actual.uiTelemetryService,
-      recordRewind: vi.fn(),
-    },
-    debugLogger: {
-      ...actual.debugLogger,
-      error: vi.fn(),
-    },
     coreEvents: {
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
     },
-    LruCache: class {
-      get() {
-        return undefined;
-      }
-      set() {}
-      clear() {}
-      has() {
-        return false;
-      }
-    },
-    DEFAULT_MODEL_CONFIGS: { aliases: {}, overrides: [] },
   };
 });
 

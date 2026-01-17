@@ -8,9 +8,9 @@ import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 
-export const DEFAULT_MAX_WIDTH = 150;
+export const MAX_WIDTH = 150;
 
-export interface ExpandablePromptProps {
+export interface ExpandableTextProps {
   label: string;
   matchedIndex?: number;
   userInput?: string;
@@ -20,13 +20,13 @@ export interface ExpandablePromptProps {
   maxLines?: number;
 }
 
-const _ExpandablePrompt: React.FC<ExpandablePromptProps> = ({
+const _ExpandableText: React.FC<ExpandableTextProps> = ({
   label,
   matchedIndex,
   userInput = '',
   textColor = theme.text.primary,
   isExpanded = false,
-  maxWidth = DEFAULT_MAX_WIDTH,
+  maxWidth = MAX_WIDTH,
   maxLines,
 }) => {
   const hasMatch =
@@ -133,4 +133,4 @@ const _ExpandablePrompt: React.FC<ExpandablePromptProps> = ({
   );
 };
 
-export const ExpandablePrompt = React.memo(_ExpandablePrompt);
+export const ExpandableText = React.memo(_ExpandableText);

@@ -21,7 +21,7 @@ import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
-import { ExpandablePrompt } from './shared/ExpandablePrompt.js';
+import { ExpandableText } from './shared/ExpandableText.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -126,7 +126,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           width={terminalWidth}
           flexDirection="row"
         >
-          <Box marginRight={1}>
+          <Box>
             <CliSpinner />
           </Box>
           <Text>Rewinding...</Text>
@@ -207,7 +207,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             return (
               <Box flexDirection="column" marginBottom={1}>
                 <Box>
-                  <ExpandablePrompt
+                  <ExpandableText
                     label={cleanedText}
                     isExpanded={expandedMessageId === userPrompt.id}
                     textColor={
