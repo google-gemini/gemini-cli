@@ -511,13 +511,11 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly hooks:
-    | { [K in HookEventName]?: HookDefinition[] }
-    | undefined;
-  private readonly projectHooks:
+  private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+  private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
-  private readonly disabledHooks: string[];
+  private disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -710,8 +708,15 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.hooks = params.hooks;
-    this.projectHooks = params.projectHooks;
+
+    if (params.hooks) {
+      const { disabled: _, ...restOfHooks } = params.hooks;
+      this.hooks = restOfHooks;
+    }
+    if (params.projectHooks) {
+      this.projectHooks = params.projectHooks;
+    }
+
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
@@ -1928,6 +1933,15 @@ export class Config {
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined {
     return this.projectHooks;
+  }
+
+  /**
+   * Update the list of disabled hooks dynamically.
+   * This is used to keep the running system in sync with settings changes
+   * without risk of loading new hook definitions into memory.
+   */
+  updateDisabledHooks(disabledHooks: string[]): void {
+    this.disabledHooks = disabledHooks;
   }
 
   /**
