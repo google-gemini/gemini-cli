@@ -30,7 +30,7 @@
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
     "fs-extra": "^11.3.0",
-    "tar": "^7.5.2",
+    "tar": "^7.5.3",
     "uuid": "^13.0.0",
     "winston": "^3.17.0"
   },
