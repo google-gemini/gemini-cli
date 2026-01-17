@@ -1,0 +1,381 @@
+# =============================================================================
+# Sync Upstream Workflow
+# =============================================================================
+# Automatically syncs the main branch with upstream google-gemini/gemini-cli
+#
+# Branch Strategy:
+#   - main: Syncs with Google upstream (this workflow)
+#   - feat/trozlan-*: Custom development branches (NOT touched by this workflow)
+#
+# Behavior:
+#   - Runs daily at 6:00 AM UTC
+#   - Can be triggered manually via workflow_dispatch
+#   - On conflict: Creates a PR for human resolution instead of failing
+#   - Only syncs the main branch
+# =============================================================================
+
+name: Sync Upstream
+
+on:
+  schedule:
+    # Run daily at 6:00 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_pr:
+        description: 'Force PR creation even without conflicts (for review)'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run - only check for updates without applying'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  UPSTREAM_REPO: 'google-gemini/gemini-cli'
+  FORK_REPO: 'MegaPhoenix92/gemini-cli'
+  SYNC_BRANCH: 'main'
+
+jobs:
+  sync-upstream:
+    name: Sync with Upstream
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      # =========================================================================
+      # Step 1: Checkout the fork repository
+      # =========================================================================
+      - name: Checkout Fork
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYNC_BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # =========================================================================
+      # Step 2: Configure Git identity for commits
+      # =========================================================================
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # =========================================================================
+      # Step 3: Add upstream remote and fetch
+      # =========================================================================
+      - name: Add Upstream Remote
+        env:
+          UPSTREAM_URL: https://github.com/${{ env.UPSTREAM_REPO }}.git
+        run: |
+          echo "::group::Adding upstream remote"
+          if git remote get-url upstream 2>/dev/null; then
+            echo "Upstream remote already exists, updating URL..."
+            git remote set-url upstream "$UPSTREAM_URL"
+          else
+            echo "Adding upstream remote..."
+            git remote add upstream "$UPSTREAM_URL"
+          fi
+          echo "::endgroup::"
+
+      - name: Fetch Upstream
+        env:
+          BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          echo "::group::Fetching upstream changes"
+          git fetch upstream "$BRANCH" --tags
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 4: Check for upstream changes
+      # =========================================================================
+      - name: Check for Updates
+        id: check_updates
+        env:
+          BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          echo "::group::Checking for upstream updates"
+
+          FORK_COMMIT=$(git rev-parse HEAD)
+          UPSTREAM_COMMIT=$(git rev-parse "upstream/$BRANCH")
+
+          echo "Fork HEAD:     $FORK_COMMIT"
+          echo "Upstream HEAD: $UPSTREAM_COMMIT"
+
+          if [ "$FORK_COMMIT" = "$UPSTREAM_COMMIT" ]; then
+            echo "No updates available - fork is up to date with upstream"
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "commits_behind=0" >> $GITHUB_OUTPUT
+          else
+            COMMITS_BEHIND=$(git rev-list --count "HEAD..upstream/$BRANCH")
+            echo "Fork is $COMMITS_BEHIND commits behind upstream"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "commits_behind=$COMMITS_BEHIND" >> $GITHUB_OUTPUT
+
+            echo ""
+            echo "=== Recent upstream commits ==="
+            git log --oneline "HEAD..upstream/$BRANCH" | head -20
+          fi
+
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 5: Dry run - just report status
+      # =========================================================================
+      - name: Dry Run Report
+        if: inputs.dry_run == true
+        env:
+          HAS_UPDATES: ${{ steps.check_updates.outputs.has_updates }}
+          COMMITS_BEHIND: ${{ steps.check_updates.outputs.commits_behind }}
+          BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          echo "=== DRY RUN MODE ==="
+          echo ""
+          if [ "$HAS_UPDATES" = "true" ]; then
+            echo "Would sync $COMMITS_BEHIND commits from upstream"
+            echo ""
+            echo "=== Commits that would be synced ==="
+            git log --oneline "HEAD..upstream/$BRANCH"
+          else
+            echo "No changes would be made - fork is up to date"
+          fi
+          echo ""
+          echo "=== DRY RUN COMPLETE - NO CHANGES MADE ==="
+
+      # =========================================================================
+      # Step 6: Attempt fast-forward merge (no conflicts possible)
+      # =========================================================================
+      - name: Attempt Fast-Forward Merge
+        if: steps.check_updates.outputs.has_updates == 'true' && inputs.dry_run != true
+        id: fast_forward
+        continue-on-error: true
+        env:
+          BRANCH: ${{ env.SYNC_BRANCH }}
+        run: |
+          echo "::group::Attempting fast-forward merge"
+
+          if git merge-base --is-ancestor HEAD "upstream/$BRANCH"; then
+            echo "Fast-forward merge is possible"
+            git merge --ff-only "upstream/$BRANCH"
+            echo "merge_type=fast-forward" >> $GITHUB_OUTPUT
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "Fast-forward not possible - fork has diverged from upstream"
+            echo "merge_type=diverged" >> $GITHUB_OUTPUT
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 7: Attempt regular merge if fast-forward failed
+      # =========================================================================
+      - name: Attempt Regular Merge
+        if: |
+          steps.check_updates.outputs.has_updates == 'true' &&
+          inputs.dry_run != true &&
+          steps.fast_forward.outputs.success != 'true' &&
+          inputs.force_pr != true
+        id: regular_merge
+        continue-on-error: true
+        env:
+          BRANCH: ${{ env.SYNC_BRANCH }}
+          COMMITS_BEHIND: ${{ steps.check_updates.outputs.commits_behind }}
+          UPSTREAM_REPO_NAME: ${{ env.UPSTREAM_REPO }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          echo "::group::Attempting regular merge"
+
+          MERGE_MSG="chore(sync): merge upstream changes from $UPSTREAM_REPO_NAME
+
+          Syncing $COMMITS_BEHIND commit(s) from upstream.
+
+          Upstream: https://github.com/$UPSTREAM_REPO_NAME
+          Workflow: $WORKFLOW_URL"
+
+          if git merge "upstream/$BRANCH" -m "$MERGE_MSG"; then
+            echo "Regular merge successful"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "Merge conflict detected"
+            git merge --abort || true
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 8: Push changes if merge was successful
+      # =========================================================================
+      - name: Push Changes
+        if: |
+          steps.check_updates.outputs.has_updates == 'true' &&
+          inputs.dry_run != true &&
+          inputs.force_pr != true &&
+          (steps.fast_forward.outputs.success == 'true' || steps.regular_merge.outputs.success == 'true')
+        env:
+          BRANCH: ${{ env.SYNC_BRANCH }}
+          FF_SUCCESS: ${{ steps.fast_forward.outputs.success }}
+          COMMITS_BEHIND: ${{ steps.check_updates.outputs.commits_behind }}
+        run: |
+          echo "::group::Pushing changes to origin"
+
+          if [ "$FF_SUCCESS" = "true" ]; then
+            echo "Pushing fast-forward merge..."
+          else
+            echo "Pushing regular merge..."
+          fi
+
+          git push origin "$BRANCH"
+
+          echo ""
+          echo "=== Sync Complete ==="
+          echo "Successfully synced $COMMITS_BEHIND commits from upstream"
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 9: Create PR if merge conflict or force_pr requested
+      # =========================================================================
+      - name: Create Sync PR (Conflict Resolution)
+        if: |
+          steps.check_updates.outputs.has_updates == 'true' &&
+          inputs.dry_run != true &&
+          (
+            inputs.force_pr == true ||
+            (steps.fast_forward.outputs.success != 'true' && steps.regular_merge.outputs.success != 'true')
+          )
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ env.SYNC_BRANCH }}
+          COMMITS_BEHIND: ${{ steps.check_updates.outputs.commits_behind }}
+          FORCE_PR: ${{ inputs.force_pr }}
+          UPSTREAM_REPO_NAME: ${{ env.UPSTREAM_REPO }}
+          RUN_NUMBER: ${{ github.run_number }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_FILE_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/sync-upstream.yml
+        run: |
+          echo "::group::Creating sync PR for manual resolution"
+
+          # Create a new branch for the sync
+          SYNC_PR_BRANCH="sync/upstream-$(date +%Y%m%d-%H%M%S)"
+
+          echo "Creating sync branch: $SYNC_PR_BRANCH"
+          git checkout -b "$SYNC_PR_BRANCH"
+
+          # Reset to upstream and force push (this branch will have upstream's state)
+          git reset --hard "upstream/$BRANCH"
+          git push -u origin "$SYNC_PR_BRANCH"
+
+          # Determine PR reason
+          if [ "$FORCE_PR" = "true" ]; then
+            PR_REASON="Manual review requested via workflow_dispatch"
+          else
+            PR_REASON="Merge conflict detected - manual resolution required"
+          fi
+
+          # Get commit details for PR body
+          COMMIT_LIST=$(git log --oneline "origin/$BRANCH..HEAD" | head -30)
+
+          # Check for existing sync PRs with same base
+          EXISTING_PR=$(gh pr list --base "$BRANCH" --label "sync" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
+            echo "Existing sync PR found: #$EXISTING_PR"
+            echo "Adding comment to existing PR instead of creating duplicate..."
+            gh pr comment "$EXISTING_PR" --body "New upstream changes detected. This sync branch has been updated with the latest upstream commits.
+
+          **Run:** [#$RUN_NUMBER]($WORKFLOW_URL)
+          **New commits behind:** $COMMITS_BEHIND"
+          else
+            # Create PR using heredoc for body to avoid injection
+            PR_TITLE="chore(sync): merge $COMMITS_BEHIND upstream commits from google-gemini/gemini-cli"
+
+            gh pr create \
+              --base "$BRANCH" \
+              --head "$SYNC_PR_BRANCH" \
+              --title "$PR_TITLE" \
+              --body "## Upstream Sync PR
+
+          **Reason:** $PR_REASON
+
+          ### Summary
+          This PR syncs **$COMMITS_BEHIND commits** from the upstream repository.
+
+          - **Upstream:** [google-gemini/gemini-cli](https://github.com/$UPSTREAM_REPO_NAME)
+          - **Branch:** \`$BRANCH\`
+          - **Workflow Run:** [#$RUN_NUMBER]($WORKFLOW_URL)
+
+          ### Upstream Commits (last 30)
+          \`\`\`
+          $COMMIT_LIST
+          \`\`\`
+
+          ### Resolution Instructions
+          1. Review the changes for any conflicts with TROZLAN customizations
+          2. Resolve any merge conflicts locally if needed
+          3. Test that existing \`feat/trozlan-*\` branches still work after merge
+          4. Approve and merge when ready
+
+          ### Branch Strategy Reminder
+          - \`main\` = Syncs with Google upstream
+          - \`feat/trozlan-*\` = Custom TROZLAN features (NOT touched by sync)
+
+          ---
+          *This PR was automatically created by the [sync-upstream workflow]($WORKFLOW_FILE_URL)*" \
+              --label "sync,automated"
+
+            echo ""
+            echo "=== Sync PR Created ==="
+            echo "Manual intervention required to resolve conflicts and merge"
+          fi
+
+          echo "::endgroup::"
+
+      # =========================================================================
+      # Step 10: Summary
+      # =========================================================================
+      - name: Generate Summary
+        if: always()
+        env:
+          UPSTREAM_REPO_NAME: ${{ env.UPSTREAM_REPO }}
+          FORK_REPO_NAME: ${{ env.FORK_REPO }}
+          BRANCH: ${{ env.SYNC_BRANCH }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          HAS_UPDATES: ${{ steps.check_updates.outputs.has_updates }}
+          COMMITS_BEHIND: ${{ steps.check_updates.outputs.commits_behind }}
+          FF_SUCCESS: ${{ steps.fast_forward.outputs.success }}
+          MERGE_SUCCESS: ${{ steps.regular_merge.outputs.success }}
+        run: |
+          {
+            echo "## Upstream Sync Summary"
+            echo ""
+            echo "| Property | Value |"
+            echo "|----------|-------|"
+            echo "| Upstream | \`$UPSTREAM_REPO_NAME\` |"
+            echo "| Fork | \`$FORK_REPO_NAME\` |"
+            echo "| Branch | \`$BRANCH\` |"
+            echo "| Dry Run | \`${DRY_RUN:-false}\` |"
+            echo ""
+
+            if [ "$HAS_UPDATES" = "true" ]; then
+              echo "### Updates Found"
+              echo "- Commits behind upstream: **$COMMITS_BEHIND**"
+
+              if [ "${DRY_RUN:-false}" = "true" ]; then
+                echo "- Status: **Dry run - no changes made**"
+              elif [ "$FF_SUCCESS" = "true" ]; then
+                echo "- Status: **Fast-forward merged and pushed**"
+              elif [ "$MERGE_SUCCESS" = "true" ]; then
+                echo "- Status: **Regular merge completed and pushed**"
+              else
+                echo "- Status: **PR created for manual resolution**"
+              fi
+            else
+              echo "### No Updates"
+              echo "Fork is already up to date with upstream."
+            fi
+          } >> $GITHUB_STEP_SUMMARY
