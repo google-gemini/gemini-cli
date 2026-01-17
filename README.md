@@ -53,6 +53,15 @@ npm install -g @google/gemini-cli
 ```bash
 brew install gemini-cli
 ```
+#### Install with Anaconda (for restricted environments)
+
+```bash
+# Create and activate a new environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
+
+# Install Gemini CLI globally via npm (inside the environment)
+```
 
 ## Release Cadence and Tags
 
