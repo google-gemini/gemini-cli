@@ -729,7 +729,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
-    shellConfirmationRequest,
     confirmationRequest,
   } = useSlashCommandProcessor(
     config,
@@ -1379,7 +1378,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
-  // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
     // Respect hideWindowTitle settings
     if (settings.merged.ui.hideWindowTitle) return;
@@ -1387,10 +1385,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming:
-        !!shellConfirmationRequest ||
-        !!confirmationRequest ||
-        showShellActionRequired,
+      isConfirming: !!confirmationRequest || showShellActionRequired,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
@@ -1405,7 +1400,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    shellConfirmationRequest,
     confirmationRequest,
     showShellActionRequired,
     settings.merged.ui.showStatusInTitle,
@@ -1484,7 +1478,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
-    !!shellConfirmationRequest ||
     !!confirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
@@ -1579,7 +1572,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
@@ -1672,7 +1664,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,

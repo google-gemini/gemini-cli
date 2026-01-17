@@ -66,6 +66,33 @@ describe('ToolConfirmationMessage', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('should display multiple commands for exec type when provided', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiple Commands',
+      command: 'echo "hello"', // Primary command
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+      commands: ['echo "hello"', 'ls -la', 'whoami'], // Multi-command list
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('ls -la');
+    expect(output).toContain('whoami');
+    expect(output).toMatchSnapshot();
+  });
+
   describe('with folder trust', () => {
     const editConfirmationDetails: ToolCallConfirmationDetails = {
       type: 'edit',
