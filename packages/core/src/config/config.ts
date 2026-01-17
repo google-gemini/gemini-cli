@@ -1941,9 +1941,7 @@ export class Config {
    * without risk of loading new hook definitions into memory.
    */
   updateDisabledHooks(disabledHooks: string[]): void {
-    if (Array.isArray(disabledHooks)) {
-      this.disabledHooks = disabledHooks;
-    }
+    this.disabledHooks = disabledHooks;
   }
 
   /**
