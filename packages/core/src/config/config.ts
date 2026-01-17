@@ -1585,8 +1585,6 @@ export class Config {
       return this.compressionThreshold;
     }
 
-    await this.ensureExperimentsLoaded();
-
     const remoteThreshold =
       this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
         ?.floatValue;
