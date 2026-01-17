@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import type { Config } from '../config/config.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
@@ -52,11 +53,13 @@ vi.mock('../config/models.js', async (importOriginal) => {
 
 describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -78,6 +81,30 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
     } as unknown as Config;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should use Windows-specific commands when platform is win32', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+    vi.mocked(isGitRepository).mockReturnValue(true);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain("'Select-String'");
+    expect(prompt).toContain("'Get-Content -Tail 10'");
+    expect(prompt).toContain("'Get-Content -TotalCount 10'");
+    expect(prompt).toContain('git status ; git diff HEAD ; git log -n 3');
+  });
+
+  it('should use Linux-specific commands when platform is linux', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    vi.mocked(isGitRepository).mockReturnValue(true);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain("'grep'");
+    expect(prompt).toContain("'tail'");
+    expect(prompt).toContain("'head'");
+    expect(prompt).toContain('git status && git diff HEAD && git log -n 3');
   });
 
   it('should include available_skills when provided in config', () => {
