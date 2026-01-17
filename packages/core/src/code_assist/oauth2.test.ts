@@ -759,6 +759,96 @@ describe('oauth2', () => {
         ).rejects.toThrow('Failed to open browser: Browser launch failed');
       });
 
+      it('should ignore unexpected requests and keep server open', async () => {
+        const mockAuthUrl = 'https://example.com/auth';
+        const mockCode = 'test-code';
+        const mockState = 'test-state';
+        const mockTokens = {
+          access_token: 'test-access-token',
+          refresh_token: 'test-refresh-token',
+        };
+
+        const mockOAuth2Client = {
+          generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+          getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
+          setCredentials: vi.fn(),
+          getAccessToken: vi
+            .fn()
+            .mockResolvedValue({ token: 'test-access-token' }),
+          on: vi.fn(),
+          credentials: {},
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+        vi.mocked(open).mockImplementation(
+          async () => ({ on: vi.fn() }) as never,
+        );
+
+        vi.mocked(global.fetch).mockResolvedValue({
+          ok: true,
+          json: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
+        } as unknown as Response);
+
+        let requestCallback!: http.RequestListener<
+          typeof http.IncomingMessage,
+          typeof http.ServerResponse
+        >;
+        let serverListeningCallback: (value: unknown) => void;
+        const serverListeningPromise = new Promise(
+          (resolve) => (serverListeningCallback = resolve),
+        );
+
+        const mockHttpServer = {
+          listen: vi.fn((_p, _h, cb) => {
+            if (cb) cb();
+            serverListeningCallback(undefined);
+          }),
+          close: vi.fn(),
+          on: vi.fn(),
+          address: () => ({ port: 3000 }),
+        };
+        (http.createServer as Mock).mockImplementation((cb) => {
+          requestCallback = cb as http.RequestListener<
+            typeof http.IncomingMessage,
+            typeof http.ServerResponse
+          >;
+          return mockHttpServer as unknown as http.Server;
+        });
+
+        const clientPromise = getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+        await serverListeningPromise;
+
+        const unexpectedReq = {
+          url: '/session/status',
+        } as http.IncomingMessage;
+        const unexpectedRes = {
+          writeHead: vi.fn(),
+          end: vi.fn(),
+        } as unknown as http.ServerResponse;
+
+        requestCallback(unexpectedReq, unexpectedRes);
+
+        expect(unexpectedRes.writeHead).toHaveBeenCalledWith(404);
+        expect(mockHttpServer.close).not.toHaveBeenCalled();
+
+        const validReq = {
+          url: `/oauth2callback?code=${mockCode}&state=${mockState}`,
+        } as http.IncomingMessage;
+        const validRes = {
+          writeHead: vi.fn(),
+          end: vi.fn(),
+        } as unknown as http.ServerResponse;
+
+        requestCallback(validReq, validRes);
+
+        await clientPromise;
+        expect(mockHttpServer.close).toHaveBeenCalled();
+      });
+
       it('should handle authentication timeout with proper error message', async () => {
         const mockAuthUrl = 'https://example.com/auth';
         const mockOAuth2Client = {

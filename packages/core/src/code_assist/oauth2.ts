@@ -475,15 +475,13 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
 
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
+      let shouldClose = true;
       try {
         if (req.url!.indexOf('/oauth2callback') === -1) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
-          reject(
-            new FatalAuthenticationError(
-              'OAuth callback not received. Unexpected request: ' + req.url,
-            ),
-          );
+          shouldClose = false;
+          res.writeHead(404);
+          res.end('Not found');
+          return;
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
@@ -557,7 +555,9 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           );
         }
       } finally {
-        server.close();
+        if (shouldClose) {
+          server.close();
+        }
       }
     });
 
