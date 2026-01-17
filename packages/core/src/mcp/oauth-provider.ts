@@ -245,8 +245,7 @@ export class MCPOAuthProvider {
    */
   private generatePKCEParams(): PKCEParams {
     // Generate code verifier (43-128 characters)
-    // using 64 bytes results in ~86 characters, safely above the minimum of 43
-    const codeVerifier = crypto.randomBytes(64).toString('base64url');
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
 
     // Generate code challenge using SHA256
     const codeChallenge = crypto
@@ -267,10 +266,7 @@ export class MCPOAuthProvider {
    * @param expectedState The state parameter to validate
    * @returns Object containing the port (available immediately) and a promise for the auth response
    */
-  private startCallbackServer(
-    expectedState: string,
-    port?: number,
-  ): {
+  private startCallbackServer(expectedState: string): {
     port: Promise<number>;
     response: Promise<OAuthAuthorizationResponse>;
   } {
@@ -357,10 +353,9 @@ export class MCPOAuthProvider {
           reject(error);
         });
 
-        // Determine which port to use (env var, argument, or OS-assigned)
-        let listenPort = 0; // Default to OS-assigned port
-
+        // Determine which port to use (env var or OS-assigned)
         const portStr = process.env['OAUTH_CALLBACK_PORT'];
+        let listenPort = 0; // Default to OS-assigned port
         if (portStr) {
           const envPort = parseInt(portStr, 10);
           if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
@@ -372,8 +367,6 @@ export class MCPOAuthProvider {
             return;
           }
           listenPort = envPort;
-        } else if (port !== undefined) {
-          listenPort = port;
         }
 
         server.listen(listenPort, () => {
@@ -400,34 +393,7 @@ export class MCPOAuthProvider {
   }
 
   /**
-   * Extract the port number from a URL string if available and valid.
-   *
-   * @param urlString The URL string to parse
-   * @returns The port number or undefined if not found or invalid
-   */
-  private getPortFromUrl(urlString?: string): number | undefined {
-    if (!urlString) {
-      return undefined;
-    }
-
-    try {
-      const url = new URL(urlString);
-      if (url.port) {
-        const parsedPort = parseInt(url.port, 10);
-        if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-          return parsedPort;
-        }
-      }
-    } catch {
-      // Ignore invalid URL
-    }
-
-    return undefined;
-  }
-
-  /**
-   * Build the authorization URL for the OAuth flow.
-
+   * Build the authorization URL with PKCE parameters.
    *
    * @param config OAuth configuration
    * @param pkceParams PKCE parameters
@@ -832,15 +798,9 @@ export class MCPOAuthProvider {
     // Generate PKCE parameters
     const pkceParams = this.generatePKCEParams();
 
-    // Determine preferred port from redirectUri if available
-    const preferredPort = this.getPortFromUrl(config.redirectUri);
-
     // Start callback server first to allocate port
     // This ensures we only create one server and eliminates race conditions
-    const callbackServer = this.startCallbackServer(
-      pkceParams.state,
-      preferredPort,
-    );
+    const callbackServer = this.startCallbackServer(pkceParams.state);
 
     // Wait for server to start and get the allocated port
     // We need this port for client registration and auth URL building

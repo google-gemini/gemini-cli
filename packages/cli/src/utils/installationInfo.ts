@@ -33,7 +33,7 @@ export interface InstallationInfo {
 
 export function getInstallationInfo(
   projectRoot: string,
-  isAutoUpdateEnabled: boolean,
+  isAutoUpdateDisabled: boolean,
 ): InstallationInfo {
   const cliPath = process.argv[1];
   if (!cliPath) {
@@ -103,9 +103,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.PNPM,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with pnpm. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateMessage: isAutoUpdateDisabled
+          ? `Please run ${updateCommand} to update`
+          : 'Installed with pnpm. Attempting to automatically update now...',
       };
     }
 
@@ -116,9 +116,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.YARN,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with yarn. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateMessage: isAutoUpdateDisabled
+          ? `Please run ${updateCommand} to update`
+          : 'Installed with yarn. Attempting to automatically update now...',
       };
     }
 
@@ -136,9 +136,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.BUN,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with bun. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateMessage: isAutoUpdateDisabled
+          ? `Please run ${updateCommand} to update`
+          : 'Installed with bun. Attempting to automatically update now...',
       };
     }
 
@@ -169,9 +169,9 @@ export function getInstallationInfo(
       packageManager: PackageManager.NPM,
       isGlobal: true,
       updateCommand,
-      updateMessage: isAutoUpdateEnabled
-        ? 'Installed with npm. Attempting to automatically update now...'
-        : `Please run ${updateCommand} to update`,
+      updateMessage: isAutoUpdateDisabled
+        ? `Please run ${updateCommand} to update`
+        : 'Installed with npm. Attempting to automatically update now...',
     };
   } catch (error) {
     debugLogger.log(error);

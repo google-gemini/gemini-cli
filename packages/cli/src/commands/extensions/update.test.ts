@@ -152,6 +152,48 @@ describe('extensions update command', () => {
         mockCwd.mockRestore();
       },
     );
+
+    it('should list installed extensions if requested extension is not found', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const extensions = [
+        { name: 'ext1', installMetadata: {} },
+        { name: 'ext2', installMetadata: {} },
+      ];
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue(extensions);
+
+      await handleUpdate({ name: 'unknown-extension' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "unknown-extension" not found.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Installed extensions:\n- ext1\n- ext2',
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should report no extensions installed if requested extension is not found and list is empty', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue([]);
+
+      await handleUpdate({ name: 'unknown-extension' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "unknown-extension" not found.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'No extensions installed.',
+      );
+      mockCwd.mockRestore();
+    });
   });
 
   describe('updateCommand', () => {

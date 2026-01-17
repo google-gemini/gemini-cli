@@ -65,7 +65,6 @@ export interface BaseAgentDefinition<
   name: string;
   displayName?: string;
   description: string;
-  experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
 }

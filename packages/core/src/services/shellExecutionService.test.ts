@@ -30,20 +30,11 @@ const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
-const mockResolveExecutable = vi.hoisted(() => vi.fn());
 
 // Top-level Mocks
 vi.mock('@lydell/node-pty', () => ({
   spawn: mockPtySpawn,
 }));
-vi.mock('../utils/shell-utils.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../utils/shell-utils.js')>();
-  return {
-    ...actual,
-    resolveExecutable: mockResolveExecutable,
-  };
-});
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -54,7 +45,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 vi.mock('../utils/textUtils.js', () => ({
   isBinary: mockIsBinary,
 }));
-vi.mock('node:os', () => ({
+vi.mock('os', () => ({
   default: {
     platform: mockPlatform,
     constants: {
@@ -145,7 +136,6 @@ describe('ShellExecutionService', () => {
     onExit: Mock;
     write: Mock;
     resize: Mock;
-    destroy: Mock;
   };
   let mockHeadlessTerminal: {
     resize: Mock;
@@ -163,8 +153,6 @@ describe('ShellExecutionService', () => {
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
-    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
-    process.env['PATH'] = '/test/path';
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },
       name: 'mock-pty',
@@ -179,7 +167,6 @@ describe('ShellExecutionService', () => {
       onExit: Mock;
       write: Mock;
       resize: Mock;
-      destroy: Mock;
     };
     mockPtyProcess.pid = 12345;
     mockPtyProcess.kill = vi.fn();
@@ -187,7 +174,6 @@ describe('ShellExecutionService', () => {
     mockPtyProcess.onExit = vi.fn();
     mockPtyProcess.write = vi.fn();
     mockPtyProcess.resize = vi.fn();
-    mockPtyProcess.destroy = vi.fn();
 
     mockHeadlessTerminal = {
       resize: vi.fn(),
@@ -833,31 +819,6 @@ describe('ShellExecutionService', () => {
           chunk: expected,
         }),
       );
-    });
-  });
-
-  describe('Resource Management', () => {
-    it('should destroy the PTY process and clear activePtys on exit', async () => {
-      await simulateExecution('ls -l', (pty) => {
-        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
-      });
-
-      expect(mockPtyProcess.destroy).toHaveBeenCalled();
-      expect(ShellExecutionService['activePtys'].size).toBe(0);
-    });
-
-    it('should destroy the PTY process even if destroy throws', async () => {
-      mockPtyProcess.destroy.mockImplementation(() => {
-        throw new Error('Destroy failed');
-      });
-
-      await expect(
-        simulateExecution('ls -l', (pty) => {
-          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
-        }),
-      ).resolves.not.toThrow();
-
-      expect(ShellExecutionService['activePtys'].size).toBe(0);
     });
   });
 });

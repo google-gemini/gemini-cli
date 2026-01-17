@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
-import { LRUCache } from 'mnemonist';
+import { LruCache } from './LruCache.js';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -84,7 +84,7 @@ const SearchReplaceEditSchema = {
   required: ['search', 'replace', 'explanation'],
 };
 
-const editCorrectionWithInstructionCache = new LRUCache<
+const editCorrectionWithInstructionCache = new LruCache<
   string,
   SearchReplaceEdit
 >(MAX_CACHE_SIZE);

@@ -45,11 +45,6 @@ export enum HookEventName {
 }
 
 /**
- * Fields in the hooks configuration that are not hook event names
- */
-export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
-
-/**
  * Hook configuration entry
  */
 export interface CommandHookConfig {

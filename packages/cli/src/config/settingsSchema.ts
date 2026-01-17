@@ -109,7 +109,6 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
-  ignoreInDocs?: boolean;
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
@@ -192,22 +191,22 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      enableAutoUpdate: {
+      disableAutoUpdate: {
         type: 'boolean',
-        label: 'Enable Auto Update',
+        label: 'Disable Auto Update',
         category: 'General',
         requiresRestart: false,
-        default: true,
-        description: 'Enable automatic updates.',
+        default: false,
+        description: 'Disable automatic updates',
         showInDialog: true,
       },
-      enableAutoUpdateNotification: {
+      disableUpdateNag: {
         type: 'boolean',
-        label: 'Enable Auto Update Notification',
+        label: 'Disable Update Nag',
         category: 'General',
         requiresRestart: false,
-        default: true,
-        description: 'Enable update notification prompts.',
+        default: false,
+        description: 'Disable update notification prompts.',
         showInDialog: false,
       },
       checkpointing: {
@@ -578,13 +577,13 @@ const SETTINGS_SCHEMA = {
         description: 'Accessibility settings.',
         showInDialog: false,
         properties: {
-          enableLoadingPhrases: {
+          disableLoadingPhrases: {
             type: 'boolean',
-            label: 'Enable Loading Phrases',
+            label: 'Disable Loading Phrases',
             category: 'UI',
             requiresRestart: true,
-            default: true,
-            description: 'Enable loading phrases during operations.',
+            default: false,
+            description: 'Disable loading phrases for accessibility',
             showInDialog: true,
           },
           screenReader: {
@@ -915,13 +914,13 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          enableFuzzySearch: {
+          disableFuzzySearch: {
             type: 'boolean',
-            label: 'Enable Fuzzy Search',
+            label: 'Disable Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
-            default: true,
-            description: 'Enable fuzzy search when searching for files.',
+            default: false,
+            description: 'Disable fuzzy search when searching for files.',
             showInDialog: true,
           },
         },
@@ -1598,16 +1597,6 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for agent skills.',
     showInDialog: false,
     properties: {
-      enabled: {
-        type: 'boolean',
-        label: 'Enable Agent Skills',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable Agent Skills.',
-        showInDialog: true,
-        ignoreInDocs: true,
-      },
       disabled: {
         type: 'array',
         label: 'Disabled Skills',
@@ -2103,10 +2092,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
             description: 'The maximum number of conversational turns.',
           },
         },
-      },
-      enabled: {
-        type: 'boolean',
-        description: 'Whether to enable the agent.',
       },
       disabled: {
         type: 'boolean',

@@ -285,15 +285,16 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental?.extensionManagement) {
+  if (settings.experimental.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
+  if (settings.experimental.skills) {
     yargsInstance.command(skillsCommand);
   }
+
   // Register hooks command if hooks are enabled
-  if (settings.tools?.enableHooks) {
+  if (settings.tools.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -721,8 +722,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    skillsSupport:
-      settings.experimental?.skills || (settings.skills?.enabled ?? true),
+    skillsSupport: settings.experimental?.skills,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],

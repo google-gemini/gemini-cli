@@ -22,7 +22,7 @@ export interface FileSearchOptions {
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
-  enableFuzzySearch: boolean;
+  disableFuzzySearch: boolean;
   maxDepth?: number;
   maxFiles?: number;
 }
@@ -122,7 +122,7 @@ class RecursiveFileSearch implements FileSearch {
   ): Promise<string[]> {
     if (
       !this.resultCache ||
-      (!this.fzf && this.options.enableFuzzySearch) ||
+      (!this.fzf && !this.options.disableFuzzySearch) ||
       !this.ignore
     ) {
       throw new Error('Engine not initialized. Call initialize() first.');
@@ -183,7 +183,7 @@ class RecursiveFileSearch implements FileSearch {
 
   private buildResultCache(): void {
     this.resultCache = new ResultCache(this.allFiles);
-    if (this.options.enableFuzzySearch) {
+    if (!this.options.disableFuzzySearch) {
       // The v1 algorithm is much faster since it only looks at the first
       // occurrence of the pattern. We use it for search spaces that have >20k
       // files, because the v2 algorithm is just too slow in those cases.

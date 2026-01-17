@@ -8,8 +8,6 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
-import { LRUCache } from 'mnemonist';
-import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -30,11 +28,9 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
-// Cache for code points
+// Cache for code points to reduce GC pressure
+const codePointsCache = new Map<string, string[]>();
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
-const codePointsCache = new LRUCache<string, string[]>(
-  LRU_BUFFER_PERF_CACHE_LIMIT,
-);
 
 export function toCodePoints(str: string): string[] {
   // ASCII fast path - check if all chars are ASCII (0-127)
@@ -52,14 +48,14 @@ export function toCodePoints(str: string): string[] {
   // Cache short strings
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
     const cached = codePointsCache.get(str);
-    if (cached !== undefined) {
+    if (cached) {
       return cached;
     }
   }
 
   const result = Array.from(str);
 
-  // Cache result
+  // Cache result (unlimited like Ink)
   if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
     codePointsCache.set(str, result);
   }
@@ -123,26 +119,21 @@ export function stripUnsafeCharacters(str: string): string {
     .join('');
 }
 
-const stringWidthCache = new LRUCache<string, number>(
-  LRU_BUFFER_PERF_CACHE_LIMIT,
-);
+// String width caching for performance optimization
+const stringWidthCache = new Map<string, number>();
 
 /**
  * Cached version of stringWidth function for better performance
+ * Follows Ink's approach with unlimited cache (no eviction)
  */
 export const getCachedStringWidth = (str: string): number => {
-  // ASCII printable chars (32-126) have width 1.
-  // This is a very frequent path, so we use a fast numeric check.
-  if (str.length === 1) {
-    const code = str.charCodeAt(0);
-    if (code >= 0x20 && code <= 0x7e) {
-      return 1;
-    }
+  // ASCII printable chars have width 1
+  if (/^[\x20-\x7E]*$/.test(str)) {
+    return str.length;
   }
 
-  const cached = stringWidthCache.get(str);
-  if (cached !== undefined) {
-    return cached;
+  if (stringWidthCache.has(str)) {
+    return stringWidthCache.get(str)!;
   }
 
   let width: number;

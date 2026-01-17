@@ -12,11 +12,7 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import {
-  getShellConfiguration,
-  resolveExecutable,
-  type ShellType,
-} from '../utils/shell-utils.js';
+import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -187,7 +183,7 @@ export class ShellExecutionService {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
-          return await this.executeWithPty(
+          return this.executeWithPty(
             commandToExecute,
             cwd,
             onOutputEvent,
@@ -449,14 +445,14 @@ export class ShellExecutionService {
     }
   }
 
-  private static async executeWithPty(
+  private static executeWithPty(
     commandToExecute: string,
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
-  ): Promise<ShellExecutionHandle> {
+  ): ShellExecutionHandle {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
@@ -465,14 +461,6 @@ export class ShellExecutionService {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
-
-      const resolvedExecutable = await resolveExecutable(executable);
-      if (!resolvedExecutable) {
-        throw new Error(
-          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
-        );
-      }
-
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
@@ -672,12 +660,6 @@ export class ShellExecutionService {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
-            // Attempt to destroy the PTY to ensure FD is closed
-            try {
-              (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
-            } catch {
-              // Ignore errors during cleanup
-            }
 
             const finalize = () => {
               render(true);

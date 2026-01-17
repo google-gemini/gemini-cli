@@ -320,9 +320,9 @@ describe('SettingsDialog', () => {
       // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
       expect(output).toContain('Vim Mode');
       expect(output).toContain('Enable Vim keybindings');
-      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
-      expect(output).toContain('Enable Auto Update');
-      expect(output).toContain('Enable automatic updates.');
+      // 'general.disableAutoUpdate' has description 'Disable automatic updates'
+      expect(output).toContain('Disable Auto Update');
+      expect(output).toContain('Disable automatic updates');
     });
   });
 
@@ -353,7 +353,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Enable Auto Update');
+        expect(lastFrame()).toContain('Disable Auto Update');
       });
 
       // Navigate up
@@ -1236,7 +1236,7 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('nonexistentsetting');
         expect(lastFrame()).toContain('');
         expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
-        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1263,7 +1263,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            enableAutoUpdate: false,
+            disableAutoUpdate: true,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
           },
@@ -1274,7 +1274,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              enableLoadingPhrases: false,
+              disableLoadingPhrases: true,
               screenReader: true,
             },
           },
@@ -1287,7 +1287,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: true,
-              enableFuzzySearch: true,
+              disableFuzzySearch: false,
             },
           },
           tools: {
@@ -1310,7 +1310,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: false,
+            disableAutoUpdate: true,
           },
           ui: {
             showMemoryUsage: true,
@@ -1348,7 +1348,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              enableLoadingPhrases: false,
+              disableLoadingPhrases: true,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1370,7 +1370,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: false,
-              enableFuzzySearch: false,
+              disableFuzzySearch: true,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1409,7 +1409,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: true,
+            disableAutoUpdate: false,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
           },
@@ -1420,7 +1420,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              enableLoadingPhrases: true,
+              disableLoadingPhrases: false,
               screenReader: false,
             },
           },
@@ -1433,7 +1433,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
               enableRecursiveFileSearch: false,
-              enableFuzzySearch: true,
+              disableFuzzySearch: false,
             },
           },
           tools: {

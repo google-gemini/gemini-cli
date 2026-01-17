@@ -283,7 +283,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const config = createMockConfig({
-        getAccessibility: vi.fn(() => ({ enableLoadingPhrases: false })),
+        getAccessibility: vi.fn(() => ({ disableLoadingPhrases: true })),
       });
 
       const { lastFrame } = renderComposer(uiState, undefined, config);

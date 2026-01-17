@@ -48,7 +48,7 @@ describe('useAtCompletion', () => {
         respectGeminiIgnore: true,
       })),
       getEnableRecursiveFileSearch: () => true,
-      getFileFilteringEnableFuzzySearch: () => true,
+      getFileFilteringDisableFuzzySearch: () => false,
       getResourceRegistry: vi.fn().mockReturnValue({
         getAllResources: () => [],
       }),
@@ -153,7 +153,7 @@ describe('useAtCompletion', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: true,
-        enableFuzzySearch: true,
+        disableFuzzySearch: false,
       });
       await fileSearch.initialize();
 
@@ -276,7 +276,7 @@ describe('useAtCompletion', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: true,
-        enableFuzzySearch: true,
+        disableFuzzySearch: false,
       });
       await realFileSearch.initialize();
 
@@ -558,7 +558,7 @@ describe('useAtCompletion', () => {
           respectGitIgnore: true,
           respectGeminiIgnore: true,
         })),
-        getFileFilteringEnableFuzzySearch: () => true,
+        getFileFilteringDisableFuzzySearch: () => false,
       } as unknown as Config;
 
       const { result } = renderHook(() =>

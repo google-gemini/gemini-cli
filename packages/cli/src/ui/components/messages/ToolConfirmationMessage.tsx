@@ -139,11 +139,7 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
 
-      if (executionProps.commands && executionProps.commands.length > 1) {
-        question = `Allow execution of ${executionProps.commands.length} commands?`;
-      } else {
-        question = `Allow execution of: '${executionProps.rootCommand}'?`;
-      }
+      question = `Allow execution of: '${executionProps.rootCommand}'?`;
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -280,18 +276,8 @@ export const ToolConfirmationMessage: React.FC<
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          <Box flexDirection="column">
-            {executionProps.commands && executionProps.commands.length > 1 ? (
-              executionProps.commands.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {cmd}
-                </Text>
-              ))
-            ) : (
-              <Box>
-                <Text color={theme.text.link}>{executionProps.command}</Text>
-              </Box>
-            )}
+          <Box>
+            <Text color={theme.text.link}>{executionProps.command}</Text>
           </Box>
         </MaxSizedBox>
       );

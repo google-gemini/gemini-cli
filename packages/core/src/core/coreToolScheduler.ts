@@ -14,7 +14,7 @@ import {
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
-import { PolicyDecision, ApprovalMode } from '../policy/types.js';
+import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -64,9 +64,6 @@ export type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
 };
-
-export const PLAN_MODE_DENIAL_MESSAGE =
-  'You are in Plan Mode - adjust your prompt to only use read and search tools.';
 
 const createErrorResponse = (
   request: ToolCallRequestInfo,
@@ -606,18 +603,16 @@ export class CoreToolScheduler {
           .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
-          let errorMessage = `Tool execution denied by policy.`;
-          let errorType = ToolErrorType.POLICY_VIOLATION;
-
-          if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
-            errorMessage = PLAN_MODE_DENIAL_MESSAGE;
-            errorType = ToolErrorType.STOP_EXECUTION;
-          }
+          const errorMessage = `Tool execution denied by policy.`;
           this.setStatusInternal(
             reqInfo.callId,
             'error',
             signal,
-            createErrorResponse(reqInfo, new Error(errorMessage), errorType),
+            createErrorResponse(
+              reqInfo,
+              new Error(errorMessage),
+              ToolErrorType.POLICY_VIOLATION,
+            ),
           );
           await this.checkAndNotifyCompletion(signal);
           return;
