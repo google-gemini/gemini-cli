@@ -253,6 +253,7 @@ describe('RipGrepTool', () => {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
+    getFileFilteringRespectGitIgnore: () => true,
     getFileFilteringRespectGeminiIgnore: () => true,
   } as unknown as Config;
 
@@ -737,6 +738,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
@@ -882,6 +884,7 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
 
@@ -1654,6 +1657,45 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: secret log entry');
     });
 
+    it('should disable gitignore rules when respectGitIgnore is false', async () => {
+      const configWithoutGitIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
+      } as unknown as Config;
+      const gitIgnoreDisabledTool = new RipGrepTool(
+        configWithoutGitIgnore,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = gitIgnoreDisabledTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--no-ignore-vcs', '--no-ignore-exclude']),
+        expect.anything(),
+      );
+    });
+
     it('should add .geminiignore when enabled and patterns exist', async () => {
       const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
@@ -1661,6 +1703,7 @@ describe('RipGrepTool', () => {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
@@ -1701,6 +1744,7 @@ describe('RipGrepTool', () => {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => false,
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
