@@ -106,6 +106,7 @@ available combinations.
 | Focus the shell input from the gemini input.                                                     | `Tab (no Shift)` |
 | Focus the Gemini input from the shell input.                                                     | `Tab`            |
 | Clear the terminal screen and redraw the UI.                                                     | `Ctrl + L`       |
+| Restart the application.                                                                         | `R`              |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 

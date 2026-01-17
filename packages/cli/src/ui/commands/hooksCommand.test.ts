@@ -22,6 +22,7 @@ describe('hooksCommand', () => {
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
     getEnableHooks: ReturnType<typeof vi.fn>;
+    updateDisabledHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
@@ -51,6 +52,7 @@ describe('hooksCommand', () => {
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
       getEnableHooks: vi.fn().mockReturnValue(true),
+      updateDisabledHooks: vi.fn(),
     };
 
     // Create mock settings
@@ -429,7 +431,7 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should return info when hook is already disabled', async () => {
+    it('should synchronize with hook system even if hook is already in disabled list', async () => {
       // Update the context's settings with the hook already disabled
       mockContext.services.settings.merged.hooks.disabled = ['test-hook'];
 
@@ -443,11 +445,15 @@ describe('hooksCommand', () => {
       const result = await disableCmd.action(mockContext, 'test-hook');
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
-      expect(mockHookSystem.setHookEnabled).not.toHaveBeenCalled();
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'test-hook',
+        false,
+      );
+      expect(mockConfig.updateDisabledHooks).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'Hook "test-hook" is already disabled.',
+        content: 'Hook "test-hook" disabled successfully.',
       });
     });
 

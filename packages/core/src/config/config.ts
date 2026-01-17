@@ -92,7 +92,7 @@ import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
+import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -105,9 +105,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -310,7 +311,7 @@ export interface ConfigParameters {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
-    disableFuzzySearch?: boolean;
+    enableFuzzySearch?: boolean;
     maxFileCount?: number;
     searchTimeout?: number;
   };
@@ -443,7 +444,7 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
-    disableFuzzySearch: boolean;
+    enableFuzzySearch: boolean;
     maxFileCount: number;
     searchTimeout: number;
   };
@@ -510,13 +511,11 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly hooks:
-    | { [K in HookEventName]?: HookDefinition[] }
-    | undefined;
-  private readonly projectHooks:
+  private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+  private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
-  private readonly disabledHooks: string[];
+  private disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -540,7 +539,7 @@ export class Config {
   private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
-  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
+  private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
 
   constructor(params: ConfigParameters) {
@@ -597,7 +596,7 @@ export class Config {
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
-      disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
+      enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
       maxFileCount:
         params.fileFiltering?.maxFileCount ??
         DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount ??
@@ -709,8 +708,15 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.hooks = params.hooks;
-    this.projectHooks = params.projectHooks;
+
+    if (params.hooks) {
+      const { disabled: _, ...restOfHooks } = params.hooks;
+      this.hooks = restOfHooks;
+    }
+    if (params.projectHooks) {
+      this.projectHooks = params.projectHooks;
+    }
+
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
@@ -909,6 +915,22 @@ export class Config {
     if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
+
+    // Fetch admin controls
+    await this.ensureExperimentsLoaded();
+    const adminControlsEnabled =
+      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+        ?.boolValue ?? false;
+    const adminControls = await fetchAdminControls(
+      codeAssistServer,
+      this.getRemoteAdminSettings(),
+      adminControlsEnabled,
+      (newSettings: FetchAdminControlsResponse) => {
+        this.setRemoteAdminSettings(newSettings);
+        coreEvents.emitAdminSettingsChanged();
+      },
+    );
+    this.setRemoteAdminSettings(adminControls);
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -967,11 +989,11 @@ export class Config {
     this.latestApiRequest = req;
   }
 
-  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+  getRemoteAdminSettings(): FetchAdminControlsResponse | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+  setRemoteAdminSettings(settings: FetchAdminControlsResponse): void {
     this.remoteAdminSettings = settings;
   }
 
@@ -1385,8 +1407,8 @@ export class Config {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
 
-  getFileFilteringDisableFuzzySearch(): boolean {
-    return this.fileFiltering.disableFuzzySearch;
+  getFileFilteringEnableFuzzySearch(): boolean {
+    return this.fileFiltering.enableFuzzySearch;
   }
 
   getFileFilteringRespectGitIgnore(): boolean {
@@ -1562,8 +1584,6 @@ export class Config {
     if (this.compressionThreshold) {
       return this.compressionThreshold;
     }
-
-    await this.ensureExperimentsLoaded();
 
     const remoteThreshold =
       this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
@@ -1911,6 +1931,15 @@ export class Config {
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined {
     return this.projectHooks;
+  }
+
+  /**
+   * Update the list of disabled hooks dynamically.
+   * This is used to keep the running system in sync with settings changes
+   * without risk of loading new hook definitions into memory.
+   */
+  updateDisabledHooks(disabledHooks: string[]): void {
+    this.disabledHooks = disabledHooks;
   }
 
   /**
