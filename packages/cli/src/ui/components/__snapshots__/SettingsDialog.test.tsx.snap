@@ -25,7 +25,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -71,7 +71,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -117,7 +117,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Debug Keystroke Logging                                                               false*  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                false*  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -163,7 +163,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -209,7 +209,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -255,7 +255,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -301,7 +301,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -347,7 +347,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                  true  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
@@ -393,7 +393,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Debug Keystroke Logging                                                                true*  │
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
+│    Enable Session Cleanup                                                                 true*  │
 │    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │    Output Format                                                                           Text  │
