@@ -278,98 +278,134 @@ export class Session {
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
 
     let nextMessage: Content | null = { role: 'user', parts };
+    let stopReason: acp.PromptResponse['stopReason'] = 'end_turn';
 
-    while (nextMessage !== null) {
-      if (pendingSend.signal.aborted) {
-        chat.addHistory(nextMessage);
-        return { stopReason: 'cancelled' };
-      }
+    // Track pending session/update notifications to ensure they complete before responding
+    const pendingUpdates: Array<Promise<void>> = [];
 
-      const functionCalls: FunctionCall[] = [];
+    try {
+      while (nextMessage !== null) {
+        if (pendingSend.signal.aborted) {
+          chat.addHistory(nextMessage);
+          stopReason = 'cancelled';
+          return { stopReason };
+        }
 
-      try {
-        const model = resolveModel(
-          this.config.getModel(),
-          this.config.getPreviewFeatures(),
-        );
-        const responseStream = await chat.sendMessageStream(
-          { model },
-          nextMessage?.parts ?? [],
-          promptId,
-          pendingSend.signal,
-        );
-        nextMessage = null;
+        const functionCalls: FunctionCall[] = [];
 
-        for await (const resp of responseStream) {
-          if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
-          }
+        try {
+          const model = resolveModel(
+            this.config.getModel(),
+            this.config.getPreviewFeatures(),
+          );
+          const responseStream = await chat.sendMessageStream(
+            { model },
+            nextMessage?.parts ?? [],
+            promptId,
+            pendingSend.signal,
+          );
+          nextMessage = null;
 
-          if (
-            resp.type === StreamEventType.CHUNK &&
-            resp.value.candidates &&
-            resp.value.candidates.length > 0
-          ) {
-            const candidate = resp.value.candidates[0];
-            for (const part of candidate.content?.parts ?? []) {
-              if (!part.text) {
-                continue;
+          for await (const resp of responseStream) {
+            if (pendingSend.signal.aborted) {
+              stopReason = 'cancelled';
+              return { stopReason };
+            }
+
+            if (
+              resp.type === StreamEventType.CHUNK &&
+              resp.value.candidates &&
+              resp.value.candidates.length > 0
+            ) {
+              const candidate = resp.value.candidates[0];
+              for (const part of candidate.content?.parts ?? []) {
+                if (!part.text) {
+                  continue;
+                }
+
+                const content: acp.ContentBlock = {
+                  type: 'text',
+                  text: part.text,
+                };
+
+                // Collect the promise to await before returning
+                const updatePromise = this.sendUpdate({
+                  sessionUpdate: part.thought
+                    ? 'agent_thought_chunk'
+                    : 'agent_message_chunk',
+                  content,
+                });
+                pendingUpdates.push(updatePromise);
               }
+            }
 
-              const content: acp.ContentBlock = {
-                type: 'text',
-                text: part.text,
-              };
-
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              this.sendUpdate({
-                sessionUpdate: part.thought
-                  ? 'agent_thought_chunk'
-                  : 'agent_message_chunk',
-                content,
-              });
+            if (
+              resp.type === StreamEventType.CHUNK &&
+              resp.value.functionCalls
+            ) {
+              functionCalls.push(...resp.value.functionCalls);
             }
           }
 
-          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
-            functionCalls.push(...resp.value.functionCalls);
+          if (pendingSend.signal.aborted) {
+            stopReason = 'cancelled';
+            return { stopReason };
           }
+        } catch (error) {
+          if (getErrorStatus(error) === 429) {
+            throw new acp.RequestError(
+              429,
+              'Rate limit exceeded. Try again later.',
+            );
+          }
+
+          if (
+            pendingSend.signal.aborted ||
+            (error instanceof Error && error.name === 'AbortError')
+          ) {
+            stopReason = 'cancelled';
+            return { stopReason };
+          }
+
+          throw error;
         }
 
-        if (pendingSend.signal.aborted) {
-          return { stopReason: 'cancelled' };
+        if (functionCalls.length > 0) {
+          const toolResponseParts: Part[] = [];
+
+          for (const fc of functionCalls) {
+            const response = await this.runTool(
+              pendingSend.signal,
+              promptId,
+              fc,
+            );
+            toolResponseParts.push(...response);
+          }
+
+          nextMessage = { role: 'user', parts: toolResponseParts };
         }
-      } catch (error) {
-        if (getErrorStatus(error) === 429) {
-          throw new acp.RequestError(
-            429,
-            'Rate limit exceeded. Try again later.',
+      }
+    } finally {
+      // Ensure all pending session/update notifications are sent before returning,
+      // even in error or cancellation scenarios
+      if (pendingUpdates.length > 0) {
+        try {
+          debugLogger.warn(
+            `Awaiting ${pendingUpdates.length} pending session/update notification(s) before returning`,
+          );
+          await Promise.all(pendingUpdates);
+          debugLogger.warn('All pending session/update notifications sent');
+        } catch (error) {
+          // Log error but don't throw - we're in cleanup phase
+          debugLogger.error(
+            'Error while sending pending session/update notifications:',
+            error,
           );
         }
-
-        if (
-          pendingSend.signal.aborted ||
-          (error instanceof Error && error.name === 'AbortError')
-        ) {
-          return { stopReason: 'cancelled' };
-        }
-
-        throw error;
-      }
-
-      if (functionCalls.length > 0) {
-        const toolResponseParts: Part[] = [];
-
-        for (const fc of functionCalls) {
-          const response = await this.runTool(pendingSend.signal, promptId, fc);
-          toolResponseParts.push(...response);
-        }
-
-        nextMessage = { role: 'user', parts: toolResponseParts };
       }
     }
 
-    return { stopReason: 'end_turn' };
+    return { stopReason };
   }
 
   private async sendUpdate(
