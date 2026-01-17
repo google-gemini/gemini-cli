@@ -5,7 +5,10 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger ,
+  Config,
+  // getCodeAssistServer,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
@@ -18,6 +21,8 @@ import {
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { validateNonInteractiveAuth } from '../../validateNonInterActiveAuth.js';
+import { randomUUID } from 'node:crypto';
 
 interface InstallArgs {
   source: string;
@@ -30,6 +35,29 @@ interface InstallArgs {
 export async function handleInstall(args: InstallArgs) {
   try {
     const { source } = args;
+    const workspaceDir = process.cwd();
+    const settings = loadSettings(workspaceDir);
+
+    const config = new Config({
+      telemetry: settings.merged.telemetry,
+      interactive: false,
+      sessionId: randomUUID(),
+      targetDir: workspaceDir,
+      cwd: workspaceDir,
+      model: '',
+      debugMode: false,
+    });
+
+    await validateNonInteractiveAuth(
+      settings.merged.security?.auth?.selectedType,
+      settings.merged.security?.auth?.useExternal,
+      config,
+      settings,
+    );
+
+    await config.initialize();
+    // const server = getCodeAssistServer(config);
+
     const installMetadata = await inferInstallMetadata(source, {
       ref: args.ref,
       autoUpdate: args.autoUpdate,
@@ -44,12 +72,14 @@ export async function handleInstall(args: InstallArgs) {
       debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
 
-    const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
-      requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
+      requestSetting: experiments?.flags[ExperimentFlags.EXTENSION_CONFIG]
+        ?.boolValue
+        ? promptForSetting
+        : null,
+      settings: settings.merged,
     });
     await extensionManager.loadExtensions();
     const extension =
