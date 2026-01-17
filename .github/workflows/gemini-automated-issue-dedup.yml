@@ -179,7 +179,7 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Comment and Label Duplicate Issue'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
         env:
           DUPLICATES_OUTPUT: '${{ needs.find-duplicates.outputs.duplicate_issues_csv }}'
         with:

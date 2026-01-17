@@ -34,7 +34,7 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Process Stale Issues'
-        uses: 'actions/github-script@v7'
+        uses: 'actions/github-script@v8'
         env:
           DRY_RUN: '${{ inputs.dry_run }}'
         with:

@@ -59,7 +59,7 @@ jobs:
         id: 'get_issue_data'
         if: |-
           github.event_name == 'workflow_dispatch'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -105,7 +105,7 @@ jobs:
 
       - name: 'Get Repository Labels'
         id: 'get_labels'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
@@ -262,7 +262,7 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |
@@ -312,7 +312,7 @@ jobs:
         env:
           ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
           RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
