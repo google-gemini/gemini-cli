@@ -11,6 +11,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { completionCommand } from '../commands/completion.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -252,6 +253,10 @@ export async function parseArguments(
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    // Register completion command
+    .command(completionCommand)
+    // Enable internal yargs completion but hide it (we use our own completion command)
+    .completion('completion-internal', false)
     // Ensure validation flows through .fail() for clean UX
     .fail((msg, err) => {
       if (err) throw err;
@@ -302,6 +307,7 @@ export async function parseArguments(
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
+    .completion()
     .strict()
     .demandCommand(0, 0) // Allow base command to run with no subcommands
     .exitProcess(false);
@@ -319,7 +325,11 @@ export async function parseArguments(
   }
 
   // Handle help and version flags manually since we disabled exitProcess
-  if (result['help'] || result['version']) {
+  if (
+    result['help'] ||
+    result['version'] ||
+    process.argv.includes('--get-yargs-completions')
+  ) {
     await runExitCleanup();
     process.exit(0);
   }
