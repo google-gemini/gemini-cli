@@ -159,18 +159,14 @@ async function truncateHistoryToBudget(
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
-              typeof (responseObj).output ===
-                'string'
+              typeof responseObj['output'] === 'string'
             ) {
-              contentStr = (responseObj)
-                .output;
+              contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
-              typeof (responseObj).content ===
-                'string'
+              typeof responseObj['content'] === 'string'
             ) {
-              contentStr = (responseObj)
-                .content;
+              contentStr = responseObj['content'];
             } else {
               contentStr = JSON.stringify(responseObj, null, 2);
             }
