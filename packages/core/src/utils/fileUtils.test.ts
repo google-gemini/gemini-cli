@@ -1097,35 +1097,37 @@ describe('fileUtils', () => {
       const formatted = formatTruncatedToolOutput(content, outputFile, 10);
 
       expect(formatted).toContain(
-        'Output too large. Showing the last 10 of 50 lines.',
+        'Output too large. Showing a tail of the output (lines truncated). For full output see: /tmp/out.txt',
       );
-      expect(formatted).toContain('For full output see: /tmp/out.txt');
       expect(formatted).toContain('line 49');
-      expect(formatted).not.toContain('line 0');
+      expect(formatted).not.toContain('line 39');
     });
 
-    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
-      const longLine = 'a'.repeat(2000);
-      const content = `line 1\n${longLine}\nline 3`;
+    it('should format output with "elephant lines" correctly', () => {
+      const elephantLine = 'a'.repeat(2000);
+      const content = `line 1\n${elephantLine}\nline 3`;
       const outputFile = '/tmp/out.txt';
 
       const formatted = formatTruncatedToolOutput(content, outputFile, 3);
 
       expect(formatted).toContain('(some long lines truncated)');
-      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
-      expect(formatted.length).toBeLessThan(longLine.length);
+      expect(formatted).toContain(
+        'a'.repeat(1000) + '... [LINE WIDTH TRUNCATED]',
+      );
     });
 
-    it('should handle massive single-line string with character-based truncation', () => {
-      const content = 'a'.repeat(50000);
+    it('should format single massive line output correctly', () => {
+      const content = 'b'.repeat(10000);
       const outputFile = '/tmp/out.txt';
 
       const formatted = formatTruncatedToolOutput(content, outputFile);
 
       expect(formatted).toContain(
-        'Output too large. Showing the last 10,000 characters',
+        'Output too large. Showing a tail of the output (characters truncated) (some long lines truncated). For full output see: /tmp/out.txt',
       );
-      expect(formatted.endsWith(content.slice(-10000))).toBe(true);
+      expect(formatted).toContain(
+        'b'.repeat(1000) + '... [LINE WIDTH TRUNCATED]',
+      );
     });
   });
 });
