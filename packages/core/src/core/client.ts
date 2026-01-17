@@ -543,21 +543,21 @@ export class GeminiClient {
       modelForLimitCheck,
     );
 
+    const compressed = await this.tryCompressChat(prompt_id, false);
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    }
+
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
-    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+    if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
         value: { estimatedRequestTokenCount, remainingTokenCount },
       };
       return turn;
-    }
-
-    const compressed = await this.tryCompressChat(prompt_id, false);
-
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
     // Prevent context updates from being sent while a tool call is
