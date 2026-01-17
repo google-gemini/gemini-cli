@@ -57,12 +57,43 @@ export async function start_sandbox(
       }
 
       const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
+      // Prevent path traversal attacks (e.g. "../") by strictly validating the profile name.
+      // This ensures the user cannot break out of the intended directory structure.
+      if (!/^[a-zA-Z0-9-_]+$/.test(profile)) {
+        throw new FatalSandboxError(
+          `Invalid seatbelt profile name '${profile}'. Profile names can only contain alphanumeric characters, dashes, and underscores.`,
+        );
+      }
       let profileFile = fileURLToPath(
         new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
       );
-      // if profile name is not recognized, then look for file under project settings directory
+      // if profile name is not recognized, then look for file under project settings directory or home directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
+        const candidates = [
+          path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`),
+          path.join(homedir(), GEMINI_DIR, `sandbox-macos-${profile}.sb`),
+        ];
+
+        const matches = candidates.filter((candidate) =>
+          fs.existsSync(candidate),
+        );
+
+        if (matches.length > 1) {
+          throw new FatalSandboxError(
+            `Ambiguous macos seatbelt profile: found multiple candidates for profile '${profile}':\n${matches.map((m) => `- ${m}`).join('\n')}\nPlease remove duplicates so only one profile file exists.`,
+          );
+        }
+
+        if (matches.length === 1) {
+          profileFile = matches[0];
+        } else {
+          // If no matches found, set profileFile to the first candidate for context,
+          // but we will throw a detailed error below.
+          profileFile = candidates[0];
+          throw new FatalSandboxError(
+            `Missing macos seatbelt profile '${profile}'. Checked the following paths:\n${candidates.map((c) => `- ${c}`).join('\n')}`,
+          );
+        }
       }
       if (!fs.existsSync(profileFile)) {
         throw new FatalSandboxError(
