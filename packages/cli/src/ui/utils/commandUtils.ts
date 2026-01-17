@@ -140,10 +140,13 @@ const isWSL = (): boolean =>
       process.env['WSL_INTEROP'],
   );
 
+const isWindowsTerminal = (): boolean =>
+  process.platform === 'win32' && Boolean(process.env['WT_SESSION']);
+
 const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
 
 const shouldUseOsc52 = (tty: TtyTarget): boolean =>
-  Boolean(tty) && !isDumbTerm() && (isSSH() || isWSL());
+  Boolean(tty) && !isDumbTerm() && (isSSH() || isWSL() || isWindowsTerminal());
 
 const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
   if (buf.length <= maxBytes) return buf;

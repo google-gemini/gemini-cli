@@ -84,6 +84,7 @@ const resetEnv = () => {
   delete process.env['WSLENV'];
   delete process.env['WSL_INTEROP'];
   delete process.env['TERM'];
+  delete process.env['WT_SESSION'];
 };
 
 interface MockChildProcess extends EventEmitter {
@@ -476,6 +477,26 @@ describe('commandUtils', () => {
       // Fallback to clipboardy and not /dev/tty
       expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+    });
+
+    it('uses OSC-52 on Windows Terminal (WT_SESSION) even if not SSH/WSL', async () => {
+      mockProcess.platform = 'win32';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'windows-terminal-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(stderrStream.write).toHaveBeenCalledWith(expected);
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
   });
 
