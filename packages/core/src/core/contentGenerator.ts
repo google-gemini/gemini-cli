@@ -59,6 +59,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  baseUrl?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -90,7 +91,7 @@ export async function createContentGeneratorConfig(
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
     contentGeneratorConfig.vertexai = false;
-
+    contentGeneratorConfig.baseUrl = process.env['CODE_ASSIST_ENDPOINT'];
     return contentGeneratorConfig;
   }
 
@@ -173,7 +174,8 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const baseUrl = config.baseUrl;
+      const httpOptions = { headers, baseUrl };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
