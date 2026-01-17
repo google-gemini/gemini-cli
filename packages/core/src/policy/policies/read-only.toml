@@ -46,11 +46,6 @@ decision = "allow"
 priority = 50
 
 [[rule]]
-toolName = "read_many_files"
-decision = "allow"
-priority = 50
-
-[[rule]]
 toolName = "google_web_search"
 decision = "allow"
 priority = 50
