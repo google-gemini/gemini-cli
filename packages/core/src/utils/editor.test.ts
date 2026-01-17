@@ -417,6 +417,17 @@ describe('editor utils', () => {
       });
     }
 
+    it('should return a friendly error when terminal editor is missing', async () => {
+      const spawnError = Object.assign(new Error('spawnSync vim ENOENT'), {
+        code: 'ENOENT',
+      });
+      (spawnSync as Mock).mockReturnValueOnce({ error: spawnError, status: 1 });
+
+      await expect(openDiff('old.txt', 'new.txt', 'vim')).rejects.toThrow(
+        'Failed to launch vim. Ensure it is installed and available on PATH.',
+      );
+    });
+
     it('should log an error if diff command is not available', async () => {
       const consoleErrorSpy = vi
         .spyOn(debugLogger, 'error')
