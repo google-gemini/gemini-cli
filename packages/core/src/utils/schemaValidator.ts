@@ -6,6 +6,7 @@
 
 import AjvPkg from 'ajv';
 import * as addFormats from 'ajv-formats';
+import { debugLogger } from './debugLogger.js';
 // Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AjvClass = (AjvPkg as any).default || AjvPkg;
@@ -40,7 +41,27 @@ export class SchemaValidator {
     if (typeof data !== 'object' || data === null) {
       return 'Value of params must be an object';
     }
-    const validate = ajValidator.compile(schema);
+
+    // Try to compile and validate; skip validation if schema can't be compiled.
+    // This handles schemas using JSON Schema versions AJV doesn't support
+    // (e.g., draft-2020-12, draft-2019-09, future versions).
+    // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
+    let validate;
+    try {
+      validate = ajValidator.compile(schema);
+    } catch (error) {
+      // Schema compilation failed (unsupported version, invalid $ref, etc.)
+      // Skip validation rather than blocking tool usage.
+      // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
+      debugLogger.warn(
+        `Failed to compile schema (${
+          (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
+        }): ${error instanceof Error ? error.message : String(error)}. ` +
+          'Skipping parameter validation.',
+      );
+      return null;
+    }
+
     const valid = validate(data);
     if (!valid && validate.errors) {
       return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
