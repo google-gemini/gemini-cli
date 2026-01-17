@@ -23,6 +23,7 @@ import {
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,
+  GitService,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -40,6 +41,19 @@ export async function loadConfig(
   const folderTrust =
     settings.folderTrust === true ||
     process.env['GEMINI_FOLDER_TRUST'] === 'true';
+
+  let checkpointing = process.env['CHECKPOINTING']
+    ? process.env['CHECKPOINTING'] === 'true'
+    : settings.checkpointing?.enabled;
+
+  if (checkpointing) {
+    if (!(await GitService.verifyGitAvailability())) {
+      logger.warn(
+        '[Config] Checkpointing is enabled but git is not installed. Disabling checkpointing.',
+      );
+      checkpointing = false;
+    }
+  }
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
@@ -79,9 +93,7 @@ export async function loadConfig(
     folderTrust,
     trustedFolder: true,
     extensionLoader,
-    checkpointing: process.env['CHECKPOINTING']
-      ? process.env['CHECKPOINTING'] === 'true'
-      : settings.checkpointing?.enabled,
+    checkpointing,
     previewFeatures: settings.general?.previewFeatures,
     interactive: true,
     enableInteractiveShell: true,
