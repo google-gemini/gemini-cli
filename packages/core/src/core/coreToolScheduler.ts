@@ -762,9 +762,10 @@ export class CoreToolScheduler {
 
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       // Instead of just cancelling one tool, trigger the full cancel cascade.
-      const reason = signal.aborted
-        ? CancellationReason.UserCancelled
-        : CancellationReason.UserDeclined;
+      const reason =
+        outcome === ToolConfirmationOutcome.Cancel
+          ? CancellationReason.UserDeclined
+          : CancellationReason.UserCancelled;
       this.cancelAll(signal, reason);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
