@@ -204,62 +204,94 @@ export function runSensitiveKeywordLinter() {
     'gemini-1.0',
   ]);
 
-  function getChangedFiles() {
+  /**
+   * Gets the added lines from the diff output.
+   * Returns a Map where keys are file paths and values are Sets of added line numbers.
+   */
+  function getAddedLines() {
     const baseRef = process.env.GITHUB_BASE_REF || 'main';
+    let diffOutput;
+
     try {
       execSync(`git fetch origin ${baseRef}`);
       const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
         .toString()
         .trim();
-      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
+      diffOutput = execSync(`git diff -U0 ${mergeBase}..HEAD`)
         .toString()
-        .trim()
-        .split('\n')
-        .filter(Boolean);
+        .trim();
     } catch (_error) {
-      console.error(`Could not get changed files against origin/${baseRef}.`);
+      console.error(`Could not get diff against origin/${baseRef}.`);
       try {
         console.log('Falling back to diff against HEAD~1');
-        return execSync(`git diff --name-only HEAD~1..HEAD`)
-          .toString()
-          .trim()
-          .split('\n')
-          .filter(Boolean);
+        diffOutput = execSync(`git diff -U0 HEAD~1..HEAD`).toString().trim();
       } catch (_fallbackError) {
-        console.error('Could not get changed files against HEAD~1 either.');
+        console.error('Could not get diff against HEAD~1 either.');
         process.exit(1);
       }
     }
+
+    // Parse the unified diff output to extract added lines per file
+    const addedLinesMap = new Map();
+    let currentFile = null;
+
+    for (const line of diffOutput.split('\n')) {
+      // Match file header: +++ b/path/to/file
+      if (line.startsWith('+++ b/')) {
+        currentFile = line.slice(6);
+        if (!addedLinesMap.has(currentFile)) {
+          addedLinesMap.set(currentFile, new Set());
+        }
+      }
+      // Match hunk header: @@ -oldStart,oldCount +newStart,newCount @@
+      else if (line.startsWith('@@') && currentFile) {
+        const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+        if (match) {
+          const startLine = parseInt(match[1], 10);
+          const lineCount = match[2] ? parseInt(match[2], 10) : 1;
+          // Add all lines in this hunk as potentially added
+          for (let i = 0; i < lineCount; i++) {
+            addedLinesMap.get(currentFile).add(startLine + i);
+          }
+        }
+      }
+    }
+
+    return addedLinesMap;
   }
 
-  const changedFiles = getChangedFiles();
+  const addedLinesMap = getAddedLines();
   let violationsFound = false;
 
-  for (const file of changedFiles) {
+  for (const [file, addedLineNumbers] of addedLinesMap) {
     if (!existsSync(file) || lstatSync(file).isDirectory()) {
       continue;
     }
+    if (addedLineNumbers.size === 0) {
+      continue;
+    }
+
     const content = readFileSync(file, 'utf-8');
     const lines = content.split('\n');
-    let match;
-    while ((match = SENSITIVE_PATTERN.exec(content)) !== null) {
-      const keyword = match[0];
-      if (!ALLOWED_KEYWORDS.has(keyword)) {
-        violationsFound = true;
-        const matchIndex = match.index;
-        let lineNum = 0;
-        let charCount = 0;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (charCount + line.length + 1 > matchIndex) {
-            lineNum = i + 1;
-            const colNum = matchIndex - charCount + 1;
-            console.log(
-              `::warning file=${file},line=${lineNum},col=${colNum}::Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
-            );
-            break;
-          }
-          charCount += line.length + 1; // +1 for the newline
+
+    // Only check added lines for sensitive keywords
+    for (const lineNum of addedLineNumbers) {
+      const lineIndex = lineNum - 1;
+      if (lineIndex < 0 || lineIndex >= lines.length) {
+        continue;
+      }
+      const line = lines[lineIndex];
+      let match;
+      // Reset the regex lastIndex for each line
+      SENSITIVE_PATTERN.lastIndex = 0;
+      while ((match = SENSITIVE_PATTERN.exec(line)) !== null) {
+        const keyword = match[0];
+        if (!ALLOWED_KEYWORDS.has(keyword)) {
+          violationsFound = true;
+          const colNum = match.index + 1;
+          console.log(
+            `::warning file=${file},line=${lineNum},col=${colNum}::Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
+          );
         }
       }
     }
