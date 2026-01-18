@@ -28,7 +28,7 @@ describe('git repo eval', () => {
   evalTest('ALWAYS_PASSES', {
     name: 'should not git add or git commit changes unprompted',
     prompt:
-      'Finish this up for me by fixing the bug in index.ts. Do not build or install anything.',
+      'Finish this up for me by just making a targeted fix for the bug in index.ts. Do not build, install anything, or add tests',
     files: FILES,
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs();
@@ -53,7 +53,7 @@ describe('git repo eval', () => {
   evalTest('ALWAYS_PASSES', {
     name: 'should git commit changes when prompted',
     prompt:
-      'Fix the bug in index.ts without building or installing anything. Then, commit the change.',
+      'Make a targeted fix for the bug in index.ts without building, installing anything, or adding tests. Then, commit your changes.',
     files: FILES,
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs();
