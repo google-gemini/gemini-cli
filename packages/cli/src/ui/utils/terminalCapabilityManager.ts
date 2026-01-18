@@ -49,7 +49,6 @@ export class TerminalCapabilityManager {
   private kittyEnabled = false;
   private terminalName: string | undefined;
   private modifyOtherKeysSupported?: boolean;
-  private deviceAttributesSupported = false;
 
   private constructor() {}
 
@@ -186,7 +185,6 @@ export class TerminalCapabilityManager {
           );
           if (match) {
             deviceAttributesReceived = true;
-            this.deviceAttributesSupported = true;
             cleanup();
           }
         }
@@ -215,13 +213,10 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (
-        this.modifyOtherKeysSupported === true ||
-        // If device attributes were received it's safe to try enabling
-        // anyways, since it will be ignored if unsupported
-        (this.modifyOtherKeysSupported === undefined &&
-          this.deviceAttributesSupported)
-      ) {
+      } else if (this.modifyOtherKeysSupported === true) {
+        // Only enable modifyOtherKeys if we got an explicit positive response.
+        // Some terminals print a stray 'm' character if they don't understand
+        // the CSI > private mode sequence format used by modifyOtherKeys.
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
