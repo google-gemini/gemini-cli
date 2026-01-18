@@ -2131,4 +2131,71 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.error.message).toBe(PLAN_MODE_DENIAL_MESSAGE);
     });
   });
+
+  it('should use specific cancellation reason when tool is declined by user', async () => {
+    const onAllToolCallsComplete = vi.fn();
+    const messageBus = createMockMessageBus();
+    const config = createMockConfig({
+      getMessageBus: () => messageBus,
+    });
+
+    const testTool = new TestApprovalTool(config, messageBus);
+    const mockToolRegistry = {
+      getTool: () => testTool,
+      getAllToolNames: () => [TestApprovalTool.Name],
+      getTools: () => [testTool],
+    } as unknown as ToolRegistry;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (config as any).getToolRegistry = () => mockToolRegistry;
+
+    const scheduler = new CoreToolScheduler({
+      config,
+      onAllToolCallsComplete,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: 'call-1',
+      name: TestApprovalTool.Name,
+      args: { id: '1' },
+      isClientInitiated: false,
+      prompt_id: 'test-prompt',
+    };
+
+    // Schedule the tool
+    const schedulePromise = scheduler.schedule(request, abortController.signal);
+
+    // Wait for awaiting approval
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Access scheduler.toolCalls (private) to get the confirmation handler
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toolCalls = (scheduler as any).toolCalls as ToolCall[];
+    const waitingCall = toolCalls.find(
+      (c) => c.status === 'awaiting_approval',
+    ) as WaitingToolCall;
+    expect(waitingCall).toBeDefined();
+
+    const onConfirm = waitingCall.confirmationDetails.onConfirm;
+
+    // Simulate user decline
+    await onConfirm(ToolConfirmationOutcome.Cancel);
+
+    // Wait for completion
+    await schedulePromise;
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock.calls[0][0];
+    expect(completedCalls).toHaveLength(1);
+    const cancelledCall = completedCalls[0];
+    expect(cancelledCall.status).toBe('cancelled');
+
+    // Check the error message in the response
+    const responseParts = cancelledCall.response.responseParts;
+    const functionResponse = responseParts[0].functionResponse;
+    expect(functionResponse.response.error).toContain(
+      'User declined this action. No changes were applied.',
+    );
+  });
 });

@@ -63,7 +63,7 @@ export type TrackedToolCall =
   | TrackedCompletedToolCall
   | TrackedCancelledToolCall;
 
-export type CancelAllFn = (signal: AbortSignal) => void;
+export type CancelAllFn = (signal: AbortSignal, reason?: string) => void;
 
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
@@ -200,8 +200,8 @@ export function useReactToolScheduler(
   );
 
   const cancelAllToolCalls = useCallback(
-    (signal: AbortSignal) => {
-      scheduler.cancelAll(signal);
+    (signal: AbortSignal, reason?: string) => {
+      scheduler.cancelAll(signal, reason);
     },
     [scheduler],
   );

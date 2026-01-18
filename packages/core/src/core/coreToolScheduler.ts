@@ -440,7 +440,10 @@ export class CoreToolScheduler {
     );
   }
 
-  cancelAll(signal: AbortSignal): void {
+  cancelAll(
+    signal: AbortSignal,
+    reason: string = 'User cancelled the operation.',
+  ): void {
     if (this.isCancelling) {
       return;
     }
@@ -459,13 +462,13 @@ export class CoreToolScheduler {
           activeCall.request.callId,
           'cancelled',
           signal,
-          'User cancelled the operation.',
+          reason,
         );
       }
     }
 
     // Clear the queue and mark all queued items as cancelled for completion reporting.
-    this._cancelAllQueuedCalls();
+    this._cancelAllQueuedCalls(reason);
 
     // Finalize the batch immediately.
     void this.checkAndNotifyCompletion(signal);
@@ -754,7 +757,10 @@ export class CoreToolScheduler {
 
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       // Instead of just cancelling one tool, trigger the full cancel cascade.
-      this.cancelAll(signal);
+      const reason = signal.aborted
+        ? 'User cancelled the operation.'
+        : 'User declined this action. No changes were applied.';
+      this.cancelAll(signal, reason);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
@@ -958,7 +964,9 @@ export class CoreToolScheduler {
     }
   }
 
-  private _cancelAllQueuedCalls(): void {
+  private _cancelAllQueuedCalls(
+    reason: string = 'User cancelled the operation.',
+  ): void {
     while (this.toolCallQueue.length > 0) {
       const queuedCall = this.toolCallQueue.shift()!;
       // Don't cancel tools that already errored during validation.
@@ -970,8 +978,7 @@ export class CoreToolScheduler {
         'startTime' in queuedCall && queuedCall.startTime
           ? Date.now() - queuedCall.startTime
           : undefined;
-      const errorMessage =
-        '[Operation Cancelled] User cancelled the operation.';
+      const errorMessage = `[Operation Cancelled] ${reason}`;
       this.completedToolCallsForBatch.push({
         request: queuedCall.request,
         tool: queuedCall.tool,
