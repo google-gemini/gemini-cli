@@ -1312,6 +1312,8 @@ for that specific session.
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
+  - **Deprecated:** Use the positional prompt instead. This flag will be removed
+    in a future version.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
   - For scripting examples, use the `--output-format json` flag to get
