@@ -167,10 +167,13 @@ function findCodeRegions(content: string): Array<[number, number]> {
       for (const child of token.tokens) {
         const childIndexInParent = token.raw.indexOf(child.raw, childOffset);
         if (childIndexInParent === -1) {
-          logger.error(
-            `Could not find child token in parent raw content. Aborting parsing for this branch. Child raw: "${child.raw}"`,
+          // Skip this child if marked.js normalized the content differently
+          // (e.g., CRLF to LF conversion). This is a known limitation and
+          // not a fatal error - just continue with the next sibling.
+          logger.debug(
+            `Skipping child token location (normalization mismatch): "${child.raw.substring(0, 30)}..."`,
           );
-          break;
+          continue;
         }
         walk(child, baseOffset + childIndexInParent);
         childOffset = childIndexInParent + child.raw.length;
