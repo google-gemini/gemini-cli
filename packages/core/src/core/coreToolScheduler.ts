@@ -590,7 +590,7 @@ export class CoreToolScheduler {
             reqInfo.callId,
             'cancelled',
             signal,
-            'Tool call cancelled by user.',
+            CancellationReason.UserCancelled,
           );
           // The completion check will handle the cascade.
           await this.checkAndNotifyCompletion(signal);
@@ -722,7 +722,7 @@ export class CoreToolScheduler {
             reqInfo.callId,
             'cancelled',
             signal,
-            'Tool call cancelled by user.',
+            CancellationReason.UserCancelled,
           );
           await this.checkAndNotifyCompletion(signal);
         } else {
