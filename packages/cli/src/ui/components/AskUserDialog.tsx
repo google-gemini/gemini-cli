@@ -153,7 +153,7 @@ interface TextQuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
-  onEditingOther?: (editing: boolean) => void;
+  onEditingCustomOption?: (editing: boolean) => void;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -163,7 +163,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   question,
   onAnswer,
   onSelectionChange,
-  onEditingOther,
+  onEditingCustomOption,
   initialAnswer,
   progressHeader,
   keyboardHints,
@@ -206,21 +206,21 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
         const newText = textValue + key.sequence;
         setTextValue(newText);
         onSelectionChange?.(newText);
-        onEditingOther?.(true);
+        onEditingCustomOption?.(true);
       }
     },
-    [textValue, onAnswer, onSelectionChange, onEditingOther],
+    [textValue, onAnswer, onSelectionChange, onEditingCustomOption],
   );
 
   useKeypress(handleTextTyping, { isActive: true });
 
   // Notify parent that we're in text input mode (for Ctrl+C handling)
   useEffect(() => {
-    onEditingOther?.(true);
+    onEditingCustomOption?.(true);
     return () => {
-      onEditingOther?.(false);
+      onEditingCustomOption?.(false);
     };
-  }, [onEditingOther]);
+  }, [onEditingCustomOption]);
 
   const placeholder = question.placeholder || 'Enter your response';
   const showPlaceholder = !textValue;
@@ -273,7 +273,7 @@ interface ChoiceQuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
-  onEditingOther?: (editing: boolean) => void;
+  onEditingCustomOption?: (editing: boolean) => void;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -283,7 +283,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   question,
   onAnswer,
   onSelectionChange,
-  onEditingOther,
+  onEditingCustomOption,
   initialAnswer,
   progressHeader,
   keyboardHints,
@@ -298,15 +298,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     if (!initialAnswer) {
       return {
         selectedIndices: new Set<number>(),
-        otherText: '',
-        isOtherSelected: false,
+        customOptionText: '',
+        isCustomOptionSelected: false,
       };
     }
 
     // Check if initialAnswer matches any option labels
     const selectedIndices = new Set<number>();
-    let otherText = '';
-    let isOtherSelected = false;
+    let customOptionText = '';
+    let isCustomOptionSelected = false;
 
     if (question.multiSelect) {
       const answers = initialAnswer.split(', ');
@@ -315,8 +315,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         if (index !== -1) {
           selectedIndices.add(index);
         } else {
-          otherText = answer;
-          isOtherSelected = true;
+          customOptionText = answer;
+          isCustomOptionSelected = true;
         }
       });
     } else {
@@ -326,49 +326,55 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       if (index !== -1) {
         selectedIndices.add(index);
       } else {
-        otherText = initialAnswer;
-        isOtherSelected = true;
+        customOptionText = initialAnswer;
+        isCustomOptionSelected = true;
       }
     }
 
-    return { selectedIndices, otherText, isOtherSelected };
+    return { selectedIndices, customOptionText, isCustomOptionSelected };
   }, [initialAnswer, questionOptions, question.multiSelect]);
 
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     initialState.selectedIndices,
   );
-  const [otherText, setOtherText] = useState(initialState.otherText);
-  const [isOtherSelected, setIsOtherSelected] = useState(
-    initialState.isOtherSelected,
+  const [customOptionText, setCustomOptionText] = useState(
+    initialState.customOptionText,
   );
-  const [isOtherFocused, setIsOtherFocused] = useState(false);
+  const [isCustomOptionSelected, setIsCustomOptionSelected] = useState(
+    initialState.isCustomOptionSelected,
+  );
+  const [isCustomOptionFocused, setIsCustomOptionFocused] = useState(false);
 
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
-    (indices: Set<number>, includeOther: boolean, other: string) => {
+    (
+      indices: Set<number>,
+      includeCustomOption: boolean,
+      customOption: string,
+    ) => {
       const answers: string[] = [];
       questionOptions.forEach((opt, i) => {
         if (indices.has(i)) {
           answers.push(opt.label);
         }
       });
-      if (includeOther && other.trim()) {
-        answers.push(other.trim());
+      if (includeCustomOption && customOption.trim()) {
+        answers.push(customOption.trim());
       }
       return answers.join(', ');
     },
     [questionOptions],
   );
 
-  // Handle inline typing when "Other" is focused
-  const handleOtherTyping = useCallback(
+  // Handle inline typing when custom option is focused
+  const handleCustomOptionTyping = useCallback(
     (key: Key) => {
-      if (!isOtherFocused) return;
+      if (!isCustomOptionFocused) return;
 
       // Handle Ctrl+C to clear all text
       if (key.ctrl && key.name === 'c') {
-        setOtherText('');
-        setIsOtherSelected(false);
+        setCustomOptionText('');
+        setIsCustomOptionSelected(false);
         // Save for multi-select
         if (question.multiSelect) {
           onSelectionChange?.(buildAnswerString(selectedIndices, false, ''));
@@ -378,16 +384,20 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
       // Handle backspace
       if (key.name === 'backspace' || key.name === 'delete') {
-        const newText = otherText.slice(0, -1);
-        setOtherText(newText);
-        const newIsOtherSelected = newText.length > 0;
-        if (!newIsOtherSelected) {
-          setIsOtherSelected(false);
+        const newText = customOptionText.slice(0, -1);
+        setCustomOptionText(newText);
+        const newIsCustomOptionSelected = newText.length > 0;
+        if (!newIsCustomOptionSelected) {
+          setIsCustomOptionSelected(false);
         }
         // Save for multi-select
         if (question.multiSelect) {
           onSelectionChange?.(
-            buildAnswerString(selectedIndices, newIsOtherSelected, newText),
+            buildAnswerString(
+              selectedIndices,
+              newIsCustomOptionSelected,
+              newText,
+            ),
           );
         }
         return;
@@ -401,24 +411,24 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         !key.meta &&
         key.sequence.charCodeAt(0) >= 32
       ) {
-        const newText = otherText + key.sequence;
-        setOtherText(newText);
+        const newText = customOptionText + key.sequence;
+        setCustomOptionText(newText);
         // Only mark as selected in multi-select mode (for single-select, green/checkmark
         // should only appear for previously submitted answers from initialAnswer)
         if (question.multiSelect) {
-          setIsOtherSelected(true);
+          setIsCustomOptionSelected(true);
           // Save immediately so navigation preserves it
           onSelectionChange?.(
             buildAnswerString(selectedIndices, true, newText),
           );
         }
-        onEditingOther?.(true);
+        onEditingCustomOption?.(true);
       }
     },
     [
-      isOtherFocused,
-      otherText,
-      onEditingOther,
+      isCustomOptionFocused,
+      customOptionText,
+      onEditingCustomOption,
       question.multiSelect,
       onSelectionChange,
       buildAnswerString,
@@ -426,7 +436,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ],
   );
 
-  useKeypress(handleOtherTyping, { isActive: isOtherFocused });
+  useKeypress(handleCustomOptionTyping, { isActive: isCustomOptionFocused });
 
   const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(
@@ -442,11 +452,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
-    // Only add "Other" option for choice type, not yesno
+    // Only add custom option for choice type, not yesno
     if (question.type !== 'yesno') {
       const otherItem: OptionItem = {
         key: 'other',
-        label: otherText || '',
+        label: customOptionText || '',
         description: '',
         type: 'other',
         index: list.length,
@@ -466,18 +476,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, question.type, otherText]);
+  }, [questionOptions, question.multiSelect, question.type, customOptionText]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
-      const nowFocusingOther = itemValue.type === 'other';
-      setIsOtherFocused(nowFocusingOther);
-      // Notify parent when we stop focusing Other (so navigation can resume)
-      if (!nowFocusingOther) {
-        onEditingOther?.(false);
+      const nowFocusingCustomOption = itemValue.type === 'other';
+      setIsCustomOptionFocused(nowFocusingCustomOption);
+      // Notify parent when we stop focusing custom option (so navigation can resume)
+      if (!nowFocusingCustomOption) {
+        onEditingCustomOption?.(false);
       }
     },
-    [onEditingOther],
+    [onEditingCustomOption],
   );
 
   const handleSelect = useCallback(
@@ -493,22 +503,34 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           setSelectedIndices(newIndices);
           // Save selection immediately so navigation preserves it
           onSelectionChange?.(
-            buildAnswerString(newIndices, isOtherSelected, otherText),
+            buildAnswerString(
+              newIndices,
+              isCustomOptionSelected,
+              customOptionText,
+            ),
           );
         } else if (itemValue.type === 'other') {
           // Toggle other selection
-          if (otherText.trim()) {
-            const newIsOtherSelected = !isOtherSelected;
-            setIsOtherSelected(newIsOtherSelected);
+          if (customOptionText.trim()) {
+            const newIsCustomOptionSelected = !isCustomOptionSelected;
+            setIsCustomOptionSelected(newIsCustomOptionSelected);
             // Save selection immediately
             onSelectionChange?.(
-              buildAnswerString(selectedIndices, newIsOtherSelected, otherText),
+              buildAnswerString(
+                selectedIndices,
+                newIsCustomOptionSelected,
+                customOptionText,
+              ),
             );
           }
         } else if (itemValue.type === 'done') {
           // Done just triggers navigation, selections already saved
           onAnswer(
-            buildAnswerString(selectedIndices, isOtherSelected, otherText),
+            buildAnswerString(
+              selectedIndices,
+              isCustomOptionSelected,
+              customOptionText,
+            ),
           );
         }
       } else {
@@ -516,10 +538,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           onAnswer(itemValue.label);
         } else if (itemValue.type === 'other') {
           // Submit the other text if it has content
-          if (otherText.trim()) {
+          if (customOptionText.trim()) {
             // Reset editing state before submitting so navigation works on next question
-            onEditingOther?.(false);
-            onAnswer(otherText.trim());
+            onEditingCustomOption?.(false);
+            onAnswer(customOptionText.trim());
           }
         }
       }
@@ -527,10 +549,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     [
       question.multiSelect,
       selectedIndices,
-      isOtherSelected,
-      otherText,
+      isCustomOptionSelected,
+      customOptionText,
       onAnswer,
-      onEditingOther,
+      onEditingCustomOption,
       onSelectionChange,
       buildAnswerString,
     ],
@@ -565,14 +587,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           const optionItem = item.value;
           const isChecked =
             selectedIndices.has(optionItem.index) ||
-            (optionItem.type === 'other' && isOtherSelected);
+            (optionItem.type === 'other' && isCustomOptionSelected);
           const showCheck =
             question.multiSelect &&
             (optionItem.type === 'option' || optionItem.type === 'other');
 
-          // Render inline text input for "Other" option
+          // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const displayText = otherText || '';
+            const displayText = customOptionText || '';
             const placeholder = 'Enter a custom value';
             const showPlaceholder = !displayText && context.isSelected;
             const showCursor = context.isSelected;
@@ -667,29 +689,33 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
-  const [editingOther, setEditingOther] = useState(false);
+  const [isEditingCustomOption, setIsEditingCustomOption] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   // Use refs for synchronous checks to prevent race conditions
   const submittedRef = useRef(false);
-  const editingOtherRef = useRef(false);
-  editingOtherRef.current = editingOther;
+  const isEditingCustomOptionRef = useRef(false);
+  isEditingCustomOptionRef.current = isEditingCustomOption;
 
-  // Sync editingOther state with parent for global keypress handling
+  // Sync isEditingCustomOption state with parent for global keypress handling
   // Clean up on unmount to ensure Ctrl+C works normally after dialog closes
   useEffect(() => {
-    onActiveTextInputChange?.(editingOther);
+    onActiveTextInputChange?.(isEditingCustomOption);
     return () => {
       onActiveTextInputChange?.(false);
     };
-  }, [editingOther, onActiveTextInputChange]);
+  }, [isEditingCustomOption, onActiveTextInputChange]);
 
-  // Handle Escape or Ctrl+C to cancel (but not Ctrl+C when editing Other)
+  // Handle Escape or Ctrl+C to cancel (but not Ctrl+C when editing custom option)
   const handleCancel = useCallback(
     (key: Key) => {
       if (submittedRef.current) return;
       if (key.name === 'escape') {
         onCancel();
-      } else if (key.ctrl && key.name === 'c' && !editingOtherRef.current) {
+      } else if (
+        key.ctrl &&
+        key.name === 'c' &&
+        !isEditingCustomOptionRef.current
+      ) {
         onCancel();
       }
     },
@@ -708,10 +734,13 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   const handleNavigation = useCallback(
     (key: Key) => {
       // Allow navigation for text-type questions even when "editing"
-      // (editingOther blocks navigation for choice-type "Other" field, not text-type questions)
+      // (isEditingCustomOption blocks navigation for choice-type custom option field, not text-type questions)
       const currentQuestionIsText =
         questions[currentQuestionIndex]?.type === 'text';
-      if ((editingOther && !currentQuestionIsText) || submittedRef.current)
+      if (
+        (isEditingCustomOption && !currentQuestionIsText) ||
+        submittedRef.current
+      )
         return;
 
       if (key.name === 'tab' || key.name === 'right') {
@@ -727,7 +756,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         }
       }
     },
-    [editingOther, currentQuestionIndex, questions, reviewTabIndex],
+    [isEditingCustomOption, currentQuestionIndex, questions, reviewTabIndex],
   );
 
   useKeypress(handleNavigation, {
@@ -845,7 +874,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         question={currentQuestion}
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
-        onEditingOther={setEditingOther}
+        onEditingCustomOption={setIsEditingCustomOption}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
@@ -872,7 +901,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       question={effectiveQuestion}
       onAnswer={handleAnswer}
       onSelectionChange={handleSelectionChange}
-      onEditingOther={setEditingOther}
+      onEditingCustomOption={setIsEditingCustomOption}
       initialAnswer={answers[currentQuestionIndex]}
       progressHeader={progressHeader}
       keyboardHints={keyboardHints}

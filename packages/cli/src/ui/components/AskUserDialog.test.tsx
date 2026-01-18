@@ -98,7 +98,7 @@ describe('AskUserDialog', () => {
     // Toggle Feature2 (Enter)
     await writeKey(stdin, '\r');
 
-    // Move down to Other (down arrow)
+    // Move down to custom option (down arrow)
     await writeKey(stdin, '\x1b[B');
 
     // Move down to Done
@@ -110,7 +110,7 @@ describe('AskUserDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith({ '0': 'Feature1, Feature2' });
   });
 
-  it('handles Other option in single select with inline typing', async () => {
+  it('handles custom option in single select with inline typing', async () => {
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
       <AskUserDialog
@@ -120,11 +120,11 @@ describe('AskUserDialog', () => {
       />,
     );
 
-    // Move down to Other
+    // Move down to custom option
     await writeKey(stdin, '\x1b[B');
     await writeKey(stdin, '\x1b[B');
 
-    // Should show placeholder when Other is focused
+    // Should show placeholder when custom option is focused
     expect(lastFrame()).toContain('Enter a custom value');
 
     // Type directly (inline) - no need to press Enter first

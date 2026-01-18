@@ -25,17 +25,23 @@ export function useAskUser(config: Config) {
     const messageBus = config.getMessageBus();
     if (!messageBus) return;
 
-    const handler = (msg: AskUserRequest) => {
+    const askUserRequestHandler = (msg: AskUserRequest) => {
       setRequest({
         questions: msg.questions,
         correlationId: msg.correlationId,
       });
     };
 
-    messageBus.subscribe(MessageBusType.ASK_USER_REQUEST, handler);
+    messageBus.subscribe(
+      MessageBusType.ASK_USER_REQUEST,
+      askUserRequestHandler,
+    );
 
     return () => {
-      messageBus.unsubscribe(MessageBusType.ASK_USER_REQUEST, handler);
+      messageBus.unsubscribe(
+        MessageBusType.ASK_USER_REQUEST,
+        askUserRequestHandler,
+      );
     };
   }, [config]);
 
