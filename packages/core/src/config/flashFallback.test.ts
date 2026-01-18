@@ -65,9 +65,10 @@ describe('Flash Model Fallback Configuration', () => {
   });
 
   describe('activateFallbackMode', () => {
-    it('should set model to fallback and log event', () => {
+    it('should set active model to fallback and log event', () => {
       config.activateFallbackMode(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(config.getModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getActiveModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
       expect(logFlashFallback).toHaveBeenCalledWith(
         config,
         expect.any(FlashFallbackEvent),
