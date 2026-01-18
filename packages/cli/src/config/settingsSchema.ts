@@ -14,6 +14,7 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  AgentOverride,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -108,6 +109,7 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  ignoreInDocs?: boolean;
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
@@ -190,22 +192,22 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      disableAutoUpdate: {
+      enableAutoUpdate: {
         type: 'boolean',
-        label: 'Disable Auto Update',
+        label: 'Enable Auto Update',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable automatic updates',
+        default: true,
+        description: 'Enable automatic updates.',
         showInDialog: true,
       },
-      disableUpdateNag: {
+      enableAutoUpdateNotification: {
         type: 'boolean',
-        label: 'Disable Update Nag',
+        label: 'Enable Auto Update Notification',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable update notification prompts.',
+        default: true,
+        description: 'Enable update notification prompts.',
         showInDialog: false,
       },
       checkpointing: {
@@ -576,13 +578,13 @@ const SETTINGS_SCHEMA = {
         description: 'Accessibility settings.',
         showInDialog: false,
         properties: {
-          disableLoadingPhrases: {
+          enableLoadingPhrases: {
             type: 'boolean',
-            label: 'Disable Loading Phrases',
+            label: 'Enable Loading Phrases',
             category: 'UI',
             requiresRestart: true,
-            default: false,
-            description: 'Disable loading phrases for accessibility',
+            default: true,
+            description: 'Enable loading phrases during operations.',
             showInDialog: true,
           },
           screenReader: {
@@ -799,7 +801,7 @@ const SETTINGS_SCHEMA = {
         label: 'Agent Overrides',
         category: 'Advanced',
         requiresRestart: true,
-        default: {},
+        default: {} as Record<string, AgentOverride>,
         description:
           'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
         showInDialog: false,
@@ -913,13 +915,13 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          disableFuzzySearch: {
+          enableFuzzySearch: {
             type: 'boolean',
-            label: 'Disable Fuzzy Search',
+            label: 'Enable Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
-            default: false,
-            description: 'Disable fuzzy search when searching for files.',
+            default: true,
+            description: 'Enable fuzzy search when searching for files.',
             showInDialog: true,
           },
         },
@@ -1596,6 +1598,16 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for agent skills.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Agent Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Agent Skills.',
+        showInDialog: true,
+        ignoreInDocs: true,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Skills',
@@ -2092,6 +2104,10 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+      enabled: {
+        type: 'boolean',
+        description: 'Whether to enable the agent.',
+      },
       disabled: {
         type: 'boolean',
         description: 'Whether to disable the agent.',
@@ -2262,12 +2278,17 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default'];
 };
 
+type InferMergedSettings<T extends SettingsSchema> = {
+  -readonly [K in keyof T]-?: T[K] extends { properties: SettingsSchema }
+    ? InferMergedSettings<T[K]['properties']>
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
+};
+
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export function getEnableHooksUI(settings: Settings): boolean {
-  return settings.tools?.enableHooks ?? true;
-}
-
-export function getEnableHooks(settings: Settings): boolean {
-  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
-}
+export type MergedSettings = InferMergedSettings<SettingsSchemaType>;

@@ -22,6 +22,7 @@ describe('hooksCommand', () => {
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
     getEnableHooks: ReturnType<typeof vi.fn>;
+    updateDisabledHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
@@ -51,6 +52,7 @@ describe('hooksCommand', () => {
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
       getEnableHooks: vi.fn().mockReturnValue(true),
+      updateDisabledHooks: vi.fn(),
     };
 
     // Create mock settings
@@ -271,9 +273,10 @@ describe('hooksCommand', () => {
 
     it('should enable a hook and update settings', async () => {
       // Update the context's settings with disabled hooks
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook', 'other-hook'],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [
+        'test-hook',
+        'other-hook',
+      ];
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
@@ -401,9 +404,7 @@ describe('hooksCommand', () => {
     });
 
     it('should disable a hook and update settings', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -430,11 +431,9 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should return info when hook is already disabled', async () => {
+    it('should synchronize with hook system even if hook is already in disabled list', async () => {
       // Update the context's settings with the hook already disabled
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook'],
-      };
+      mockContext.services.settings.merged.hooks.disabled = ['test-hook'];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -446,18 +445,20 @@ describe('hooksCommand', () => {
       const result = await disableCmd.action(mockContext, 'test-hook');
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
-      expect(mockHookSystem.setHookEnabled).not.toHaveBeenCalled();
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'test-hook',
+        false,
+      );
+      expect(mockConfig.updateDisabledHooks).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'Hook "test-hook" is already disabled.',
+        content: 'Hook "test-hook" disabled successfully.',
       });
     });
 
     it('should handle error when disabling hook fails', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
+      mockContext.services.settings.merged.hooks.disabled = [];
       mockSettings.setValue.mockImplementationOnce(() => {
         throw new Error('Failed to save settings');
       });

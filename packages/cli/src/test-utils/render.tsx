@@ -176,6 +176,7 @@ const mockUIActions: UIActions = {
   clearAskUserRequest: vi.fn(),
   setHasActiveTextInput: vi.fn(),
   setAuthContext: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (

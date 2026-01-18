@@ -9,7 +9,6 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConsoleMessageItem,
-  ShellConfirmationRequest,
   ConfirmationRequest,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
@@ -69,7 +68,6 @@ export interface UIState {
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
@@ -144,6 +142,7 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
+  adminSettingsChanged: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

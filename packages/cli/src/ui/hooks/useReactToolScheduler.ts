@@ -32,7 +32,7 @@ import { ToolCallStatus } from '../types.js';
 export type ScheduleFn = (
   request: ToolCallRequestInfo | ToolCallRequestInfo[],
   signal: AbortSignal,
-) => void;
+) => Promise<void>;
 export type MarkToolsAsSubmittedFn = (callIds: string[]) => void;
 
 export type TrackedScheduledToolCall = ScheduledToolCall & {
@@ -181,7 +181,7 @@ export function useReactToolScheduler(
       signal: AbortSignal,
     ) => {
       setToolCallsForDisplay([]);
-      void scheduler.schedule(request, signal);
+      return scheduler.schedule(request, signal);
     },
     [scheduler, setToolCallsForDisplay],
   );
