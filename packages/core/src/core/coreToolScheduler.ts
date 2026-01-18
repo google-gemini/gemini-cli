@@ -46,6 +46,11 @@ import {
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
+export enum CancellationReason {
+  UserCancelled = 'User cancelled the operation.',
+  UserDeclined = 'User declined this action. No changes were applied.',
+}
+
 export type {
   ToolCall,
   ValidatingToolCall,
@@ -442,7 +447,7 @@ export class CoreToolScheduler {
 
   cancelAll(
     signal: AbortSignal,
-    reason: string = 'User cancelled the operation.',
+    reason: CancellationReason = CancellationReason.UserCancelled,
   ): void {
     if (this.isCancelling) {
       return;
@@ -758,8 +763,8 @@ export class CoreToolScheduler {
     if (outcome === ToolConfirmationOutcome.Cancel || signal.aborted) {
       // Instead of just cancelling one tool, trigger the full cancel cascade.
       const reason = signal.aborted
-        ? 'User cancelled the operation.'
-        : 'User declined this action. No changes were applied.';
+        ? CancellationReason.UserCancelled
+        : CancellationReason.UserDeclined;
       this.cancelAll(signal, reason);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
@@ -965,7 +970,7 @@ export class CoreToolScheduler {
   }
 
   private _cancelAllQueuedCalls(
-    reason: string = 'User cancelled the operation.',
+    reason: CancellationReason = CancellationReason.UserCancelled,
   ): void {
     while (this.toolCallQueue.length > 0) {
       const queuedCall = this.toolCallQueue.shift()!;
@@ -978,7 +983,7 @@ export class CoreToolScheduler {
         'startTime' in queuedCall && queuedCall.startTime
           ? Date.now() - queuedCall.startTime
           : undefined;
-      const errorMessage = `[Operation Cancelled] ${reason}`;
+      const errorMessage = `[Operation Cancelled] Reason: ${reason}`;
       this.completedToolCallsForBatch.push({
         request: queuedCall.request,
         tool: queuedCall.tool,

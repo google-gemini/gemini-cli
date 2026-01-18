@@ -10,6 +10,7 @@ import type { CallableTool } from '@google/genai';
 import {
   CoreToolScheduler,
   PLAN_MODE_DENIAL_MESSAGE,
+  CancellationReason,
 } from './coreToolScheduler.js';
 import type {
   ToolCall,
@@ -2148,9 +2149,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (config as any).getToolRegistry = () => mockToolRegistry;
 
+    const onToolCallsUpdate = vi.fn();
     const scheduler = new CoreToolScheduler({
       config,
       onAllToolCallsComplete,
+      onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
     });
 
@@ -2167,14 +2170,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const schedulePromise = scheduler.schedule(request, abortController.signal);
 
     // Wait for awaiting approval
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Access scheduler.toolCalls (private) to get the confirmation handler
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolCalls = (scheduler as any).toolCalls as ToolCall[];
-    const waitingCall = toolCalls.find(
-      (c) => c.status === 'awaiting_approval',
-    ) as WaitingToolCall;
+    const waitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
     expect(waitingCall).toBeDefined();
 
     const onConfirm = waitingCall.confirmationDetails.onConfirm;
@@ -2195,7 +2194,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const responseParts = cancelledCall.response.responseParts;
     const functionResponse = responseParts[0].functionResponse;
     expect(functionResponse.response.error).toContain(
-      'User declined this action. No changes were applied.',
+      CancellationReason.UserDeclined,
     );
   });
 });

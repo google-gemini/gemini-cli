@@ -20,6 +20,7 @@ import type {
   ToolCallConfirmationDetails,
   Status as CoreStatus,
   EditorType,
+  CancellationReason,
 } from '@google/gemini-cli-core';
 import { CoreToolScheduler, debugLogger } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
@@ -63,7 +64,10 @@ export type TrackedToolCall =
   | TrackedCompletedToolCall
   | TrackedCancelledToolCall;
 
-export type CancelAllFn = (signal: AbortSignal, reason?: string) => void;
+export type CancelAllFn = (
+  signal: AbortSignal,
+  reason?: CancellationReason,
+) => void;
 
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
@@ -200,7 +204,7 @@ export function useReactToolScheduler(
   );
 
   const cancelAllToolCalls = useCallback(
-    (signal: AbortSignal, reason?: string) => {
+    (signal: AbortSignal, reason?: CancellationReason) => {
       scheduler.cancelAll(signal, reason);
     },
     [scheduler],
