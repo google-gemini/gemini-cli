@@ -47,8 +47,17 @@ export async function handleUpdate(args: UpdateArgs) {
       );
       if (!extension) {
         debugLogger.log(`Extension "${args.name}" not found.`);
+        if (extensions.length > 0) {
+          debugLogger.log('\nInstalled extensions:');
+          extensions.forEach((ext) => {
+            debugLogger.log(`  - ${ext.name}`);
+          });
+        } else {
+          debugLogger.log('No extensions installed.');
+        }
         return;
       }
+
       if (!extension.installMetadata) {
         debugLogger.log(
           `Unable to install extension "${args.name}" due to missing install metadata`,
@@ -63,7 +72,6 @@ export async function handleUpdate(args: UpdateArgs) {
         debugLogger.log(`Extension "${args.name}" is already up to date.`);
         return;
       }
-      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
       const updatedExtensionInfo = (await updateExtension(
         extension,
         extensionManager,
