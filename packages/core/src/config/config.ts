@@ -839,6 +839,11 @@ export class Config {
     }
 
     await this.geminiClient.initialize();
+    // Ensure any MCP tools discovered during async initialization are loaded.
+    // MCP servers start asynchronously above (not awaited), so tools may have
+    // been discovered before geminiClient.initialize() completed. This call
+    // ensures the LLM has access to all discovered tools.
+    await this.geminiClient.setTools();
   }
 
   getContentGenerator(): ContentGenerator {

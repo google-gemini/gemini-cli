@@ -1942,7 +1942,20 @@ export async function createTransport(
         }
       }
       if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
+        // Only use the stored token if no Authorization header is manually configured
+        // or if OAuth is explicitly enabled (which implies we should use the token)
+        const hasConfiguredAuth = Object.keys(
+          mcpServerConfig.headers || {},
+        ).some((k) => k.toLowerCase() === 'authorization');
+        const isOAuthEnabled = !!mcpServerConfig.oauth?.enabled;
+
+        if (!hasConfiguredAuth || isOAuthEnabled) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        } else {
+          debugLogger.log(
+            `Ignoring stored OAuth token for server '${mcpServerName}' because an Authorization header is explicitly configured.`,
+          );
+        }
       }
     }
 
