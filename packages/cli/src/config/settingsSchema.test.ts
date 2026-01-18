@@ -160,8 +160,8 @@ describe('SettingsSchema', () => {
         getSettingsSchema().ui.properties.showMemoryUsage.showInDialog,
       ).toBe(true);
       expect(
-        getSettingsSchema().ui.properties.footer.properties
-          .hideContextPercentage.showInDialog,
+        getSettingsSchema().ui.properties.footer.properties.contextPercentage
+          .showInDialog,
       ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
@@ -172,15 +172,15 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().general.properties.autoUpdate.showInDialog,
       ).toBe(true);
+      expect(getSettingsSchema().ui.properties.windowTitle.showInDialog).toBe(
+        true,
+      );
+      expect(getSettingsSchema().ui.properties.usageTips.showInDialog).toBe(
+        true,
+      );
       expect(
-        getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
+        getSettingsSchema().ui.properties.applicationBanner.showInDialog,
       ).toBe(true);
-      expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
-        true,
-      );
-      expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
-        true,
-      );
       expect(
         getSettingsSchema().privacy.properties.usageStatisticsEnabled
           .showInDialog,
@@ -227,14 +227,14 @@ describe('SettingsSchema', () => {
         },
         context: {
           includeDirectories: ['/path/to/dir'],
-          loadMemoryFromIncludeDirectories: true,
+          includeDirectoryMemory: true,
         },
       };
 
       // TypeScript should not complain about these properties
       expect(settings.ui?.theme).toBe('dark');
       expect(settings.context?.includeDirectories).toEqual(['/path/to/dir']);
-      expect(settings.context?.loadMemoryFromIncludeDirectories).toBe(true);
+      expect(settings.context?.includeDirectoryMemory).toBe(true);
     });
 
     it('should have includeDirectories setting in schema', () => {
@@ -252,22 +252,18 @@ describe('SettingsSchema', () => {
       ).toEqual([]);
     });
 
-    it('should have loadMemoryFromIncludeDirectories setting in schema', () => {
+    it('should have includeDirectoryMemory setting in schema', () => {
       expect(
-        getSettingsSchema().context?.properties
-          .loadMemoryFromIncludeDirectories,
+        getSettingsSchema().context?.properties.includeDirectoryMemory,
       ).toBeDefined();
       expect(
-        getSettingsSchema().context?.properties.loadMemoryFromIncludeDirectories
-          .type,
+        getSettingsSchema().context?.properties.includeDirectoryMemory.type,
       ).toBe('boolean');
       expect(
-        getSettingsSchema().context?.properties.loadMemoryFromIncludeDirectories
-          .category,
+        getSettingsSchema().context?.properties.includeDirectoryMemory.category,
       ).toBe('Context');
       expect(
-        getSettingsSchema().context?.properties.loadMemoryFromIncludeDirectories
-          .default,
+        getSettingsSchema().context?.properties.includeDirectoryMemory.default,
       ).toBe(false);
     });
 

@@ -437,7 +437,8 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (
-      !(settings.merged.ui?.hideBanner || config.getScreenReader()) &&
+      settings.merged.ui?.applicationBanner &&
+      !config.getScreenReader() &&
       bannerVisible &&
       bannerText
     ) {
@@ -1284,10 +1285,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
-    // Respect both showStatusInTitle and hideWindowTitle settings
+    // Respect both windowTitleStatus and windowTitle settings
     if (
-      !settings.merged.ui?.showStatusInTitle ||
-      settings.merged.ui?.hideWindowTitle
+      !settings.merged.ui?.windowTitleStatus ||
+      !settings.merged.ui?.windowTitle
     )
       return;
 
@@ -1313,8 +1314,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    settings.merged.ui?.showStatusInTitle,
-    settings.merged.ui?.hideWindowTitle,
+    settings.merged.ui?.windowTitleStatus,
+    settings.merged.ui?.windowTitle,
     stdout,
   ]);
 

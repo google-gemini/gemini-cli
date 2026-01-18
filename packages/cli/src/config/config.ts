@@ -504,17 +504,15 @@ export async function loadCliConfig(
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
   }
 
-  // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
+  // Override approval mode if yoloMode is Disabled or secureModeEnabled is true.
+  if (!settings.security?.yoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
           'YOLO mode is disabled by "secureModeEnabled" setting.',
         );
       } else {
-        debugLogger.error(
-          'YOLO mode is disabled by the "disableYolo" setting.',
-        );
+        debugLogger.error('YOLO mode is disabled by the "yoloMode" setting.');
       }
       throw new FatalConfigError(
         'Cannot start in YOLO mode since it is disabled by your admin',
@@ -644,8 +642,7 @@ export async function loadCliConfig(
     sandbox: sandboxConfig,
     targetDir: cwd,
     includeDirectories,
-    loadMemoryFromIncludeDirectories:
-      settings.context?.loadMemoryFromIncludeDirectories || false,
+    includeDirectoryMemory: settings.context?.includeDirectoryMemory || false,
     debugMode,
     question,
     previewFeatures: settings.general?.previewFeatures,
@@ -676,8 +673,9 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    disableYoloMode:
-      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    yoloMode:
+      (settings.security?.yoloMode ?? true) &&
+      !settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,

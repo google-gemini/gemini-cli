@@ -23,7 +23,7 @@ type WarningCheck = {
 const homeDirectoryCheck: WarningCheck = {
   id: 'home-directory',
   check: async (workspaceRoot: string, settings: Settings) => {
-    if (settings.ui?.showHomeDirectoryWarning === false) {
+    if (settings.ui?.homeDirectoryWarning === false) {
       return null;
     }
 

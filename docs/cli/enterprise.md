@@ -258,7 +258,7 @@ approval.
 ```json
 {
   "security": {
-    "disableYoloMode": true
+    "yoloMode": true
   }
 }
 ```

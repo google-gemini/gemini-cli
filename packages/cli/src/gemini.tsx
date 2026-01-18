@@ -710,7 +710,7 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.ui?.hideWindowTitle) {
+  if (settings.merged.ui?.windowTitle) {
     const windowTitle = computeWindowTitle(title);
     writeToStdout(`\x1b]2;${windowTitle}\x07`);
 

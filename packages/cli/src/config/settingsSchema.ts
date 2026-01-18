@@ -365,18 +365,18 @@ const SETTINGS_SCHEMA = {
           ref: 'CustomTheme',
         },
       },
-      hideWindowTitle: {
+      windowTitle: {
         type: 'boolean',
-        label: 'Hide Window Title',
+        label: 'Window Title',
         category: 'UI',
         requiresRestart: true,
-        default: false,
-        description: 'Hide the window title bar.',
+        default: true,
+        description: 'Show the window title bar.',
         showInDialog: true,
       },
-      showStatusInTitle: {
+      windowTitleStatus: {
         type: 'boolean',
-        label: 'Show Status in Title',
+        label: 'Window Title Status',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -384,9 +384,9 @@ const SETTINGS_SCHEMA = {
           'Show Gemini CLI status and thoughts in the terminal window title.',
         showInDialog: true,
       },
-      showHomeDirectoryWarning: {
+      homeDirectoryWarning: {
         type: 'boolean',
-        label: 'Show Home Directory Warning',
+        label: 'Home Directory Warning',
         category: 'UI',
         requiresRestart: true,
         default: true,
@@ -394,32 +394,32 @@ const SETTINGS_SCHEMA = {
           'Show a warning when running Gemini CLI in the home directory.',
         showInDialog: true,
       },
-      hideTips: {
+      usageTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Usage Tips',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide helpful usage tips in the UI.',
+        default: true,
+        description: 'Show helpful usage tips in the UI.',
         showInDialog: true,
       },
-      hideBanner: {
+      applicationBanner: {
         type: 'boolean',
-        label: 'Hide Banner',
+        label: 'Application Banner',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide the application startup banner.',
+        default: true,
+        description: 'Show the application startup banner.',
         showInDialog: true,
       },
-      hideContextSummary: {
+      contextSummary: {
         type: 'boolean',
-        label: 'Hide Context Summary',
+        label: 'Context Summary',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
-          'Hide the context summary (GEMINI.md, MCP servers) above the input.',
+          'Show the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
       },
       footer: {
@@ -431,52 +431,52 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
-          hideCWD: {
+          workingDirectory: {
             type: 'boolean',
-            label: 'Hide CWD',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description:
-              'Hide the current working directory path in the footer.',
-            showInDialog: true,
-          },
-          hideSandboxStatus: {
-            type: 'boolean',
-            label: 'Hide Sandbox Status',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description: 'Hide the sandbox status indicator in the footer.',
-            showInDialog: true,
-          },
-          hideModelInfo: {
-            type: 'boolean',
-            label: 'Hide Model Info',
-            category: 'UI',
-            requiresRestart: false,
-            default: false,
-            description: 'Hide the model name and context usage in the footer.',
-            showInDialog: true,
-          },
-          hideContextPercentage: {
-            type: 'boolean',
-            label: 'Hide Context Window Percentage',
+            label: 'Working Directory',
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description:
+              'Show the current working directory path in the footer.',
+            showInDialog: true,
+          },
+          sandboxStatus: {
+            type: 'boolean',
+            label: 'Sandbox Status',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Show the sandbox status indicator in the footer.',
+            showInDialog: true,
+          },
+          modelInfo: {
+            type: 'boolean',
+            label: 'Model Information',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description: 'Show the model name and context usage in the footer.',
+            showInDialog: true,
+          },
+          contextPercentage: {
+            type: 'boolean',
+            label: 'Context Usage Percentage',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description: 'Show the context window remaining percentage.',
             showInDialog: true,
           },
         },
       },
-      hideFooter: {
+      footerEnabled: {
         type: 'boolean',
-        label: 'Hide Footer',
+        label: 'Footer',
         category: 'UI',
         requiresRestart: false,
-        default: false,
-        description: 'Hide the footer from the UI.',
+        default: true,
+        description: 'Show the footer in the UI.',
         showInDialog: true,
       },
       showMemoryUsage: {
@@ -828,15 +828,14 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.CONCAT,
       },
-      loadMemoryFromIncludeDirectories: {
+      includeDirectoryMemory: {
         type: 'boolean',
-        label: 'Load Memory From Include Directories',
+        label: 'Include Directory Memory Scan',
         category: 'Context',
         requiresRestart: false,
         default: false,
         description: oneLine`
-          Controls how /memory refresh loads GEMINI.md files.
-          When true, include directories are scanned; when false, only the current directory is used.
+          Scan include directories for GEMINI.md files during memory refresh.
         `,
         showInDialog: true,
       },
@@ -1154,13 +1153,13 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
-      disableYoloMode: {
+      yoloMode: {
         type: 'boolean',
-        label: 'Disable YOLO Mode',
+        label: 'YOLO Mode',
         category: 'Security',
         requiresRestart: true,
-        default: false,
-        description: 'Disable YOLO mode, even if enabled by a flag.',
+        default: true,
+        description: 'Allow the use of YOLO mode for automatic tool approval.',
         showInDialog: true,
       },
       permanentToolApproval: {

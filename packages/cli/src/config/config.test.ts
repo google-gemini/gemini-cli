@@ -1059,12 +1059,12 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
   });
 
-  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should throw an error if YOLO mode is attempted when yoloMode is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       security: {
-        disableYoloMode: true,
+        yoloMode: true,
       },
     };
 
@@ -2413,42 +2413,46 @@ describe('Policy Engine Integration in loadCliConfig', () => {
   });
 });
 
-describe('loadCliConfig disableYoloMode', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
-    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
-      isTrusted: true,
-      source: undefined,
-    });
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
-
-  it('should allow auto_edit mode even if yolo mode is disabled', async () => {
-    process.argv = ['node', 'script.js', '--approval-mode=auto_edit'];
+describe('loadCliConfig yoloMode', () => {
+  it('should set yoloMode based on settings', async () => {
+    process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
-      security: { disableYoloMode: true },
+      security: { yoloMode: true },
     };
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
+    expect(config.isYoloModeDisabled()).toBe(false);
   });
 
-  it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should set yoloMode to false when in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: { yoloMode: true },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isYoloModeDisabled()).toBe(true);
+  });
+
+  it('should throw if YOLO mode is attempted when yoloMode is false', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
-      security: { disableYoloMode: true },
+      security: { yoloMode: true },
     };
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'Cannot start in YOLO mode since it is disabled by your admin',
     );
+  });
+
+  it('should set yoloMode to false when secureModeEnabled is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      admin: { secureModeEnabled: true },
+    };
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.isYoloModeDisabled()).toBe(true);
   });
 });
 
@@ -2497,7 +2501,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     );
   });
 
-  it('should set disableYoloMode to true when secureModeEnabled is true', async () => {
+  it('should set yoloMode to true when secureModeEnabled is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {

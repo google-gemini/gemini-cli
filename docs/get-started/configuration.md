@@ -174,52 +174,52 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
 
-- **`ui.hideWindowTitle`** (boolean):
+- **`ui.windowTitle`** (boolean):
   - **Description:** Hide the window title bar.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`ui.showStatusInTitle`** (boolean):
+- **`ui.windowTitleStatus`** (boolean):
   - **Description:** Show Gemini CLI status and thoughts in the terminal window
     title.
   - **Default:** `false`
 
-- **`ui.showHomeDirectoryWarning`** (boolean):
+- **`ui.homeDirectoryWarning`** (boolean):
   - **Description:** Show a warning when running Gemini CLI in the home
     directory.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`ui.hideTips`** (boolean):
+- **`ui.usageTips`** (boolean):
   - **Description:** Hide helpful usage tips in the UI.
   - **Default:** `false`
 
-- **`ui.hideBanner`** (boolean):
+- **`ui.applicationBanner`** (boolean):
   - **Description:** Hide the application startup banner.
   - **Default:** `false`
 
-- **`ui.hideContextSummary`** (boolean):
+- **`ui.contextSummary`** (boolean):
   - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
     input.
   - **Default:** `false`
 
-- **`ui.footer.hideCWD`** (boolean):
+- **`ui.footer.workingDirectory`** (boolean):
   - **Description:** Hide the current working directory path in the footer.
   - **Default:** `false`
 
-- **`ui.footer.hideSandboxStatus`** (boolean):
+- **`ui.footer.sandboxStatus`** (boolean):
   - **Description:** Hide the sandbox status indicator in the footer.
   - **Default:** `false`
 
-- **`ui.footer.hideModelInfo`** (boolean):
+- **`ui.footer.modelInfo`** (boolean):
   - **Description:** Hide the model name and context usage in the footer.
   - **Default:** `false`
 
-- **`ui.footer.hideContextPercentage`** (boolean):
+- **`ui.footer.contextPercentage`** (boolean):
   - **Description:** Hides the context window remaining percentage.
   - **Default:** `true`
 
-- **`ui.hideFooter`** (boolean):
+- **`ui.footerEnabled`** (boolean):
   - **Description:** Hide the footer from the UI.
   - **Default:** `false`
 
@@ -573,7 +573,7 @@ their corresponding top-level category object in your `settings.json` file.
     Missing directories will be skipped with a warning.
   - **Default:** `[]`
 
-- **`context.loadMemoryFromIncludeDirectories`** (boolean):
+- **`context.includeDirectoryMemory`** (boolean):
   - **Description:** Controls how /memory refresh loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
@@ -722,7 +722,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `security`
 
-- **`security.disableYoloMode`** (boolean):
+- **`security.yoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
   - **Default:** `false`
   - **Requires restart:** Yes
@@ -1037,8 +1037,8 @@ of v0.3.0:
   },
   "ui": {
     "theme": "GitHub",
-    "hideBanner": true,
-    "hideTips": false,
+    "applicationBanner": true,
+    "usageTips": false,
     "customWittyPhrases": [
       "You forget a thousand things every day. Make sure this is one of ’em",
       "Connecting to AGI"
@@ -1080,7 +1080,7 @@ of v0.3.0:
   "context": {
     "fileName": ["CONTEXT.md", "GEMINI.md"],
     "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
-    "loadMemoryFromIncludeDirectories": true,
+    "includeDirectoryMemory": true,
     "fileFiltering": {
       "respectGitIgnore": false
     }

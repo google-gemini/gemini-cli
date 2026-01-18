@@ -315,7 +315,7 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
-  loadMemoryFromIncludeDirectories?: boolean;
+  includeDirectoryMemory?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -344,7 +344,7 @@ export interface ConfigParameters {
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
-  disableYoloMode?: boolean;
+  yoloMode?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   hooksEnabled?: boolean;
   hooksUI?: boolean;
@@ -441,7 +441,7 @@ export class Config {
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
   private readonly experimentalZedIntegration: boolean = false;
-  private readonly loadMemoryFromIncludeDirectories: boolean = false;
+  private readonly includeDirectoryMemory: boolean = false;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
@@ -473,7 +473,7 @@ export class Config {
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
-  private readonly disableYoloMode: boolean;
+  private readonly yoloMode: boolean;
   private pendingIncludeDirectories: string[];
   private readonly hooksEnabled: boolean;
   private readonly hooksUI: boolean;
@@ -583,8 +583,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
-    this.loadMemoryFromIncludeDirectories =
-      params.loadMemoryFromIncludeDirectories ?? false;
+    this.includeDirectoryMemory = params.includeDirectoryMemory ?? false;
     this.importFormat = params.importFormat ?? 'tree';
     this.discoveryMaxDirs = params.discoveryMaxDirs ?? 200;
     this.compressionThreshold = params.compressionThreshold;
@@ -653,7 +652,7 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
-    this.disableYoloMode = params.disableYoloMode ?? false;
+    this.yoloMode = params.yoloMode ?? true;
     this.hooks = params.hooks;
     this.projectHooks = params.projectHooks;
     this.experiments = params.experiments;
@@ -914,7 +913,7 @@ export class Config {
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
-    return this.loadMemoryFromIncludeDirectories;
+    return this.includeDirectoryMemory;
   }
 
   getImportFormat(): 'tree' | 'flat' {
@@ -1246,7 +1245,7 @@ export class Config {
   }
 
   isYoloModeDisabled(): boolean {
-    return this.disableYoloMode || !this.isTrustedFolder();
+    return !this.yoloMode || !this.isTrustedFolder();
   }
 
   getPendingIncludeDirectories(): string[] {

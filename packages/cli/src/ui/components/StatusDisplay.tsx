@@ -59,7 +59,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
-  if (!settings.merged.ui?.hideContextSummary && !hideContextSummary) {
+  if (settings.merged.ui?.contextSummary && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}

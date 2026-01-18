@@ -80,9 +80,9 @@ describe('getUserStartupWarnings', () => {
       );
     });
 
-    it('should not return a warning when showHomeDirectoryWarning is false', async () => {
+    it('should not return a warning when homeDirectoryWarning is false', async () => {
       const warnings = await getUserStartupWarnings(
-        { ui: { showHomeDirectoryWarning: false } },
+        { ui: { homeDirectoryWarning: false } },
         homeDir,
       );
       expect(warnings).not.toContainEqual(

@@ -60,16 +60,17 @@ export const Footer: React.FC = () => {
 
   const showMemoryUsage =
     config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
-  const hideCWD = settings.merged.ui?.footer?.hideCWD;
-  const hideSandboxStatus = settings.merged.ui?.footer?.hideSandboxStatus;
-  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo;
-  const hideContextPercentage =
-    settings.merged.ui?.footer?.hideContextPercentage;
+  const showCWD = settings.merged.ui?.footer?.workingDirectory ?? true;
+  const showSandboxStatus = settings.merged.ui?.footer?.sandboxStatus ?? true;
+  const showModelInfo = settings.merged.ui?.footer?.modelInfo ?? true;
+  const showContextPercentage =
+    settings.merged.ui?.footer?.contextPercentage ?? false;
 
   const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
-  const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
+  const justifyContent =
+    !showCWD && !showModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
   const showDebugProfiler = debugMode || isDevelopment;
@@ -82,13 +83,13 @@ export const Footer: React.FC = () => {
       alignItems="center"
       paddingX={1}
     >
-      {(showDebugProfiler || displayVimMode || !hideCWD) && (
+      {(showDebugProfiler || displayVimMode || showCWD) && (
         <Box>
           {showDebugProfiler && <DebugProfiler />}
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
-          {!hideCWD &&
+          {showCWD &&
             (nightly ? (
               <ThemedGradient>
                 {displayPath}
@@ -111,7 +112,7 @@ export const Footer: React.FC = () => {
       )}
 
       {/* Middle Section: Centered Trust/Sandbox Info */}
-      {!hideSandboxStatus && (
+      {showSandboxStatus && (
         <Box
           flexGrow={1}
           alignItems="center"
@@ -144,13 +145,13 @@ export const Footer: React.FC = () => {
       )}
 
       {/* Right Section: Gemini Label and Console Summary */}
-      {!hideModelInfo && (
+      {showModelInfo && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.accent}>
               {getDisplayString(model, config.getPreviewFeatures())}
               <Text color={theme.text.secondary}> /model</Text>
-              {!hideContextPercentage && (
+              {showContextPercentage && (
                 <>
                   {' '}
                   <ContextUsageDisplay

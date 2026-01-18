@@ -389,14 +389,14 @@ describe('AppContainer State Management', () => {
     // Mock LoadedSettings
     mockSettings = {
       merged: {
-        hideBanner: false,
-        hideFooter: false,
-        hideTips: false,
+        applicationBanner: true,
+        footerEnabled: true,
+        usageTips: true,
         showMemoryUsage: false,
         theme: 'default',
         ui: {
-          showStatusInTitle: false,
-          hideWindowTitle: false,
+          windowTitleStatus: false,
+          windowTitle: true,
         },
         useAlternateBuffer: false,
       },
@@ -515,9 +515,9 @@ describe('AppContainer State Management', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = {
         merged: {
-          hideBanner: true,
-          hideFooter: true,
-          hideTips: true,
+          applicationBanner: true,
+          footerEnabled: true,
+          usageTips: true,
           showMemoryUsage: false,
         },
       } as unknown as LoadedSettings;
@@ -534,9 +534,9 @@ describe('AppContainer State Management', () => {
     it('handles settings with memory usage enabled', async () => {
       const settingsWithMemory = {
         merged: {
-          hideBanner: false,
-          hideFooter: false,
-          hideTips: false,
+          applicationBanner: true,
+          footerEnabled: true,
+          usageTips: true,
           showMemoryUsage: true,
         },
       } as unknown as LoadedSettings;
@@ -995,16 +995,16 @@ describe('AppContainer State Management', () => {
       expect(stdout).toBe(mocks.mockStdout);
     });
 
-    it('should not update terminal title when showStatusInTitle is false', () => {
-      // Arrange: Set up mock settings with showStatusInTitle disabled
+    it('should not update terminal title when windowTitleStatus is false', () => {
+      // Arrange: Set up mock settings with windowTitleStatus disabled
       const mockSettingsWithShowStatusFalse = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: false,
-            hideWindowTitle: false,
+            windowTitleStatus: false,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1023,16 +1023,16 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should not update terminal title when hideWindowTitle is true', () => {
-      // Arrange: Set up mock settings with hideWindowTitle enabled
+    it('should not update terminal title when windowTitle is false', () => {
+      // Arrange: Set up mock settings with windowTitle enabled
       const mockSettingsWithHideTitleTrue = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: true,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1052,15 +1052,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should update terminal title with thought subject when in active state', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1094,15 +1094,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should update terminal title with default text when in Idle state and no thought subject', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1135,15 +1135,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should update terminal title when in WaitingForConfirmation state with thought subject', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1177,15 +1177,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should pad title to exactly 80 characters', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1223,15 +1223,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should use correct ANSI escape code format', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1264,15 +1264,15 @@ describe('AppContainer State Management', () => {
     });
 
     it('should use CLI_TITLE environment variable when set', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
+      // Arrange: Set up mock settings with windowTitleStatus enabled
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+            windowTitleStatus: true,
+            windowTitle: true,
           },
         },
       } as unknown as LoadedSettings;

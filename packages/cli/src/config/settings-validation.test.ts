@@ -116,10 +116,10 @@ describe('settings-validation', () => {
       const validSettings = {
         ui: {
           theme: 'dark',
-          hideWindowTitle: true,
+          windowTitle: true,
           footer: {
-            hideCWD: false,
-            hideModelInfo: true,
+            workingDirectory: false,
+            modelInfo: true,
           },
         },
         tools: {

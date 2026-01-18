@@ -82,9 +82,7 @@ export const Composer = () => {
       <Box
         marginTop={1}
         justifyContent={
-          settings.merged.ui?.hideContextSummary
-            ? 'flex-start'
-            : 'space-between'
+          !settings.merged.ui?.contextSummary ? 'flex-start' : 'space-between'
         }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
@@ -153,7 +151,9 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {settings.merged.ui?.footerEnabled && !isScreenReaderEnabled && (
+        <Footer />
+      )}
     </Box>
   );
 };

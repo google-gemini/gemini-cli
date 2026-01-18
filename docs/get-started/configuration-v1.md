@@ -391,23 +391,23 @@ a few things you can try in order of recommendation:
     "usageStatisticsEnabled": false
     ```
 
-- **`hideTips`** (boolean):
+- **`usageTips`** (boolean):
   - **Description:** Enables or disables helpful tips in the CLI interface.
   - **Default:** `false`
   - **Example:**
 
     ```json
-    "hideTips": true
+    "usageTips": true
     ```
 
-- **`hideBanner`** (boolean):
+- **`applicationBanner`** (boolean):
   - **Description:** Enables or disables the startup banner (ASCII art logo) in
     the CLI interface.
   - **Default:** `false`
   - **Example:**
 
     ```json
-    "hideBanner": true
+    "applicationBanner": true
     ```
 
 - **`maxSessionTurns`** (number):
@@ -462,7 +462,7 @@ a few things you can try in order of recommendation:
     ]
     ```
 
-- **`loadMemoryFromIncludeDirectories`** (boolean):
+- **`includeDirectoryMemory`** (boolean):
   - **Description:** Controls the behavior of the `/memory refresh` command. If
     set to `true`, `GEMINI.md` files should be loaded from all directories that
     are added. If set to `false`, `GEMINI.md` should only be loaded from the
@@ -470,7 +470,7 @@ a few things you can try in order of recommendation:
   - **Default:** `false`
   - **Example:**
     ```json
-    "loadMemoryFromIncludeDirectories": true
+    "includeDirectoryMemory": true
     ```
 
 - **`showLineNumbers`** (boolean):
@@ -524,8 +524,8 @@ a few things you can try in order of recommendation:
     "logPrompts": true
   },
   "usageStatisticsEnabled": true,
-  "hideTips": false,
-  "hideBanner": false,
+  "usageTips": false,
+  "applicationBanner": false,
   "maxSessionTurns": 10,
   "summarizeToolOutput": {
     "run_shell_command": {
@@ -534,7 +534,7 @@ a few things you can try in order of recommendation:
   },
   "excludedProjectEnvVars": ["DEBUG", "DEBUG_MODE", "NODE_ENV"],
   "includeDirectories": ["path/to/dir1", "~/path/to/dir2", "../path/to/dir3"],
-  "loadMemoryFromIncludeDirectories": true
+  "includeDirectoryMemory": true
 }
 ```
 

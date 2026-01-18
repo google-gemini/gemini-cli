@@ -180,42 +180,42 @@
             "$ref": "#/$defs/CustomTheme"
           }
         },
-        "hideWindowTitle": {
+        "windowTitle": {
           "title": "Hide Window Title",
           "description": "Hide the window title bar.",
           "markdownDescription": "Hide the window title bar.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "showStatusInTitle": {
+        "windowTitleStatus": {
           "title": "Show Status in Title",
           "description": "Show Gemini CLI status and thoughts in the terminal window title.",
           "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "showHomeDirectoryWarning": {
+        "homeDirectoryWarning": {
           "title": "Show Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",
           "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
-        "hideTips": {
+        "usageTips": {
           "title": "Hide Tips",
           "description": "Hide helpful usage tips in the UI.",
           "markdownDescription": "Hide helpful usage tips in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "hideBanner": {
+        "applicationBanner": {
           "title": "Hide Banner",
           "description": "Hide the application startup banner.",
           "markdownDescription": "Hide the application startup banner.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
-        "hideContextSummary": {
+        "contextSummary": {
           "title": "Hide Context Summary",
           "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
           "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
@@ -229,28 +229,28 @@
           "default": {},
           "type": "object",
           "properties": {
-            "hideCWD": {
+            "workingDirectory": {
               "title": "Hide CWD",
               "description": "Hide the current working directory path in the footer.",
               "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
-            "hideSandboxStatus": {
+            "sandboxStatus": {
               "title": "Hide Sandbox Status",
               "description": "Hide the sandbox status indicator in the footer.",
               "markdownDescription": "Hide the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
-            "hideModelInfo": {
+            "modelInfo": {
               "title": "Hide Model Info",
               "description": "Hide the model name and context usage in the footer.",
               "markdownDescription": "Hide the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
-            "hideContextPercentage": {
+            "contextPercentage": {
               "title": "Hide Context Window Percentage",
               "description": "Hides the context window remaining percentage.",
               "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
@@ -260,7 +260,7 @@
           },
           "additionalProperties": false
         },
-        "hideFooter": {
+        "footerEnabled": {
           "title": "Hide Footer",
           "description": "Hide the footer from the UI.",
           "markdownDescription": "Hide the footer from the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
@@ -955,7 +955,7 @@
             "type": "string"
           }
         },
-        "loadMemoryFromIncludeDirectories": {
+        "includeDirectoryMemory": {
           "title": "Load Memory From Include Directories",
           "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
           "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
@@ -1193,7 +1193,7 @@
       "default": {},
       "type": "object",
       "properties": {
-        "disableYoloMode": {
+        "yoloMode": {
           "title": "Disable YOLO Mode",
           "description": "Disable YOLO mode, even if enabled by a flag.",
           "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",

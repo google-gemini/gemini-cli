@@ -26,7 +26,7 @@ describe('Interactive file system', () => {
           auth: {
             selectedType: 'gemini-api-key',
           },
-          disableYoloMode: false,
+          yoloMode: true,
         },
       },
     });

@@ -661,6 +661,10 @@ export function migrateDeprecatedSettings(
       | (Record<string, unknown> & typeof settings.context)
       | undefined;
 
+    const securitySettings = settings.security as
+      | (Record<string, unknown> & typeof settings.security)
+      | undefined;
+
     // Migrate general settings (disableAutoUpdate, disableUpdateNag)
     if (generalSettings) {
       const newGeneral: Record<string, unknown> = { ...generalSettings };
@@ -729,42 +733,103 @@ export function migrateDeprecatedSettings(
       const newUi: Record<string, unknown> = { ...uiSettings };
       let modified = false;
 
+      // Inverted UI Visibility Migrations
+      const uiMap: Record<string, string> = {
+        hideWindowTitle: 'windowTitle',
+        hideTips: 'usageTips',
+        hideBanner: 'applicationBanner',
+        hideContextSummary: 'contextSummary',
+        hideFooter: 'footerEnabled',
+      };
+
+      for (const [oldKey, newKey] of Object.entries(uiMap)) {
+        if (typeof newUi[oldKey] === 'boolean') {
+          const oldValue = newUi[oldKey];
+          debugLogger.log(
+            `Migrating deprecated ui.${oldKey} to ui.${newKey} from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newUi[newKey] = !oldValue;
+          delete newUi[oldKey];
+          modified = true;
+        }
+      }
+
+      // Direct UI Migrations
+      if (typeof newUi['showStatusInTitle'] === 'boolean') {
+        newUi['windowTitleStatus'] = newUi['showStatusInTitle'];
+        delete newUi['showStatusInTitle'];
+        modified = true;
+      }
+      if (typeof newUi['showHomeDirectoryWarning'] === 'boolean') {
+        newUi['homeDirectoryWarning'] = newUi['showHomeDirectoryWarning'];
+        delete newUi['showHomeDirectoryWarning'];
+        modified = true;
+      }
+
+      // Footer Property Migrations
+      const footerSettings = newUi['footer'] as
+        | Record<string, unknown>
+        | undefined;
+      if (footerSettings) {
+        const newFooter = { ...footerSettings };
+        let footerModified = false;
+        const footerMap: Record<string, string> = {
+          hideCWD: 'workingDirectory',
+          hideSandboxStatus: 'sandboxStatus',
+          hideModelInfo: 'modelInfo',
+          hideContextPercentage: 'contextPercentage',
+        };
+
+        for (const [oldKey, newKey] of Object.entries(footerMap)) {
+          if (typeof newFooter[oldKey] === 'boolean') {
+            const oldValue = newFooter[oldKey];
+            debugLogger.log(
+              `Migrating deprecated ui.footer.${oldKey} to ui.footer.${newKey} from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+            );
+            newFooter[newKey] = !oldValue;
+            delete newFooter[oldKey];
+            footerModified = true;
+          }
+        }
+
+        if (footerModified) {
+          newUi['footer'] = newFooter;
+          modified = true;
+        }
+      }
+
       // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.loadingPhrases
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
-      if (
-        accessibilitySettings &&
-        typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
-      ) {
-        const oldValue = accessibilitySettings['disableLoadingPhrases'];
-        debugLogger.log(
-          `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
-        );
-        const newAccessibility: Record<string, unknown> = {
-          ...accessibilitySettings,
-          loadingPhrases: !oldValue,
-        };
-        delete newAccessibility['disableLoadingPhrases'];
-        newUi['accessibility'] = newAccessibility;
-        modified = true;
-      }
-      // Migrate ui.accessibility.enableLoadingPhrases -> ui.accessibility.loadingPhrases
-      if (
-        accessibilitySettings &&
-        typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
-      ) {
-        const oldValue = accessibilitySettings['enableLoadingPhrases'];
-        debugLogger.log(
-          `Migrating deprecated ui.accessibility.enableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings...`,
-        );
-        const newAccessibility: Record<string, unknown> = {
-          ...accessibilitySettings,
-          loadingPhrases: oldValue,
-        };
-        delete newAccessibility['enableLoadingPhrases'];
-        newUi['accessibility'] = newAccessibility;
-        modified = true;
+      if (accessibilitySettings) {
+        const newAccessibility = { ...accessibilitySettings };
+        let accModified = false;
+
+        if (typeof newAccessibility['disableLoadingPhrases'] === 'boolean') {
+          const oldValue = newAccessibility['disableLoadingPhrases'];
+          debugLogger.log(
+            `Migrating deprecated ui.accessibility.disableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+          );
+          newAccessibility['loadingPhrases'] = !oldValue;
+          delete newAccessibility['disableLoadingPhrases'];
+          accModified = true;
+        }
+        // Migrate ui.accessibility.enableLoadingPhrases -> ui.accessibility.loadingPhrases
+        if (typeof newAccessibility['enableLoadingPhrases'] === 'boolean') {
+          const oldValue = newAccessibility['enableLoadingPhrases'];
+          debugLogger.log(
+            `Migrating deprecated ui.accessibility.enableLoadingPhrases to ui.accessibility.loadingPhrases from ${scope} settings...`,
+          );
+          newAccessibility['loadingPhrases'] = oldValue;
+          delete newAccessibility['enableLoadingPhrases'];
+          accModified = true;
+        }
+
+        if (accModified) {
+          newUi['accessibility'] = newAccessibility;
+          modified = true;
+        }
       }
 
       if (modified) {
@@ -833,8 +898,36 @@ export function migrateDeprecatedSettings(
         modified = true;
       }
 
+      // Migrate loadMemoryFromIncludeDirectories -> includeDirectoryMemory
+      if (typeof newContext['loadMemoryFromIncludeDirectories'] === 'boolean') {
+        newContext['includeDirectoryMemory'] =
+          newContext['loadMemoryFromIncludeDirectories'];
+        delete newContext['loadMemoryFromIncludeDirectories'];
+        modified = true;
+      }
+
       if (modified) {
         loadedSettings.setValue(scope, 'context', newContext);
+      }
+    }
+
+    // Migrate security settings
+    if (securitySettings) {
+      const newSecurity: Record<string, unknown> = { ...securitySettings };
+      let modified = false;
+
+      if (typeof newSecurity['disableYoloMode'] === 'boolean') {
+        const oldValue = newSecurity['disableYoloMode'];
+        debugLogger.log(
+          `Migrating deprecated security.disableYoloMode to security.yoloMode from ${scope} settings (inverting value: ${oldValue} -> ${!oldValue})...`,
+        );
+        newSecurity['yoloMode'] = !oldValue;
+        delete newSecurity['disableYoloMode'];
+        modified = true;
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'security', newSecurity);
       }
     }
   };

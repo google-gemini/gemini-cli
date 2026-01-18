@@ -124,7 +124,7 @@ describe('<Footer />', () => {
       settings: createMockSettings({
         ui: {
           footer: {
-            hideContextPercentage: false,
+            contextPercentage: true,
           },
         },
       }),
@@ -140,7 +140,7 @@ describe('<Footer />', () => {
       settings: createMockSettings({
         ui: {
           footer: {
-            hideContextPercentage: false,
+            contextPercentage: true,
           },
         },
       }),
@@ -210,7 +210,7 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: false,
+              contextPercentage: true,
             },
           },
         }),
@@ -225,9 +225,9 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideCWD: true,
-              hideSandboxStatus: true,
-              hideModelInfo: true,
+              workingDirectory: true,
+              sandboxStatus: true,
+              modelInfo: true,
             },
           },
         }),
@@ -242,9 +242,9 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideCWD: false,
-              hideSandboxStatus: false,
-              hideModelInfo: true,
+              workingDirectory: true,
+              sandboxStatus: true,
+              modelInfo: true,
             },
           },
         }),
@@ -259,9 +259,9 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideCWD: true,
-              hideSandboxStatus: false,
-              hideModelInfo: true,
+              workingDirectory: true,
+              sandboxStatus: true,
+              modelInfo: true,
             },
           },
         }),
@@ -269,14 +269,14 @@ describe('<Footer />', () => {
       expect(lastFrame()).toMatchSnapshot('footer-only-sandbox');
     });
 
-    it('hides the context percentage when hideContextPercentage is true', () => {
+    it('hides the context percentage when contextPercentage is false', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: true,
+              contextPercentage: true,
             },
           },
         }),
@@ -285,14 +285,14 @@ describe('<Footer />', () => {
       expect(lastFrame()).not.toMatch(/\(\d+% context left\)/);
     });
 
-    it('shows the context percentage when hideContextPercentage is false', () => {
+    it('shows the context percentage when contextPercentage is true', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
         uiState: { sessionStats: mockSessionStats },
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: false,
+              contextPercentage: true,
             },
           },
         }),
@@ -308,7 +308,7 @@ describe('<Footer />', () => {
         settings: createMockSettings({
           ui: {
             footer: {
-              hideContextPercentage: false,
+              contextPercentage: true,
             },
           },
         }),

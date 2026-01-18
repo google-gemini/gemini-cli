@@ -165,7 +165,7 @@ const createMockConfig = (overrides = {}) => ({
 
 const createMockSettings = (merged = {}) => ({
   merged: {
-    hideFooter: false,
+    footerEnabled: true,
     showMemoryUsage: false,
     ...merged,
   },
@@ -193,18 +193,18 @@ const renderComposer = (
 
 describe('Composer', () => {
   describe('Footer Display Settings', () => {
-    it('renders Footer by default when hideFooter is false', () => {
+    it('renders Footer by default when footerEnabled is true', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: false });
+      const settings = createMockSettings({ footerEnabled: true });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
       expect(lastFrame()).toContain('Footer');
     });
 
-    it('does NOT render Footer when hideFooter is true', () => {
+    it('does NOT render Footer when footerEnabled is false', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: true });
+      const settings = createMockSettings({ footerEnabled: false });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
@@ -233,7 +233,7 @@ describe('Composer', () => {
         getDebugMode: vi.fn(() => true),
       });
       const settings = createMockSettings({
-        hideFooter: false,
+        footerEnabled: true,
         showMemoryUsage: true,
       });
       // Mock vim mode for this test

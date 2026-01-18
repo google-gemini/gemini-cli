@@ -209,7 +209,7 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
           },
           interactiveShell: {
             type: 'boolean',
-            label: 'Enable Interactive Shell',
+            label: 'Interactive Shell',
             category: 'Tools',
             requiresRestart: true,
             default: true,
@@ -311,12 +311,14 @@ describe('SettingsDialog', () => {
       const { lastFrame } = renderDialog(settings, onSelect);
 
       const output = lastFrame();
-      // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
+      // 'general.vimMode' has description 'Use Vim-style keybindings for text input.' in settingsSchema.ts
       expect(output).toContain('Vim Mode');
-      expect(output).toContain('Enable Vim keybindings');
-      // 'general.autoUpdate' has description 'Enable automatic updates.'
-      expect(output).toContain('Enable Auto Update');
-      expect(output).toContain('Enable automatic updates.');
+      expect(output).toContain('Use Vim-style keybindings for text input.');
+      // 'general.autoUpdate' has description 'Automatically check for and install application updates.'
+      expect(output).toContain('Auto Update');
+      expect(output).toContain(
+        'Automatically check for and install application updates.',
+      );
     });
   });
 
@@ -347,7 +349,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Enable Auto Update');
+        expect(lastFrame()).toContain('Auto Update');
       });
 
       // Navigate up
@@ -708,8 +710,8 @@ describe('SettingsDialog', () => {
   describe('Specific Settings Behavior', () => {
     it('should show correct display values for settings with different states', () => {
       const settings = createMockSettings(
-        { vimMode: true, hideTips: false }, // User settings
-        { hideWindowTitle: true }, // System settings
+        { vimMode: true, usageTips: true }, // User settings
+        { windowTitle: true }, // System settings
         { ideMode: false }, // Workspace settings
       );
       const onSelect = vi.fn();
@@ -727,7 +729,7 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount } = renderDialog(settings, onSelect);
 
-      // Toggle a non-restart-required setting (like hideTips)
+      // Toggle a non-restart-required setting (like usageTips)
       act(() => {
         stdin.write(TerminalKeys.ENTER as string); // Enter - toggle current setting
       });
@@ -770,7 +772,7 @@ describe('SettingsDialog', () => {
     it('should show correct values for inherited settings', () => {
       const settings = createMockSettings(
         {},
-        { vimMode: true, hideWindowTitle: false }, // System settings
+        { vimMode: true, windowTitle: true }, // System settings
         {},
       );
       const onSelect = vi.fn();
@@ -1153,7 +1155,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain('yolo');
-        expect(lastFrame()).toContain('Disable YOLO Mode');
+        expect(lastFrame()).toContain('YOLO Mode');
       });
 
       unmount();
@@ -1262,8 +1264,8 @@ describe('SettingsDialog', () => {
             promptCompletion: true,
           },
           ui: {
-            hideWindowTitle: true,
-            hideTips: true,
+            windowTitle: true,
+            usageTips: true,
             showMemoryUsage: true,
             showLineNumbers: true,
             showCitations: true,
@@ -1276,7 +1278,7 @@ describe('SettingsDialog', () => {
             enabled: true,
           },
           context: {
-            loadMemoryFromIncludeDirectories: true,
+            includeDirectoryMemory: true,
             fileFiltering: {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
@@ -1308,7 +1310,7 @@ describe('SettingsDialog', () => {
           },
           ui: {
             showMemoryUsage: true,
-            hideWindowTitle: false,
+            windowTitle: true,
           },
           tools: {
             truncateToolOutputThreshold: 50000,
@@ -1366,7 +1368,7 @@ describe('SettingsDialog', () => {
               recursiveFileSearch: false,
               fuzzySearch: false,
             },
-            loadMemoryFromIncludeDirectories: true,
+            includeDirectoryMemory: true,
             discoveryMaxDirs: 100,
           },
         },
@@ -1408,8 +1410,8 @@ describe('SettingsDialog', () => {
             promptCompletion: false,
           },
           ui: {
-            hideWindowTitle: false,
-            hideTips: false,
+            windowTitle: true,
+            usageTips: true,
             showMemoryUsage: false,
             showLineNumbers: false,
             showCitations: false,
@@ -1422,7 +1424,7 @@ describe('SettingsDialog', () => {
             enabled: false,
           },
           context: {
-            loadMemoryFromIncludeDirectories: false,
+            includeDirectoryMemory: false,
             fileFiltering: {
               respectGitIgnore: false,
               respectGeminiIgnore: false,

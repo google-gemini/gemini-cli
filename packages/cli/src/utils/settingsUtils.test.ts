@@ -368,7 +368,7 @@ describe('SettingsUtils', () => {
       it('should return true for settings marked to show in dialog', () => {
         expect(shouldShowInDialog('ui.requiresRestart')).toBe(true);
         expect(shouldShowInDialog('general.vimMode')).toBe(true);
-        expect(shouldShowInDialog('ui.hideWindowTitle')).toBe(true);
+        expect(shouldShowInDialog('ui.windowTitle')).toBe(true);
       });
 
       it('should return false for settings marked to hide from dialog', () => {
@@ -536,7 +536,7 @@ describe('SettingsUtils', () => {
           new Set(),
           updatedPendingSettings,
         );
-        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
+        expect(displayValue).toBe('Enabled'); // Should show Enabled (no * since value matches default)
 
         // Test that modified settings also show the * indicator
         const modifiedSettings = new Set([key]);
@@ -547,7 +547,7 @@ describe('SettingsUtils', () => {
           modifiedSettings,
           {},
         );
-        expect(displayValueWithModified).toBe('true*'); // Should show true* because it's in modified settings and default is true
+        expect(displayValueWithModified).toBe('Enabled*'); // Should show Enabled* because it's in modified settings and default is true
       });
     });
   });
@@ -652,12 +652,12 @@ describe('SettingsUtils', () => {
       it('should set top-level setting value', () => {
         const pendingSettings = makeMockSettings({});
         const result = setPendingSettingValue(
-          'ui.hideWindowTitle',
-          true,
+          'ui.windowTitle',
+          false,
           pendingSettings,
         );
 
-        expect(result.ui?.hideWindowTitle).toBe(true);
+        expect(result.ui?.windowTitle).toBe(false);
       });
 
       it('should set nested setting value', () => {
@@ -727,7 +727,7 @@ describe('SettingsUtils', () => {
       it('should return empty array when no settings require restart', () => {
         const modifiedSettings = new Set<string>([
           'requiresRestart',
-          'hideTips',
+          'usageTips',
         ]);
         const result = getRestartRequiredFromModified(modifiedSettings);
 
@@ -927,7 +927,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false*');
+        expect(result).toBe('Disabled*');
       });
 
       it('should show default value when setting is not in scope', () => {
@@ -943,7 +943,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // shows default value
+        expect(result).toBe('Disabled'); // shows default value
       });
 
       it('should show value with * when changed from default', () => {
@@ -959,7 +959,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('true*');
+        expect(result).toBe('Enabled*');
       });
 
       it('should show default value without * when setting does not exist in scope', () => {
@@ -975,7 +975,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // default value (false) without *
+        expect(result).toBe('Disabled'); // default value (false) without *
       });
 
       it('should show value with * when user changes from default', () => {
@@ -995,7 +995,7 @@ describe('SettingsUtils', () => {
           modifiedSettings,
           pendingSettings,
         );
-        expect(result).toBe('true*'); // changed from default (false) to true
+        expect(result).toBe('Enabled*'); // changed from default (false) to true
       });
     });
 
