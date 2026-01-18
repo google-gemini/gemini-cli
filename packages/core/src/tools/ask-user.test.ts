@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AskUserTool } from './ask-user.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
+import { MessageBusType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 describe('AskUserTool', () => {
@@ -54,14 +54,14 @@ describe('AskUserTool', () => {
 
     it('should return error if question field is missing', () => {
       const result = tool.validateToolParams({
-        questions: [{ header: 'Test' }],
+        questions: [{ header: 'Test' } as unknown as Question],
       });
       expect(result).toContain("must have required property 'question'");
     });
 
     it('should return error if header field is missing', () => {
       const result = tool.validateToolParams({
-        questions: [{ question: 'Test?' }],
+        questions: [{ question: 'Test?' } as unknown as Question],
       });
       expect(result).toContain("must have required property 'header'");
     });
