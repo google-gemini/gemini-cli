@@ -505,6 +505,7 @@ export const useSlashCommandProcessor = (
                     const toolDisplay: IndividualToolCallDisplay = {
                       callId,
                       name: 'Expansion',
+                      toolName: 'expansion',
                       description: 'Command expansion needs shell access',
                       status: ToolCallStatus.Confirming,
                       resultDisplay: undefined,
