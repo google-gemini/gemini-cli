@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
+import type { ToolCallResponseInfo } from '../scheduler/types.js';
 import {
   logLoopDetected,
   logLoopDetectionDisabled,
@@ -30,6 +31,20 @@ const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
 const MAX_HISTORY_LENGTH = 5000;
+
+/**
+ * Threshold for detecting loops when the same tool is called repeatedly
+ * with different arguments but returning the same error.
+ * Uses the same threshold as identical tool calls for consistency.
+ */
+const TOOL_ERROR_LOOP_THRESHOLD = TOOL_CALL_LOOP_THRESHOLD;
+
+/**
+ * Threshold for detecting loops when the same tool name is called repeatedly
+ * regardless of arguments (catches cases where args vary slightly each time).
+ * Uses the same threshold as identical tool calls for consistency.
+ */
+const SAME_TOOL_NAME_LOOP_THRESHOLD = TOOL_CALL_LOOP_THRESHOLD;
 
 /**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
@@ -105,6 +120,14 @@ export class LoopDetectionService {
   private lastToolCallKey: string | null = null;
   private toolCallRepetitionCount: number = 0;
 
+  // Same tool name tracking (regardless of args)
+  private lastToolName: string | null = null;
+  private sameToolNameCount: number = 0;
+
+  // Tool error tracking (catches loops where same error keeps occurring)
+  private lastToolErrorMessage: string | null = null;
+  private toolErrorRepetitionCount: number = 0;
+
   // Content streaming tracking
   private streamContentHistory = '';
   private contentStats = new Map<string, number[]>();
@@ -162,6 +185,10 @@ export class LoopDetectionService {
         this.resetContentTracking();
         this.loopDetected = this.checkToolCallLoop(event.value);
         break;
+      case GeminiEventType.ToolCallResponse:
+        // Check for repeated error patterns
+        this.loopDetected = this.checkToolErrorLoop(event.value);
+        break;
       case GeminiEventType.Content:
         this.loopDetected = this.checkContentLoop(event.value);
         break;
@@ -200,12 +227,24 @@ export class LoopDetectionService {
 
   private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
     const key = this.getToolCallKey(toolCall);
+
+    // Track identical tool calls (same name + same args)
     if (this.lastToolCallKey === key) {
       this.toolCallRepetitionCount++;
     } else {
       this.lastToolCallKey = key;
       this.toolCallRepetitionCount = 1;
     }
+
+    // Track same tool name regardless of args (catches slight arg variations)
+    if (this.lastToolName === toolCall.name) {
+      this.sameToolNameCount++;
+    } else {
+      this.lastToolName = toolCall.name;
+      this.sameToolNameCount = 1;
+    }
+
+    // Check for identical tool call loop
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
       logLoopDetected(
         this.config,
@@ -216,6 +255,68 @@ export class LoopDetectionService {
       );
       return true;
     }
+
+    // Check for same tool being called repeatedly with different args
+    if (this.sameToolNameCount >= SAME_TOOL_NAME_LOOP_THRESHOLD) {
+      logLoopDetected(
+        this.config,
+        new LoopDetectedEvent(LoopType.SAME_TOOL_REPEATED, this.promptId),
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Checks for loops based on repeated tool errors.
+   * If the same error message is returned multiple times in a row,
+   * it indicates the model is stuck trying the same failing approach.
+   */
+  private checkToolErrorLoop(toolResponse: ToolCallResponseInfo): boolean {
+    // Extract error message from either the error object or response text
+    let errorMessage: string | null = null;
+
+    if (toolResponse.error) {
+      errorMessage = toolResponse.error.message;
+    } else if (toolResponse.responseParts) {
+      // Check if response contains an error-like message
+      const responseText = toolResponse.responseParts
+        .map((part: Part) => (part as { text?: string }).text || '')
+        .join('');
+      // Look for common error patterns in tool responses
+      if (
+        responseText.includes('not within any of the registered workspace') ||
+        responseText.includes('Error:') ||
+        responseText.includes('failed') ||
+        responseText.includes('Permission denied')
+      ) {
+        errorMessage = responseText.slice(0, 200); // Truncate for comparison
+      }
+    }
+
+    if (!errorMessage) {
+      // Successful tool call, reset error tracking
+      this.lastToolErrorMessage = null;
+      this.toolErrorRepetitionCount = 0;
+      return false;
+    }
+
+    if (this.lastToolErrorMessage === errorMessage) {
+      this.toolErrorRepetitionCount++;
+    } else {
+      this.lastToolErrorMessage = errorMessage;
+      this.toolErrorRepetitionCount = 1;
+    }
+
+    if (this.toolErrorRepetitionCount >= TOOL_ERROR_LOOP_THRESHOLD) {
+      logLoopDetected(
+        this.config,
+        new LoopDetectedEvent(LoopType.REPEATED_TOOL_ERRORS, this.promptId),
+      );
+      return true;
+    }
+
     return false;
   }
 
@@ -586,6 +687,10 @@ export class LoopDetectionService {
   private resetToolCallCount(): void {
     this.lastToolCallKey = null;
     this.toolCallRepetitionCount = 0;
+    this.lastToolName = null;
+    this.sameToolNameCount = 0;
+    this.lastToolErrorMessage = null;
+    this.toolErrorRepetitionCount = 0;
   }
 
   private resetContentTracking(resetHistory = true): void {

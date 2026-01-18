@@ -1023,3 +1023,196 @@ describe('LoopDetectionService LLM Checks', () => {
     );
   });
 });
+
+describe('LoopDetectionService Same Tool Name Detection', () => {
+  let service: LoopDetectionService;
+  let mockConfig: Config;
+
+  const SAME_TOOL_NAME_LOOP_THRESHOLD = 5;
+
+  beforeEach(() => {
+    mockConfig = {
+      getTelemetryEnabled: () => true,
+      isInteractive: () => false,
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
+    } as unknown as Config;
+    service = new LoopDetectionService(mockConfig);
+    vi.clearAllMocks();
+  });
+
+  const createToolCallRequestEvent = (
+    name: string,
+    args: Record<string, unknown>,
+  ): ServerGeminiToolCallRequestEvent => ({
+    type: GeminiEventType.ToolCallRequest,
+    value: {
+      name,
+      args,
+      callId: 'test-id',
+      isClientInitiated: false,
+      prompt_id: 'test-prompt-id',
+    },
+  });
+
+  it('should detect loop when same tool is called repeatedly with different args', () => {
+    // Call the same tool with different args each time
+    for (let i = 0; i < SAME_TOOL_NAME_LOOP_THRESHOLD - 1; i++) {
+      const event = createToolCallRequestEvent('Shell', {
+        command: 'ls -l',
+        dir_path: `/path/variation-${i}`,
+      });
+      expect(service.addAndCheck(event)).toBe(false);
+    }
+
+    // The 5th call should trigger the loop
+    const finalEvent = createToolCallRequestEvent('Shell', {
+      command: 'ls -l',
+      dir_path: '/path/variation-final',
+    });
+    expect(service.addAndCheck(finalEvent)).toBe(true);
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        loop_type: LoopType.SAME_TOOL_REPEATED,
+      }),
+    );
+  });
+
+  it('should reset count when different tool is called', () => {
+    // Call Shell 5 times
+    for (let i = 0; i < 5; i++) {
+      const event = createToolCallRequestEvent('Shell', {
+        command: 'ls',
+        iteration: i,
+      });
+      service.addAndCheck(event);
+    }
+
+    // Call a different tool
+    const differentToolEvent = createToolCallRequestEvent('ReadFile', {
+      path: '/some/file',
+    });
+    service.addAndCheck(differentToolEvent);
+
+    // Call Shell again - count should have reset
+    for (let i = 0; i < SAME_TOOL_NAME_LOOP_THRESHOLD - 1; i++) {
+      const event = createToolCallRequestEvent('Shell', {
+        command: 'cat',
+        iteration: i,
+      });
+      expect(service.addAndCheck(event)).toBe(false);
+    }
+  });
+});
+
+describe('LoopDetectionService Tool Error Detection', () => {
+  let service: LoopDetectionService;
+  let mockConfig: Config;
+
+  const TOOL_ERROR_LOOP_THRESHOLD = 5;
+
+  beforeEach(() => {
+    mockConfig = {
+      getTelemetryEnabled: () => true,
+      isInteractive: () => false,
+      getModelAvailabilityService: vi
+        .fn()
+        .mockReturnValue(createAvailabilityServiceMock()),
+    } as unknown as Config;
+    service = new LoopDetectionService(mockConfig);
+    vi.clearAllMocks();
+  });
+
+  const createToolCallResponseEvent = (
+    errorMessage?: string,
+    responseText?: string,
+  ) => ({
+    type: GeminiEventType.ToolCallResponse,
+    value: {
+      callId: 'test-id',
+      responseParts: responseText ? [{ text: responseText }] : [],
+      resultDisplay: undefined,
+      error: errorMessage ? new Error(errorMessage) : undefined,
+      errorType: undefined,
+    },
+  });
+
+  it('should detect loop when same error occurs repeatedly', () => {
+    const errorEvent = createToolCallResponseEvent(
+      "Directory '/home/user/remote' is not within any of the registered workspace directories.",
+    );
+
+    for (let i = 0; i < TOOL_ERROR_LOOP_THRESHOLD - 1; i++) {
+      expect(service.addAndCheck(errorEvent)).toBe(false);
+    }
+
+    expect(service.addAndCheck(errorEvent)).toBe(true);
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        loop_type: LoopType.REPEATED_TOOL_ERRORS,
+      }),
+    );
+  });
+
+  it('should reset error count on successful tool call', () => {
+    const errorEvent = createToolCallResponseEvent('Some error message');
+
+    // Add some errors
+    for (let i = 0; i < TOOL_ERROR_LOOP_THRESHOLD - 2; i++) {
+      service.addAndCheck(errorEvent);
+    }
+
+    // Successful call should reset the count
+    const successEvent = createToolCallResponseEvent(undefined, 'Success!');
+    service.addAndCheck(successEvent);
+
+    // Should need full threshold again
+    for (let i = 0; i < TOOL_ERROR_LOOP_THRESHOLD - 1; i++) {
+      expect(service.addAndCheck(errorEvent)).toBe(false);
+    }
+    expect(service.addAndCheck(errorEvent)).toBe(true);
+  });
+
+  it('should detect error patterns in response text', () => {
+    const errorResponseEvent = {
+      type: GeminiEventType.ToolCallResponse,
+      value: {
+        callId: 'test-id',
+        responseParts: [
+          {
+            text: "Directory '/remote/path' is not within any of the registered workspace directories.",
+          },
+        ],
+        resultDisplay: undefined,
+        error: undefined,
+        errorType: undefined,
+      },
+    };
+
+    for (let i = 0; i < TOOL_ERROR_LOOP_THRESHOLD - 1; i++) {
+      expect(service.addAndCheck(errorResponseEvent)).toBe(false);
+    }
+
+    expect(service.addAndCheck(errorResponseEvent)).toBe(true);
+    expect(loggers.logLoopDetected).toHaveBeenCalled();
+  });
+
+  it('should reset error count when different error occurs', () => {
+    const error1 = createToolCallResponseEvent('Error type 1');
+    const error2 = createToolCallResponseEvent('Error type 2');
+
+    // Add errors of type 1
+    for (let i = 0; i < TOOL_ERROR_LOOP_THRESHOLD - 2; i++) {
+      service.addAndCheck(error1);
+    }
+
+    // Different error should reset count
+    service.addAndCheck(error2);
+
+    // Should not trigger with just one more of error 1
+    expect(service.addAndCheck(error1)).toBe(false);
+  });
+});

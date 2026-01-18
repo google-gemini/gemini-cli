@@ -740,6 +740,8 @@ export enum LoopType {
   CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
   CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
   LLM_DETECTED_LOOP = 'llm_detected_loop',
+  REPEATED_TOOL_ERRORS = 'repeated_tool_errors',
+  SAME_TOOL_REPEATED = 'same_tool_repeated',
 }
 
 export class LoopDetectedEvent implements BaseTelemetryEvent {
