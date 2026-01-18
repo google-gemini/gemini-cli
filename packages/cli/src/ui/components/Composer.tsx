@@ -42,10 +42,14 @@ export const Composer = () => {
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
+
   const { showAutoAcceptIndicator } = uiState;
+
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
-  const hideContextSummary =
-    suggestionsVisible && suggestionsPosition === 'above';
+
+  const contextSummaryVisible = !(
+    suggestionsVisible && suggestionsPosition === 'above'
+  );
 
   return (
     <Box
@@ -89,7 +93,7 @@ export const Composer = () => {
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
         <Box marginRight={1}>
-          <StatusDisplay hideContextSummary={hideContextSummary} />
+          <StatusDisplay contextSummaryVisible={contextSummaryVisible} />
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&

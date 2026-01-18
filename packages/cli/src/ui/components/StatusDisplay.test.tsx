@@ -60,7 +60,7 @@ const createMockSettings = (merged = {}) => ({
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderStatusDisplay = (
-  props: { contextSummary: boolean } = { contextSummary: true },
+  props: { contextSummaryVisible: boolean } = { contextSummaryVisible: true },
   uiState: UIState = createMockUIState(),
   settings = createMockSettings(),
   config = createMockConfig(),
@@ -85,7 +85,7 @@ describe('StatusDisplay', () => {
   });
 
   it('renders nothing by default if context summary is hidden via props', () => {
-    const { lastFrame } = renderStatusDisplay({ contextSummary: true });
+    const { lastFrame } = renderStatusDisplay({ contextSummaryVisible: false });
     expect(lastFrame()).toBe('');
   });
 
@@ -107,7 +107,7 @@ describe('StatusDisplay', () => {
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -118,7 +118,7 @@ describe('StatusDisplay', () => {
       warningMessage: 'This is a warning',
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -130,7 +130,7 @@ describe('StatusDisplay', () => {
       ctrlDPressedOnce: true,
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -141,7 +141,7 @@ describe('StatusDisplay', () => {
       ctrlDPressedOnce: true,
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -152,7 +152,7 @@ describe('StatusDisplay', () => {
       showEscapePrompt: true,
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -163,7 +163,7 @@ describe('StatusDisplay', () => {
       queueErrorMessage: 'Queue Error',
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -174,7 +174,7 @@ describe('StatusDisplay', () => {
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -188,7 +188,7 @@ describe('StatusDisplay', () => {
       hooks: { notifications: false },
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       uiState,
       settings,
     );
@@ -197,10 +197,10 @@ describe('StatusDisplay', () => {
 
   it('hides ContextSummaryDisplay if configured in settings', () => {
     const settings = createMockSettings({
-      ui: { contextSummary: true },
+      ui: { contextSummary: false },
     });
     const { lastFrame } = renderStatusDisplay(
-      { contextSummary: true },
+      { contextSummaryVisible: true },
       undefined,
       settings,
     );

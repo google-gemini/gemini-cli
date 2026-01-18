@@ -481,7 +481,7 @@ const SETTINGS_SCHEMA = {
       },
       showMemoryUsage: {
         type: 'boolean',
-        label: 'Show Memory Usage',
+        label: 'Memory Usage',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -490,7 +490,7 @@ const SETTINGS_SCHEMA = {
       },
       showLineNumbers: {
         type: 'boolean',
-        label: 'Show Line Numbers',
+        label: 'Line Numbers',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -499,7 +499,7 @@ const SETTINGS_SCHEMA = {
       },
       showCitations: {
         type: 'boolean',
-        label: 'Show Citations',
+        label: 'Citation Display',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -508,7 +508,7 @@ const SETTINGS_SCHEMA = {
       },
       showModelInfoInChat: {
         type: 'boolean',
-        label: 'Show Model Info In Chat',
+        label: 'Chat Model Info',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -517,7 +517,7 @@ const SETTINGS_SCHEMA = {
       },
       useFullWidth: {
         type: 'boolean',
-        label: 'Use Full Width',
+        label: 'Full Width Output',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -526,7 +526,7 @@ const SETTINGS_SCHEMA = {
       },
       useAlternateBuffer: {
         type: 'boolean',
-        label: 'Use Alternate Screen Buffer',
+        label: 'Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
         default: false,
@@ -714,11 +714,12 @@ const SETTINGS_SCHEMA = {
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
-        label: 'Skip Next Speaker Check',
+        label: 'Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
         default: true,
-        description: 'Skip the next speaker check.',
+        description:
+          'When enabled, the model skips the check that requires alternating speakers in chat history. Default: Enabled (Check is skipped).',
         showInDialog: true,
       },
     },
@@ -830,7 +831,7 @@ const SETTINGS_SCHEMA = {
       },
       includeDirectoryMemory: {
         type: 'boolean',
-        label: 'Include Directory Memory Scan',
+        label: 'Directory Memory Scan',
         category: 'Context',
         requiresRestart: false,
         default: false,
@@ -850,7 +851,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           respectGitIgnore: {
             type: 'boolean',
-            label: 'Respect .gitignore',
+            label: '.gitignore Rules',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -859,7 +860,7 @@ const SETTINGS_SCHEMA = {
           },
           respectGeminiIgnore: {
             type: 'boolean',
-            label: 'Respect .geminiignore',
+            label: '.geminiignore Rules',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -1045,7 +1046,7 @@ const SETTINGS_SCHEMA = {
       },
       useRipgrep: {
         type: 'boolean',
-        label: 'Use Ripgrep',
+        label: 'Ripgrep Integration',
         category: 'Tools',
         requiresRestart: false,
         default: true,
@@ -1174,7 +1175,7 @@ const SETTINGS_SCHEMA = {
       },
       blockGitExtensions: {
         type: 'boolean',
-        label: 'Blocks extensions from Git',
+        label: 'Git Extension Blocking',
         category: 'Security',
         requiresRestart: true,
         default: false,
@@ -1455,7 +1456,7 @@ const SETTINGS_SCHEMA = {
       },
       useOSC52Paste: {
         type: 'boolean',
-        label: 'Use OSC 52 Paste',
+        label: 'OSC 52 Paste',
         category: 'Experimental',
         requiresRestart: false,
         default: false,

@@ -175,8 +175,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
 
 - **`ui.windowTitle`** (boolean):
-  - **Description:** Hide the window title bar.
-  - **Default:** `false`
+  - **Description:** Show the window title bar.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.windowTitleStatus`** (boolean):
@@ -191,37 +191,37 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.usageTips`** (boolean):
-  - **Description:** Hide helpful usage tips in the UI.
-  - **Default:** `false`
-
-- **`ui.applicationBanner`** (boolean):
-  - **Description:** Hide the application startup banner.
-  - **Default:** `false`
-
-- **`ui.contextSummary`** (boolean):
-  - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
-    input.
-  - **Default:** `false`
-
-- **`ui.footer.workingDirectory`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.sandboxStatus`** (boolean):
-  - **Description:** Hide the sandbox status indicator in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.modelInfo`** (boolean):
-  - **Description:** Hide the model name and context usage in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.contextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Show helpful usage tips in the UI.
   - **Default:** `true`
 
-- **`ui.footerEnabled`** (boolean):
-  - **Description:** Hide the footer from the UI.
+- **`ui.applicationBanner`** (boolean):
+  - **Description:** Show the application startup banner.
+  - **Default:** `true`
+
+- **`ui.contextSummary`** (boolean):
+  - **Description:** Show the context summary (GEMINI.md, MCP servers) above the
+    input.
+  - **Default:** `true`
+
+- **`ui.footer.workingDirectory`** (boolean):
+  - **Description:** Show the current working directory path in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.sandboxStatus`** (boolean):
+  - **Description:** Show the sandbox status indicator in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.modelInfo`** (boolean):
+  - **Description:** Show the model name and context usage in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.contextPercentage`** (boolean):
+  - **Description:** Show the context window remaining percentage.
   - **Default:** `false`
+
+- **`ui.footerEnabled`** (boolean):
+  - **Description:** Show the footer in the UI.
+  - **Default:** `true`
 
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI.
@@ -315,7 +315,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
-  - **Description:** Skip the next speaker check.
+  - **Description:** When enabled, the model skips the check that requires
+    alternating speakers in chat history. Default: Enabled (Check is skipped).
   - **Default:** `true`
 
 #### `modelConfigs`
@@ -574,9 +575,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.includeDirectoryMemory`** (boolean):
-  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
-    true, include directories are scanned; when false, only the current
-    directory is used.
+  - **Description:** Scan include directories for GEMINI.md files during memory
+    refresh.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
@@ -723,8 +723,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `security`
 
 - **`security.yoloMode`** (boolean):
-  - **Description:** Disable YOLO mode, even if enabled by a flag.
-  - **Default:** `false`
+  - **Description:** Allow the use of YOLO mode for automatic tool approval.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.permanentToolApproval`** (boolean):

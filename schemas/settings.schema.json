@@ -181,45 +181,45 @@
           }
         },
         "windowTitle": {
-          "title": "Hide Window Title",
-          "description": "Hide the window title bar.",
-          "markdownDescription": "Hide the window title bar.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "title": "Window Title",
+          "description": "Show the window title bar.",
+          "markdownDescription": "Show the window title bar.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "windowTitleStatus": {
-          "title": "Show Status in Title",
+          "title": "Window Title Status",
           "description": "Show Gemini CLI status and thoughts in the terminal window title.",
           "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "homeDirectoryWarning": {
-          "title": "Show Home Directory Warning",
+          "title": "Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",
           "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "usageTips": {
-          "title": "Hide Tips",
-          "description": "Hide helpful usage tips in the UI.",
-          "markdownDescription": "Hide helpful usage tips in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "title": "Usage Tips",
+          "description": "Show helpful usage tips in the UI.",
+          "markdownDescription": "Show helpful usage tips in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "applicationBanner": {
-          "title": "Hide Banner",
-          "description": "Hide the application startup banner.",
-          "markdownDescription": "Hide the application startup banner.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "title": "Application Banner",
+          "description": "Show the application startup banner.",
+          "markdownDescription": "Show the application startup banner.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "contextSummary": {
-          "title": "Hide Context Summary",
-          "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
-          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "title": "Context Summary",
+          "description": "Show the context summary (GEMINI.md, MCP servers) above the input.",
+          "markdownDescription": "Show the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "footer": {
@@ -230,80 +230,80 @@
           "type": "object",
           "properties": {
             "workingDirectory": {
-              "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "title": "Working Directory",
+              "description": "Show the current working directory path in the footer.",
+              "markdownDescription": "Show the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "sandboxStatus": {
-              "title": "Hide Sandbox Status",
-              "description": "Hide the sandbox status indicator in the footer.",
-              "markdownDescription": "Hide the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "title": "Sandbox Status",
+              "description": "Show the sandbox status indicator in the footer.",
+              "markdownDescription": "Show the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "modelInfo": {
-              "title": "Hide Model Info",
-              "description": "Hide the model name and context usage in the footer.",
-              "markdownDescription": "Hide the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "title": "Model Information",
+              "description": "Show the model name and context usage in the footer.",
+              "markdownDescription": "Show the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "contextPercentage": {
-              "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
-              "default": true,
+              "title": "Context Usage Percentage",
+              "description": "Show the context window remaining percentage.",
+              "markdownDescription": "Show the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
           "additionalProperties": false
         },
         "footerEnabled": {
-          "title": "Hide Footer",
-          "description": "Hide the footer from the UI.",
-          "markdownDescription": "Hide the footer from the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "title": "Footer",
+          "description": "Show the footer in the UI.",
+          "markdownDescription": "Show the footer in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showMemoryUsage": {
-          "title": "Show Memory Usage",
+          "title": "Memory Usage",
           "description": "Display memory usage information in the UI.",
           "markdownDescription": "Display memory usage information in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showLineNumbers": {
-          "title": "Show Line Numbers",
+          "title": "Line Numbers",
           "description": "Show line numbers in the chat window.",
           "markdownDescription": "Show line numbers in the chat window.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "showCitations": {
-          "title": "Show Citations",
+          "title": "Citation Display",
           "description": "Show citations for generated text in the chat.",
           "markdownDescription": "Show citations for generated text in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showModelInfoInChat": {
-          "title": "Show Model Info In Chat",
+          "title": "Chat Model Info",
           "description": "Show the model name in the chat for each model turn.",
           "markdownDescription": "Show the model name in the chat for each model turn.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "useFullWidth": {
-          "title": "Use Full Width",
+          "title": "Full Width Output",
           "description": "Use the entire width of the terminal for output.",
           "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "useAlternateBuffer": {
-          "title": "Use Alternate Screen Buffer",
+          "title": "Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
           "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
@@ -437,9 +437,9 @@
           "type": "number"
         },
         "skipNextSpeakerCheck": {
-          "title": "Skip Next Speaker Check",
-          "description": "Skip the next speaker check.",
-          "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
+          "title": "Next Speaker Check",
+          "description": "When enabled, the model skips the check that requires alternating speakers in chat history. Default: Enabled (Check is skipped).",
+          "markdownDescription": "When enabled, the model skips the check that requires alternating speakers in chat history. Default: Enabled (Check is skipped).\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         }
@@ -956,9 +956,9 @@
           }
         },
         "includeDirectoryMemory": {
-          "title": "Load Memory From Include Directories",
-          "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
-          "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Directory Memory Scan",
+          "description": "Scan include directories for GEMINI.md files during memory refresh.",
+          "markdownDescription": "Scan include directories for GEMINI.md files during memory refresh.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -970,14 +970,14 @@
           "type": "object",
           "properties": {
             "respectGitIgnore": {
-              "title": "Respect .gitignore",
+              "title": ".gitignore Rules",
               "description": "Respect .gitignore files when searching.",
               "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "respectGeminiIgnore": {
-              "title": "Respect .geminiignore",
+              "title": ".geminiignore Rules",
               "description": "Respect .geminiignore files when searching.",
               "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
@@ -1108,7 +1108,7 @@
           "type": "string"
         },
         "useRipgrep": {
-          "title": "Use Ripgrep",
+          "title": "Ripgrep Integration",
           "description": "Use the ripgrep tool for significantly faster file content searching.",
           "markdownDescription": "Use the ripgrep tool for significantly faster file content searching.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
@@ -1194,10 +1194,10 @@
       "type": "object",
       "properties": {
         "yoloMode": {
-          "title": "Disable YOLO Mode",
-          "description": "Disable YOLO mode, even if enabled by a flag.",
-          "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "title": "YOLO Mode",
+          "description": "Allow the use of YOLO mode for automatic tool approval.",
+          "markdownDescription": "Allow the use of YOLO mode for automatic tool approval.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "permanentToolApproval": {
@@ -1208,7 +1208,7 @@
           "type": "boolean"
         },
         "blockGitExtensions": {
-          "title": "Blocks extensions from Git",
+          "title": "Git Extension Blocking",
           "description": "Blocks installing and loading extensions from Git.",
           "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
@@ -1426,7 +1426,7 @@
           "additionalProperties": false
         },
         "useOSC52Paste": {
-          "title": "Use OSC 52 Paste",
+          "title": "OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
           "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
