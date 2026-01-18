@@ -253,6 +253,12 @@ export function setupTtyCheck(): () => void {
         'Lost controlling terminal (stdin and stdout are not TTY), exiting...',
       );
 
+      // Prevent race condition with signal handlers
+      if (isShuttingDown) {
+        return;
+      }
+      isShuttingDown = true;
+
       try {
         await runExitCleanup();
       } catch (err) {
