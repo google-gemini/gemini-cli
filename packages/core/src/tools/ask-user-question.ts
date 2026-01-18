@@ -60,14 +60,14 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
                 },
                 type: {
                   type: 'string',
-                  enum: ['choice', 'text'],
+                  enum: ['choice', 'text', 'yesno'],
                   description:
-                    "Question type. 'choice' (default) shows selectable options, 'text' shows a free-form text input.",
+                    "Question type. 'choice' (default) shows selectable options, 'text' shows a free-form text input, 'yesno' shows a binary Yes/No choice.",
                 },
                 options: {
                   type: 'array',
                   description:
-                    "Required for 'choice' type. The available choices (2-4 options). Do NOT include an 'Other' option - one is automatically added.",
+                    "Required for 'choice' type, ignored for 'text' and 'yesno'. The available choices (2-4 options). Do NOT include an 'Other' option - one is automatically added for 'choice' type.",
                   minItems: 2,
                   maxItems: 4,
                   items: {

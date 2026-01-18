@@ -95,6 +95,55 @@ describe('AskUserQuestionTool', () => {
     expect(JSON.parse(result.llmContent as string)).toEqual({ answers });
   });
 
+  it('should handle yesno type questions', async () => {
+    const tool = new AskUserQuestionTool(mockMessageBus);
+    const questions = [
+      {
+        question:
+          'Should we maintain backward compatibility with the existing API?',
+        header: 'Compat',
+        type: 'yesno' as const,
+      },
+    ];
+
+    const invocation = tool.build({ questions });
+    const executePromise = invocation.execute(new AbortController().signal);
+
+    // Verify publish called with yesno question
+    expect(mockMessageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.ASK_USER_QUESTION_REQUEST,
+        questions,
+      }),
+    );
+
+    // Get the correlation ID from the published message
+    const publishCall = vi.mocked(mockMessageBus.publish).mock.calls[0][0] as {
+      correlationId: string;
+    };
+    const correlationId = publishCall.correlationId;
+
+    // Simulate response
+    const subscribeCall = vi
+      .mocked(mockMessageBus.subscribe)
+      .mock.calls.find(
+        (call) => call[0] === MessageBusType.ASK_USER_QUESTION_RESPONSE,
+      );
+    const handler = subscribeCall![1];
+
+    const answers = { '0': 'Yes' };
+    handler({
+      type: MessageBusType.ASK_USER_QUESTION_RESPONSE,
+      correlationId,
+      answers,
+    });
+
+    const result = await executePromise;
+    expect(result.returnDisplay).toContain('User answered:');
+    expect(result.returnDisplay).toContain('  Compat → Yes');
+    expect(JSON.parse(result.llmContent as string)).toEqual({ answers });
+  });
+
   it('should handle cancellation', async () => {
     const tool = new AskUserQuestionTool(mockMessageBus);
     const invocation = tool.build({

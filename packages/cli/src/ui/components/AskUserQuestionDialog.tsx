@@ -442,14 +442,17 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
-    const otherItem: OptionItem = {
-      key: 'other',
-      label: otherText || '',
-      description: '',
-      type: 'other',
-      index: list.length,
-    };
-    list.push({ key: otherItem.key, value: otherItem });
+    // Only add "Other" option for choice type, not yesno
+    if (question.type !== 'yesno') {
+      const otherItem: OptionItem = {
+        key: 'other',
+        label: otherText || '',
+        description: '',
+        type: 'other',
+        index: list.length,
+      };
+      list.push({ key: otherItem.key, value: otherItem });
+    }
 
     if (question.multiSelect) {
       const doneItem: OptionItem = {
@@ -463,7 +466,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, otherText]);
+  }, [questionOptions, question.multiSelect, question.type, otherText]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
@@ -850,10 +853,23 @@ export const AskUserQuestionDialog: React.FC<AskUserQuestionDialogProps> = ({
     );
   }
 
+  // For yesno type, generate Yes/No options and force single-select
+  const effectiveQuestion =
+    currentQuestion.type === 'yesno'
+      ? {
+          ...currentQuestion,
+          options: [
+            { label: 'Yes', description: '' },
+            { label: 'No', description: '' },
+          ],
+          multiSelect: false,
+        }
+      : currentQuestion;
+
   return (
     <ChoiceQuestionView
       key={currentQuestionIndex}
-      question={currentQuestion}
+      question={effectiveQuestion}
       onAnswer={handleAnswer}
       onSelectionChange={handleSelectionChange}
       onEditingOther={setEditingOther}

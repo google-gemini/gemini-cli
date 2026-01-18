@@ -149,8 +149,8 @@ export interface QuestionOption {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input. Defaults to 'choice'. */
-  type?: 'choice' | 'text';
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
+  type?: 'choice' | 'text' | 'yesno';
   /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies to 'choice' type. */
