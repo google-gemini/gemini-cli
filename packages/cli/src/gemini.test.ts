@@ -164,6 +164,34 @@ describe('gemini.tsx signal handling', () => {
       cleanup();
     });
 
+    it('should exit when both stdin and stdout are not TTY', async () => {
+      // Reset modules to get fresh isShuttingDown state
+      vi.resetModules();
+      const { setupTtyCheck: freshSetupTtyCheck } = await import('./gemini.js');
+
+      // Set both as non-TTY to simulate lost terminal
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = freshSetupTtyCheck();
+
+      // Advance timers to trigger the check
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockRunExitCleanup).toHaveBeenCalled();
+      expect(process.exit).toHaveBeenCalledWith(0);
+
+      cleanup();
+    });
+
     it('should not check when SANDBOX env is set', async () => {
       const originalSandbox = process.env['SANDBOX'];
       process.env['SANDBOX'] = 'true';
