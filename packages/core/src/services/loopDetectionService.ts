@@ -282,7 +282,7 @@ export class LoopDetectionService {
     } else if (toolResponse.responseParts) {
       // Check if response contains an error-like message
       const responseText = toolResponse.responseParts
-        .map((part: Part) => (part as { text?: string }).text || '')
+        .map((part: Part) => ('text' in part && typeof part.text === 'string' ? part.text : ''))
         .join('');
       // Look for common error patterns in tool responses
       if (
