@@ -31,7 +31,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
-import { AskUserQuestionDialog } from './AskUserQuestionDialog.js';
+import { AskUserDialog } from './AskUserDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -51,12 +51,12 @@ export const DialogManager = ({
   const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
     uiState;
 
-  if (uiState.askUserQuestionRequest) {
+  if (uiState.askUserRequest) {
     return (
-      <AskUserQuestionDialog
-        questions={uiState.askUserQuestionRequest.questions}
-        onSubmit={uiActions.handleAskUserQuestionSubmit}
-        onCancel={uiActions.clearAskUserQuestionRequest}
+      <AskUserDialog
+        questions={uiState.askUserRequest.questions}
+        onSubmit={uiActions.handleAskUserSubmit}
+        onCancel={uiActions.clearAskUserRequest}
         onActiveTextInputChange={uiActions.setHasActiveTextInput}
       />
     );

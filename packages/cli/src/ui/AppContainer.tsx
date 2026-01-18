@@ -60,7 +60,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
-  ASK_USER_QUESTION_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -128,7 +128,7 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
 } from './constants.js';
-import { useAskUserQuestion } from './hooks/useAskUserQuestion.js';
+import { useAskUser } from './hooks/useAskUser.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
 
@@ -219,10 +219,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const { bannerText } = useBanner(bannerData, config);
 
   const {
-    request: askUserQuestionRequest,
-    handleSubmit: handleAskUserQuestionSubmit,
-    clearRequest: clearAskUserQuestionRequest,
-  } = useAskUserQuestion(config);
+    request: askUserRequest,
+    handleSubmit: handleAskUserSubmit,
+    clearRequest: clearAskUserRequest,
+  } = useAskUser(config);
 
   // Track when a dialog text input is focused
   const [hasActiveTextInput, setHasActiveTextInput] = useState(false);
@@ -1464,7 +1464,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
-    !!askUserQuestionRequest ||
+    !!askUserRequest ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
@@ -1492,14 +1492,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ...pendingGeminiHistoryItems,
     ];
 
-    // Hide ask_user_question tool display when the dialog is shown
-    if (askUserQuestionRequest) {
+    // Hide ask_user tool display when the dialog is shown
+    if (askUserRequest) {
       return items
         .map((item) => {
           if (item.type === 'tool_group') {
-            // Filter out ask_user_question tool but keep others
+            // Filter out ask_user tool but keep others
             const filteredTools = item.tools.filter(
-              (tool) => tool.toolName !== ASK_USER_QUESTION_TOOL_NAME,
+              (tool) => tool.toolName !== ASK_USER_TOOL_NAME,
             );
             // If no tools left, exclude the entire group
             if (filteredTools.length === 0) {
@@ -1517,7 +1517,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     pendingSlashCommandHistoryItems,
     pendingGeminiHistoryItems,
-    askUserQuestionRequest,
+    askUserRequest,
   ]);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
@@ -1660,7 +1660,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
-      askUserQuestionRequest,
+      askUserRequest,
       hasActiveTextInput,
     }),
     [
@@ -1756,7 +1756,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
-      askUserQuestionRequest,
+      askUserRequest,
       hasActiveTextInput,
     ],
   );
@@ -1801,8 +1801,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
-      handleAskUserQuestionSubmit,
-      clearAskUserQuestionRequest,
+      handleAskUserSubmit,
+      clearAskUserRequest,
       setHasActiveTextInput,
       setAuthContext,
     }),
@@ -1840,8 +1840,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       setEmbeddedShellFocused,
-      handleAskUserQuestionSubmit,
-      clearAskUserQuestionRequest,
+      handleAskUserSubmit,
+      clearAskUserRequest,
       setHasActiveTextInput,
       setAuthContext,
     ],

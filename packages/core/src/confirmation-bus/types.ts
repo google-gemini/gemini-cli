@@ -21,8 +21,8 @@ export enum MessageBusType {
   HOOK_EXECUTION_REQUEST = 'hook-execution-request',
   HOOK_EXECUTION_RESPONSE = 'hook-execution-response',
   HOOK_POLICY_DECISION = 'hook-policy-decision',
-  ASK_USER_QUESTION_REQUEST = 'ask-user-question-request',
-  ASK_USER_QUESTION_RESPONSE = 'ask-user-question-response',
+  ASK_USER_REQUEST = 'ask-user-request',
+  ASK_USER_RESPONSE = 'ask-user-response',
   TOOL_CALLS_UPDATE = 'tool-calls-update',
 }
 
@@ -159,14 +159,14 @@ export interface Question {
   placeholder?: string;
 }
 
-export interface AskUserQuestionRequest {
-  type: MessageBusType.ASK_USER_QUESTION_REQUEST;
+export interface AskUserRequest {
+  type: MessageBusType.ASK_USER_REQUEST;
   questions: Question[];
   correlationId: string;
 }
 
-export interface AskUserQuestionResponse {
-  type: MessageBusType.ASK_USER_QUESTION_RESPONSE;
+export interface AskUserResponse {
+  type: MessageBusType.ASK_USER_RESPONSE;
   correlationId: string;
   answers: { [questionIndex: string]: string };
 }
@@ -181,6 +181,6 @@ export type Message =
   | HookExecutionRequest
   | HookExecutionResponse
   | HookPolicyDecision
-  | AskUserQuestionRequest
-  | AskUserQuestionResponse
+  | AskUserRequest
+  | AskUserResponse
   | ToolCallsUpdateMessage;

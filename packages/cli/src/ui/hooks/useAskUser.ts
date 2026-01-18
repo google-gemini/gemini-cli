@@ -8,34 +8,34 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   type Config,
   MessageBusType,
-  type AskUserQuestionRequest,
-  type AskUserQuestionResponse,
+  type AskUserRequest,
+  type AskUserResponse,
   type Question,
 } from '@google/gemini-cli-core';
 
-export interface AskUserQuestionState {
+export interface AskUserState {
   questions: Question[];
   correlationId: string;
 }
 
-export function useAskUserQuestion(config: Config) {
-  const [request, setRequest] = useState<AskUserQuestionState | null>(null);
+export function useAskUser(config: Config) {
+  const [request, setRequest] = useState<AskUserState | null>(null);
 
   useEffect(() => {
     const messageBus = config.getMessageBus();
     if (!messageBus) return;
 
-    const handler = (msg: AskUserQuestionRequest) => {
+    const handler = (msg: AskUserRequest) => {
       setRequest({
         questions: msg.questions,
         correlationId: msg.correlationId,
       });
     };
 
-    messageBus.subscribe(MessageBusType.ASK_USER_QUESTION_REQUEST, handler);
+    messageBus.subscribe(MessageBusType.ASK_USER_REQUEST, handler);
 
     return () => {
-      messageBus.unsubscribe(MessageBusType.ASK_USER_QUESTION_REQUEST, handler);
+      messageBus.unsubscribe(MessageBusType.ASK_USER_REQUEST, handler);
     };
   }, [config]);
 
@@ -46,8 +46,8 @@ export function useAskUserQuestion(config: Config) {
       const messageBus = config.getMessageBus();
       if (!messageBus) return;
 
-      const response: AskUserQuestionResponse = {
-        type: MessageBusType.ASK_USER_QUESTION_RESPONSE,
+      const response: AskUserResponse = {
+        type: MessageBusType.ASK_USER_RESPONSE,
         correlationId: request.correlationId,
         answers,
       };

@@ -15,24 +15,24 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
   type Question,
-  type AskUserQuestionRequest,
-  type AskUserQuestionResponse,
+  type AskUserRequest,
+  type AskUserResponse,
 } from '../confirmation-bus/types.js';
 import { randomUUID } from 'node:crypto';
-import { ASK_USER_QUESTION_TOOL_NAME } from './tool-names.js';
+import { ASK_USER_TOOL_NAME } from './tool-names.js';
 
-export interface AskUserQuestionParams {
+export interface AskUserParams {
   questions: Question[];
 }
 
-export class AskUserQuestionTool extends BaseDeclarativeTool<
-  AskUserQuestionParams,
+export class AskUserTool extends BaseDeclarativeTool<
+  AskUserParams,
   ToolResult
 > {
   constructor(messageBus: MessageBus) {
     super(
-      ASK_USER_QUESTION_TOOL_NAME,
-      'Ask User Question',
+      ASK_USER_TOOL_NAME,
+      'Ask User',
       'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
       Kind.Other,
       {
@@ -107,22 +107,17 @@ export class AskUserQuestionTool extends BaseDeclarativeTool<
   }
 
   protected createInvocation(
-    params: AskUserQuestionParams,
+    params: AskUserParams,
     messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
-  ): AskUserQuestionInvocation {
-    return new AskUserQuestionInvocation(
-      params,
-      messageBus,
-      toolName,
-      toolDisplayName,
-    );
+  ): AskUserInvocation {
+    return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
   }
 }
 
-export class AskUserQuestionInvocation extends BaseToolInvocation<
-  AskUserQuestionParams,
+export class AskUserInvocation extends BaseToolInvocation<
+  AskUserParams,
   ToolResult
 > {
   override async shouldConfirmExecute(
@@ -138,14 +133,14 @@ export class AskUserQuestionInvocation extends BaseToolInvocation<
   async execute(signal: AbortSignal): Promise<ToolResult> {
     const correlationId = randomUUID();
 
-    const request: AskUserQuestionRequest = {
-      type: MessageBusType.ASK_USER_QUESTION_REQUEST,
+    const request: AskUserRequest = {
+      type: MessageBusType.ASK_USER_REQUEST,
       questions: this.params.questions,
       correlationId,
     };
 
     return new Promise<ToolResult>((resolve, reject) => {
-      const responseHandler = (response: AskUserQuestionResponse): void => {
+      const responseHandler = (response: AskUserResponse): void => {
         if (response.correlationId === correlationId) {
           cleanup();
 
@@ -170,7 +165,7 @@ export class AskUserQuestionInvocation extends BaseToolInvocation<
       const cleanup = () => {
         if (responseHandler) {
           this.messageBus.unsubscribe(
-            MessageBusType.ASK_USER_QUESTION_RESPONSE,
+            MessageBusType.ASK_USER_RESPONSE,
             responseHandler,
           );
         }
@@ -195,7 +190,7 @@ export class AskUserQuestionInvocation extends BaseToolInvocation<
 
       signal.addEventListener('abort', abortHandler);
       this.messageBus.subscribe(
-        MessageBusType.ASK_USER_QUESTION_RESPONSE,
+        MessageBusType.ASK_USER_RESPONSE,
         responseHandler,
       );
 

@@ -172,8 +172,8 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
-  handleAskUserQuestionSubmit: vi.fn(),
-  clearAskUserQuestionRequest: vi.fn(),
+  handleAskUserSubmit: vi.fn(),
+  clearAskUserRequest: vi.fn(),
   setHasActiveTextInput: vi.fn(),
   setAuthContext: vi.fn(),
 };

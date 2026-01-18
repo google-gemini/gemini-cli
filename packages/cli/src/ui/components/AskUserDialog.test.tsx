@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { AskUserQuestionDialog } from './AskUserQuestionDialog.js';
+import { AskUserDialog } from './AskUserDialog.js';
 import type { Question } from '@google/gemini-cli-core';
 
 // Helper to write to stdin with proper act() wrapping
@@ -22,7 +22,7 @@ const writeKey = async (
   await new Promise((resolve) => setTimeout(resolve, delay));
 };
 
-describe('AskUserQuestionDialog', () => {
+describe('AskUserDialog', () => {
   const questions: Question[] = [
     {
       question: 'Q1?',
@@ -37,7 +37,7 @@ describe('AskUserQuestionDialog', () => {
 
   it('renders question and options', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={questions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -55,7 +55,7 @@ describe('AskUserQuestionDialog', () => {
   it('calls onSubmit with answers when an option is selected', async () => {
     const onSubmit = vi.fn();
     const { stdin } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={questions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
@@ -82,7 +82,7 @@ describe('AskUserQuestionDialog', () => {
     ];
     const onSubmit = vi.fn();
     const { stdin } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
@@ -113,7 +113,7 @@ describe('AskUserQuestionDialog', () => {
   it('handles Other option in single select with inline typing', async () => {
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={questions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
@@ -164,7 +164,7 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -182,7 +182,7 @@ describe('AskUserQuestionDialog', () => {
 
   it('hides progress header for single question', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={questions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -197,7 +197,7 @@ describe('AskUserQuestionDialog', () => {
 
   it('shows keyboard hints', () => {
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={questions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -226,7 +226,7 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -265,7 +265,7 @@ describe('AskUserQuestionDialog', () => {
 
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
@@ -323,7 +323,7 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -353,7 +353,7 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -396,7 +396,7 @@ describe('AskUserQuestionDialog', () => {
     ];
 
     const { stdin, lastFrame } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
@@ -430,7 +430,7 @@ describe('AskUserQuestionDialog', () => {
 
     const onSubmit = vi.fn();
     const { stdin } = renderWithProviders(
-      <AskUserQuestionDialog
+      <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
@@ -463,7 +463,7 @@ describe('AskUserQuestionDialog', () => {
       ];
 
       const { lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
@@ -491,7 +491,7 @@ describe('AskUserQuestionDialog', () => {
 
       const onSubmit = vi.fn();
       const { stdin, lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
@@ -521,7 +521,7 @@ describe('AskUserQuestionDialog', () => {
       ];
 
       const { lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
@@ -541,7 +541,7 @@ describe('AskUserQuestionDialog', () => {
       ];
 
       const { stdin, lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
@@ -570,7 +570,7 @@ describe('AskUserQuestionDialog', () => {
       ];
 
       const { lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
@@ -603,7 +603,7 @@ describe('AskUserQuestionDialog', () => {
       ];
 
       const { stdin, lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={mixedQuestions}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
@@ -649,7 +649,7 @@ describe('AskUserQuestionDialog', () => {
 
       const onSubmit = vi.fn();
       const { stdin, lastFrame } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={mixedQuestions}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
@@ -694,7 +694,7 @@ describe('AskUserQuestionDialog', () => {
 
       const onSubmit = vi.fn();
       const { stdin } = renderWithProviders(
-        <AskUserQuestionDialog
+        <AskUserDialog
           questions={textQuestion}
           onSubmit={onSubmit}
           onCancel={vi.fn()}

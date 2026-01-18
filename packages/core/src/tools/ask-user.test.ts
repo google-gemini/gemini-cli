@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AskUserQuestionTool } from './ask-user-question.js';
+import { AskUserTool } from './ask-user.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
-describe('AskUserQuestionTool', () => {
+describe('AskUserTool', () => {
   let mockMessageBus: MessageBus;
 
   beforeEach(() => {
@@ -21,13 +21,13 @@ describe('AskUserQuestionTool', () => {
   });
 
   it('should have correct metadata', () => {
-    const tool = new AskUserQuestionTool(mockMessageBus);
-    expect(tool.name).toBe('ask_user_question');
-    expect(tool.displayName).toBe('Ask User Question');
+    const tool = new AskUserTool(mockMessageBus);
+    expect(tool.name).toBe('ask_user');
+    expect(tool.displayName).toBe('Ask User');
   });
 
-  it('should publish ASK_USER_QUESTION_REQUEST and wait for response', async () => {
-    const tool = new AskUserQuestionTool(mockMessageBus);
+  it('should publish ASK_USER_REQUEST and wait for response', async () => {
+    const tool = new AskUserTool(mockMessageBus);
     const questions = [
       {
         question: 'How should we proceed with this task?',
@@ -54,7 +54,7 @@ describe('AskUserQuestionTool', () => {
     // Verify publish called
     expect(mockMessageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: MessageBusType.ASK_USER_QUESTION_REQUEST,
+        type: MessageBusType.ASK_USER_REQUEST,
         questions,
       }),
     );
@@ -68,21 +68,19 @@ describe('AskUserQuestionTool', () => {
 
     // Verify subscribe called
     expect(mockMessageBus.subscribe).toHaveBeenCalledWith(
-      MessageBusType.ASK_USER_QUESTION_RESPONSE,
+      MessageBusType.ASK_USER_RESPONSE,
       expect.any(Function),
     );
 
     // Simulate response
     const subscribeCall = vi
       .mocked(mockMessageBus.subscribe)
-      .mock.calls.find(
-        (call) => call[0] === MessageBusType.ASK_USER_QUESTION_RESPONSE,
-      );
+      .mock.calls.find((call) => call[0] === MessageBusType.ASK_USER_RESPONSE);
     const handler = subscribeCall![1];
 
     const answers = { '0': 'Quick fix (Recommended)' };
     handler({
-      type: MessageBusType.ASK_USER_QUESTION_RESPONSE,
+      type: MessageBusType.ASK_USER_RESPONSE,
       correlationId,
       answers,
     });
@@ -96,7 +94,7 @@ describe('AskUserQuestionTool', () => {
   });
 
   it('should handle cancellation', async () => {
-    const tool = new AskUserQuestionTool(mockMessageBus);
+    const tool = new AskUserTool(mockMessageBus);
     const invocation = tool.build({
       questions: [
         {
