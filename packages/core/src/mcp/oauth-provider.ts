@@ -16,6 +16,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { formatHyperlink } from '../utils/terminal.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
 
@@ -904,13 +905,17 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
+    // Format the URL as a clickable hyperlink for terminals that support OSC 8.
+    // This helps avoid the issue where long URLs wrap across lines and characters
+    // at line-break boundaries can be lost when copying.
+    const clickableUrl = formatHyperlink(authUrl, '🔗 Click here to authenticate');
+
     displayMessage(`→ Opening your browser for OAuth sign-in...
 
-If the browser does not open, copy and paste this URL into your browser:
-${authUrl}
+If the browser does not open: ${clickableUrl}
 
-💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
-⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
+Or copy this URL (triple-click to select all):
+${authUrl}`);
 
     // Open browser securely (callback server is already running)
     try {
