@@ -52,10 +52,11 @@ describe('git repo eval', () => {
 
   /**
    * Ensures that the agent can commit its changes when prompted, despite being
-   * instructed to not do so by default.
+   * instructed to not do so by default. Also ensures that any commits are non-interactive.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should git commit changes when prompted',
+    failOnInteractiveGit: true,
     prompt:
       'Make a targeted fix for the bug in index.ts without building, installing anything, or adding tests. Then, commit your changes.',
     files: FILES,

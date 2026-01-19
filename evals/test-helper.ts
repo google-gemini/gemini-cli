@@ -49,17 +49,58 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git config user.email "test@example.com"', execOptions);
         execSync('git config user.name "Test User"', execOptions);
 
+        const interactiveGitMarker = path.join(
+          rig.testDir || '',
+          'interactive_git_triggered',
+        );
+        let gitEditor = 'echo "Auto-commit" >';
+        if (evalCase.failOnInteractiveGit) {
+          gitEditor = `sh -c 'echo "Auto-commit" > "$0" && touch "${interactiveGitMarker}"'`;
+        }
+
         // Temporarily disable the interactive editor and git pager
         // to avoid hanging the tests. It seems the the agent isn't
         // consistently honoring the instructions to avoid interactive
         // commands.
-        execSync('git config core.editor "true"', execOptions);
-        execSync('git config core.pager "cat"', execOptions);
+        // We use a shell command that writes to the file argument to ensure
+        // git commits succeed without user interaction.
+        const escapedGitEditor = gitEditor.replace(/"/g, '\\"');
+        execSync(`git config core.editor "${escapedGitEditor}"`, execOptions);
+        execSync('git config core.pager cat', execOptions);
+        execSync('git config commit.gpgsign false', execOptions);
+        execSync('git config tag.gpgsign false', execOptions);
+        execSync('git config core.hooksPath /dev/null', execOptions);
         execSync('git add .', execOptions);
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const result = await rig.run({ args: evalCase.prompt });
+      const interactiveGitMarker = path.join(
+        rig.testDir || '',
+        'interactive_git_triggered',
+      );
+      let gitEditorEnv = 'echo "Auto-commit" >';
+      if (evalCase.failOnInteractiveGit) {
+        gitEditorEnv = `sh -c 'echo "Auto-commit" > "$0" && touch "${interactiveGitMarker}"'`;
+      }
+
+      const result = await rig.run({
+        args: evalCase.prompt,
+        env: {
+          // Force non-interactive git behavior
+          GIT_EDITOR: gitEditorEnv,
+          GIT_PAGER: 'cat',
+          GIT_TERMINAL_PROMPT: '0',
+        },
+      });
+
+      if (
+        evalCase.failOnInteractiveGit &&
+        fs.existsSync(interactiveGitMarker)
+      ) {
+        throw new Error(
+          'Test failed: Interactive git editor was triggered. The agent should use "git commit -m" or similar to avoid opening an editor.',
+        );
+      }
 
       const unauthorizedErrorPrefix =
         createUnauthorizedToolError('').split("'")[0];
@@ -90,6 +131,7 @@ export interface EvalCase {
   name: string;
   params?: Record<string, any>;
   prompt: string;
+  failOnInteractiveGit?: boolean;
   files?: Record<string, string>;
   assert: (rig: TestRig, result: string) => Promise<void>;
 }
