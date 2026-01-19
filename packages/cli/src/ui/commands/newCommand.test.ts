@@ -1,9 +1,8 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { newCommand } from './newCommand.js';
 import { SessionEndReason, SessionStartSource } from '@google/gemini-cli-core';
@@ -11,11 +10,27 @@ import type { CommandContext } from './types.js';
 
 describe('newCommand', () => {
   let mockContext: CommandContext;
-  let mockGeminiClient: unknown;
-  let mockConfig: unknown;
-  let mockChatRecordingService: unknown;
-  let mockHookSystem: unknown;
-  let mockUi: unknown;
+  let mockGeminiClient: {
+    resetChat: ReturnType<typeof vi.fn>;
+    getChat: ReturnType<typeof vi.fn>;
+  };
+  let mockConfig: {
+    getGeminiClient: ReturnType<typeof vi.fn>;
+    getHookSystem: ReturnType<typeof vi.fn>;
+    setSessionId: ReturnType<typeof vi.fn>;
+  };
+  let mockChatRecordingService: {
+    initialize: ReturnType<typeof vi.fn>;
+  };
+  let mockHookSystem: {
+    fireSessionEndEvent: ReturnType<typeof vi.fn>;
+    fireSessionStartEvent: ReturnType<typeof vi.fn>;
+  };
+  let mockUi: {
+    setDebugMessage: ReturnType<typeof vi.fn>;
+    addItem: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockChatRecordingService = {
@@ -66,26 +81,18 @@ describe('newCommand', () => {
   });
 
   it('should reset chat and start a new session', async () => {
-    await newCommand.action(mockContext, '');
+    await newCommand.action!(mockContext, '');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockHookSystem as any).fireSessionEndEvent).toHaveBeenCalledWith(
+    expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledWith(
       SessionEndReason.Clear,
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockGeminiClient as any).resetChat).toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockConfig as any).setSessionId).toHaveBeenCalledWith(
-      'new-session-id',
+    expect(mockGeminiClient.resetChat).toHaveBeenCalled();
+    expect(mockConfig.setSessionId).toHaveBeenCalledWith('new-session-id');
+    expect(mockChatRecordingService.initialize).toHaveBeenCalled();
+    expect(mockHookSystem.fireSessionStartEvent).toHaveBeenCalledWith(
+      SessionStartSource.New,
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockChatRecordingService as any).initialize).toHaveBeenCalled();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockHookSystem as any).fireSessionStartEvent).toHaveBeenCalledWith(
-      SessionStartSource.Clear,
-    );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockUi as any).addItem).toHaveBeenCalledWith(
+    expect(mockUi.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining('Started a new chat session'),
       }),
@@ -93,7 +100,6 @@ describe('newCommand', () => {
     );
 
     // Ensure UI is NOT cleared
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((mockUi as any).clear).not.toHaveBeenCalled();
+    expect(mockUi.clear).not.toHaveBeenCalled();
   });
 });

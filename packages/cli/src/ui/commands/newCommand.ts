@@ -15,6 +15,6 @@ export const newCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
-    await startNewSession(context, SessionStartSource.Clear, false);
+    await startNewSession(context, SessionStartSource.New, false);
   },
 };
