@@ -109,6 +109,18 @@ const pickTty = (): Promise<TtyTarget> =>
   });
 
 const getStdioTty = (): TtyTarget => {
+  // On Windows, prioritize stdout to prevent shell-specific formatting (e.g., PowerShell's
+  // red stderr) from corrupting the raw escape sequence payload.
+  if (process.platform === 'win32') {
+    if (process.stdout?.isTTY)
+      return { stream: process.stdout, closeAfter: false };
+    if (process.stderr?.isTTY)
+      return { stream: process.stderr, closeAfter: false };
+    return null;
+  }
+
+  // On non-Windows platforms, prioritize stderr to avoid polluting stdout,
+  // preserving it for potential redirection or piping.
   if (process.stderr?.isTTY)
     return { stream: process.stderr, closeAfter: false };
   if (process.stdout?.isTTY)
@@ -179,6 +191,27 @@ const wrapForScreen = (seq: string): string => {
 
 const writeAll = (stream: Writable, data: string): Promise<void> =>
   new Promise<void>((resolve, reject) => {
+    // On Windows, writing directly to the underlying file descriptor bypasses
+    // application-level stream interception (e.g., by the Ink UI framework).
+    // This ensures the raw OSC-52 escape sequence reaches the terminal host uncorrupted.
+    const fd = (stream as unknown as { fd?: number }).fd;
+    if (
+      process.platform === 'win32' &&
+      typeof fd === 'number' &&
+      (stream === process.stdout || stream === process.stderr)
+    ) {
+      try {
+        fs.writeSync(fd, data);
+        resolve();
+        return;
+      } catch (e) {
+        debugLogger.warn(
+          'Direct write to TTY failed, falling back to stream write',
+          e,
+        );
+      }
+    }
+
     const onError = (err: unknown) => {
       cleanup();
       reject(err as Error);
