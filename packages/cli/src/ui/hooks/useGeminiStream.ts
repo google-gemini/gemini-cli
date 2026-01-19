@@ -48,9 +48,11 @@ import type {
   SlashCommandProcessorResult,
   HistoryItemModel,
   RenewSessionConfirmationResult,
+  RenewSessionConfirmationRequest,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
+import { checkExhaustive } from '../../utils/checks.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -219,12 +221,7 @@ export const useGeminiStream = (
   } | null>(null);
 
   const [renewSessionConfirmationRequest, setRenewSessionConfirmationRequest] =
-    useState<{
-      onComplete: (result: {
-        userSelection: 'compress_session' | 'new_session';
-      }) => void;
-      reason?: 'turn_limit' | 'topic_change';
-    } | null>(null);
+    useState<RenewSessionConfirmationRequest | null>(null);
 
   const renewSessionConfirmationRequestRef = useRef(
     renewSessionConfirmationRequest,
@@ -783,15 +780,12 @@ export const useGeminiStream = (
       addItem(pendingHistoryItemRef.current, Date.now());
       setPendingHistoryItem(null);
     }
-    geminiClient.resetSessionTurnCount();
 
     // Mark that we've shown the dialog
     hasShownRenewDialogRef.current = true;
 
     setRenewSessionConfirmationRequest({
-      onComplete: (result: {
-        userSelection: 'compress_session' | 'new_session';
-      }) => {
+      onComplete: (result: RenewSessionConfirmationResult) => {
         queueMicrotask(async () => {
           cancelOngoingRequest();
 
@@ -800,6 +794,7 @@ export const useGeminiStream = (
             // and not destructive to the DOM structure immediately.
             setRenewSessionConfirmationRequest(null);
             hasShownRenewDialogRef.current = false;
+            geminiClient.resetSessionTurnCount();
 
             await handleSlashCommandRef.current(
               '/compress',
@@ -812,6 +807,7 @@ export const useGeminiStream = (
             // This ensures the heavy DOM destruction (clearing history) happens
             // in a separate render cycle from the Dialog unmounting.
             lastUserQueryTextRef.current = null;
+            geminiClient.resetSessionTurnCount();
             if (executeClearCommand) {
               await executeClearCommand();
             }
@@ -1069,15 +1065,30 @@ export const useGeminiStream = (
                     >((resolve) => {
                       setRenewSessionConfirmationRequest({
                         reason: 'topic_change',
-                        onComplete: (result) => {
+                        onComplete: (
+                          result: RenewSessionConfirmationResult,
+                        ) => {
                           setRenewSessionConfirmationRequest(null);
                           resolve(result.userSelection);
                         },
                       });
                     });
 
-                    if (selection === 'new_session') {
-                      queueMicrotask(async () => {
+                    switch (selection) {
+                      case 'continue_session':
+                        // Do nothing and proceed with the current context
+                        break;
+                      case 'compress_session':
+                        geminiClient.resetSessionTurnCount();
+                        await handleSlashCommandRef.current(
+                          '/compress',
+                          undefined,
+                          undefined,
+                          false,
+                        );
+                        break;
+                      case 'new_session':
+                        geminiClient.resetSessionTurnCount();
                         if (executeClearCommand) {
                           await executeClearCommand();
                         } else {
@@ -1092,12 +1103,9 @@ export const useGeminiStream = (
                           },
                           Date.now(),
                         );
-
-                        // A short delay ensures React processes the history clearing first.
-                        setTimeout(() => {
-                          setRenewSessionConfirmationRequest(null);
-                        }, 50);
-                      });
+                        break;
+                      default:
+                        checkExhaustive(selection);
                     }
                   }
                 }

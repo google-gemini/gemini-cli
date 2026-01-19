@@ -412,7 +412,7 @@ export interface LoopDetectionConfirmationRequest {
 }
 
 export interface RenewSessionConfirmationResult {
-  userSelection: 'compress_session' | 'new_session';
+  userSelection: 'compress_session' | 'new_session' | 'continue_session';
 }
 
 export interface RenewSessionConfirmationRequest {
