@@ -225,8 +225,14 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
     inputConfig: {
       inputs: { goal: { type: 'string', required: true, description: 'goal' } },
     },
-    modelConfig: { model: 'gemini-test-model', temp: 0, top_p: 1 },
-    runConfig: { max_time_minutes: 5, max_turns: 5, ...runConfigOverrides },
+    modelConfig: {
+      model: 'gemini-test-model',
+      generateContentConfig: {
+        temperature: 0,
+        topP: 1,
+      },
+    },
+    runConfig: { maxTimeMinutes: 5, maxTurns: 5, ...runConfigOverrides },
     promptConfig: { systemPrompt: 'Achieve the goal: ${goal}.' },
     toolConfig: { tools },
     outputConfig,
@@ -1321,7 +1327,7 @@ describe('LocalAgentExecutor', () => {
     it('should terminate when max_turns is reached', async () => {
       const MAX = 2;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1338,7 +1344,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should terminate with TIMEOUT if a model call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1395,7 +1401,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should terminate with TIMEOUT if a tool call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 1,
+        maxTimeMinutes: 1,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1483,7 +1489,7 @@ describe('LocalAgentExecutor', () => {
     it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1531,7 +1537,7 @@ describe('LocalAgentExecutor', () => {
     it('should fail if complete_task is NOT called during the grace turn after MAX_TURNS', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1650,7 +1656,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should recover successfully from a TIMEOUT', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1705,7 +1711,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should fail recovery from a TIMEOUT if the grace period also times out', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1797,7 +1803,7 @@ describe('LocalAgentExecutor', () => {
     it('should log a RecoveryAttemptEvent when a recoverable error occurs and recovery fails', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1822,7 +1828,7 @@ describe('LocalAgentExecutor', () => {
     it('should log a successful RecoveryAttemptEvent when recovery succeeds', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 

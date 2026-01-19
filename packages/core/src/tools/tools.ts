@@ -693,6 +693,8 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  rootCommands: string[];
+  commands?: string[];
 }
 
 export interface ToolMcpConfirmationDetails {

@@ -12,12 +12,12 @@ import {
   type CommandContext,
 } from '../ui/commands/types.js';
 import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
-import { startupProfiler } from '@google/gemini-cli-core';
+import { isNightly, startupProfiler } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
-import { chatCommand } from '../ui/commands/chatCommand.js';
+import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
@@ -65,12 +65,20 @@ export class BuiltinCommandLoader implements ICommandLoader {
    */
   async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
     const handle = startupProfiler.start('load_builtin_commands');
+
+    const isNightlyBuild = await isNightly(process.cwd());
+
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
       bugCommand,
-      chatCommand,
+      {
+        ...chatCommand,
+        subCommands: isNightlyBuild
+          ? [...(chatCommand.subCommands || []), debugCommand]
+          : chatCommand.subCommands,
+      },
       clearCommand,
       compressCommand,
       copyCommand,
@@ -131,7 +139,26 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
-      ...(this.config?.isSkillsSupportEnabled() ? [skillsCommand] : []),
+      ...(this.config?.isSkillsSupportEnabled()
+        ? this.config?.getSkillManager()?.isAdminEnabled() === false
+          ? [
+              {
+                name: 'skills',
+                description: 'Manage agent skills',
+                kind: CommandKind.BUILT_IN,
+                autoExecute: false,
+                subCommands: [],
+                action: async (
+                  _context: CommandContext,
+                ): Promise<MessageActionReturn> => ({
+                  type: 'message',
+                  messageType: 'error',
+                  content: 'Agent skills are disabled by your admin.',
+                }),
+              },
+            ]
+          : [skillsCommand]
+        : []),
       settingsCommand,
       vimCommand,
       setupGithubCommand,

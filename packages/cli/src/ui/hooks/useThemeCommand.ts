@@ -67,7 +67,7 @@ export const useThemeCommand = (
 
   const closeThemeDialog = useCallback(() => {
     // Re-apply the saved theme to revert any preview changes from highlighting
-    applyTheme(loadedSettings.merged.ui?.theme);
+    applyTheme(loadedSettings.merged.ui.theme);
     setIsThemeDialogOpen(false);
   }, [applyTheme, loadedSettings]);
 
@@ -88,10 +88,10 @@ export const useThemeCommand = (
           return;
         }
         loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
-        if (loadedSettings.merged.ui?.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.ui?.customThemes);
+        if (loadedSettings.merged.ui.customThemes) {
+          themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }
-        applyTheme(loadedSettings.merged.ui?.theme); // Apply the current theme
+        applyTheme(loadedSettings.merged.ui.theme); // Apply the current theme
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog

@@ -19,7 +19,10 @@ const wait = () => new Promise((resolve) => setTimeout(resolve, 0));
 import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from '../hooks/useCommandCompletion.js';
 import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
@@ -30,6 +33,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { StreamingState } from '../types.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -108,6 +112,10 @@ describe('InputPrompt', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isKittyProtocolEnabled',
+    ).mockReturnValue(true);
 
     mockCommandContext = createMockCommandContext();
 
@@ -205,6 +213,16 @@ describe('InputPrompt', () => {
         isActive: false,
         markSelected: vi.fn(),
       },
+      getCommandFromSuggestion: vi.fn().mockReturnValue(undefined),
+      slashCompletionRange: {
+        completionStart: -1,
+        completionEnd: -1,
+        getCommandFromSuggestion: vi.fn().mockReturnValue(undefined),
+        isArgumentCompletion: false,
+        leafCommand: null,
+      },
+      getCompletedText: vi.fn().mockReturnValue(null),
+      completionMode: CompletionMode.IDLE,
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -1282,7 +1300,7 @@ describe('InputPrompt', () => {
       await vi.waitFor(() => {
         expect(mockBuffer.handleInput).toHaveBeenCalledWith(
           expect.objectContaining({
-            paste: true,
+            name: 'paste',
             sequence: 'pasted text',
           }),
         );
@@ -1525,7 +1543,7 @@ describe('InputPrompt', () => {
         expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
         expect(props.buffer.handleInput).toHaveBeenCalledWith(
           expect.objectContaining({
-            paste: true,
+            name: 'paste',
             sequence: pastedText,
           }),
         );
@@ -1667,8 +1685,11 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('enhanced input UX - double ESC clear functionality', () => {
-    it.skip('should clear buffer on second ESC press', async () => {
+  describe('enhanced input UX - keyboard shortcuts', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('should clear buffer on Ctrl-C', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('text to clear');
@@ -1679,18 +1700,29 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x1B');
-      });
-      await vi.waitFor(() => {
-        expect(onEscapePromptChange).toHaveBeenCalledWith(true);
-      });
+        stdin.write('\x03');
+        vi.advanceTimersByTime(100);
 
-      await act(async () => {
-        stdin.write('\x1B');
-      });
-      await vi.waitFor(() => {
         expect(props.buffer.setText).toHaveBeenCalledWith('');
         expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should submit /rewind on double ESC', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('some text');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B\x1B');
+        vi.advanceTimersByTime(100);
+
+        expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
       unmount();
     });
@@ -2192,6 +2224,182 @@ describe('InputPrompt', () => {
         expect(frame).not.toContain('→');
         expect(frame).not.toContain('←');
       });
+      unmount();
+    });
+  });
+
+  describe('Tab focus toggle', () => {
+    it.each([
+      {
+        name: 'should toggle focus in on Tab when no suggestions or ghost text',
+        showSuggestions: false,
+        ghostText: '',
+        suggestions: [],
+        expectedFocusToggle: true,
+      },
+      {
+        name: 'should accept ghost text and NOT toggle focus on Tab',
+        showSuggestions: false,
+        ghostText: 'ghost text',
+        suggestions: [],
+        expectedFocusToggle: false,
+        expectedAcceptCall: true,
+      },
+      {
+        name: 'should NOT toggle focus on Tab when suggestions are present',
+        showSuggestions: true,
+        ghostText: '',
+        suggestions: [{ label: 'test', value: 'test' }],
+        expectedFocusToggle: false,
+      },
+    ])(
+      '$name',
+      async ({
+        showSuggestions,
+        ghostText,
+        suggestions,
+        expectedFocusToggle,
+        expectedAcceptCall,
+      }) => {
+        const mockAccept = vi.fn();
+        mockedUseCommandCompletion.mockReturnValue({
+          ...mockCommandCompletion,
+          showSuggestions,
+          suggestions,
+          promptCompletion: {
+            text: ghostText,
+            accept: mockAccept,
+            clear: vi.fn(),
+            isLoading: false,
+            isActive: ghostText !== '',
+            markSelected: vi.fn(),
+          },
+        });
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiActions,
+            uiState: { activePtyId: 1 },
+          },
+        );
+
+        await act(async () => {
+          stdin.write('\t');
+        });
+
+        await waitFor(() => {
+          if (expectedFocusToggle) {
+            expect(uiActions.setEmbeddedShellFocused).toHaveBeenCalledWith(
+              true,
+            );
+          } else {
+            expect(uiActions.setEmbeddedShellFocused).not.toHaveBeenCalled();
+          }
+
+          if (expectedAcceptCall) {
+            expect(mockAccept).toHaveBeenCalled();
+          }
+        });
+        unmount();
+      },
+    );
+  });
+
+  describe('mouse interaction', () => {
+    it.each([
+      {
+        name: 'first line, first char',
+        relX: 0,
+        relY: 0,
+        mouseCol: 5,
+        mouseRow: 2,
+      },
+      {
+        name: 'first line, middle char',
+        relX: 6,
+        relY: 0,
+        mouseCol: 11,
+        mouseRow: 2,
+      },
+      {
+        name: 'second line, first char',
+        relX: 0,
+        relY: 1,
+        mouseCol: 5,
+        mouseRow: 3,
+      },
+      {
+        name: 'second line, end char',
+        relX: 5,
+        relY: 1,
+        mouseCol: 10,
+        mouseRow: 3,
+      },
+    ])(
+      'should move cursor on mouse click - $name',
+      async ({ relX, relY, mouseCol, mouseRow }) => {
+        props.buffer.text = 'hello world\nsecond line';
+        props.buffer.lines = ['hello world', 'second line'];
+        props.buffer.viewportVisualLines = ['hello world', 'second line'];
+        props.buffer.visualToLogicalMap = [
+          [0, 0],
+          [1, 0],
+        ];
+        props.buffer.visualCursor = [0, 11];
+        props.buffer.visualScrollRow = 0;
+
+        const { stdin, stdout, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          { mouseEventsEnabled: true, uiActions },
+        );
+
+        // Wait for initial render
+        await waitFor(() => {
+          expect(stdout.lastFrame()).toContain('hello world');
+        });
+
+        // Simulate left mouse press at calculated coordinates.
+        // Assumes inner box is at x=4, y=1 based on border(1)+padding(1)+prompt(2) and border-top(1).
+        await act(async () => {
+          stdin.write(`\x1b[<0;${mouseCol};${mouseRow}M`);
+        });
+
+        await waitFor(() => {
+          expect(props.buffer.moveToVisualPosition).toHaveBeenCalledWith(
+            relY,
+            relX,
+          );
+        });
+
+        unmount();
+      },
+    );
+
+    it('should unfocus embedded shell on click', async () => {
+      props.buffer.text = 'hello';
+      props.buffer.lines = ['hello'];
+      props.buffer.viewportVisualLines = ['hello'];
+      props.buffer.visualToLogicalMap = [[0, 0]];
+      props.isEmbeddedShellFocused = true;
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { mouseEventsEnabled: true, uiActions },
+      );
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('hello');
+      });
+
+      await act(async () => {
+        // Click somewhere in the prompt
+        stdin.write(`\x1b[<0;5;2M`);
+      });
+
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+
       unmount();
     });
   });

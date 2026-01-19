@@ -11,6 +11,7 @@
 import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
+import type { ModelConfig } from '../services/modelConfigService.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -64,6 +65,7 @@ export interface BaseAgentDefinition<
   name: string;
   displayName?: string;
   description: string;
+  experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
 }
@@ -178,21 +180,11 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 }
 
 /**
- * Configures the generative model parameters for the agent.
- */
-export interface ModelConfig {
-  model: string;
-  temp: number;
-  top_p: number;
-  thinkingBudget?: number;
-}
-
-/**
  * Configures the execution environment and constraints for the agent.
  */
 export interface RunConfig {
   /** The maximum execution time for the agent in minutes. */
-  max_time_minutes: number;
+  maxTimeMinutes: number;
   /** The maximum number of conversational turns. */
-  max_turns?: number;
+  maxTurns?: number;
 }
