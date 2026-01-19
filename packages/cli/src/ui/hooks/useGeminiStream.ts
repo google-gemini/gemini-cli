@@ -922,7 +922,12 @@ export const useGeminiStream = (
           }
         }
       }
+
       if (toolCallRequests.length > 0) {
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+          setPendingHistoryItem(null);
+        }
         await scheduleToolCalls(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
