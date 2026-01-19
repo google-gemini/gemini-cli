@@ -136,6 +136,33 @@ describe('getCommandRoots', () => {
     expect(result).toEqual(['echo', 'git']);
   });
 
+  it('should handle single environment variable assignments', () => {
+    const result = getCommandRoots('DEBUG=true npm run start');
+    expect(result).toEqual(['npm']);
+  });
+
+  it('should handle single environment variable assignments across multiple commands', () => {
+    const result = getCommandRoots('DEBUG=true npm run start && echo test');
+    expect(result).toEqual(['npm', 'echo']);
+  });
+
+  it('should handle single environment variable only in a second command', () => {
+    const result = getCommandRoots('npm run start && TEST=true echo test');
+    expect(result).toEqual(['npm', 'echo']);
+  });
+
+  it('should handle multiple environment variable assignments', () => {
+    const result = getCommandRoots('DEBUG=true ENV=dev npm run start');
+    expect(result).toEqual(['npm']);
+  });
+
+  it('should handle multiple environment variable assignments across multiple commands', () => {
+    const result = getCommandRoots(
+      'DEBUG=true ENV=dev npm run start && TEST=false echo $TEST',
+    );
+    expect(result).toEqual(['npm', 'echo']);
+  });
+
   it('should include nested command substitutions', () => {
     const result = getCommandRoots('echo $(badCommand --danger)');
     expect(result).toEqual(['echo', 'badCommand']);
