@@ -81,7 +81,7 @@ export function getResponseText(
       candidate.content.parts.length > 0
     ) {
       return candidate.content.parts
-        .filter((part) => part.text)
+        .filter((part) => part.text && !part.thought)
         .map((part) => part.text)
         .join('');
     }
