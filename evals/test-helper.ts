@@ -37,6 +37,15 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     try {
       rig.setup(evalCase.name, evalCase.params);
 
+      const interactiveGitMarker = path.join(
+        rig.testDir || '',
+        'interactive_git_triggered',
+      );
+
+      const gitEditorCmd = evalCase.failOnInteractiveGit
+        ? `sh -c 'echo "Auto-commit" > "$0" && touch "${interactiveGitMarker}"'`
+        : `sh -c 'echo "Auto-commit" > "$0"'`;
+
       if (evalCase.files) {
         for (const [filePath, content] of Object.entries(evalCase.files)) {
           const fullPath = path.join(rig.testDir!, filePath);
@@ -49,22 +58,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git config user.email "test@example.com"', execOptions);
         execSync('git config user.name "Test User"', execOptions);
 
-        const interactiveGitMarker = path.join(
-          rig.testDir || '',
-          'interactive_git_triggered',
-        );
-        let gitEditor = 'echo "Auto-commit" >';
-        if (evalCase.failOnInteractiveGit) {
-          gitEditor = `sh -c 'echo "Auto-commit" > "$0" && touch "${interactiveGitMarker}"'`;
-        }
-
         // Temporarily disable the interactive editor and git pager
         // to avoid hanging the tests. It seems the the agent isn't
         // consistently honoring the instructions to avoid interactive
         // commands.
         // We use a shell command that writes to the file argument to ensure
         // git commits succeed without user interaction.
-        const escapedGitEditor = gitEditor.replace(/"/g, '\\"');
+        const escapedGitEditor = gitEditorCmd.replace(/"/g, '\\"');
         execSync(`git config core.editor "${escapedGitEditor}"`, execOptions);
         execSync('git config core.pager cat', execOptions);
         execSync('git config commit.gpgsign false', execOptions);
@@ -74,20 +74,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const interactiveGitMarker = path.join(
-        rig.testDir || '',
-        'interactive_git_triggered',
-      );
-      let gitEditorEnv = 'echo "Auto-commit" >';
-      if (evalCase.failOnInteractiveGit) {
-        gitEditorEnv = `sh -c 'echo "Auto-commit" > "$0" && touch "${interactiveGitMarker}"'`;
-      }
-
       const result = await rig.run({
         args: evalCase.prompt,
         env: {
           // Force non-interactive git behavior
-          GIT_EDITOR: gitEditorEnv,
+          GIT_EDITOR: gitEditorCmd,
           GIT_PAGER: 'cat',
           GIT_TERMINAL_PROMPT: '0',
         },
