@@ -26,6 +26,17 @@ import { GEMINI_DIR, homedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
+import { assembleKinderpowersPrompt } from './kinderpowers-system-prompt.js';
+
+/**
+ * Check if kinderpowers mode is enabled.
+ * Kinderpowers uses agency-respecting language instead of coercive directives.
+ * Enable with GEMINI_KINDERPOWERS=1 or GEMINI_KINDERPOWERS=true
+ */
+function isKinderpowersEnabled(): boolean {
+  const envVar = process.env['GEMINI_KINDERPOWERS']?.trim().toLowerCase();
+  return envVar === '1' || envVar === 'true';
+}
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -158,6 +169,25 @@ ${skillsXml}
   let basePrompt: string;
   if (systemMdEnabled) {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
+  } else if (isKinderpowersEnabled()) {
+    // Kinderpowers: agency-respecting language with ethics framework
+    const skills = config.getSkillManager().getSkills();
+    const isSandboxExec = process.env['SANDBOX'] === 'sandbox-exec';
+    const isGenericSandbox = !!process.env['SANDBOX'];
+
+    basePrompt = assembleKinderpowersPrompt({
+      interactiveMode: config.isInteractive(),
+      isGitRepo: isGitRepository(process.cwd()),
+      sandboxMode: isSandboxExec
+        ? 'sandbox-exec'
+        : isGenericSandbox
+          ? 'generic'
+          : 'none',
+      skills:
+        skills.length > 0
+          ? skills.map((s) => ({ name: s.name, description: s.description }))
+          : undefined,
+    });
   } else {
     const promptConfig = {
       preamble: `You are ${interactiveMode ? 'an interactive ' : 'a non-interactive '}CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.`,
