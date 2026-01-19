@@ -708,6 +708,7 @@ describe('ChatCompressionService', () => {
 
       vi.mocked(mockChat.getHistory).mockReturnValue(history);
       vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
 
       const result = await service.compress(
         mockChat,
@@ -764,6 +765,7 @@ describe('ChatCompressionService', () => {
       ];
 
       vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
 
       const result = await service.compress(
         mockChat,
