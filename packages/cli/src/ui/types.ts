@@ -10,7 +10,6 @@ import type {
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
   SkillDefinition,
@@ -416,14 +415,6 @@ export type SlashCommandProcessorResult =
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
   | SubmitPromptResult;
-
-export interface ShellConfirmationRequest {
-  commands: string[];
-  onConfirm: (
-    outcome: ToolConfirmationOutcome,
-    approvedCommands?: string[],
-  ) => void;
-}
 
 export interface ConfirmationRequest {
   prompt: ReactNode;
