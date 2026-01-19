@@ -75,6 +75,63 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
+    it('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
+      await rig.setup(
+        'should block tool execution and use stderr as reason when hook exits with code 2',
+        {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.block-tool.responses',
+          ),
+          settings: {
+            hooks: {
+              enabled: true,
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      // Exit with code 2 and write reason to stderr
+                      command:
+                        'node -e "process.stderr.write(\'File writing blocked by security policy\'); process.exit(2)"',
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const result = await rig.run({
+        args: 'Create a file called test.txt with content "Hello World"',
+      });
+
+      // The hook should block the write_file tool
+      const toolLogs = rig.readToolLogs();
+      const writeFileCalls = toolLogs.filter(
+        (t) =>
+          t.toolRequest.name === 'write_file' && t.toolRequest.success === true,
+      );
+
+      // Tool should not be called due to blocking hook
+      expect(writeFileCalls).toHaveLength(0);
+
+      // Result should mention the blocking reason from stderr
+      expect(result).toContain('File writing blocked by security policy');
+
+      // Verify hook telemetry shows exit code 2 and stderr
+      const hookLogs = rig.readHookLogs();
+      const blockHook = hookLogs.find((log) => log.hookCall.exit_code === 2);
+      expect(blockHook).toBeDefined();
+      expect(blockHook?.hookCall.stderr).toContain(
+        'File writing blocked by security policy',
+      );
+      expect(blockHook?.hookCall.success).toBe(false);
+    });
+
     it('should allow tool execution when hook returns allow decision', async () => {
       await rig.setup(
         'should allow tool execution when hook returns allow decision',
@@ -247,6 +304,92 @@ console.log(JSON.stringify({
       expect(hookTelemetryFound[0].hookCall.exit_code).toBe(0);
       expect(hookTelemetryFound[0].hookCall.stdout).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.stderr).toBeDefined();
+    });
+
+    it('should block model execution when BeforeModel hook returns deny decision', async () => {
+      await rig.setup(
+        'should block model execution when BeforeModel hook returns deny decision',
+      );
+      const hookScript = `console.log(JSON.stringify({
+  decision: "deny",
+  reason: "Model execution blocked by security policy"
+}));`;
+      const scriptPath = join(rig.testDir!, 'before_model_deny_hook.cjs');
+      writeFileSync(scriptPath, hookScript);
+
+      await rig.setup(
+        'should block model execution when BeforeModel hook returns deny decision',
+        {
+          settings: {
+            hooks: {
+              enabled: true,
+              BeforeModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const result = await rig.run({ args: 'Hello' });
+
+      // The hook should have blocked the request
+      expect(result).toContain('Model execution blocked by security policy');
+
+      // Verify no API requests were made to the LLM
+      const apiRequests = rig.readAllApiRequest();
+      expect(apiRequests).toHaveLength(0);
+    });
+
+    it('should block model execution when BeforeModel hook returns block decision', async () => {
+      await rig.setup(
+        'should block model execution when BeforeModel hook returns block decision',
+      );
+      const hookScript = `console.log(JSON.stringify({
+  decision: "block",
+  reason: "Model execution blocked by security policy"
+}));`;
+      const scriptPath = join(rig.testDir!, 'before_model_block_hook.cjs');
+      writeFileSync(scriptPath, hookScript);
+
+      await rig.setup(
+        'should block model execution when BeforeModel hook returns block decision',
+        {
+          settings: {
+            hooks: {
+              enabled: true,
+              BeforeModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      const result = await rig.run({ args: 'Hello' });
+
+      // The hook should have blocked the request
+      expect(result).toContain('Model execution blocked by security policy');
+
+      // Verify no API requests were made to the LLM
+      const apiRequests = rig.readAllApiRequest();
+      expect(apiRequests).toHaveLength(0);
     });
   });
 
