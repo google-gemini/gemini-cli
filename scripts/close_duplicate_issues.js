@@ -105,7 +105,7 @@ async function run() {
             repo,
             issue_number: issue.number,
             state: 'closed',
-            state_reason: 'not_planned',
+            state_reason: 'duplicate',
           });
           console.log(`  Closed issue.`);
         } else {
