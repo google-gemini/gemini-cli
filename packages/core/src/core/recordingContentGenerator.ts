@@ -15,7 +15,6 @@ import type {
 import { appendFileSync } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { FakeResponse } from './fakeContentGenerator.js';
-import type { UserTierId } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 // A ContentGenerator that wraps another content generator and records all the
@@ -25,12 +24,14 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 //
 // Note that only the "interesting" bits of the responses are actually kept.
 export class RecordingContentGenerator implements ContentGenerator {
-  userTier?: UserTierId;
-
   constructor(
     private readonly realGenerator: ContentGenerator,
     private readonly filePath: string,
   ) {}
+
+  get userTier() {
+    return this.realGenerator.userTier;
+  }
 
   async generateContent(
     request: GenerateContentParameters,

@@ -222,6 +222,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showAuthOnStartup": {
+          "title": "Show Auth On Startup",
+          "description": "Show the authenticated account and plan on startup.",
+          "markdownDescription": "Show the authenticated account and plan on startup.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideContextSummary": {
           "title": "Hide Context Summary",
           "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",

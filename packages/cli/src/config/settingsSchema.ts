@@ -424,6 +424,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the application banner',
         showInDialog: true,
       },
+      showAuthOnStartup: {
+        type: 'boolean',
+        label: 'Show Auth On Startup',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show the authenticated account and plan on startup.',
+        showInDialog: true,
+      },
       hideContextSummary: {
         type: 'boolean',
         label: 'Hide Context Summary',

@@ -51,6 +51,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     return this.wrapped;
   }
 
+  get userTier() {
+    return this.wrapped.userTier;
+  }
+
   private logApiRequest(
     contents: Content[],
     model: string,
