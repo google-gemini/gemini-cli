@@ -64,17 +64,29 @@ async function main() {
     // -r: recursive
     // -x: exclude patterns
     // Run the zip command from within the directory to avoid parent folder nesting
-    const zipProcess = spawnSync('zip', ['-r', outputFilename, '.'], {
+    let zipProcess = spawnSync('zip', ['-r', outputFilename, '.'], {
       cwd: skillPath,
       stdio: 'inherit',
     });
+
+    if (zipProcess.error && zipProcess.error.code === 'ENOENT') {
+      console.log(
+        `⚠️  zip command not found (code: ${zipProcess.error.code}), trying tar...`,
+      );
+      // Fallback to tar (common on Windows 10+ and Linux)
+      // tar -a -c -f output.zip .
+      zipProcess = spawnSync('tar', ['-a', '-c', '-f', outputFilename, '.'], {
+        cwd: skillPath,
+        stdio: 'inherit',
+      });
+    }
 
     if (zipProcess.error) {
       throw zipProcess.error;
     }
 
     if (zipProcess.status !== 0) {
-      throw new Error(`zip command failed with exit code ${zipProcess.status}`);
+      throw new Error(`Archiver command failed with exit code ${zipProcess.status}`);
     }
 
     console.log(`✅ Successfully packaged skill to: ${outputFilename}`);

@@ -1153,8 +1153,25 @@ export class TestRig {
       ) as { [key: string]: string },
     };
 
+    if (process.platform === 'win32' && process.env['CI']) {
+      console.warn(
+        '⚠️  WARNING: Running interactive test (node-pty) on Windows CI. This is known to be unstable.',
+      );
+    }
+
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
+    let ptyProcess: pty.IPty;
+    try {
+      ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
+    } catch (err) {
+      console.error('Failed to spawn interactive process (node-pty):', err);
+      if (process.platform === 'win32') {
+        console.error(
+          'Hint: This is often caused by missing console/terminal subsystem in Windows CI agents (AttachConsole failed).',
+        );
+      }
+      throw err;
+    }
 
     const run = new InteractiveRun(ptyProcess);
     this._interactiveRuns.push(run);

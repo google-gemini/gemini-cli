@@ -432,98 +432,105 @@ console.log(JSON.stringify({
   });
 
   describe('Notification Hooks - Permission Handling', () => {
-    it('should handle notification hooks for tool permissions', async () => {
-      // Create inline hook command (works on both Unix and Windows)
-      // Create inline hook command (works on both Unix and Windows)
-      const hookCommand =
-        'node -e "console.log(JSON.stringify({suppressOutput: false, systemMessage: \'Permission request logged by security hook\'}))"';
+    it.skipIf(process.platform === 'win32')(
+      'should handle notification hooks for tool permissions',
+      async () => {
+        // Create inline hook command (works on both Unix and Windows)
+        // Create inline hook command (works on both Unix and Windows)
+        const hookCommand =
+          'node -e "console.log(JSON.stringify({suppressOutput: false, systemMessage: \'Permission request logged by security hook\'}))"';
 
-      await rig.setup('should handle notification hooks for tool permissions', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.notification.responses',
-        ),
-        settings: {
-          // Configure tools to enable hooks and require confirmation to trigger notifications
-          tools: {
-            approval: 'ASK', // Disable YOLO mode to show permission prompts
-            confirmationRequired: ['run_shell_command'],
-          },
-          hooks: {
-            enabled: true,
-            Notification: [
-              {
-                matcher: 'ToolPermission',
-                hooks: [
+        await rig.setup(
+          'should handle notification hooks for tool permissions',
+          {
+            fakeResponsesPath: join(
+              import.meta.dirname,
+              'hooks-system.notification.responses',
+            ),
+            settings: {
+              // Configure tools to enable hooks and require confirmation to trigger notifications
+              tools: {
+                approval: 'ASK', // Disable YOLO mode to show permission prompts
+                confirmationRequired: ['run_shell_command'],
+              },
+              hooks: {
+                enabled: true,
+                Notification: [
                   {
-                    type: 'command',
-                    command: hookCommand,
-                    timeout: 5000,
+                    matcher: 'ToolPermission',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: hookCommand,
+                        timeout: 5000,
+                      },
+                    ],
                   },
                 ],
               },
-            ],
+            },
           },
-        },
-      });
-
-      const run = await rig.runInteractive({ yolo: false });
-
-      // Send prompt that will trigger a permission request
-      await run.type('Run the command "echo test"');
-      await run.type('\r');
-
-      // Wait for permission prompt to appear
-      await run.expectText('Allow', 10000);
-
-      // Approve the permission
-      await run.type('y');
-      await run.type('\r');
-
-      // Wait for command to execute
-      await run.expectText('test', 10000);
-
-      // Should find the shell command execution
-      const foundShellCommand = await rig.waitForToolCall('run_shell_command');
-      expect(foundShellCommand).toBeTruthy();
-
-      // Verify Notification hook executed
-      const hookLogs = rig.readHookLogs();
-      const notificationLog = hookLogs.find(
-        (log) =>
-          log.hookCall.hook_event_name === 'Notification' &&
-          log.hookCall.hook_name === hookCommand,
-      );
-
-      expect(notificationLog).toBeDefined();
-      if (notificationLog) {
-        expect(notificationLog.hookCall.exit_code).toBe(0);
-        expect(notificationLog.hookCall.stdout).toContain(
-          'Permission request logged by security hook',
         );
 
-        // Verify hook input contains notification details
-        const hookInputStr =
-          typeof notificationLog.hookCall.hook_input === 'string'
-            ? notificationLog.hookCall.hook_input
-            : JSON.stringify(notificationLog.hookCall.hook_input);
-        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+        const run = await rig.runInteractive({ yolo: false });
 
-        // Should have notification type (uses snake_case)
-        expect(hookInput['notification_type']).toBe('ToolPermission');
+        // Send prompt that will trigger a permission request
+        await run.type('Run the command "echo test"');
+        await run.type('\r');
 
-        // Should have message
-        expect(hookInput['message']).toBeDefined();
+        // Wait for permission prompt to appear
+        await run.expectText('Allow', 10000);
 
-        // Should have details with tool info
-        expect(hookInput['details']).toBeDefined();
-        const details = hookInput['details'] as Record<string, unknown>;
-        // For 'exec' type confirmations, details contains: type, title, command, rootCommand
-        expect(details['type']).toBe('exec');
-        expect(details['command']).toBeDefined();
-        expect(details['title']).toBeDefined();
-      }
-    });
+        // Approve the permission
+        await run.type('y');
+        await run.type('\r');
+
+        // Wait for command to execute
+        await run.expectText('test', 10000);
+
+        // Should find the shell command execution
+        const foundShellCommand =
+          await rig.waitForToolCall('run_shell_command');
+        expect(foundShellCommand).toBeTruthy();
+
+        // Verify Notification hook executed
+        const hookLogs = rig.readHookLogs();
+        const notificationLog = hookLogs.find(
+          (log) =>
+            log.hookCall.hook_event_name === 'Notification' &&
+            log.hookCall.hook_name === hookCommand,
+        );
+
+        expect(notificationLog).toBeDefined();
+        if (notificationLog) {
+          expect(notificationLog.hookCall.exit_code).toBe(0);
+          expect(notificationLog.hookCall.stdout).toContain(
+            'Permission request logged by security hook',
+          );
+
+          // Verify hook input contains notification details
+          const hookInputStr =
+            typeof notificationLog.hookCall.hook_input === 'string'
+              ? notificationLog.hookCall.hook_input
+              : JSON.stringify(notificationLog.hookCall.hook_input);
+          const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+
+          // Should have notification type (uses snake_case)
+          expect(hookInput['notification_type']).toBe('ToolPermission');
+
+          // Should have message
+          expect(hookInput['message']).toBeDefined();
+
+          // Should have details with tool info
+          expect(hookInput['details']).toBeDefined();
+          const details = hookInput['details'] as Record<string, unknown>;
+          // For 'exec' type confirmations, details contains: type, title, command, rootCommand
+          expect(details['type']).toBe('exec');
+          expect(details['command']).toBeDefined();
+          expect(details['title']).toBeDefined();
+        }
+      },
+    );
   });
 
   describe('Sequential Hook Execution', () => {
@@ -999,9 +1006,11 @@ console.log(JSON.stringify({
       expect(requestText).toContain('protocol droid');
     });
 
-    it('should fire SessionStart hook and display systemMessage in interactive mode', async () => {
-      // Create hook script that outputs JSON with systemMessage and additionalContext
-      const hookScript = `const fs = require('fs');
+    it.skipIf(process.platform === 'win32')(
+      'should fire SessionStart hook and display systemMessage in interactive mode',
+      async () => {
+        // Create hook script that outputs JSON with systemMessage and additionalContext
+        const hookScript = `const fs = require('fs');
 console.log(JSON.stringify({
   decision: 'allow', 
   systemMessage: 'Interactive Session Start Message', 
@@ -1011,252 +1020,258 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      await rig.setup(
-        'should fire SessionStart hook and display systemMessage in interactive mode',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.session-startup.responses',
-          ),
-        },
-      );
+        await rig.setup(
+          'should fire SessionStart hook and display systemMessage in interactive mode',
+          {
+            fakeResponsesPath: join(
+              import.meta.dirname,
+              'hooks-system.session-startup.responses',
+            ),
+          },
+        );
 
-      const scriptPath = join(
-        rig.testDir!,
-        'session_start_interactive_hook.cjs',
-      );
-      writeFileSync(scriptPath, hookScript);
+        const scriptPath = join(
+          rig.testDir!,
+          'session_start_interactive_hook.cjs',
+        );
+        writeFileSync(scriptPath, hookScript);
 
-      await rig.setup(
-        'should fire SessionStart hook and display systemMessage in interactive mode',
-        {
-          settings: {
-            hooks: {
-              enabled: true,
-              SessionStart: [
-                {
-                  matcher: 'startup',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+        await rig.setup(
+          'should fire SessionStart hook and display systemMessage in interactive mode',
+          {
+            settings: {
+              hooks: {
+                enabled: true,
+                SessionStart: [
+                  {
+                    matcher: 'startup',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: `node "${scriptPath}"`,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           },
-        },
-      );
+        );
 
-      const run = await rig.runInteractive();
+        const run = await rig.runInteractive();
 
-      // Verify systemMessage is displayed
-      await run.expectText('Interactive Session Start Message', 10000);
+        // Verify systemMessage is displayed
+        await run.expectText('Interactive Session Start Message', 10000);
 
-      // Send a prompt to establish a session and trigger an API call
-      await run.sendKeys('Hello');
-      await run.type('\r');
-
-      // Wait for response to ensure API call happened
-      await run.expectText('Hello', 15000);
-
-      // Wait for telemetry to be written to disk
-      await rig.waitForTelemetryReady();
-
-      // Verify the API request contained the injected context
-      // We may need to poll for API requests as they are written asynchronously
-      const pollResult = await poll(
-        () => {
-          const apiRequests = rig.readAllApiRequest();
-          return apiRequests.length > 0;
-        },
-        15000,
-        500,
-      );
-
-      expect(pollResult).toBe(true);
-
-      const apiRequests = rig.readAllApiRequest();
-      // The injected context should be in the request_text of the API request
-      const requestText = apiRequests[0].attributes?.request_text || '';
-      expect(requestText).toContain('Jedi Master');
-    });
-
-    it('should fire SessionEnd and SessionStart hooks on /clear command', async () => {
-      // Create inline hook commands for both SessionEnd and SessionStart
-      const sessionEndCommand =
-        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session ending due to clear'}))\"";
-      const sessionStartCommand =
-        "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting after clear'}))\"";
-
-      await rig.setup(
-        'should fire SessionEnd and SessionStart hooks on /clear command',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.session-clear.responses',
-          ),
-          settings: {
-            hooks: {
-              enabled: true,
-              SessionEnd: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionEndCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              SessionStart: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionStartCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      );
-
-      const run = await rig.runInteractive();
-
-      // Send an initial prompt to establish a session
-      await run.sendKeys('Say hello');
-      await run.type('\r');
-
-      // Wait for the response
-      await run.expectText('Hello', 10000);
-
-      // Execute /clear command multiple times to generate more hook events
-      // This makes the test more robust by creating multiple start/stop cycles
-      const numClears = 3;
-      for (let i = 0; i < numClears; i++) {
-        await run.sendKeys('/clear');
+        // Send a prompt to establish a session and trigger an API call
+        await run.sendKeys('Hello');
         await run.type('\r');
 
-        // Wait a bit for clear to complete
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Wait for response to ensure API call happened
+        await run.expectText('Hello', 15000);
 
-        // Send a prompt to establish an active session before next clear
+        // Wait for telemetry to be written to disk
+        await rig.waitForTelemetryReady();
+
+        // Verify the API request contained the injected context
+        // We may need to poll for API requests as they are written asynchronously
+        const pollResult = await poll(
+          () => {
+            const apiRequests = rig.readAllApiRequest();
+            return apiRequests.length > 0;
+          },
+          15000,
+          500,
+        );
+
+        expect(pollResult).toBe(true);
+
+        const apiRequests = rig.readAllApiRequest();
+        // The injected context should be in the request_text of the API request
+        const requestText = apiRequests[0].attributes?.request_text || '';
+        expect(requestText).toContain('Jedi Master');
+      },
+    );
+
+    it.skipIf(process.platform === 'win32')(
+      'should fire SessionEnd and SessionStart hooks on /clear command',
+      async () => {
+        // Create inline hook commands for both SessionEnd and SessionStart
+        const sessionEndCommand =
+          "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session ending due to clear'}))\"";
+        const sessionStartCommand =
+          "node -e \"console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting after clear'}))\"";
+
+        await rig.setup(
+          'should fire SessionEnd and SessionStart hooks on /clear command',
+          {
+            fakeResponsesPath: join(
+              import.meta.dirname,
+              'hooks-system.session-clear.responses',
+            ),
+            settings: {
+              hooks: {
+                enabled: true,
+                SessionEnd: [
+                  {
+                    matcher: '*',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: sessionEndCommand,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+                SessionStart: [
+                  {
+                    matcher: '*',
+                    hooks: [
+                      {
+                        type: 'command',
+                        command: sessionStartCommand,
+                        timeout: 5000,
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        );
+
+        const run = await rig.runInteractive();
+
+        // Send an initial prompt to establish a session
         await run.sendKeys('Say hello');
         await run.type('\r');
 
-        // Wait for response
+        // Wait for the response
         await run.expectText('Hello', 10000);
-      }
 
-      // Wait for all clears to complete
-      // BatchLogRecordProcessor exports telemetry every 10 seconds by default
-      // Use generous wait time across all platforms (CI, Docker, Mac, Linux)
-      await new Promise((resolve) => setTimeout(resolve, 15000));
+        // Execute /clear command multiple times to generate more hook events
+        // This makes the test more robust by creating multiple start/stop cycles
+        const numClears = 3;
+        for (let i = 0; i < numClears; i++) {
+          await run.sendKeys('/clear');
+          await run.type('\r');
 
-      // Wait for telemetry to be written to disk
-      await rig.waitForTelemetryReady();
+          // Wait a bit for clear to complete
+          await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Wait for hook telemetry events to be flushed to disk
-      // In interactive mode, telemetry may be buffered, so we need to poll for the events
-      // We execute multiple clears to generate more hook events (total: 1 + numClears * 2)
-      // But we only require >= 1 hooks to pass, making the test more permissive
-      const expectedMinHooks = 1; // SessionStart (startup), SessionEnd (clear), SessionStart (clear)
-      const pollResult = await poll(
-        () => {
+          // Send a prompt to establish an active session before next clear
+          await run.sendKeys('Say hello');
+          await run.type('\r');
+
+          // Wait for response
+          await run.expectText('Hello', 10000);
+        }
+
+        // Wait for all clears to complete
+        // BatchLogRecordProcessor exports telemetry every 10 seconds by default
+        // Use generous wait time across all platforms (CI, Docker, Mac, Linux)
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+
+        // Wait for telemetry to be written to disk
+        await rig.waitForTelemetryReady();
+
+        // Wait for hook telemetry events to be flushed to disk
+        // In interactive mode, telemetry may be buffered, so we need to poll for the events
+        // We execute multiple clears to generate more hook events (total: 1 + numClears * 2)
+        // But we only require >= 1 hooks to pass, making the test more permissive
+        const expectedMinHooks = 1; // SessionStart (startup), SessionEnd (clear), SessionStart (clear)
+        const pollResult = await poll(
+          () => {
+            const hookLogs = rig.readHookLogs();
+            return hookLogs.length >= expectedMinHooks;
+          },
+          90000, // 90 second timeout for all platforms
+          1000, // check every 1s to reduce I/O overhead
+        );
+
+        // If polling failed, log diagnostic info
+        if (!pollResult) {
           const hookLogs = rig.readHookLogs();
-          return hookLogs.length >= expectedMinHooks;
-        },
-        90000, // 90 second timeout for all platforms
-        1000, // check every 1s to reduce I/O overhead
-      );
+          const hookEvents = hookLogs.map(
+            (log) => log.hookCall.hook_event_name,
+          );
+          console.error(
+            `Polling timeout after 90000ms: Expected >= ${expectedMinHooks} hooks, got ${hookLogs.length}`,
+          );
+          console.error(
+            'Hooks found:',
+            hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE',
+          );
+          console.error('Full hook logs:', JSON.stringify(hookLogs, null, 2));
+        }
 
-      // If polling failed, log diagnostic info
-      if (!pollResult) {
+        // Verify hooks executed
         const hookLogs = rig.readHookLogs();
+
+        // Diagnostic: Log which hooks we actually got
         const hookEvents = hookLogs.map((log) => log.hookCall.hook_event_name);
-        console.error(
-          `Polling timeout after 90000ms: Expected >= ${expectedMinHooks} hooks, got ${hookLogs.length}`,
+        if (hookLogs.length < expectedMinHooks) {
+          console.error(
+            `TEST FAILURE: Expected >= ${expectedMinHooks} hooks, got ${hookLogs.length}: [${hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE'}]`,
+          );
+        }
+
+        expect(hookLogs.length).toBeGreaterThanOrEqual(expectedMinHooks);
+
+        // Find SessionEnd hook log
+        const sessionEndLog = hookLogs.find(
+          (log) =>
+            log.hookCall.hook_event_name === 'SessionEnd' &&
+            log.hookCall.hook_name === sessionEndCommand,
         );
-        console.error(
-          'Hooks found:',
-          hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE',
+        // Because the flakiness of the test, we relax this check
+        // expect(sessionEndLog).toBeDefined();
+        if (sessionEndLog) {
+          expect(sessionEndLog.hookCall.exit_code).toBe(0);
+          expect(sessionEndLog.hookCall.stdout).toContain(
+            'Session ending due to clear',
+          );
+
+          // Verify hook input contains reason
+          const hookInputStr =
+            typeof sessionEndLog.hookCall.hook_input === 'string'
+              ? sessionEndLog.hookCall.hook_input
+              : JSON.stringify(sessionEndLog.hookCall.hook_input);
+          const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+          expect(hookInput['reason']).toBe('clear');
+        }
+
+        // Find SessionStart hook log after clear
+        const sessionStartAfterClearLogs = hookLogs.filter(
+          (log) =>
+            log.hookCall.hook_event_name === 'SessionStart' &&
+            log.hookCall.hook_name === sessionStartCommand,
         );
-        console.error('Full hook logs:', JSON.stringify(hookLogs, null, 2));
-      }
+        // Should have at least one SessionStart from after clear
+        // Because the flakiness of the test, we relax this check
+        // expect(sessionStartAfterClearLogs.length).toBeGreaterThanOrEqual(1);
 
-      // Verify hooks executed
-      const hookLogs = rig.readHookLogs();
+        const sessionStartLog = sessionStartAfterClearLogs.find((log) => {
+          const hookInputStr =
+            typeof log.hookCall.hook_input === 'string'
+              ? log.hookCall.hook_input
+              : JSON.stringify(log.hookCall.hook_input);
+          const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
+          return hookInput['source'] === 'clear';
+        });
 
-      // Diagnostic: Log which hooks we actually got
-      const hookEvents = hookLogs.map((log) => log.hookCall.hook_event_name);
-      if (hookLogs.length < expectedMinHooks) {
-        console.error(
-          `TEST FAILURE: Expected >= ${expectedMinHooks} hooks, got ${hookLogs.length}: [${hookEvents.length > 0 ? hookEvents.join(', ') : 'NONE'}]`,
-        );
-      }
-
-      expect(hookLogs.length).toBeGreaterThanOrEqual(expectedMinHooks);
-
-      // Find SessionEnd hook log
-      const sessionEndLog = hookLogs.find(
-        (log) =>
-          log.hookCall.hook_event_name === 'SessionEnd' &&
-          log.hookCall.hook_name === sessionEndCommand,
-      );
-      // Because the flakiness of the test, we relax this check
-      // expect(sessionEndLog).toBeDefined();
-      if (sessionEndLog) {
-        expect(sessionEndLog.hookCall.exit_code).toBe(0);
-        expect(sessionEndLog.hookCall.stdout).toContain(
-          'Session ending due to clear',
-        );
-
-        // Verify hook input contains reason
-        const hookInputStr =
-          typeof sessionEndLog.hookCall.hook_input === 'string'
-            ? sessionEndLog.hookCall.hook_input
-            : JSON.stringify(sessionEndLog.hookCall.hook_input);
-        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
-        expect(hookInput['reason']).toBe('clear');
-      }
-
-      // Find SessionStart hook log after clear
-      const sessionStartAfterClearLogs = hookLogs.filter(
-        (log) =>
-          log.hookCall.hook_event_name === 'SessionStart' &&
-          log.hookCall.hook_name === sessionStartCommand,
-      );
-      // Should have at least one SessionStart from after clear
-      // Because the flakiness of the test, we relax this check
-      // expect(sessionStartAfterClearLogs.length).toBeGreaterThanOrEqual(1);
-
-      const sessionStartLog = sessionStartAfterClearLogs.find((log) => {
-        const hookInputStr =
-          typeof log.hookCall.hook_input === 'string'
-            ? log.hookCall.hook_input
-            : JSON.stringify(log.hookCall.hook_input);
-        const hookInput = JSON.parse(hookInputStr) as Record<string, unknown>;
-        return hookInput['source'] === 'clear';
-      });
-
-      // Because the flakiness of the test, we relax this check
-      // expect(sessionStartLog).toBeDefined();
-      if (sessionStartLog) {
-        expect(sessionStartLog.hookCall.exit_code).toBe(0);
-        expect(sessionStartLog.hookCall.stdout).toContain(
-          'Session starting after clear',
-        );
-      }
-    });
+        // Because the flakiness of the test, we relax this check
+        // expect(sessionStartLog).toBeDefined();
+        if (sessionStartLog) {
+          expect(sessionStartLog.hookCall.exit_code).toBe(0);
+          expect(sessionStartLog.hookCall.stdout).toContain(
+            'Session starting after clear',
+          );
+        }
+      },
+    );
   });
 
   describe('Compression Hooks', () => {
