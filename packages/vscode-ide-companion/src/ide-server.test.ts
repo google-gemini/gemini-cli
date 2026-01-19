@@ -10,12 +10,27 @@ import * as fs from 'node:fs/promises';
 import type * as os from 'node:os';
 import * as path from 'node:path';
 import * as http from 'node:http';
+import { spawnSync } from 'node:child_process';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(() => 'test-auth-token'),
 }));
+
+const canListen = (() => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      "const net=require('net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));server.on('error',()=>process.exit(1));",
+    ],
+    { timeout: 2000 },
+  );
+  return result.status === 0;
+})();
+
+const describeIfListening = canListen ? describe : describe.skip;
 
 const mocks = vi.hoisted(() => ({
   diffManager: {
@@ -88,7 +103,7 @@ const getPortFromMock = (
   return port;
 };
 
-describe('IDEServer', () => {
+describeIfListening('IDEServer', () => {
   let ideServer: IDEServer;
   let mockContext: vscode.ExtensionContext;
   let mockLog: (message: string) => void;
@@ -458,7 +473,7 @@ const request = (
     req.end();
   });
 
-describe('IDEServer HTTP endpoints', () => {
+describeIfListening('IDEServer HTTP endpoints', () => {
   let ideServer: IDEServer;
   let mockContext: vscode.ExtensionContext;
   let mockLog: (message: string) => void;

@@ -12,11 +12,26 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { spawnSync } from 'node:child_process';
 
 import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
 import { debugLogger, type Config } from '@google/gemini-cli-core';
+
+const canListen = (() => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      "const net=require('net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));server.on('error',()=>process.exit(1));",
+    ],
+    { timeout: 2000 },
+  );
+  return result.status === 0;
+})();
+
+const describeIfListening = canListen ? describe : describe.skip;
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
@@ -69,13 +84,13 @@ vi.mock('../config/config.js', async () => {
   };
 });
 
-describe('Agent Server Endpoints', () => {
+describeIfListening('Agent Server Endpoints', () => {
   let app: express.Express;
   let server: Server;
   let testWorkspace: string;
 
   const createTask = (contextId: string) =>
-    request(app)
+    request(server)
       .post('/tasks')
       .send({
         contextId,
@@ -93,7 +108,7 @@ describe('Agent Server Endpoints', () => {
     );
     app = await createApp();
     await new Promise<void>((resolve) => {
-      server = app.listen(0, () => {
+      server = app.listen(0, '127.0.0.1', () => {
         const port = (server.address() as AddressInfo).port;
         updateCoderAgentCardUrl(port);
         resolve();
@@ -129,7 +144,7 @@ describe('Agent Server Endpoints', () => {
   it('should get metadata for a specific task via GET /tasks/:taskId/metadata', async () => {
     const createResponse = await createTask('test-context-2');
     const taskId = createResponse.body;
-    const response = await request(app).get(`/tasks/${taskId}/metadata`);
+    const response = await request(server).get(`/tasks/${taskId}/metadata`);
     expect(response.status).toBe(200);
     expect(response.body.metadata.id).toBe(taskId);
   }, 6000);
@@ -137,7 +152,7 @@ describe('Agent Server Endpoints', () => {
   it('should get metadata for all tasks via GET /tasks/metadata', async () => {
     const createResponse = await createTask('test-context-3');
     const taskId = createResponse.body;
-    const response = await request(app).get('/tasks/metadata');
+    const response = await request(server).get('/tasks/metadata');
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);
     expect(response.body.length).toBeGreaterThan(0);
@@ -148,12 +163,12 @@ describe('Agent Server Endpoints', () => {
   });
 
   it('should return 404 for a non-existent task', async () => {
-    const response = await request(app).get('/tasks/fake-task/metadata');
+    const response = await request(server).get('/tasks/fake-task/metadata');
     expect(response.status).toBe(404);
   });
 
   it('should return agent metadata via GET /.well-known/agent-card.json', async () => {
-    const response = await request(app).get('/.well-known/agent-card.json');
+    const response = await request(server).get('/.well-known/agent-card.json');
     const port = (server.address() as AddressInfo).port;
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Gemini SDLC Agent');

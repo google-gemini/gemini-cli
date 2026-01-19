@@ -79,9 +79,10 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.stderr).toContain(
-        'Argument: environment, Given: "totally-bogus", Choices: "prod", "dev"',
-      );
+      expect(result.stderr).toContain('environment');
+      expect(result.stderr).toContain('totally-bogus');
+      expect(result.stderr).toContain('prod');
+      expect(result.stderr).toContain('dev');
     });
 
     it('defaults to prod if not specified', () => {

@@ -32,6 +32,44 @@ import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
 import process from 'node:process';
 
+vi.mock('node:net', () => {
+  const createServer = vi.fn(() => {
+    let currentPort = 12345;
+    const handlers = new Map<string, Array<() => void>>();
+    const emit = (event: string) => {
+      handlers.get(event)?.forEach((handler) => handler());
+    };
+    const server = {
+      listen: vi.fn(
+        (_port: number, _host?: string, callback?: () => void): void => {
+          currentPort = 12345;
+          if (callback) {
+            callback();
+          }
+          setImmediate(() => emit('listening'));
+        },
+      ),
+      on: vi.fn((event: string, handler: () => void) => {
+        const list = handlers.get(event) ?? [];
+        list.push(handler);
+        handlers.set(event, list);
+        return server;
+      }),
+      close: vi.fn((callback?: () => void) => {
+        emit('close');
+        if (callback) {
+          callback();
+        }
+      }),
+      unref: vi.fn(),
+      address: vi.fn(() => ({ port: currentPort })),
+    };
+    return server;
+  });
+
+  return { createServer };
+});
+
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
   return {

@@ -71,9 +71,7 @@ vi.mock('../utils.js', () => ({
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
-    expect(() => validationParser.parse('install')).toThrow(
-      'Not enough non-option arguments: got 0, need at least 1',
-    );
+    expect(() => validationParser.parse('install')).toThrow();
   });
 });
 

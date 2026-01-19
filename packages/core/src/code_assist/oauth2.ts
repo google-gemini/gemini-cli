@@ -595,7 +595,7 @@ export function getAvailablePort(): Promise<number> {
         return resolve(port);
       }
       const server = net.createServer();
-      server.listen(0, () => {
+      server.listen(0, '127.0.0.1', () => {
         const address = server.address()! as net.AddressInfo;
         port = address.port;
       });
