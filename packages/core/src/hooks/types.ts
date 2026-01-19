@@ -45,6 +45,11 @@ export enum HookEventName {
 }
 
 /**
+ * Fields in the hooks configuration that are not hook event names
+ */
+export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
+
+/**
  * Hook configuration entry
  */
 export interface CommandHookConfig {
@@ -351,22 +356,6 @@ export class AfterModelHookOutput extends DefaultHookOutput {
           hookResponse as LLMResponse,
         );
       }
-    }
-
-    // If hook wants to stop execution, create a synthetic stop response
-    if (this.shouldStopExecution()) {
-      const stopResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: [this.getEffectiveReason() || 'Execution stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      return defaultHookTranslator.fromHookLLMResponse(stopResponse);
     }
 
     return undefined;

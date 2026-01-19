@@ -10,7 +10,6 @@ import type {
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
   SkillDefinition,
@@ -30,6 +29,8 @@ export enum AuthState {
   AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
+  // Waiting for the user to restart after a Google login
+  AwaitingGoogleLoginRestart = 'awaiting_google_login_restart',
 }
 
 // Only defining the state enum needed by the UI
@@ -414,14 +415,6 @@ export type SlashCommandProcessorResult =
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
   | SubmitPromptResult;
-
-export interface ShellConfirmationRequest {
-  commands: string[];
-  onConfirm: (
-    outcome: ToolConfirmationOutcome,
-    approvedCommands?: string[],
-  ) => void;
-}
 
 export interface ConfirmationRequest {
   prompt: ReactNode;

@@ -51,7 +51,6 @@ interface RunNonInteractiveParams {
   settings: LoadedSettings;
   input: string;
   prompt_id: string;
-  hasDeprecatedPromptArg?: boolean;
   resumedSessionData?: ResumedSessionData;
 }
 
@@ -60,7 +59,6 @@ export async function runNonInteractive({
   settings,
   input,
   prompt_id,
-  hasDeprecatedPromptArg,
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
@@ -264,21 +262,6 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
-      const deprecateText =
-        'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
-      if (hasDeprecatedPromptArg) {
-        if (streamFormatter) {
-          streamFormatter.emitEvent({
-            type: JsonStreamEventType.MESSAGE,
-            timestamp: new Date().toISOString(),
-            role: 'assistant',
-            content: deprecateText,
-            delta: true,
-          });
-        } else {
-          process.stderr.write(deprecateText);
-        }
-      }
       while (true) {
         turnCount++;
         if (
@@ -349,7 +332,7 @@ export async function runNonInteractive({
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
-            const stopMessage = `Agent execution stopped: ${event.value.reason}`;
+            const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`${stopMessage}\n`);
             }
@@ -369,7 +352,7 @@ export async function runNonInteractive({
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
-            const blockMessage = `Agent execution blocked: ${event.value.reason}`;
+            const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }

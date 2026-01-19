@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.25.0-nightly.20260107.59a18e710",
+  "version": "0.26.0-nightly.20260115.6cb3ae4e0",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -21,7 +21,7 @@
     "dist"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.7",
+    "@a2a-js/sdk": "^0.3.8",
     "@google-cloud/logging": "^11.2.1",
     "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
     "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
@@ -64,6 +64,7 @@
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
+    "systeminformation": "^5.25.11",
     "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
     "uuid": "^13.0.0",
