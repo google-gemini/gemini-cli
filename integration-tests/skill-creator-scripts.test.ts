@@ -22,6 +22,18 @@ describe('skill-creator scripts e2e', () => {
     'packages/core/src/skills/builtin/skill-creator/scripts/package_skill.cjs',
   );
 
+  function execAndLog(command: string) {
+    try {
+      return execSync(command, { encoding: 'utf8', stdio: 'pipe' });
+    } catch (error: unknown) {
+      console.error('Command failed:', command);
+      const err = error as { stdout?: Buffer; stderr?: Buffer };
+      if (err.stdout) console.log('STDOUT:', err.stdout.toString());
+      if (err.stderr) console.error('STDERR:', err.stderr.toString());
+      throw error;
+    }
+  }
+
   beforeEach(() => {
     rig = new TestRig();
   });
@@ -36,9 +48,7 @@ describe('skill-creator scripts e2e', () => {
     const tempDir = rig.testDir!;
 
     // 1. Initialize
-    execSync(`node "${initScript}" ${skillName} --path "${tempDir}"`, {
-      stdio: 'inherit',
-    });
+    execAndLog(`node "${initScript}" ${skillName} --path "${tempDir}"`);
     const skillDir = path.join(tempDir, skillName);
 
     expect(fs.existsSync(skillDir)).toBe(true);
@@ -48,17 +58,15 @@ describe('skill-creator scripts e2e', () => {
     ).toBe(true);
 
     // 2. Validate (should have warning initially due to TODOs)
-    const validateOutputInitial = execSync(
+    // redirct stderr to stdout to capture warnings in the output check
+    const validateOutputInitial = execAndLog(
       `node "${validateScript}" "${skillDir}" 2>&1`,
-      { encoding: 'utf8' },
     );
     expect(validateOutputInitial).toContain('⚠️  Found unresolved TODO');
 
     // 3. Package (should fail due to TODOs)
     try {
-      execSync(`node "${packageScript}" "${skillDir}" "${tempDir}"`, {
-        stdio: 'pipe',
-      });
+      execAndLog(`node "${packageScript}" "${skillDir}" "${tempDir}"`);
       throw new Error('Packaging should have failed due to TODOs');
     } catch (err: unknown) {
       expect((err as Error).message).toContain('Command failed');
@@ -66,32 +74,41 @@ describe('skill-creator scripts e2e', () => {
 
     // 4. Fix SKILL.md (remove TODOs)
     let content = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
-    content = content.replace(/TODO: .+/g, 'Fixed');
-    content = content.replace(/\[TODO: .+/g, 'Fixed');
+    // Replace all TODOs with "Fixed" to ensure validation passes
+    content = content.replace(/TODO:/g, 'Fixed:');
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
 
     // Also remove TODOs from example scripts
     const exampleScriptPath = path.join(skillDir, 'scripts/example_script.cjs');
     let scriptContent = fs.readFileSync(exampleScriptPath, 'utf8');
-    scriptContent = scriptContent.replace(/TODO: .+/g, 'Fixed');
+    scriptContent = scriptContent.replace(/TODO:/g, 'Fixed:');
     fs.writeFileSync(exampleScriptPath, scriptContent);
 
     // 4. Validate again (should pass now)
-    const validateOutput = execSync(`node "${validateScript}" "${skillDir}"`, {
-      encoding: 'utf8',
-    });
+    const validateOutput = execAndLog(`node "${validateScript}" "${skillDir}"`);
     expect(validateOutput).toContain('Skill is valid!');
 
     // 5. Package
-    execSync(`node "${packageScript}" "${skillDir}" "${tempDir}"`, {
-      stdio: 'inherit',
-    });
+    execAndLog(`node "${packageScript}" "${skillDir}" "${tempDir}"`);
     const skillFile = path.join(tempDir, `${skillName}.skill`);
     expect(fs.existsSync(skillFile)).toBe(true);
 
     // 6. Verify zip content (should NOT have nested directory)
-    const zipList = execSync(`unzip -l "${skillFile}"`, { encoding: 'utf8' });
-    expect(zipList).toContain('SKILL.md');
-    expect(zipList).not.toContain(`${skillName}/SKILL.md`);
+    // We prefer unzip as it handles zip files reliably across platforms where installed
+    try {
+      const zipList = execAndLog(`unzip -l "${skillFile}"`);
+      expect(zipList).toContain('SKILL.md');
+      expect(zipList).not.toContain(`${skillName}/SKILL.md`);
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err.code === 'ENOENT' || err.message?.includes('not found')) {
+        // Fallback to tar if unzip is missing (e.g. some Windows envs)
+        const tarList = execAndLog(`tar -tf "${skillFile}"`);
+        expect(tarList).toContain('SKILL.md');
+        expect(tarList).not.toContain(`${skillName}/SKILL.md`);
+      } else {
+        throw e;
+      }
+    }
   });
 });

@@ -186,8 +186,11 @@ async function main() {
   const skillDir = path.join(basePath, skillName);
 
   // Additional check to ensure the resolved skillDir is actually inside basePath
-  if (!skillDir.startsWith(basePath)) {
-    console.error('❌ Error: Invalid skill name or path.');
+  const relativePath = path.relative(basePath, skillDir);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    console.error(
+      `❌ Error: Invalid skill name or path.\n  SkillDir: ${skillDir}\n  BasePath: ${basePath}\n  Relative: ${relativePath}`,
+    );
     process.exit(1);
   }
 
