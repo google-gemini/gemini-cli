@@ -330,20 +330,23 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Execution Logic', () => {
-    it('should display an error for an unknown command', async () => {
+    it('should treat unknown command as regular input', async () => {
       const result = await setupProcessorHook();
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
+      let handled: boolean | SlashCommandProcessorResult = true;
       await act(async () => {
-        await result.current.handleSlashCommand('/nonexistent');
+        handled = await result.current.handleSlashCommand('/nonexistent');
       });
 
-      // Expect 2 calls: one for the user's input, one for the error message.
-      expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(mockAddItem).toHaveBeenLastCalledWith(
+      expect(handled).toBe(false);
+
+      // Expect 1 call: just the user's input. No error message.
+      expect(mockAddItem).toHaveBeenCalledTimes(1);
+      expect(mockAddItem).toHaveBeenCalledWith(
         {
-          type: MessageType.ERROR,
-          text: 'Unknown command: /nonexistent',
+          type: MessageType.USER,
+          text: '/nonexistent',
         },
         expect.any(Number),
       );
@@ -639,16 +642,20 @@ describe('useSlashCommandProcessor', () => {
       const result = await setupProcessorHook([command]);
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
+      let handled: boolean | SlashCommandProcessorResult = true;
       await act(async () => {
         // Use uppercase when command is lowercase
-        await result.current.handleSlashCommand('/Test');
+        handled = await result.current.handleSlashCommand('/Test');
       });
 
-      // It should fail and call addItem with an error
+      // It should be treated as regular input
+      expect(handled).toBe(false);
+
+      expect(mockAddItem).toHaveBeenCalledTimes(1);
       expect(mockAddItem).toHaveBeenCalledWith(
         {
-          type: MessageType.ERROR,
-          text: 'Unknown command: /Test',
+          type: MessageType.USER,
+          text: '/Test',
         },
         expect.any(Number),
       );
