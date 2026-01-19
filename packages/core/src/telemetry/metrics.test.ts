@@ -5,14 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import type {
-  Counter,
-  Meter,
-  Attributes,
-  Context,
-  Histogram,
-} from '@opentelemetry/api';
-import type { Config } from '../config/config.js';
 import {
   FileOperation,
   MemoryMetricType,
@@ -22,55 +14,67 @@ import {
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ModelRoutingEvent, AgentFinishEvent } from './types.js';
 import { AgentTerminateMode } from '../agents/types.js';
+import type { Config } from '../config/config.js';
+import type { Counter, Histogram, Meter } from '@opentelemetry/api';
 
-const mockCounterAddFn: Mock<
-  (value: number, attributes?: Attributes, context?: Context) => void
-> = vi.fn();
-const mockHistogramRecordFn: Mock<
-  (value: number, attributes?: Attributes, context?: Context) => void
-> = vi.fn();
+const {
+  mockCounterAddFn,
+  mockHistogramRecordFn,
+  mockCreateCounterFn,
+  mockCreateHistogramFn,
+  mockCounterInstance,
+  mockHistogramInstance,
+  mockMeterInstance,
+} = vi.hoisted(() => {
+  const mockCounterAddFn = vi.fn();
+  const mockHistogramRecordFn = vi.fn();
+  const mockCreateCounterFn = vi.fn();
+  const mockCreateHistogramFn = vi.fn();
 
-const mockCreateCounterFn: Mock<(name: string, options?: unknown) => Counter> =
-  vi.fn();
-const mockCreateHistogramFn: Mock<
-  (name: string, options?: unknown) => Histogram
-> = vi.fn();
+  const mockCounterInstance = {
+    add: mockCounterAddFn,
+  };
 
-const mockCounterInstance: Counter = {
-  add: mockCounterAddFn,
-} as Partial<Counter> as Counter;
+  const mockHistogramInstance = {
+    record: mockHistogramRecordFn,
+  };
 
-const mockHistogramInstance: Histogram = {
-  record: mockHistogramRecordFn,
-} as Partial<Histogram> as Histogram;
+  const mockMeterInstance = {
+    createCounter: mockCreateCounterFn.mockReturnValue(mockCounterInstance),
+    createHistogram: mockCreateHistogramFn.mockReturnValue(
+      mockHistogramInstance,
+    ),
+  };
 
-const mockMeterInstance: Meter = {
-  createCounter: mockCreateCounterFn.mockReturnValue(mockCounterInstance),
-  createHistogram: mockCreateHistogramFn.mockReturnValue(mockHistogramInstance),
-} as Partial<Meter> as Meter;
-
-function originalOtelMockFactory() {
   return {
-    metrics: {
-      getMeter: vi.fn(),
-    },
-    ValueType: {
-      INT: 1,
-      DOUBLE: 2,
-    },
-    diag: {
-      setLogger: vi.fn(),
-      warn: vi.fn(),
-    },
-    DiagConsoleLogger: vi.fn(),
-    DiagLogLevel: {
-      NONE: 0,
-      INFO: 1,
-    },
-  } as const;
-}
+    mockCounterAddFn,
+    mockHistogramRecordFn,
+    mockCreateCounterFn,
+    mockCreateHistogramFn,
+    mockCounterInstance,
+    mockHistogramInstance,
+    mockMeterInstance,
+  };
+});
 
-vi.mock('@opentelemetry/api');
+vi.mock('@opentelemetry/api', () => ({
+  metrics: {
+    getMeter: vi.fn().mockReturnValue(mockMeterInstance),
+  },
+  ValueType: {
+    INT: 1,
+    DOUBLE: 2,
+  },
+  diag: {
+    setLogger: vi.fn(),
+    warn: vi.fn(),
+  },
+  DiagConsoleLogger: vi.fn(),
+  DiagLogLevel: {
+    NONE: 0,
+    INFO: 1,
+  },
+}));
 vi.mock('./telemetryAttributes.js');
 
 describe('Telemetry Metrics', () => {
@@ -96,14 +100,10 @@ describe('Telemetry Metrics', () => {
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
+  let recordHookCallMetricsModule: typeof import('./metrics.js').recordHookCallMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock('@opentelemetry/api', () => {
-      const actualApi = originalOtelMockFactory();
-      actualApi.metrics.getMeter.mockReturnValue(mockMeterInstance);
-      return actualApi;
-    });
 
     const { getCommonAttributes } = await import('./telemetryAttributes.js');
     (getCommonAttributes as Mock).mockReturnValue({
@@ -140,18 +140,25 @@ describe('Telemetry Metrics', () => {
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
+    recordHookCallMetricsModule = metricsJsModule.recordHookCallMetrics;
 
-    const otelApiModule = await import('@opentelemetry/api');
+    const { metrics: otelMetrics } = await import('@opentelemetry/api');
 
     mockCounterAddFn.mockClear();
     mockCreateCounterFn.mockClear();
     mockCreateHistogramFn.mockClear();
     mockHistogramRecordFn.mockClear();
-    (otelApiModule.metrics.getMeter as Mock).mockClear();
+    (otelMetrics.getMeter as Mock).mockClear();
 
-    (otelApiModule.metrics.getMeter as Mock).mockReturnValue(mockMeterInstance);
-    mockCreateCounterFn.mockReturnValue(mockCounterInstance);
-    mockCreateHistogramFn.mockReturnValue(mockHistogramInstance);
+    (otelMetrics.getMeter as Mock).mockReturnValue(
+      mockMeterInstance as unknown as Meter,
+    );
+    mockCreateCounterFn.mockReturnValue(
+      mockCounterInstance as unknown as Counter,
+    );
+    mockCreateHistogramFn.mockReturnValue(
+      mockHistogramInstance as unknown as Histogram,
+    );
   });
 
   describe('recordFlickerFrame', () => {
@@ -1344,13 +1351,6 @@ describe('Telemetry Metrics', () => {
     });
 
     describe('recordHookCallMetrics', () => {
-      let recordHookCallMetricsModule: typeof import('./metrics.js').recordHookCallMetrics;
-
-      beforeEach(async () => {
-        recordHookCallMetricsModule = (await import('./metrics.js'))
-          .recordHookCallMetrics;
-      });
-
       it('should record hook call metrics with counter and histogram', () => {
         initializeMetricsModule(mockConfig);
         mockCounterAddFn.mockClear();

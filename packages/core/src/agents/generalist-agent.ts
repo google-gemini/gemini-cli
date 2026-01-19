@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import type { Config } from '../config/config.js';
-import { getCoreSystemPrompt } from '../core/prompts.js';
+import { getCoreSystemPrompt, getPromptEnv } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
@@ -58,7 +58,8 @@ export const GeneralistAgent = (
     return {
       systemPrompt: getCoreSystemPrompt(
         config,
-        /*useMemory=*/ undefined,
+        getPromptEnv(config),
+        /*userMemory=*/ undefined,
         /*interactiveOverride=*/ false,
       ),
       query: '${request}',

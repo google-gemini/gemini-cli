@@ -5,8 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
-import { isGitRepository } from '../utils/gitUtils.js';
+import {
+  getCoreSystemPrompt,
+  resolvePathFromEnv,
+  type PromptEnv,
+} from './prompts.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,11 +55,17 @@ vi.mock('../config/models.js', async (importOriginal) => {
 
 describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
+  let mockEnv: PromptEnv;
   beforeEach(() => {
     vi.resetAllMocks();
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+    mockEnv = {
+      today: 'Monday, January 1, 2024',
+      platform: 'linux',
+      tempDir: '/tmp/project-temp',
+    };
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -90,13 +99,12 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
     ];
     vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
 
-    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain('# Agent Skills');
     expect(prompt).toContain(
-      "To activate a skill and receive its detailed instructions, you can call the `activate_skill` tool with the skill's name.",
+      "If a task aligns with a skill's description, you **MUST** call the `activate_skill` tool",
     );
-    expect(prompt).toContain('Skill Guidance');
     expect(prompt).toContain('<available_skills>');
     expect(prompt).toContain('<skill>');
     expect(prompt).toContain('<name>test-skill</name>');
@@ -113,7 +121,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
     vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
 
     expect(prompt).not.toContain('# Available Agent Skills');
     expect(prompt).not.toContain('Skill Guidance');
@@ -122,9 +130,9 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should use chatty system prompt for preview model', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
+    expect(prompt).toContain('You are Gemini CLI'); // Check for core content // Check for core content
+    expect(prompt).toContain('Communication Style');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -132,9 +140,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(
       PREVIEW_GEMINI_FLASH_MODEL,
     );
-    const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
+    expect(prompt).toContain('You are Gemini CLI'); // Check for core content // Check for core content
+    expect(prompt).toContain('Communication Style');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -143,33 +151,38 @@ describe('Core System Prompt (prompts.ts)', () => {
     ['whitespace only', '   \n  \t '],
   ])('should return the base prompt when userMemory is %s', (_, userMemory) => {
     vi.stubEnv('SANDBOX', undefined);
-    const prompt = getCoreSystemPrompt(mockConfig, userMemory);
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv, userMemory);
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
-    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).toContain('No Chitchat:');
+    expect(prompt).toContain('You are Gemini CLI'); // Check for core content // Check for core content
+    expect(prompt).toContain('Communication Style');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
   it('should append userMemory with separator when provided', () => {
     vi.stubEnv('SANDBOX', undefined);
     const memory = 'This is custom user memory.\nBe extra polite.';
-    const expectedSuffix = `\n\n---\n\n${memory}`;
-    const prompt = getCoreSystemPrompt(mockConfig, memory);
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv, memory);
 
-    expect(prompt.endsWith(expectedSuffix)).toBe(true);
-    expect(prompt).toContain('You are an interactive CLI agent'); // Ensure base prompt follows
+    expect(prompt).toContain('# Contextual Instructions (GEMINI.md)');
+    expect(prompt).toContain('<loaded_context>');
+    expect(prompt).toContain(memory);
+    expect(prompt).toContain('You are Gemini CLI'); // Ensure base prompt follows
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
   it.each([
-    ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
-    ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
-    [undefined, '# Outside of Sandbox', ['# Sandbox', '# macOS Seatbelt']],
+    ['true', 'Sandbox Container', ['macOS Seatbelt', 'Host System']],
+    ['sandbox-exec', 'macOS Seatbelt', ['Sandbox Container', 'Host System']],
+    [
+      undefined,
+      'Environment',
+      ['Runtime:', 'Sandbox Container', 'macOS Seatbelt'],
+    ],
   ])(
     'should include correct sandbox instructions for SANDBOX=%s',
     (sandboxValue, expectedContains, expectedNotContains) => {
-      vi.stubEnv('SANDBOX', sandboxValue);
-      const prompt = getCoreSystemPrompt(mockConfig);
+      vi.stubEnv('SANDBOX', sandboxValue as string);
+      const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
       expect(prompt).toContain(expectedContains);
       expectedNotContains.forEach((text) => expect(prompt).not.toContain(text));
       expect(prompt).toMatchSnapshot();
@@ -179,24 +192,18 @@ describe('Core System Prompt (prompts.ts)', () => {
   it.each([
     [true, true],
     [false, false],
-  ])(
-    'should handle git instructions when isGitRepository=%s',
-    (isGitRepo, shouldContainGit) => {
-      vi.stubEnv('SANDBOX', undefined);
-      vi.mocked(isGitRepository).mockReturnValue(isGitRepo);
-      const prompt = getCoreSystemPrompt(mockConfig);
-      shouldContainGit
-        ? expect(prompt).toContain('# Git Repository')
-        : expect(prompt).not.toContain('# Git Repository');
-      expect(prompt).toMatchSnapshot();
-    },
-  );
+  ])('should handle git instructions', () => {
+    // Git instructions were removed from core system prompt in this version.
+    // Keeping the test structure but it's currently a no-op or just checking base prompt.
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
+    expect(prompt).toContain('You are Gemini CLI');
+  });
 
-  it('should return the interactive avoidance prompt when in non-interactive mode', () => {
+  it('should return the non-interactive prompt when in non-interactive mode', () => {
     vi.stubEnv('SANDBOX', undefined);
     mockConfig.isInteractive = vi.fn().mockReturnValue(false);
-    const prompt = getCoreSystemPrompt(mockConfig, '');
-    expect(prompt).toContain('**Interactive Commands:**'); // Check for interactive prompt
+    const prompt = getCoreSystemPrompt(mockConfig, mockEnv, '');
+    expect(prompt).toContain('Only execute non-interactive commands.');
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
@@ -228,21 +235,14 @@ describe('Core System Prompt (prompts.ts)', () => {
         }),
       } as unknown as Config;
 
-      const prompt = getCoreSystemPrompt(testConfig);
+      const prompt = getCoreSystemPrompt(testConfig, mockEnv);
       if (expectCodebaseInvestigator) {
         expect(prompt).toContain(
-          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
-        );
-        expect(prompt).toContain(`do not ignore the output of the agent`);
-        expect(prompt).not.toContain(
-          "Use 'search_file_content' and 'glob' search tools extensively",
+          `Use \`${CodebaseInvestigatorAgent.name}\` for deep analysis of complex tasks.`,
         );
       } else {
         expect(prompt).not.toContain(
-          `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
-        );
-        expect(prompt).toContain(
-          "Use 'search_file_content' and 'glob' search tools extensively",
+          `Use \`${CodebaseInvestigatorAgent.name}\` for deep analysis of complex tasks.`,
         );
       }
       expect(prompt).toMatchSnapshot();
@@ -254,7 +254,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       'should use default prompt when GEMINI_SYSTEM_MD is "%s"',
       (value) => {
         vi.stubEnv('GEMINI_SYSTEM_MD', value);
-        const prompt = getCoreSystemPrompt(mockConfig);
+        const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
         expect(fs.readFileSync).not.toHaveBeenCalled();
         expect(prompt).not.toContain('custom system prompt');
       },
@@ -264,7 +264,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       const customPath = '/non/existent/path/system.md';
       vi.stubEnv('GEMINI_SYSTEM_MD', customPath);
       vi.mocked(fs.existsSync).mockReturnValue(false);
-      expect(() => getCoreSystemPrompt(mockConfig)).toThrow(
+      expect(() => getCoreSystemPrompt(mockConfig, mockEnv)).toThrow(
         `missing system prompt file '${path.resolve(customPath)}'`,
       );
     });
@@ -277,7 +277,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
 
-        const prompt = getCoreSystemPrompt(mockConfig);
+        const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
         expect(fs.readFileSync).toHaveBeenCalledWith(defaultPath, 'utf8');
         expect(prompt).toBe('custom system prompt');
       },
@@ -289,7 +289,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
 
-      const prompt = getCoreSystemPrompt(mockConfig);
+      const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
       expect(fs.readFileSync).toHaveBeenCalledWith(customPath, 'utf8');
       expect(prompt).toBe('custom system prompt');
     });
@@ -303,7 +303,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
 
-      const prompt = getCoreSystemPrompt(mockConfig);
+      const prompt = getCoreSystemPrompt(mockConfig, mockEnv);
       expect(fs.readFileSync).toHaveBeenCalledWith(
         path.resolve(expectedPath),
         'utf8',
@@ -317,7 +317,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       'should not write to file when GEMINI_WRITE_SYSTEM_MD is "%s"',
       (value) => {
         vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
-        getCoreSystemPrompt(mockConfig);
+        getCoreSystemPrompt(mockConfig, mockEnv);
         expect(fs.writeFileSync).not.toHaveBeenCalled();
       },
     );
@@ -327,7 +327,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       (value) => {
         const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
         vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', value);
-        getCoreSystemPrompt(mockConfig);
+        getCoreSystemPrompt(mockConfig, mockEnv);
         expect(fs.writeFileSync).toHaveBeenCalledWith(
           defaultPath,
           expect.any(String),
@@ -338,7 +338,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     it('should write to custom path when GEMINI_WRITE_SYSTEM_MD provides one', () => {
       const customPath = path.resolve('/custom/path/system.md');
       vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', customPath);
-      getCoreSystemPrompt(mockConfig);
+      getCoreSystemPrompt(mockConfig, mockEnv);
       expect(fs.writeFileSync).toHaveBeenCalledWith(
         customPath,
         expect.any(String),
@@ -357,7 +357,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           ? path.join(homeDir, relativePath)
           : homeDir;
         vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', customPath);
-        getCoreSystemPrompt(mockConfig);
+        getCoreSystemPrompt(mockConfig, mockEnv);
         expect(fs.writeFileSync).toHaveBeenCalledWith(
           path.resolve(expectedPath),
           expect.any(String),

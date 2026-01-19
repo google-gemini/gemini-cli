@@ -461,24 +461,28 @@ export class AgentRegistry {
       return 'No sub-agents are currently available.';
     }
 
-    let context = '## Available Sub-Agents\n';
-    context += `Sub-agents are specialized expert agents that you can use to assist you in
-      the completion of all or part of a task.
+    const agentsXml = Array.from(this.agents.entries())
+      .map(
+        ([name, def]) => `  <sub_agent>
+    <name>${name}</name>
+    <description>${def.description}</description>
+  </sub_agent>`,
+      )
+      .join('\n');
 
-      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
-      exists that has expertise relevant to your task.
+    return `
+# Sub-Agents
+Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task. ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a sub-agent if one exists that has expertise relevant to your task.
 
-      For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
-      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+For example:
+- Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
+- Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
+- Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
+- Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
 
-      The following are the available sub-agents:\n\n`;
-
-    for (const [name, def] of this.agents) {
-      context += `- **${name}**: ${def.description}\n`;
-    }
-    return context;
+<available_sub_agents>
+${agentsXml}
+</available_sub_agents>
+`;
   }
 }

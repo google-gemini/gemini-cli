@@ -29,7 +29,7 @@ import {
   Turn,
   type ChatCompressionInfo,
 } from './turn.js';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, type PromptEnv } from './prompts.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
@@ -109,7 +109,14 @@ vi.mock('./turn', async (importOriginal) => {
 });
 
 vi.mock('../config/config.js');
-vi.mock('./prompts');
+vi.mock('./prompts.js', () => ({
+  getCoreSystemPrompt: vi.fn(),
+  getPromptEnv: vi.fn(() => ({
+    today: 'Monday, January 1, 2024',
+    platform: 'linux',
+    tempDir: '/test/temp',
+  })),
+}));
 vi.mock('../utils/getFolderStructure', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock Folder Structure'),
 }));
@@ -354,9 +361,9 @@ describe('Gemini Client (client.ts)', () => {
 
       // The first message should be the environment context
       expect(history[0].role).toBe('user');
-      expect(history[0].parts?.[0]?.text).toContain('This is the Gemini CLI');
+      expect(history[0].parts?.[0]?.text).toContain('<session_context>');
       expect(history[0].parts?.[0]?.text).toContain(
-        "The project's temporary directory is:",
+        '- **Workspace Directories:**',
       );
 
       // The subsequent messages should be the extra history
@@ -1835,6 +1842,7 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
+        expect.any(Object),
         'Global JIT Memory',
       );
     });
@@ -1850,6 +1858,7 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
+        expect.any(Object),
         'Legacy Memory',
       );
     });
@@ -2873,7 +2882,11 @@ ${JSON.stringify(
           model: 'test-model',
           config: {
             abortSignal,
-            systemInstruction: getCoreSystemPrompt({} as unknown as Config, ''),
+            systemInstruction: getCoreSystemPrompt(
+              {} as unknown as Config,
+              {} as PromptEnv,
+              '',
+            ),
             temperature: 0,
             topP: 1,
           },
