@@ -37,7 +37,9 @@ import {
 export class SchedulerStateManager {
   private readonly activeCalls = new Map<string, ToolCall>();
   private readonly queue: ToolCall[] = [];
+  private queueHead = 0; // Pointer-based queue head to avoid shift() cost.
   private _completedBatch: CompletedToolCall[] = [];
+  private readonly callIndex = new Map<string, ToolCall>();
 
   constructor(private readonly messageBus: MessageBus) {}
 
@@ -46,22 +48,27 @@ export class SchedulerStateManager {
   }
 
   getToolCall(callId: string): ToolCall | undefined {
-    return (
-      this.activeCalls.get(callId) ||
-      this.queue.find((c) => c.request.callId === callId) ||
-      this._completedBatch.find((c) => c.request.callId === callId)
-    );
+    return this.callIndex.get(callId);
   }
 
   enqueue(calls: ToolCall[]): void {
     this.queue.push(...calls);
+    for (const call of calls) {
+      this.callIndex.set(call.request.callId, call);
+    }
     this.emitUpdate();
   }
 
   dequeue(): ToolCall | undefined {
-    const next = this.queue.shift();
+    const next = this.queue[this.queueHead];
+    if (!next) {
+      return undefined;
+    }
+    this.queueHead += 1;
+    this.compactQueue();
     if (next) {
       this.activeCalls.set(next.request.callId, next);
+      this.callIndex.set(next.request.callId, next);
       this.emitUpdate();
     }
     return next;
@@ -119,6 +126,7 @@ export class SchedulerStateManager {
 
     const updatedCall = this.transitionCall(call, status, auxiliaryData);
     this.activeCalls.set(callId, updatedCall);
+    this.callIndex.set(callId, updatedCall);
 
     this.emitUpdate();
   }
@@ -130,6 +138,7 @@ export class SchedulerStateManager {
     if (this.isTerminalCall(call)) {
       this._completedBatch.push(call);
       this.activeCalls.delete(callId);
+      this.callIndex.set(callId, call);
     }
   }
 
@@ -148,6 +157,10 @@ export class SchedulerStateManager {
         invocation: newInvocation,
       }),
     );
+    const updatedCall = this.activeCalls.get(callId);
+    if (updatedCall) {
+      this.callIndex.set(callId, updatedCall);
+    }
     this.emitUpdate();
   }
 
@@ -155,19 +168,29 @@ export class SchedulerStateManager {
     const call = this.activeCalls.get(callId);
     if (!call) return;
 
-    this.activeCalls.set(callId, this.patchCall(call, { outcome }));
+    const updatedCall = this.patchCall(call, { outcome });
+    this.activeCalls.set(callId, updatedCall);
+    this.callIndex.set(callId, updatedCall);
     this.emitUpdate();
   }
 
   cancelAllQueued(reason: string): void {
-    while (this.queue.length > 0) {
-      const queuedCall = this.queue.shift()!;
+    while (this.queueHead < this.queue.length) {
+      const queuedCall = this.queue[this.queueHead];
+      if (!queuedCall) {
+        break;
+      }
+      this.queueHead += 1;
       if (queuedCall.status === 'error') {
         this._completedBatch.push(queuedCall);
+        this.callIndex.set(queuedCall.request.callId, queuedCall);
         continue;
       }
-      this._completedBatch.push(this.toCancelled(queuedCall, reason));
+      const cancelled = this.toCancelled(queuedCall, reason);
+      this._completedBatch.push(cancelled);
+      this.callIndex.set(queuedCall.request.callId, cancelled);
     }
+    this.compactQueue();
     this.emitUpdate();
   }
 
@@ -175,12 +198,15 @@ export class SchedulerStateManager {
     return [
       ...this._completedBatch,
       ...Array.from(this.activeCalls.values()),
-      ...this.queue,
+      ...this.queue.slice(this.queueHead),
     ];
   }
 
   clearBatch(): void {
     if (this._completedBatch.length === 0) return;
+    for (const call of this._completedBatch) {
+      this.callIndex.delete(call.request.callId);
+    }
     this._completedBatch = [];
     this.emitUpdate();
   }
@@ -197,6 +223,21 @@ export class SchedulerStateManager {
       type: MessageBusType.TOOL_CALLS_UPDATE,
       toolCalls: snapshot,
     });
+  }
+
+  private compactQueue(): void {
+    if (this.queueHead === 0) {
+      return;
+    }
+    if (this.queueHead >= this.queue.length) {
+      this.queue.length = 0;
+      this.queueHead = 0;
+      return;
+    }
+    if (this.queueHead > 50 && this.queueHead * 2 > this.queue.length) {
+      this.queue.splice(0, this.queueHead);
+      this.queueHead = 0;
+    }
   }
 
   private isTerminalCall(call: ToolCall): call is CompletedToolCall {
