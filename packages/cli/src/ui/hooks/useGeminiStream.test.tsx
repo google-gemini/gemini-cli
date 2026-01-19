@@ -74,6 +74,8 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     });
     this.resetChat = vi.fn().mockResolvedValue(undefined);
     this.getCurrentSequenceModel = vi.fn().mockReturnValue('gemini-pro');
+    this.getSessionTurnCount = vi.fn().mockReturnValue(0);
+    this.resetSessionTurnCount = vi.fn();
   }),
 );
 
@@ -3075,7 +3077,7 @@ describe('useGeminiStream', () => {
     });
 
     describe('Topic Change Detection', () => {
-      it('should trigger renewSessionConfirmationRequest on topic change and reset chat if confirmed', async () => {
+      it('should trigger renewSessionConfirmationRequest on topic change and reset chat if confirmed (new_session)', async () => {
         const client = new MockedGeminiClientClass(mockConfig);
         const topicDetector = {
           isTopicChanged: vi
@@ -3131,14 +3133,10 @@ describe('useGeminiStream', () => {
           capturedOnComplete({ userSelection: 'new_session' });
         });
 
-        // Use a small delay for the setTimeout in the implementation
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 60));
-        });
-
         await waitFor(() => expect(submitResolved).toBe(true));
 
         expect(executeClearCommand).toHaveBeenCalled();
+        expect(client.resetSessionTurnCount).toHaveBeenCalled();
         expect(client.resetChat).not.toHaveBeenCalled();
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -3154,7 +3152,7 @@ describe('useGeminiStream', () => {
         );
       });
 
-      it('should trigger renewSessionConfirmationRequest on topic change and NOT reset chat if cancelled', async () => {
+      it('should trigger renewSessionConfirmationRequest on topic change and just proceed if continue_session', async () => {
         const client = new MockedGeminiClientClass(mockConfig);
         const topicDetector = {
           isTopicChanged: vi
@@ -3183,7 +3181,54 @@ describe('useGeminiStream', () => {
         const capturedOnComplete =
           result.current.renewSessionConfirmationRequest!.onComplete;
 
-        // Simulate user choosing "Continue" (compress_session)
+        // Simulate user choosing "Continue" (continue_session)
+        await act(async () => {
+          capturedOnComplete({ userSelection: 'continue_session' });
+        });
+
+        await waitFor(() => expect(submitResolved).toBe(true));
+
+        expect(client.resetSessionTurnCount).not.toHaveBeenCalled();
+        expect(client.resetChat).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/compress');
+        expect(mockSendMessageStream).toHaveBeenCalledWith(
+          'Query 2',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+
+      it('should trigger renewSessionConfirmationRequest on topic change and compress chat if compress_session', async () => {
+        const client = new MockedGeminiClientClass(mockConfig);
+        const topicDetector = {
+          isTopicChanged: vi
+            .fn()
+            .mockResolvedValue({ topic_changed: true, reasoning: 'test' }),
+        };
+        client.getTopicDetectionService.mockReturnValue(topicDetector);
+
+        const { result } = renderTestHook([], client);
+
+        await act(async () => {
+          await result.current.submitQuery('Query 1');
+        });
+
+        mockSendMessageStream.mockClear();
+        mockHandleSlashCommand.mockClear();
+
+        let submitResolved = false;
+        void result.current.submitQuery('Query 2').then(() => {
+          submitResolved = true;
+        });
+
+        await waitFor(() => {
+          expect(result.current.renewSessionConfirmationRequest).not.toBeNull();
+        });
+
+        const capturedOnComplete =
+          result.current.renewSessionConfirmationRequest!.onComplete;
+
+        // Simulate user choosing "Compress" (compress_session)
         await act(async () => {
           capturedOnComplete({ userSelection: 'compress_session' });
         });
@@ -3191,6 +3236,12 @@ describe('useGeminiStream', () => {
         await waitFor(() => expect(submitResolved).toBe(true));
 
         expect(client.resetChat).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/compress',
+          undefined,
+          undefined,
+          false,
+        );
         expect(mockSendMessageStream).toHaveBeenCalledWith(
           'Query 2',
           expect.any(AbortSignal),
@@ -3236,6 +3287,50 @@ describe('useGeminiStream', () => {
             text: expect.stringContaining('Should be ignored'),
           }),
           expect.any(Number),
+        );
+      });
+
+      it('should resubmit query after compress_session is selected', async () => {
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.RenewSession,
+            };
+          })(),
+        );
+
+        const { result } = renderHookWithDefaults();
+
+        await act(async () => {
+          await result.current.submitQuery('Original query');
+        });
+
+        // Wait for the dialog to be requested
+        await waitFor(() => {
+          expect(result.current.renewSessionConfirmationRequest).not.toBeNull();
+        });
+
+        // Capture the initial call count
+        const initialCallCount = mockSendMessageStream.mock.calls.length;
+
+        // Simulate choosing 'compress_session'
+        await act(async () => {
+          result.current.renewSessionConfirmationRequest?.onComplete({
+            userSelection: 'compress_session',
+          });
+        });
+
+        // Wait for the second query to be submitted
+        await waitFor(() => {
+          expect(mockSendMessageStream).toHaveBeenCalledTimes(
+            initialCallCount + 1,
+          );
+        });
+
+        expect(mockSendMessageStream).toHaveBeenLastCalledWith(
+          'Original query',
+          expect.any(AbortSignal),
+          expect.any(String),
         );
       });
     });

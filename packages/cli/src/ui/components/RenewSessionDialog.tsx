@@ -22,29 +22,48 @@ export function RenewSessionDialog({
   maxSessionTurns,
   reason = 'turn_limit',
 }: RenewSessionDialogProps) {
+  const isTopicChange = reason === 'topic_change';
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
         onComplete({
-          userSelection: 'compress_session',
+          userSelection: isTopicChange
+            ? 'continue_session'
+            : 'compress_session',
         });
       }
     },
     { isActive: true },
   );
 
-  const isTopicChange = reason === 'topic_change';
-
   const OPTIONS: Array<RadioSelectItem<RenewSessionConfirmationResult>> = [
-    {
-      label: isTopicChange
-        ? 'Continue with current context'
-        : 'Compress session',
-      value: {
-        userSelection: 'compress_session',
-      } as RenewSessionConfirmationResult,
-      key: 'compress_session',
-    },
+    ...(isTopicChange
+      ? [
+          {
+            label: 'Continue with current context',
+            value: {
+              userSelection: 'continue_session',
+            } as RenewSessionConfirmationResult,
+            key: 'continue_session',
+          },
+          {
+            label: 'Compress conversation',
+            value: {
+              userSelection: 'compress_session',
+            } as RenewSessionConfirmationResult,
+            key: 'compress_session',
+          },
+        ]
+      : [
+          {
+            label: 'Compress session',
+            value: {
+              userSelection: 'compress_session',
+            } as RenewSessionConfirmationResult,
+            key: 'compress_session',
+          },
+        ]),
     {
       label: 'Start a new session',
       value: {
