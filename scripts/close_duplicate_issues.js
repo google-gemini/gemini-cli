@@ -41,6 +41,12 @@ const argv = yargs(hideBin(process.argv))
     default: 'gemini-cli',
     description: 'Repository name',
   })
+  .option('dry-run', {
+    alias: 'd',
+    type: 'boolean',
+    default: false,
+    description: 'Run without making actual changes (read-only mode)',
+  })
   .help()
   .parse();
 
@@ -48,15 +54,16 @@ const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 });
 
-const { query, canonical, pr, owner, repo } = argv;
+const { query, canonical, pr, owner, repo, dryRun } = argv;
 
 // Construct the full search query ensuring it targets the specific repo and open issues
-// Note: We wrap the user query in quotes if it contains spaces to ensure it's treated as a phrase if needed,
-// but usually passing it as part of the string is fine.
 const fullSearchQuery = `repo:${owner}/${repo} is:issue is:open ${query}`;
 
 async function run() {
   console.log(`Searching for issues matching: ${fullSearchQuery}`);
+  if (dryRun) {
+    console.log('--- DRY RUN MODE: No changes will be made ---');
+  }
 
   try {
     const issues = await octokit.paginate(
@@ -82,24 +89,29 @@ async function run() {
       }
 
       try {
-        // Add comment
-        await octokit.rest.issues.createComment({
-          owner,
-          repo,
-          issue_number: issue.number,
-          body: commentBody,
-        });
-        console.log(`  Added comment.`);
+        if (!dryRun) {
+          // Add comment
+          await octokit.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: issue.number,
+            body: commentBody,
+          });
+          console.log(`  Added comment.`);
 
-        // Close issue
-        await octokit.rest.issues.update({
-          owner,
-          repo,
-          issue_number: issue.number,
-          state: 'closed',
-          state_reason: 'not_planned',
-        });
-        console.log(`  Closed issue.`);
+          // Close issue
+          await octokit.rest.issues.update({
+            owner,
+            repo,
+            issue_number: issue.number,
+            state: 'closed',
+            state_reason: 'not_planned',
+          });
+          console.log(`  Closed issue.`);
+        } else {
+          console.log(`  [DRY RUN] Would add comment: "${commentBody}"`);
+          console.log(`  [DRY RUN] Would close issue #${issue.number}`);
+        }
       } catch (error) {
         console.error(
           `  Failed to process issue #${issue.number}:`,
