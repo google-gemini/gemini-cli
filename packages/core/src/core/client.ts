@@ -566,6 +566,7 @@ export class GeminiClient {
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
       yield { type: GeminiEventType.RenewSession };
+      return new Turn(this.getChat(), prompt_id);
     }
 
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops

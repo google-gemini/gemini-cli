@@ -453,7 +453,7 @@ export interface ActiveHook {
   total?: number;
 }
 export interface RenewSessionConfirmationResult {
-  userSelection: 'compress_session' | 'new_session';
+  userSelection: 'compress_session' | 'new_session' | 'continue_session';
 }
 
 export interface RenewSessionConfirmationRequest {
