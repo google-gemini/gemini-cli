@@ -299,12 +299,13 @@ export class Turn {
               value: thought,
               traceId,
             };
+          } else if (part.text) {
+            yield {
+              type: GeminiEventType.Content,
+              value: part.text,
+              traceId,
+            };
           }
-        }
-
-        const text = getResponseText(resp);
-        if (text) {
-          yield { type: GeminiEventType.Content, value: text, traceId };
         }
 
         // Handle function calls (requesting tool execution)
@@ -312,7 +313,7 @@ export class Turn {
         for (const fnCall of functionCalls) {
           const event = this.handlePendingFunctionCall(fnCall, traceId);
           if (event) {
-            yield event;
+            yield { ...event, traceId };
           }
         }
 

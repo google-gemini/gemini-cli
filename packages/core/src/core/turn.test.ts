@@ -805,53 +805,34 @@ describe('Turn', () => {
 
       expect(events.length).toBe(5);
 
-      const thoughtEvent = events.find(
-        (e) => e.type === GeminiEventType.Thought,
-      );
-      expect(thoughtEvent).toBeDefined();
-      expect(thoughtEvent).toMatchObject({
+      expect(events[0]).toMatchObject({
         type: GeminiEventType.Thought,
         value: { subject: 'Planning', description: 'the solution' },
         traceId: 'trace-789',
       });
 
-      const contentEvent = events.find(
-        (e) => e.type === GeminiEventType.Content,
-      );
-      expect(contentEvent).toBeDefined();
-      expect(contentEvent).toMatchObject({
+      expect(events[1]).toMatchObject({
         type: GeminiEventType.Content,
         value: 'I will help you with that.',
         traceId: 'trace-789',
       });
 
-      const toolCallEvent = events.find(
-        (e) => e.type === GeminiEventType.ToolCallRequest,
-      );
-      expect(toolCallEvent).toBeDefined();
-      expect(toolCallEvent).toMatchObject({
+      expect(events[2]).toMatchObject({
         type: GeminiEventType.ToolCallRequest,
         value: expect.objectContaining({
           callId: 'fc1',
           name: 'ReadFile',
           args: { path: 'file.txt' },
         }),
+        traceId: 'trace-789',
       });
 
-      const citationEvent = events.find(
-        (e) => e.type === GeminiEventType.Citation,
-      );
-      expect(citationEvent).toBeDefined();
-      expect(citationEvent).toMatchObject({
+      expect(events[3]).toMatchObject({
         type: GeminiEventType.Citation,
         value: expect.stringContaining('https://example.com'),
       });
 
-      const finishedEvent = events.find(
-        (e) => e.type === GeminiEventType.Finished,
-      );
-      expect(finishedEvent).toBeDefined();
-      expect(finishedEvent).toMatchObject({
+      expect(events[4]).toMatchObject({
         type: GeminiEventType.Finished,
         value: { reason: 'STOP' },
       });

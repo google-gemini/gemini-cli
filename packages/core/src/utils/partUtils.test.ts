@@ -163,6 +163,14 @@ describe('partUtils', () => {
       expect(getResponseText(result)).toBe('hello');
     });
 
+    it('should ignore thought parts', () => {
+      const result = mockResponse([
+        { text: '**Thought**', thought: true } as unknown as Part,
+        { text: 'Final answer' },
+      ]);
+      expect(getResponseText(result)).toBe('Final answer');
+    });
+
     it('should return null when candidate has no parts', () => {
       const result = mockResponse([]);
       expect(getResponseText(result)).toBeNull();
