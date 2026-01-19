@@ -1465,7 +1465,7 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(mockBuffer.handleInput).toHaveBeenCalledWith(
           expect.objectContaining({
-            paste: true,
+            name: 'paste',
             sequence: 'pasted text',
           }),
         );
@@ -1708,7 +1708,7 @@ describe('InputPrompt', () => {
         expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
         expect(props.buffer.handleInput).toHaveBeenCalledWith(
           expect.objectContaining({
-            paste: true,
+            name: 'paste',
             sequence: pastedText,
           }),
         );
@@ -1870,11 +1870,11 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('enhanced input UX - double ESC clear functionality', () => {
+  describe('enhanced input UX - keyboard shortcuts', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    it('should clear buffer on second ESC press', async () => {
+    it('should clear buffer on Ctrl-C', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('text to clear');
@@ -1884,14 +1884,7 @@ describe('InputPrompt', () => {
       );
 
       await act(async () => {
-        stdin.write('\x1B');
-        vi.advanceTimersByTime(100);
-
-        expect(onEscapePromptChange).toHaveBeenCalledWith(false);
-      });
-
-      await act(async () => {
-        stdin.write('\x1B');
+        stdin.write('\x03');
         vi.advanceTimersByTime(100);
 
         expect(props.buffer.setText).toHaveBeenCalledWith('');
@@ -1900,10 +1893,10 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should clear buffer on double ESC', async () => {
+    it('should submit /rewind on double ESC', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
-      props.buffer.setText('text to clear');
+      props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1913,8 +1906,7 @@ describe('InputPrompt', () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
 
-        expect(props.buffer.setText).toHaveBeenCalledWith('');
-        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+        expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
       unmount();
     });

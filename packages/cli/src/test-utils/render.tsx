@@ -133,6 +133,7 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
 };
@@ -172,6 +173,7 @@ const mockUIActions: UIActions = {
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (

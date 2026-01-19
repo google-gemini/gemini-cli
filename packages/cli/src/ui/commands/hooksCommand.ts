@@ -76,8 +76,7 @@ async function enableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
-
+  const disabledHooks = settings.merged.hooks.disabled;
   // Remove from disabled list if present
   const newDisabledHooks = disabledHooks.filter(
     (name: string) => name !== hookName,
@@ -89,6 +88,9 @@ async function enableAction(
       ? SettingScope.Workspace
       : SettingScope.User;
     settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
+
+    // Update core config so re-initialization (e.g. extension reload) respects the change
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     // Enable in hook system
     hookSystem.setHookEnabled(hookName, true);
@@ -143,39 +145,34 @@ async function disableAction(
 
   // Get current disabled hooks from settings
   const settings = context.services.settings;
-  const disabledHooks = settings.merged.hooks?.disabled || ([] as string[]);
-
+  const disabledHooks = settings.merged.hooks.disabled;
   // Add to disabled list if not already present
-  if (!disabledHooks.includes(hookName)) {
-    const newDisabledHooks = [...disabledHooks, hookName];
+  try {
+    if (!disabledHooks.includes(hookName)) {
+      const newDisabledHooks = [...disabledHooks, hookName];
 
-    // Update settings (setValue automatically saves)
-    try {
       const scope = settings.workspace
         ? SettingScope.Workspace
         : SettingScope.User;
       settings.setValue(scope, 'hooks.disabled', newDisabledHooks);
-
-      // Disable in hook system
-      hookSystem.setHookEnabled(hookName, false);
-
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `Hook "${hookName}" disabled successfully.`,
-      };
-    } catch (error) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: `Failed to disable hook: ${getErrorMessage(error)}`,
-      };
     }
-  } else {
+
+    // Update core config so re-initialization (e.g. extension reload) respects the change
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
+
+    // Always disable in hook system to ensure in-memory state matches settings
+    hookSystem.setHookEnabled(hookName, false);
+
     return {
       type: 'message',
       messageType: 'info',
-      content: `Hook "${hookName}" is already disabled.`,
+      content: `Hook "${hookName}" disabled successfully.`,
+    };
+  } catch (error) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Failed to disable hook: ${getErrorMessage(error)}`,
     };
   }
 }
@@ -255,6 +252,9 @@ async function enableAllAction(
       : SettingScope.User;
     settings.setValue(scope, 'hooks.disabled', []);
 
+    // Update core config so re-initialization (e.g. extension reload) respects the change
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
+
     for (const hook of disabledHooks) {
       const hookName = getHookDisplayName(hook);
       hookSystem.setHookEnabled(hookName, true);
@@ -324,6 +324,9 @@ async function disableAllAction(
       ? SettingScope.Workspace
       : SettingScope.User;
     settings.setValue(scope, 'hooks.disabled', allHookNames);
+
+    // Update core config so re-initialization (e.g. extension reload) respects the change
+    config.updateDisabledHooks(settings.merged.hooks.disabled);
 
     for (const hook of enabledHooks) {
       const hookName = getHookDisplayName(hook);

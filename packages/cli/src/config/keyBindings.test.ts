@@ -28,12 +28,9 @@ describe('keyBindings config', () => {
     it('should have valid key binding structures', () => {
       for (const [_, bindings] of Object.entries(defaultKeyBindings)) {
         for (const binding of bindings) {
-          // Each binding should have either key or sequence, but not both
-          const hasKey = binding.key !== undefined;
-          const hasSequence = binding.sequence !== undefined;
-
-          expect(hasKey || hasSequence).toBe(true);
-          expect(hasKey && hasSequence).toBe(false);
+          // Each binding must have a key name
+          expect(typeof binding.key).toBe('string');
+          expect(binding.key.length).toBeGreaterThan(0);
 
           // Modifier properties should be boolean or undefined
           if (binding.ctrl !== undefined) {
@@ -44,9 +41,6 @@ describe('keyBindings config', () => {
           }
           if (binding.command !== undefined) {
             expect(typeof binding.command).toBe('boolean');
-          }
-          if (binding.paste !== undefined) {
-            expect(typeof binding.paste).toBe('boolean');
           }
         }
       }
