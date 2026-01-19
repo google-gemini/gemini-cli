@@ -9,6 +9,7 @@ import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
+import { LoadedSettings } from '../../config/settings.js';
 
 const persistentStateMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -27,6 +28,7 @@ describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     persistentStateMock.get.mockReturnValue({});
+    vi.spyOn(LoadedSettings.prototype, 'setValue').mockImplementation(() => {});
   });
 
   it('should render the banner with default text', () => {

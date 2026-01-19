@@ -412,7 +412,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description:
+          'Hide helpful tips in the UI (auto-hidden after 10 sessions)',
         showInDialog: true,
       },
       hideBanner: {
@@ -1804,6 +1805,27 @@ const SETTINGS_SCHEMA = {
       description:
         'Custom hook event arrays that contain hook definitions for user-defined events',
       mergeStrategy: MergeStrategy.CONCAT,
+    },
+  },
+
+  internal: {
+    type: 'object',
+    label: 'Internal',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Internal state tracking.',
+    showInDialog: false,
+    properties: {
+      tipsShownCount: {
+        type: 'number',
+        label: 'Tips Shown Count',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 0,
+        description: 'Number of times the startup tips have been shown.',
+        showInDialog: false,
+      },
     },
   },
 
