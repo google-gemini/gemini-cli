@@ -33,6 +33,7 @@ vi.mock('child_process');
 // fs (for /dev/tty)
 const mockFs = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
+  writeSync: vi.fn(),
   constants: { W_OK: 2 },
 }));
 vi.mock('node:fs', () => ({
@@ -84,6 +85,7 @@ const resetEnv = () => {
   delete process.env['WSLENV'];
   delete process.env['WSL_INTEROP'];
   delete process.env['TERM'];
+  delete process.env['WT_SESSION'];
 };
 
 interface MockChildProcess extends EventEmitter {
@@ -476,6 +478,85 @@ describe('commandUtils', () => {
       // Fallback to clipboardy and not /dev/tty
       expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
       expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+    });
+
+    it('uses OSC-52 on Windows Terminal (WT_SESSION) and prioritizes stdout', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: true });
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'windows-terminal-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(stdoutStream.write).toHaveBeenCalledWith(expected);
+      expect(stderrStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses fs.writeSync on Windows when stdout has an fd (bypassing Ink)', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: true });
+      // Simulate FD
+      (stdoutStream as unknown as { fd: number }).fd = 1;
+
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'direct-write-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(mockFs.writeSync).toHaveBeenCalledWith(1, expected);
+      expect(stdoutStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses fs.writeSync on Windows when stderr has an fd and stdout is not a TTY', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: false });
+      const stderrStream = makeWritable({ isTTY: true });
+      // Simulate FD
+      (stderrStream as unknown as { fd: number }).fd = 2;
+
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'direct-write-stderr-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(mockFs.writeSync).toHaveBeenCalledWith(2, expected);
+      expect(stderrStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
   });
 
