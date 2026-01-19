@@ -75,10 +75,16 @@ async function main() {
       );
       // Fallback to tar (common on Windows 10+ and Linux)
       // tar -a -c -f output.zip .
-      zipProcess = spawnSync('tar', ['-a', '-c', '-f', outputFilename, '.'], {
-        cwd: skillPath,
-        stdio: 'inherit',
-      });
+      // We force zip format because .skill files are expected to be zips.
+      // bsdtar (standard on Windows 10+) supports --format=zip.
+      zipProcess = spawnSync(
+        'tar',
+        ['--format=zip', '-a', '-c', '-f', outputFilename, '.'],
+        {
+          cwd: skillPath,
+          stdio: 'inherit',
+        },
+      );
     }
 
     if (zipProcess.error) {
@@ -86,7 +92,9 @@ async function main() {
     }
 
     if (zipProcess.status !== 0) {
-      throw new Error(`Archiver command failed with exit code ${zipProcess.status}`);
+      throw new Error(
+        `Archiver command failed with exit code ${zipProcess.status}`,
+      );
     }
 
     console.log(`✅ Successfully packaged skill to: ${outputFilename}`);

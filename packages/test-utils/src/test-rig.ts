@@ -297,6 +297,15 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    // Clean up if directories already exist (e.g. from a previous failed run or retry)
+    try {
+      fs.rmSync(this.testDir, { recursive: true, force: true });
+      fs.rmSync(this.homeDir, { recursive: true, force: true });
+    } catch {
+      // Ignore errors if they don't exist
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {

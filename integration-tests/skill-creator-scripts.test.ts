@@ -74,14 +74,14 @@ describe('skill-creator scripts e2e', () => {
 
     // 4. Fix SKILL.md (remove TODOs)
     let content = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
-    content = content.replace(/TODO: .+/g, 'Fixed');
-    content = content.replace(/\[TODO: .+/g, 'Fixed');
+    // Replace all TODOs with "Fixed" to ensure validation passes
+    content = content.replace(/TODO:/g, 'Fixed:');
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
 
     // Also remove TODOs from example scripts
     const exampleScriptPath = path.join(skillDir, 'scripts/example_script.cjs');
     let scriptContent = fs.readFileSync(exampleScriptPath, 'utf8');
-    scriptContent = scriptContent.replace(/TODO: .+/g, 'Fixed');
+    scriptContent = scriptContent.replace(/TODO:/g, 'Fixed:');
     fs.writeFileSync(exampleScriptPath, scriptContent);
 
     // 4. Validate again (should pass now)
@@ -94,8 +94,21 @@ describe('skill-creator scripts e2e', () => {
     expect(fs.existsSync(skillFile)).toBe(true);
 
     // 6. Verify zip content (should NOT have nested directory)
-    const zipList = execAndLog(`tar -tf "${skillFile}"`);
-    expect(zipList).toContain('SKILL.md');
-    expect(zipList).not.toContain(`${skillName}/SKILL.md`);
+    // We prefer unzip as it handles zip files reliably across platforms where installed
+    try {
+      const zipList = execAndLog(`unzip -l "${skillFile}"`);
+      expect(zipList).toContain('SKILL.md');
+      expect(zipList).not.toContain(`${skillName}/SKILL.md`);
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err.code === 'ENOENT' || err.message?.includes('not found')) {
+        // Fallback to tar if unzip is missing (e.g. some Windows envs)
+        const tarList = execAndLog(`tar -tf "${skillFile}"`);
+        expect(tarList).toContain('SKILL.md');
+        expect(tarList).not.toContain(`${skillName}/SKILL.md`);
+      } else {
+        throw e;
+      }
+    }
   });
 });
