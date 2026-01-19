@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseInputForHighlighting } from './highlight.js';
+import {
+  buildSegmentsForVisualSlice,
+  parseInputForHighlighting,
+} from './highlight.js';
 
 describe('parseInputForHighlighting', () => {
   it('should handle an empty string', () => {
@@ -232,5 +235,47 @@ describe('parseInputForHighlighting with Transformations', () => {
     );
 
     expect(result[1]).toEqual({ text: '@test.png', type: 'file' });
+  });
+});
+
+describe('buildSegmentsForVisualSlice', () => {
+  const tokens = [
+    { text: 'hello ', type: 'default' as const },
+    { text: '@world', type: 'file' as const },
+    { text: '!', type: 'default' as const },
+  ]; // total length 12
+
+  it('should return the full set of tokens when slice covers all', () => {
+    const segments = buildSegmentsForVisualSlice(tokens, 0, 13);
+    expect(segments).toEqual([
+      { text: 'hello ', type: 'default' },
+      { text: '@world', type: 'file' },
+      { text: '!', type: 'default' },
+    ]);
+  });
+
+  it('should return a partial token from the beginning', () => {
+    const segments = buildSegmentsForVisualSlice(tokens, 0, 3);
+    expect(segments).toEqual([{ text: 'hel', type: 'default' }]);
+  });
+
+  it('should return a partial token from the middle', () => {
+    const segments = buildSegmentsForVisualSlice(tokens, 2, 8);
+    expect(segments).toEqual([
+      { text: 'llo ', type: 'default' },
+      { text: '@w', type: 'file' },
+    ]);
+  });
+
+  it('should merge tokens of the same type', () => {
+    const segments = buildSegmentsForVisualSlice(
+      [
+        { text: 'a', type: 'default' },
+        { text: 'b', type: 'default' },
+      ],
+      0,
+      2,
+    );
+    expect(segments).toEqual([{ text: 'ab', type: 'default' }]);
   });
 });
