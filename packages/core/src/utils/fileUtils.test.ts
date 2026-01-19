@@ -32,6 +32,8 @@ import {
   readFileWithEncoding,
   fileExists,
   readWasmBinaryFromDisk,
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -1020,6 +1022,110 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+  });
+
+  describe('saveTruncatedToolOutput & formatTruncatedToolOutput', () => {
+    it('should save content to a file with safe name', async () => {
+      const content = 'some content';
+      const toolName = 'shell';
+      const id = '123';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      const expectedOutputFile = path.join(tempRootDir, 'shell_123.txt');
+      expect(result.outputFile).toBe(expectedOutputFile);
+      expect(result.totalLines).toBe(1);
+
+      const savedContent = await fsPromises.readFile(
+        expectedOutputFile,
+        'utf-8',
+      );
+      expect(savedContent).toBe(content);
+    });
+
+    it('should sanitize tool name in filename', async () => {
+      const content = 'content';
+      const toolName = '../../dangerous/tool';
+      const id = 1;
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../dangerous/tool -> ______dangerous_tool
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        '______dangerous_tool_1.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should sanitize id in filename', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '../../etc/passwd';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'shell_______etc_passwd.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should format multi-line output correctly', () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
+      const content = lines.join('\n');
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 10);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 10 of 50 lines.',
+      );
+      expect(formatted).toContain('For full output see: /tmp/out.txt');
+      expect(formatted).toContain('line 49');
+      expect(formatted).not.toContain('line 0');
+    });
+
+    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
+      const longLine = 'a'.repeat(2000);
+      const content = `line 1\n${longLine}\nline 3`;
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 3);
+
+      expect(formatted).toContain('(some long lines truncated)');
+      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
+      expect(formatted.length).toBeLessThan(longLine.length);
+    });
+
+    it('should handle massive single-line string with character-based truncation', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 10,000 characters',
+      );
+      expect(formatted.endsWith(content.slice(-10000))).toBe(true);
     });
   });
 });

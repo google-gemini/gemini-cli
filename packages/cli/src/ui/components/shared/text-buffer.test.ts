@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
-import { renderHook } from '../../../test-utils/render.js';
+import {
+  renderHook,
+  renderHookWithProviders,
+} from '../../../test-utils/render.js';
 import type {
   Viewport,
   TextBuffer,
@@ -24,6 +27,10 @@ import {
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
+  calculateTransformationsForLine,
+  calculateTransformedLine,
+  getTransformUnderCursor,
+  getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
 
@@ -31,6 +38,8 @@ const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
   logicalToVisualMap: [[[0, 0]]],
   visualToLogicalMap: [[0, 0]],
+  transformedToLogicalMaps: [[]],
+  visualToTransformedMap: [],
 };
 
 const initialState: TextBufferState = {
@@ -44,10 +53,15 @@ const initialState: TextBufferState = {
   selectionAnchor: null,
   viewportWidth: 80,
   viewportHeight: 24,
+  transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
 };
 
 describe('textBufferReducer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should return the initial state if state is undefined', () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
@@ -372,6 +386,10 @@ describe('useTextBuffer', () => {
 
   beforeEach(() => {
     viewport = { width: 10, height: 3 }; // Default viewport for tests
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('Initialization', () => {
@@ -1044,7 +1062,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: 'h',
         }),
@@ -1055,7 +1072,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: 'i',
         }),
@@ -1073,7 +1089,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1091,7 +1106,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\t',
         }),
@@ -1109,7 +1123,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: true,
-          paste: false,
           insertable: false,
           sequence: '\u001b[9;2u',
         }),
@@ -1132,7 +1145,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x7f',
         }),
@@ -1157,7 +1169,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x7f',
         });
@@ -1166,7 +1177,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x7f',
         });
@@ -1175,7 +1185,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x7f',
         });
@@ -1235,7 +1244,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x1b[D',
         }),
@@ -1247,7 +1255,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\x1b[C',
         }),
@@ -1267,7 +1274,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: textWithAnsi,
         }),
@@ -1285,7 +1291,6 @@ describe('useTextBuffer', () => {
           ctrl: false,
           meta: false,
           shift: true,
-          paste: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1490,7 +1495,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       ctrl: false,
       meta: false,
       shift: false,
-      paste: false,
       insertable: true,
       sequence,
     });
@@ -1549,7 +1553,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: largeTextWithUnsafe,
         }),
@@ -1584,7 +1587,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: largeTextWithAnsi,
         }),
@@ -1609,7 +1611,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: emojis,
         }),
@@ -1801,7 +1802,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1823,7 +1823,6 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           ctrl: false,
           meta: false,
           shift: false,
-          paste: false,
           insertable: false,
           sequence: '\u001bOP',
         }),
@@ -2378,6 +2377,310 @@ describe('Unicode helper functions', () => {
       // wordLeft -> start of line (should stay at 0)
       act(() => result.current.move('wordLeft'));
       expect(result.current.cursor[1]).toBe(0);
+    });
+  });
+});
+
+describe('Transformation Utilities', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('getTransformedImagePath', () => {
+    it('should transform a simple image path', () => {
+      expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
+    });
+
+    it('should handle paths with directories', () => {
+      expect(getTransformedImagePath('@path/to/image.jpg')).toBe(
+        '[Image image.jpg]',
+      );
+    });
+
+    it('should truncate long filenames', () => {
+      expect(getTransformedImagePath('@verylongfilename1234567890.png')).toBe(
+        '[Image ...1234567890.png]',
+      );
+    });
+
+    it('should handle different image extensions', () => {
+      expect(getTransformedImagePath('@test.jpg')).toBe('[Image test.jpg]');
+      expect(getTransformedImagePath('@test.jpeg')).toBe('[Image test.jpeg]');
+      expect(getTransformedImagePath('@test.gif')).toBe('[Image test.gif]');
+      expect(getTransformedImagePath('@test.webp')).toBe('[Image test.webp]');
+      expect(getTransformedImagePath('@test.svg')).toBe('[Image test.svg]');
+      expect(getTransformedImagePath('@test.bmp')).toBe('[Image test.bmp]');
+    });
+
+    it('should handle POSIX-style forward-slash paths on any platform', () => {
+      const input = '@C:/Users/foo/screenshots/image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle Windows-style backslash paths on any platform', () => {
+      const input = '@C:\\Users\\foo\\screenshots\\image2x.png';
+      expect(getTransformedImagePath(input)).toBe('[Image image2x.png]');
+    });
+
+    it('should handle escaped spaces in paths', () => {
+      const input = '@path/to/my\\ file.png';
+      expect(getTransformedImagePath(input)).toBe('[Image my file.png]');
+    });
+  });
+
+  describe('getTransformationsForLine', () => {
+    it('should find transformations in a line', () => {
+      const line = 'Check out @test.png and @another.jpg';
+      const result = calculateTransformationsForLine(line);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        logicalText: '@test.png',
+        collapsedText: '[Image test.png]',
+      });
+      expect(result[1]).toMatchObject({
+        logicalText: '@another.jpg',
+        collapsedText: '[Image another.jpg]',
+      });
+    });
+
+    it('should handle no transformations', () => {
+      const line = 'Just some regular text';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformationsForLine('');
+      expect(result).toEqual([]);
+    });
+
+    it('should keep adjacent image paths as separate transformations', () => {
+      const line = '@a.png@b.png@c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+      expect(result[0].logicalText).toBe('@a.png');
+      expect(result[1].logicalText).toBe('@b.png');
+      expect(result[2].logicalText).toBe('@c.png');
+    });
+
+    it('should handle multiple transformations in a row', () => {
+      const line = '@a.png @b.png @c.png';
+      const result = calculateTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  describe('getTransformUnderCursor', () => {
+    const transformations = [
+      {
+        logStart: 5,
+        logEnd: 14,
+        logicalText: '@test.png',
+        collapsedText: '[Image @test.png]',
+      },
+      {
+        logStart: 20,
+        logEnd: 31,
+        logicalText: '@another.jpg',
+        collapsedText: '[Image @another.jpg]',
+      },
+    ];
+
+    it('should find transformation when cursor is inside it', () => {
+      const result = getTransformUnderCursor(0, 7, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at start', () => {
+      const result = getTransformUnderCursor(0, 5, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at end', () => {
+      const result = getTransformUnderCursor(0, 14, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should return null when cursor is not on a transformation', () => {
+      const result = getTransformUnderCursor(0, 2, [transformations]);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty transformations array', () => {
+      const result = getTransformUnderCursor(0, 5, []);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('calculateTransformedLine', () => {
+    it('should transform a line with one transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      const result = calculateTransformedLine(line, 0, [0, 0], transformations);
+
+      expect(result.transformedLine).toBe('Check out [Image test.png]');
+      expect(result.transformedToLogMap).toHaveLength(27); // Length includes all characters in the transformed line
+
+      // Test that we have proper mappings
+      expect(result.transformedToLogMap[0]).toBe(0); // 'C'
+      expect(result.transformedToLogMap[9]).toBe(9); // ' ' before transformation
+    });
+
+    it('should handle cursor inside transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = calculateTransformationsForLine(line);
+      // Cursor at '@' (position 10 in the line)
+      const result = calculateTransformedLine(
+        line,
+        0,
+        [0, 10],
+        transformations,
+      );
+
+      // Should show full path when cursor is on it
+      expect(result.transformedLine).toBe('Check out @test.png');
+      // When expanded, each character maps to itself
+      expect(result.transformedToLogMap[10]).toBe(10); // '@'
+    });
+
+    it('should handle line with no transformations', () => {
+      const line = 'Just some text';
+      const result = calculateTransformedLine(line, 0, [0, 0], []);
+
+      expect(result.transformedLine).toBe(line);
+      // Each visual position should map directly to logical position + trailing
+      expect(result.transformedToLogMap).toHaveLength(15); // 14 chars + 1 trailing
+      expect(result.transformedToLogMap[0]).toBe(0);
+      expect(result.transformedToLogMap[13]).toBe(13);
+      expect(result.transformedToLogMap[14]).toBe(14); // Trailing position
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformedLine('', 0, [0, 0], []);
+      expect(result.transformedLine).toBe('');
+      expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
+    });
+  });
+
+  describe('Layout Caching and Invalidation', () => {
+    it.each([
+      {
+        desc: 'via setText',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.setText('changed line'),
+        expected: 'changed line',
+      },
+      {
+        desc: 'via replaceRange',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.replaceRange(0, 0, 0, 13, 'changed line'),
+        expected: 'changed line',
+      },
+    ])(
+      'should invalidate cache when line content changes $desc',
+      ({ actFn, expected }) => {
+        const viewport = { width: 80, height: 24 };
+        const { result } = renderHookWithProviders(() =>
+          useTextBuffer({
+            initialText: 'original line',
+            viewport,
+            isValidPath: () => true,
+          }),
+        );
+
+        const originalLayout = result.current.visualLayout;
+
+        act(() => {
+          actFn(result);
+        });
+
+        expect(result.current.visualLayout).not.toBe(originalLayout);
+        expect(result.current.allVisualLines[0]).toBe(expected);
+      },
+    );
+
+    it('should invalidate cache when viewport width changes', () => {
+      const viewport = { width: 80, height: 24 };
+      const { result, rerender } = renderHookWithProviders(
+        ({ vp }) =>
+          useTextBuffer({
+            initialText:
+              'a very long line that will wrap when the viewport is small',
+            viewport: vp,
+            isValidPath: () => true,
+          }),
+        { initialProps: { vp: viewport } },
+      );
+
+      const originalLayout = result.current.visualLayout;
+
+      // Shrink viewport to force wrapping change
+      rerender({ vp: { width: 10, height: 24 } });
+
+      expect(result.current.visualLayout).not.toBe(originalLayout);
+      expect(result.current.allVisualLines.length).toBeGreaterThan(1);
+    });
+
+    it('should correctly handle cursor expansion/collapse in cached layout', () => {
+      const viewport = { width: 80, height: 24 };
+      const text = 'Check @image.png here';
+      const { result } = renderHookWithProviders(() =>
+        useTextBuffer({
+          initialText: text,
+          viewport,
+          isValidPath: () => true,
+        }),
+      );
+
+      // Cursor at start (collapsed)
+      act(() => {
+        result.current.moveToOffset(0);
+      });
+      expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
+
+      // Move cursor onto the @path (expanded)
+      act(() => {
+        result.current.moveToOffset(7); // onto @
+      });
+      expect(result.current.allVisualLines[0]).toContain('@image.png');
+      expect(result.current.allVisualLines[0]).not.toContain(
+        '[Image image.png]',
+      );
+
+      // Move cursor away (collapsed again)
+      act(() => {
+        result.current.moveToOffset(0);
+      });
+      expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
+    });
+
+    it('should reuse cache for unchanged lines during editing', () => {
+      const viewport = { width: 80, height: 24 };
+      const initialText = 'line 1\nline 2\nline 3';
+      const { result } = renderHookWithProviders(() =>
+        useTextBuffer({
+          initialText,
+          viewport,
+          isValidPath: () => true,
+        }),
+      );
+
+      const layout1 = result.current.visualLayout;
+
+      // Edit line 1
+      act(() => {
+        result.current.moveToOffset(0);
+        result.current.insert('X');
+      });
+
+      const layout2 = result.current.visualLayout;
+      expect(layout2).not.toBe(layout1);
+
+      // Verify that visual lines for line 2 and 3 (indices 1 and 2 in visualLines)
+      // are identical in content if not in object reference (the arrays are rebuilt, but contents are cached)
+      expect(result.current.allVisualLines[1]).toBe('line 2');
+      expect(result.current.allVisualLines[2]).toBe('line 3');
     });
   });
 });

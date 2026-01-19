@@ -16,6 +16,8 @@ import type {
   SettingsValue,
 } from '../config/settingsSchema.js';
 import { getSettingsSchema } from '../config/settingsSchema.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ExperimentFlags } from '@google/gemini-cli-core';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -94,6 +96,28 @@ export function requiresRestart(key: string): boolean {
  */
 export function getDefaultValue(key: string): SettingsValue {
   return getFlattenedSchema()[key]?.default;
+}
+
+/**
+ * Get the effective default value for a setting, checking experiment values when available.
+ * For settings like compressionThreshold, this will return the experiment value if set,
+ * otherwise falls back to the schema default.
+ */
+export function getEffectiveDefaultValue(
+  key: string,
+  config?: Config,
+): SettingsValue {
+  if (key === 'model.compressionThreshold' && config) {
+    const experiments = config.getExperiments();
+    const experimentValue =
+      experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
+        ?.floatValue;
+    if (experimentValue !== undefined && experimentValue !== 0) {
+      return experimentValue;
+    }
+  }
+
+  return getDefaultValue(key);
 }
 
 /**
@@ -279,11 +303,7 @@ export function getSettingValue(
   if (typeof value === 'boolean') {
     return value;
   }
-  // Fall back to default value, ensuring it's a boolean
-  const defaultValue = definition.default;
-  if (typeof defaultValue === 'boolean') {
-    return defaultValue;
-  }
+
   return false; // Final fallback
 }
 

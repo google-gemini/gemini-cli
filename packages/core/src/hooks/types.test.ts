@@ -8,12 +8,12 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createHookOutput,
   DefaultHookOutput,
-  BeforeToolHookOutput,
   BeforeModelHookOutput,
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
   HookEventName,
   HookType,
+  BeforeToolHookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -92,6 +92,11 @@ describe('Hook Output Classes', () => {
     it('should return BeforeToolSelectionHookOutput for BeforeToolSelection event', () => {
       const output = createHookOutput(HookEventName.BeforeToolSelection, {});
       expect(output).toBeInstanceOf(BeforeToolSelectionHookOutput);
+    });
+
+    it('should return BeforeToolHookOutput for BeforeTool event', () => {
+      const output = createHookOutput(HookEventName.BeforeTool, {});
+      expect(output).toBeInstanceOf(BeforeToolHookOutput);
     });
   });
 
@@ -208,33 +213,6 @@ describe('Hook Output Classes', () => {
     });
   });
 
-  describe('BeforeToolHookOutput', () => {
-    it('isBlockingDecision should use permissionDecision from hookSpecificOutput', () => {
-      const output1 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecision: 'block' },
-      });
-      expect(output1.isBlockingDecision()).toBe(true);
-
-      const output2 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecision: 'approve' },
-      });
-      expect(output2.isBlockingDecision()).toBe(false);
-    });
-
-    it('getEffectiveReason should use permissionDecisionReason from hookSpecificOutput', () => {
-      const output1 = new BeforeToolHookOutput({
-        hookSpecificOutput: { permissionDecisionReason: 'compat reason' },
-      });
-      expect(output1.getEffectiveReason()).toBe('compat reason');
-
-      const output2 = new BeforeToolHookOutput({
-        reason: 'default reason',
-        hookSpecificOutput: { other: 'value' },
-      });
-      expect(output2.getEffectiveReason()).toBe('default reason');
-    });
-  });
-
   describe('BeforeModelHookOutput', () => {
     it('getSyntheticResponse should return synthetic response if llm_response is present', () => {
       const mockResponse: LLMResponse = { candidates: [] };
@@ -341,45 +319,17 @@ describe('Hook Output Classes', () => {
       expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response if shouldStopExecution is true', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true', () => {
       const output = new AfterModelHookOutput({
         continue: false,
         stopReason: 'stopped by hook',
       });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response with default reason if shouldStopExecution is true and no stopReason', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true and no stopReason', () => {
       const output = new AfterModelHookOutput({ continue: false });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['No reason provided'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
   });
 });

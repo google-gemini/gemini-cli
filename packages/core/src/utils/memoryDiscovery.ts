@@ -7,14 +7,13 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, homedir } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
@@ -31,7 +30,7 @@ const logger = {
     debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [MemoryDiscovery]', ...args),
+    debugLogger.error('[ERROR] [MemoryDiscovery]', ...args),
 };
 
 export interface GeminiFileContent {

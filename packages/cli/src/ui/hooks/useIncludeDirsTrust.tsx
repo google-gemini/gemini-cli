@@ -8,25 +8,28 @@ import { useEffect } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
-import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  refreshServerHierarchicalMemory,
+} from '@google/gemini-cli-core';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type HistoryItem } from '../types.js';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number,
   added: string[],
   errors: string[],
 ) {
   if (!config) {
-    addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     return;
   }
 
@@ -46,7 +49,7 @@ async function finishAddingDirectories(
   }
 
   if (errors.length > 0) {
-    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') });
   }
 }
 
@@ -133,7 +136,7 @@ export function useIncludeDirsTrust(
     }
 
     if (undefinedTrustDirs.length > 0) {
-      console.log(
+      debugLogger.log(
         'Creating custom dialog with undecidedDirs:',
         undefinedTrustDirs,
       );

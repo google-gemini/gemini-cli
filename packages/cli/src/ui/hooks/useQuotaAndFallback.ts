@@ -129,21 +129,27 @@ export function useQuotaAndFallback({
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
-      if (choice === 'retry_always') {
-        // Explicitly set the model to the fallback model to persist the user's choice.
-        // This ensures the Footer updates and future turns use this model.
-        config.setModel(proQuotaRequest.fallbackModel);
+      if (choice === 'retry_always' || choice === 'retry_once') {
+        // Reset quota error flags to allow the agent loop to continue.
+        setModelSwitchedFromQuotaError(false);
+        config.setQuotaErrorOccurred(false);
 
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: `Switched to fallback model ${proQuotaRequest.fallbackModel}`,
-          },
-          Date.now(),
-        );
+        if (choice === 'retry_always') {
+          // Set the model to the fallback model for the current session.
+          // This ensures the Footer updates and future turns use this model.
+          // The change is not persisted, so the original model is restored on restart.
+          config.activateFallbackMode(proQuotaRequest.fallbackModel);
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}`,
+            },
+            Date.now(),
+          );
+        }
       }
     },
-    [proQuotaRequest, historyManager, config],
+    [proQuotaRequest, historyManager, config, setModelSwitchedFromQuotaError],
   );
 
   return {
