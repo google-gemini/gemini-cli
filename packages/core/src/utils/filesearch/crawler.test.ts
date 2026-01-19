@@ -503,14 +503,14 @@ describe('crawler', () => {
       });
     });
 
-    const getCrawlResults = (maxDepth?: number) => {
+    const getCrawlResults = async (maxDepth?: number) => {
       const ignore = loadIgnoreRules({
         projectRoot: tmpDir,
         useGitignore: false,
         useGeminiignore: false,
         ignoreDirs: [],
       });
-      return crawl({
+      const paths = await crawl({
         crawlDirectory: tmpDir,
         cwd: tmpDir,
         ignore,
@@ -518,6 +518,7 @@ describe('crawler', () => {
         cacheTtl: 0,
         maxDepth,
       });
+      return paths;
     };
 
     it('should only crawl top-level files when maxDepth is 0', async () => {
@@ -570,5 +571,35 @@ describe('crawler', () => {
         ]),
       );
     });
+  });
+
+  it('should detect truncation when maxFiles is hit', async () => {
+    tmpDir = await createTmpDir({
+      'file1.js': '',
+      'file2.js': '',
+      'file3.js': '',
+    });
+
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+    });
+
+    const paths = await crawl({
+      crawlDirectory: tmpDir,
+      cwd: tmpDir,
+      ignore,
+      cache: false,
+      cacheTtl: 0,
+      maxFiles: 2,
+    });
+
+    // fdir returns files and directories.
+    // In our filter, we only increment fileCount for files.
+    // So we should have 2 files + some directories.
+    const files = paths.filter((p) => p !== '.' && !p.endsWith('/'));
+    expect(files.length).toBe(2);
   });
 });

@@ -73,6 +73,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your
     clipboard, for easy sharing or reuse.
+  - **Behavior:**
+    - Local sessions use system clipboard tools (pbcopy/xclip/clip).
+    - Remote sessions (SSH/WSL) use OSC 52 and require terminal support.
   - **Note:** This command requires platform-specific clipboard tools to be
     installed.
     - On Linux, it requires `xclip` or `xsel`. You can typically install them
@@ -164,6 +167,13 @@ Slash commands provide meta-level control over the CLI itself.
   - **Note:** Only available if checkpointing is configured via
     [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
+
+- [**`/rewind`**](./rewind.md)
+  - **Description:** Browse and rewind previous interactions. Allows you to
+    rewind the conversation, revert file changes, or both. Provides an
+    interactive interface to select the exact point to rewind to.
+  - **Keyboard shortcut:** Press **Esc** twice.
+
 - **`/resume`**
   - **Description:** Browse and resume previous conversation sessions. Opens an
     interactive session browser where you can search, filter, and select from
@@ -193,6 +203,23 @@ Slash commands provide meta-level control over the CLI itself.
     browse or search for specific settings, view their current values, and
     modify them as desired. Changes to some settings are applied immediately,
     while others require a restart.
+
+- [**`/skills`**](./skills.md)
+  - **Description:** (Experimental) Manage Agent Skills, which provide on-demand
+    expertise and specialized workflows.
+  - **Sub-commands:**
+    - **`list`**:
+      - **Description:** List all discovered skills and their current status
+        (enabled/disabled).
+    - **`enable`**:
+      - **Description:** Enable a specific skill by name.
+      - **Usage:** `/skills enable <name>`
+    - **`disable`**:
+      - **Description:** Disable a specific skill by name.
+      - **Usage:** `/skills disable <name>`
+    - **`reload`**:
+      - **Description:** Refresh the list of discovered skills from all tiers
+        (workspace, user, and extensions).
 
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI

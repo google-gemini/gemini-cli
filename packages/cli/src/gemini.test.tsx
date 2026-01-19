@@ -23,8 +23,30 @@ import {
 import os from 'node:os';
 import v8 from 'node:v8';
 import { type CliArgs } from './config/config.js';
-import { type LoadedSettings } from './config/settings.js';
+import {
+  type LoadedSettings,
+  type Settings,
+  createTestMergedSettings,
+} from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
+
+function createMockSettings(
+  overrides: Record<string, unknown> = {},
+): LoadedSettings {
+  const merged = createTestMergedSettings(
+    (overrides['merged'] as Partial<Settings>) || {},
+  );
+
+  return {
+    system: { settings: {} },
+    systemDefaults: { settings: {} },
+    user: { settings: {} },
+    workspace: { settings: {} },
+    errors: [],
+    ...overrides,
+    merged,
+  } as unknown as LoadedSettings;
+}
 import {
   type Config,
   type ResumedSessionData,
@@ -108,26 +130,19 @@ class MockProcessExitError extends Error {
 }
 
 // Mock dependencies
-vi.mock('./config/settings.js', () => ({
-  loadSettings: vi.fn().mockReturnValue({
-    merged: {
-      advanced: {},
-      security: { auth: {} },
-      ui: {},
-    },
-    workspace: { settings: {} },
-    setValue: vi.fn(),
-    forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-    errors: [],
-  }),
-  migrateDeprecatedSettings: vi.fn(),
-  SettingScope: {
-    User: 'user',
-    Workspace: 'workspace',
-    System: 'system',
-    SystemDefaults: 'system-defaults',
-  },
-}));
+vi.mock('./config/settings.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./config/settings.js')>();
+  return {
+    ...actual,
+    loadSettings: vi.fn().mockImplementation(() => ({
+      merged: actual.getDefaultsFromSchema(),
+      workspace: { settings: {} },
+      errors: [],
+    })),
+    saveModelChange: vi.fn(),
+    getDefaultsFromSchema: actual.getDefaultsFromSchema,
+  };
+});
 
 vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
@@ -142,6 +157,9 @@ vi.mock('./config/config.js', () => ({
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
     setTerminalBackground: vi.fn(),
+    storage: {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+    },
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
@@ -436,18 +454,19 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
-    } as unknown as Config);
-    vi.mocked(loadSettings).mockReturnValue({
-      errors: [],
-      merged: {
-        advanced: {},
-        security: { auth: {} },
-        ui: {},
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
       },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-    } as never);
+    } as unknown as Config);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+      }),
+    );
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
       sandbox: undefined,
@@ -499,17 +518,18 @@ describe('gemini.tsx main function kitty protocol', () => {
         throw new MockProcessExitError(code);
       });
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: {
-        advanced: {},
-        security: { auth: {} },
-        ui: {},
-      },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
@@ -588,17 +608,18 @@ describe('gemini.tsx main function kitty protocol', () => {
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: {
-        advanced: {},
-        security: { auth: {} },
-        ui: {},
-      },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     const mockConfig = {
       isInteractive: () => false,
@@ -659,17 +680,18 @@ describe('gemini.tsx main function kitty protocol', () => {
         throw new MockProcessExitError(code);
       });
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: {
-        advanced: {},
-        security: { auth: {} },
-        ui: { theme: 'non-existent-theme' },
-      },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: {} },
+          ui: { theme: 'non-existent-theme' },
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
@@ -747,13 +769,14 @@ describe('gemini.tsx main function kitty protocol', () => {
       });
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
@@ -793,6 +816,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     try {
@@ -830,13 +856,14 @@ describe('gemini.tsx main function kitty protocol', () => {
         throw new MockProcessExitError(code);
       });
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { advanced: {}, security: { auth: {} }, ui: {} },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: {} },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
@@ -875,6 +902,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // The mock is already set up at the top of the test
@@ -906,13 +936,14 @@ describe('gemini.tsx main function kitty protocol', () => {
         throw new MockProcessExitError(code);
       });
 
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { advanced: {}, security: { auth: {} }, ui: {} },
-      workspace: { settings: {} },
-      setValue: vi.fn(),
-      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
-      errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: {} },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
@@ -1022,10 +1053,11 @@ describe('gemini.tsx main function exit codes', () => {
     );
     const { loadSettings } = await import('./config/settings.js');
     vi.mocked(loadCliConfig).mockResolvedValue({} as Config);
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { security: { auth: {} }, ui: {} },
-      errors: [],
-    } as never);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: {} }, ui: {} },
+      }),
+    );
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: true,
     } as unknown as CliArgs);
@@ -1054,14 +1086,13 @@ describe('gemini.tsx main function exit codes', () => {
     vi.mocked(loadCliConfig).mockResolvedValue({
       refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
     } as unknown as Config);
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: {
-        security: { auth: { selectedType: 'google', useExternal: false } },
-        ui: {},
-      },
-      workspace: { settings: {} },
-      errors: [],
-    } as never);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+        },
+      }),
+    );
     vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
     vi.mock('./config/auth.js', () => ({
       validateAuthMethod: vi.fn().mockReturnValue(null),
@@ -1115,12 +1146,15 @@ describe('gemini.tsx main function exit codes', () => {
       getUsageStatisticsEnabled: () => false,
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
     } as unknown as Config);
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { security: { auth: {} }, ui: {} },
-      workspace: { settings: {} },
-      errors: [],
-    } as never);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: {} }, ui: {} },
+      }),
+    );
     vi.mocked(parseArguments).mockResolvedValue({
       resume: 'invalid-session',
     } as unknown as CliArgs);
@@ -1180,13 +1214,16 @@ describe('gemini.tsx main function exit codes', () => {
       getExtensions: () => [],
       getUsageStatisticsEnabled: () => false,
       setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
       getRemoteAdminSettings: () => undefined,
     } as unknown as Config);
-    vi.mocked(loadSettings).mockReturnValue({
-      merged: { security: { auth: {} }, ui: {} },
-      workspace: { settings: {} },
-      errors: [],
-    } as never);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: {} }, ui: {} },
+      }),
+    );
     vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true, // Simulate TTY so it doesn't try to read stdin
