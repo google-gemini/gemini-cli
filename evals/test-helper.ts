@@ -48,6 +48,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git init', execOptions);
         execSync('git config user.email "test@example.com"', execOptions);
         execSync('git config user.name "Test User"', execOptions);
+
+        // Temporarily disable the interactive editor and git pager
+        // to avoid hanging the tests. It seems the the agent isn't
+        // consistently honoring the instructions to avoid interactive
+        // commands.
+        execSync('git config core.editor "true"', execOptions);
+        execSync('git config core.pager "cat"', execOptions);
         execSync('git add .', execOptions);
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
