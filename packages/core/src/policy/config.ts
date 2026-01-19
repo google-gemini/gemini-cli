@@ -16,11 +16,8 @@ import {
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
-import {
-  loadPoliciesFromToml,
-  type PolicyFileError,
-  escapeRegex,
-} from './toml-loader.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -28,6 +25,9 @@ import {
 } from '../confirmation-bus/types.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,7 +124,7 @@ export async function createPolicyEngineConfig(
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(approvalMode, policyDirs, (dir) =>
+  } = await loadPoliciesFromToml(policyDirs, (dir) =>
     getPolicyTier(dir, defaultPoliciesDir),
   );
 
@@ -174,6 +174,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.DENY,
         priority: 2.9,
+        source: 'Settings (MCP Excluded)',
       });
     }
   }
@@ -186,6 +187,7 @@ export async function createPolicyEngineConfig(
         toolName: tool,
         decision: PolicyDecision.DENY,
         priority: 2.4,
+        source: 'Settings (Tools Excluded)',
       });
     }
   }
@@ -194,11 +196,51 @@ export async function createPolicyEngineConfig(
   // Priority: 2.3 (user tier - explicit temporary allows)
   if (settings.tools?.allowed) {
     for (const tool of settings.tools.allowed) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 2.3,
-      });
+      // Check for legacy format: toolName(args)
+      const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
+      if (match) {
+        const [, rawToolName, args] = match;
+        // Normalize shell tool aliases
+        const toolName = SHELL_TOOL_NAMES.includes(rawToolName)
+          ? SHELL_TOOL_NAME
+          : rawToolName;
+
+        // Treat args as a command prefix for shell tool
+        if (toolName === SHELL_TOOL_NAME) {
+          const patterns = buildArgsPatterns(undefined, args);
+          for (const pattern of patterns) {
+            if (pattern) {
+              rules.push({
+                toolName,
+                decision: PolicyDecision.ALLOW,
+                priority: 2.3,
+                argsPattern: new RegExp(pattern),
+                source: 'Settings (Tools Allowed)',
+              });
+            }
+          }
+        } else {
+          // For non-shell tools, we allow the tool itself but ignore args
+          // as args matching was only supported for shell tools historically.
+          rules.push({
+            toolName,
+            decision: PolicyDecision.ALLOW,
+            priority: 2.3,
+            source: 'Settings (Tools Allowed)',
+          });
+        }
+      } else {
+        // Standard tool name
+        const toolName = SHELL_TOOL_NAMES.includes(tool)
+          ? SHELL_TOOL_NAME
+          : tool;
+        rules.push({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority: 2.3,
+          source: 'Settings (Tools Allowed)',
+        });
+      }
     }
   }
 
@@ -215,6 +257,7 @@ export async function createPolicyEngineConfig(
           toolName: `${serverName}__*`,
           decision: PolicyDecision.ALLOW,
           priority: 2.2,
+          source: 'Settings (MCP Trusted)',
         });
       }
     }
@@ -228,6 +271,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.ALLOW,
         priority: 2.1,
+        source: 'Settings (MCP Allowed)',
       });
     }
   }
@@ -236,6 +280,7 @@ export async function createPolicyEngineConfig(
     rules,
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
+    approvalMode,
   };
 }
 
@@ -244,7 +289,7 @@ interface TomlRule {
   mcpName?: string;
   decision?: string;
   priority?: number;
-  commandPrefix?: string;
+  commandPrefix?: string | string[];
   argsPattern?: string;
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
@@ -258,26 +303,40 @@ export function createPolicyUpdater(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {
       const toolName = message.toolName;
-      let argsPattern = message.argsPattern
-        ? new RegExp(message.argsPattern)
-        : undefined;
 
       if (message.commandPrefix) {
-        // Convert commandPrefix to argsPattern for in-memory rule
-        // This mimics what toml-loader does
-        const escapedPrefix = escapeRegex(message.commandPrefix);
-        argsPattern = new RegExp(`"command":"${escapedPrefix}`);
-      }
+        // Convert commandPrefix(es) to argsPatterns for in-memory rules
+        const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        for (const pattern of patterns) {
+          if (pattern) {
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              // User tier (2) + high priority (950/1000) = 2.95
+              // This ensures user "always allow" selections are high priority
+              // but still lose to admin policies (3.xxx) and settings excludes (200)
+              priority: 2.95,
+              argsPattern: new RegExp(pattern),
+              source: 'Dynamic (Confirmed)',
+            });
+          }
+        }
+      } else {
+        const argsPattern = message.argsPattern
+          ? new RegExp(message.argsPattern)
+          : undefined;
 
-      policyEngine.addRule({
-        toolName,
-        decision: PolicyDecision.ALLOW,
-        // User tier (2) + high priority (950/1000) = 2.95
-        // This ensures user "always allow" selections are high priority
-        // but still lose to admin policies (3.xxx) and settings excludes (200)
-        priority: 2.95,
-        argsPattern,
-      });
+        policyEngine.addRule({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          // User tier (2) + high priority (950/1000) = 2.95
+          // This ensures user "always allow" selections are high priority
+          // but still lose to admin policies (3.xxx) and settings excludes (200)
+          priority: 2.95,
+          argsPattern,
+          source: 'Dynamic (Confirmed)',
+        });
+      }
 
       if (message.persist) {
         try {
@@ -292,7 +351,7 @@ export function createPolicyUpdater(
             existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-              console.warn(
+              debugLogger.warn(
                 `Failed to parse ${policyFile}, overwriting with new policy.`,
                 error,
               );

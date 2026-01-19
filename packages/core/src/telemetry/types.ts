@@ -39,6 +39,7 @@ import {
   toSystemInstruction,
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
+import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -290,13 +291,17 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         this.tool_type = 'native';
       }
 
+      const fileDiff = getFileDiffFromResultDisplay(
+        call.response.resultDisplay,
+      );
+
       if (
         call.status === 'success' &&
         typeof call.response.resultDisplay === 'object' &&
         call.response.resultDisplay !== null &&
-        'diffStat' in call.response.resultDisplay
+        fileDiff
       ) {
-        const diffStat = call.response.resultDisplay.diffStat;
+        const diffStat = fileDiff.diffStat;
         if (diffStat) {
           this.metadata = {
             model_added_lines: diffStat.model_added_lines,
@@ -1231,6 +1236,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_version: string;
   extension_source: string;
@@ -1238,6 +1244,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_source: string,
@@ -1246,6 +1253,7 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_install';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_source = extension_source;
@@ -1325,17 +1333,20 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   status: 'success' | 'error';
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     status: 'success' | 'error',
   ) {
     this['event.name'] = 'extension_uninstall';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.status = status;
   }
@@ -1360,6 +1371,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
   'event.name': 'extension_update';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   extension_previous_version: string;
   extension_version: string;
@@ -1368,6 +1380,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     extension_version: string,
     extension_previous_version: string,
@@ -1377,6 +1390,7 @@ export class ExtensionUpdateEvent implements BaseTelemetryEvent {
     this['event.name'] = 'extension_update';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.extension_version = extension_version;
     this.extension_previous_version = extension_previous_version;
@@ -1407,17 +1421,20 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_enable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_enable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1536,24 +1553,29 @@ export type TelemetryEvent =
   | RecoveryAttemptEvent
   | LlmLoopCheckEvent
   | StartupStatsEvent
-  | WebFetchFallbackAttemptEvent;
+  | WebFetchFallbackAttemptEvent
+  | EditStrategyEvent
+  | EditCorrectionEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
   'event.timestamp': string;
   extension_name: string;
+  hashed_extension_name: string;
   extension_id: string;
   setting_scope: string;
 
   constructor(
     extension_name: string,
+    hashed_extension_name: string,
     extension_id: string,
     settingScope: string,
   ) {
     this['event.name'] = 'extension_disable';
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
+    this.hashed_extension_name = hashed_extension_name;
     this.extension_id = extension_id;
     this.setting_scope = settingScope;
   }
@@ -1573,14 +1595,14 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit_strategy';
-export class SmartEditStrategyEvent implements BaseTelemetryEvent {
-  'event.name': 'smart_edit_strategy';
+export const EVENT_EDIT_STRATEGY = 'gemini_cli.edit_strategy';
+export class EditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'edit_strategy';
   'event.timestamp': string;
   strategy: string;
 
   constructor(strategy: string) {
-    this['event.name'] = 'smart_edit_strategy';
+    this['event.name'] = 'edit_strategy';
     this['event.timestamp'] = new Date().toISOString();
     this.strategy = strategy;
   }
@@ -1588,25 +1610,25 @@ export class SmartEditStrategyEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_SMART_EDIT_STRATEGY,
+      'event.name': EVENT_EDIT_STRATEGY,
       'event.timestamp': this['event.timestamp'],
       strategy: this.strategy,
     };
   }
 
   toLogBody(): string {
-    return `Smart Edit Tool Strategy: ${this.strategy}`;
+    return `Edit Tool Strategy: ${this.strategy}`;
   }
 }
 
-export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit_correction';
-export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
-  'event.name': 'smart_edit_correction';
+export const EVENT_EDIT_CORRECTION = 'gemini_cli.edit_correction';
+export class EditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'edit_correction';
   'event.timestamp': string;
   correction: 'success' | 'failure';
 
   constructor(correction: 'success' | 'failure') {
-    this['event.name'] = 'smart_edit_correction';
+    this['event.name'] = 'edit_correction';
     this['event.timestamp'] = new Date().toISOString();
     this.correction = correction;
   }
@@ -1614,14 +1636,14 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_SMART_EDIT_CORRECTION,
+      'event.name': EVENT_EDIT_CORRECTION,
       'event.timestamp': this['event.timestamp'],
       correction: this.correction,
     };
   }
 
   toLogBody(): string {
-    return `Smart Edit Tool Correction: ${this.correction}`;
+    return `Edit Tool Correction: ${this.correction}`;
   }
 }
 

@@ -14,7 +14,7 @@ import {
   type MockedObject,
 } from 'vitest';
 import { McpClientManager } from './mcp-client-manager.js';
-import { McpClient } from './mcp-client.js';
+import { McpClient, MCPDiscoveryState } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config } from '../config/config.js';
 
@@ -69,6 +69,18 @@ describe('McpClientManager', () => {
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
+  });
+
+  it('should update global discovery state', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    const manager = new McpClientManager(toolRegistry, mockConfig);
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.NOT_STARTED);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
   });
 
   it('should not discover tools if folder is not trusted', async () => {
@@ -236,6 +248,42 @@ describe('McpClientManager', () => {
       expect(instructions).not.toContain(
         "# Instructions for MCP Server 'server-without-instructions'",
       );
+    });
+  });
+
+  describe('Promise rejection handling', () => {
+    it('should handle errors thrown during client initialization', async () => {
+      vi.mocked(McpClient).mockImplementation(() => {
+        throw new Error('Client initialization failed');
+      });
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+
+      await expect(manager.startConfiguredMcpServers()).resolves.not.toThrow();
+    });
+
+    it('should handle errors thrown in the async IIFE before try block', async () => {
+      let disconnectCallCount = 0;
+      mockedMcpClient.disconnect.mockImplementation(async () => {
+        disconnectCallCount++;
+        if (disconnectCallCount === 1) {
+          throw new Error('Disconnect failed unexpectedly');
+        }
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue({});
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+
+      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      await expect(manager.restartServer('test-server')).resolves.not.toThrow();
     });
   });
 });

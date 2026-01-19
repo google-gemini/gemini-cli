@@ -18,6 +18,88 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.23.0 - 2026-01-07
+
+- 🎉 **Experimental Agent Skills Support in Preview:** Gemini CLI now supports
+  [Agent Skills](https://agentskills.io/home) in our preview builds. This is an
+  early preview where we’re looking for feedback!
+  - Install Preview: `npm install -g @google/gemini-cli@preview`
+  - Enable in `/settings`
+  - Docs:
+    [https://geminicli.com/docs/cli/skills/](https://geminicli.com/docs/cli/skills/)
+- **Gemini CLI wrapped:** Run `npx gemini-wrapped` to visualize your usage
+  stats, top models, languages, and more!
+- **Windows clipboard image support:** Windows users can now paste images
+  directly from their clipboard into the CLI using `Alt`+`V`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/13997) by
+  [@sgeraldes](https://github.com/sgeraldes))
+- **Terminal background color detection:** Automatically optimizes your
+  terminal's background color to select compatible themes and provide
+  accessibility warnings.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/15132) by
+  [@jacob314](https://github.com/jacob314))
+- **Session logout:** Use the new `/logout` command to instantly clear
+  credentials and reset your authentication state for seamless account
+  switching. ([pr](https://github.com/google-gemini/gemini-cli/pull/13383) by
+  [@CN-Scars](https://github.com/CN-Scars))
+
+## Announcements: v0.22.0 - 2025-12-22
+
+- 🎉**Free Tier + Gemini 3:** Free tier users now all have access to Gemini 3
+  Pro & Flash. Enable in `/settings` by toggling "Preview Features" to `true`.
+- 🎉**Gemini CLI + Colab:** Gemini CLI is now pre-installed. Can be used
+  headlessly in notebook cells or interactively in the built-in terminal
+  ([pic](https://imgur.com/a/G0Tn7vi))
+- 🎉**Gemini CLI Extensions:**
+  - **Conductor:** Planning++, Gemini works with you to build out a detailed
+    plan, pull in extra details as needed, ultimately to give the LLM guardrails
+    with artifacts. Measure twice, implement once!
+
+    `gemini extensions install https://github.com/gemini-cli-extensions/conductor`
+
+    Blog:
+    [https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/](https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/)
+
+  - **Endor Labs:** Perform code analysis, vulnerability scanning, and
+    dependency checks using natural language.
+
+    `gemini extensions install https://github.com/endorlabs/gemini-extension`
+
+## Announcements: v0.21.0 - 2025-12-15
+
+- **⚡️⚡️⚡️ Gemini 3 Flash + Gemini CLI:** Better, faster and cheaper than 2.5
+  Pro - and in some scenarios better than 3 Pro! For paid tiers + free tier
+  users who were on the wait list enable **Preview Features** in `/settings.`
+- For more information:
+  [Gemini 3 Flash is now available in Gemini CLI](https://developers.googleblog.com/gemini-3-flash-is-now-available-in-gemini-cli/).
+- 🎉 Gemini CLI Extensions:
+  - Rill: Utilize natural language to analyze Rill data, enabling the
+    exploration of metrics and trends without the need for manual queries.
+    `gemini extensions install https://github.com/rilldata/rill-gemini-extension`
+  - Browserbase: Interact with web pages, take screenshots, extract information,
+    and perform automated actions with atomic precision.
+    `gemini extensions install https://github.com/browserbase/mcp-server-browserbase`
+- Quota Visibility: The `/stats` command now displays quota information for all
+  available models, including those not used in the current session. (@sehoon38)
+- Fuzzy Setting Search: Users can now quickly find settings using fuzzy search
+  within the settings dialog. (@sehoon38)
+- MCP Resource Support: Users can now discover, view, and search through
+  resources using the @ command. (@MrLesk)
+- Auto-execute Simple Slash Commands: Simple slash commands are now executed
+  immediately on enter. (@jackwotherspoon)
+
+## Announcements: v0.20.0 - 2025-12-01
+
+- **Multi-file Drag & Drop:** Users can now drag and drop multiple files into
+  the terminal, and the CLI will automatically prefix each valid path with `@`.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/14832) by
+  [@jackwotherspoon](https://github.com/jackwotherspoon))
+- **Persistent "Always Allow" Policies:** Users can now save "Always Allow"
+  decisions for tool executions, with granular control over specific shell
+  commands and multi-cloud platform tools.
+  ([pr](https://github.com/google-gemini/gemini-cli/pull/14737) by
+  [@allenhutchison](https://github.com/allenhutchison))
+
 ## Announcements: v0.19.0 - 2025-11-24
 
 - 🎉 **New extensions:**
@@ -54,8 +136,7 @@ on GitHub.
 - **Experimental permission improvements:** We are now experimenting with a new
   policy engine in Gemini CLI. This allows users and administrators to create
   fine-grained policy for tool calls. Currently behind a flag. See
-  [https://geminicli.com/docs/core/policy-engine/](../core/policy-engine.md) for
-  more information.
+  [policy engine documentation](../core/policy-engine.md) for more information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
 - **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API

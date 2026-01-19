@@ -11,7 +11,7 @@ import {
   MultiFolderTrustChoice,
   type MultiFolderTrustDialogProps,
 } from './MultiFolderTrustDialog.js';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   TrustLevel,
   type LoadedTrustedFolders,
@@ -89,12 +89,11 @@ describe('MultiFolderTrustDialog', () => {
 
     const keypressCallback = mockedUseKeypress.mock.calls[0][0];
     await act(async () => {
-      await keypressCallback({
+      keypressCallback({
         name: 'escape',
         ctrl: false,
         meta: false,
         shift: false,
-        paste: false,
         sequence: '',
         insertable: false,
       });
@@ -117,7 +116,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.NO);
+      onSelect(MultiFolderTrustChoice.NO);
     });
 
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
@@ -145,7 +144,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/folder1');
@@ -166,7 +165,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
+      onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/folder1');
@@ -192,7 +191,7 @@ describe('MultiFolderTrustDialog', () => {
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
 
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.NO);
+      onSelect(MultiFolderTrustChoice.NO);
     });
 
     expect(lastFrame()).toContain('Applying trust settings...');
@@ -210,16 +209,13 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      expect.any(Number),
-    );
+    expect(mockAddItem).toHaveBeenCalledWith({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     expect(mockOnComplete).toHaveBeenCalled();
     expect(mockFinishAddingDirectories).not.toHaveBeenCalled();
   });
@@ -243,7 +239,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/good');

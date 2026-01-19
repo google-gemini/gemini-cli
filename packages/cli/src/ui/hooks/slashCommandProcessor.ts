@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  createElement,
+} from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -12,6 +18,7 @@ import type {
   Config,
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
+  ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -22,6 +29,9 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
+  addMCPStatusChangeListener,
+  removeMCPStatusChangeListener,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -30,8 +40,9 @@ import type {
   SlashCommandProcessorResult,
   HistoryItem,
   ConfirmationRequest,
+  IndividualToolCallDisplay,
 } from '../types.js';
-import { MessageType } from '../types.js';
+import { MessageType, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
@@ -44,7 +55,11 @@ import {
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 import { appEvents } from '../../utils/events.js';
-import { useAlternateBuffer } from './useAlternateBuffer.js';
+import {
+  LogoutConfirmationDialog,
+  LogoutChoice,
+} from '../components/LogoutConfirmationDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -85,20 +100,11 @@ export const useSlashCommandProcessor = (
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
-  const alternateBuffer = useAlternateBuffer();
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
     setReloadTrigger((v) => v + 1);
   }, []);
-  const [shellConfirmationRequest, setShellConfirmationRequest] =
-    useState<null | {
-      commands: string[];
-      onConfirm: (
-        outcome: ToolConfirmationOutcome,
-        approvedCommands?: string[],
-      ) => void;
-    }>(null);
   const [confirmationRequest, setConfirmationRequest] = useState<null | {
     prompt: React.ReactNode;
     onConfirm: (confirmed: boolean) => void;
@@ -201,9 +207,6 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          if (!alternateBuffer) {
-            console.clear();
-          }
           refreshStatic();
           setBannerVisible(false);
         },
@@ -227,7 +230,6 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
-      alternateBuffer,
       config,
       settings,
       gitService,
@@ -264,6 +266,10 @@ export const useSlashCommandProcessor = (
       ideClient.addStatusChangeListener(listener);
     })();
 
+    // Listen for MCP server status changes (e.g. connection, discovery completion)
+    // to reload slash commands (since they may include MCP prompts).
+    addMCPStatusChangeListener(listener);
+
     // TODO: Ideally this would happen more directly inside the ExtensionLoader,
     // but the CommandService today is not conducive to that since it isn't a
     // long lived service but instead gets fully re-created based on reload
@@ -284,6 +290,7 @@ export const useSlashCommandProcessor = (
         const ideClient = await IdeClient.getInstance();
         ideClient.removeStatusChangeListener(listener);
       })();
+      removeMCPStatusChangeListener(listener);
       appEvents.off('extensionsStarting', extensionEventListener);
       appEvents.off('extensionsStopping', extensionEventListener);
     };
@@ -400,6 +407,22 @@ export const useSlashCommandProcessor = (
                     Date.now(),
                   );
                   return { type: 'handled' };
+                case 'logout':
+                  // Show logout confirmation dialog with Login/Exit options
+                  setCustomDialog(
+                    createElement(LogoutConfirmationDialog, {
+                      onSelect: async (choice: LogoutChoice) => {
+                        setCustomDialog(null);
+                        if (choice === LogoutChoice.LOGIN) {
+                          actions.openAuthDialog();
+                        } else {
+                          await runExitCleanup();
+                          process.exit(0);
+                        }
+                      },
+                    }),
+                  );
+                  return { type: 'handled' };
                 case 'dialog':
                   switch (result.dialog) {
                     case 'auth':
@@ -455,30 +478,59 @@ export const useSlashCommandProcessor = (
                     content: result.content,
                   };
                 case 'confirm_shell_commands': {
+                  const callId = `expansion-${Date.now()}`;
                   const { outcome, approvedCommands } = await new Promise<{
                     outcome: ToolConfirmationOutcome;
                     approvedCommands?: string[];
                   }>((resolve) => {
-                    setShellConfirmationRequest({
+                    const confirmationDetails: ToolCallConfirmationDetails = {
+                      type: 'exec',
+                      title: `Confirm Shell Expansion`,
+                      command: result.commandsToConfirm[0] || '',
+                      rootCommand: result.commandsToConfirm[0] || '',
+                      rootCommands: result.commandsToConfirm,
                       commands: result.commandsToConfirm,
-                      onConfirm: (
-                        resolvedOutcome,
-                        resolvedApprovedCommands,
-                      ) => {
-                        setShellConfirmationRequest(null); // Close the dialog
+                      onConfirm: async (resolvedOutcome) => {
+                        // Close the pending tool display by resolving
                         resolve({
                           outcome: resolvedOutcome,
-                          approvedCommands: resolvedApprovedCommands,
+                          approvedCommands:
+                            resolvedOutcome === ToolConfirmationOutcome.Cancel
+                              ? []
+                              : result.commandsToConfirm,
                         });
                       },
+                    };
+
+                    const toolDisplay: IndividualToolCallDisplay = {
+                      callId,
+                      name: 'Expansion',
+                      description: 'Command expansion needs shell access',
+                      status: ToolCallStatus.Confirming,
+                      resultDisplay: undefined,
+                      confirmationDetails,
+                    };
+
+                    setPendingItem({
+                      type: 'tool_group',
+                      tools: [toolDisplay],
                     });
                   });
+
+                  setPendingItem(null);
 
                   if (
                     outcome === ToolConfirmationOutcome.Cancel ||
                     !approvedCommands ||
                     approvedCommands.length === 0
                   ) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Slash command shell execution declined.',
+                      },
+                      Date.now(),
+                    );
                     return { type: 'handled' };
                   }
 
@@ -492,6 +544,8 @@ export const useSlashCommandProcessor = (
                     result.originalInvocation.raw,
                     // Pass the approved commands as a one-time grant for this execution.
                     new Set(approvedCommands),
+                    undefined,
+                    false, // Do not add to history again
                   );
                 }
                 case 'confirm_action': {
@@ -551,9 +605,16 @@ export const useSlashCommandProcessor = (
           }
         }
 
+        const isMcpLoading =
+          config?.getMcpClientManager()?.getDiscoveryState() ===
+          MCPDiscoveryState.IN_PROGRESS;
+        const errorMessage = isMcpLoading
+          ? `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`
+          : `Unknown command: ${trimmed}`;
+
         addMessage({
           type: MessageType.ERROR,
-          content: `Unknown command: ${trimmed}`,
+          content: errorMessage,
           timestamp: new Date(),
         });
 
@@ -597,7 +658,6 @@ export const useSlashCommandProcessor = (
       commands,
       commandContext,
       addMessage,
-      setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
       setConfirmationRequest,
@@ -610,7 +670,6 @@ export const useSlashCommandProcessor = (
     slashCommands: commands,
     pendingHistoryItems,
     commandContext,
-    shellConfirmationRequest,
     confirmationRequest,
   };
 };

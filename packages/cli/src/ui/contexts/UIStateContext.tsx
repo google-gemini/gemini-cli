@@ -9,11 +9,11 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConsoleMessageItem,
-  ShellConfirmationRequest,
   ConfirmationRequest,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
+  ActiveHook,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -40,6 +40,7 @@ export interface ProQuotaDialogRequest {
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
+import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -66,7 +67,6 @@ export interface UIState {
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
@@ -95,6 +95,7 @@ export interface UIState {
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
+  activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
   showAutoAcceptIndicator: ApprovalMode;
@@ -136,6 +137,9 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  terminalBackgroundColor: TerminalBackgroundColor;
+  settingsNonce: number;
+  adminSettingsChanged: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

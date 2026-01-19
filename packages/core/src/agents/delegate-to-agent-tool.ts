@@ -12,14 +12,15 @@ import {
   type ToolInvocation,
   type ToolResult,
   BaseToolInvocation,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import type { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { SubagentInvocation } from './invocation.js';
-import type { AgentInputs } from './types.js';
+import type { AgentDefinition, AgentInputs } from './types.js';
+import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 
 type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
@@ -30,7 +31,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
   constructor(
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const definitions = registry.getAllDefinitions();
 
@@ -119,20 +120,25 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
       registry.getToolDescription(),
       Kind.Think,
       zodToJsonSchema(schema),
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: DelegateParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<DelegateParams, ToolResult> {
     return new DelegateInvocation(
       params,
       this.registry,
       this.config,
-      this.messageBus,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }
@@ -145,13 +151,37 @@ class DelegateInvocation extends BaseToolInvocation<
     params: DelegateParams,
     private readonly registry: AgentRegistry,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, DELEGATE_TO_AGENT_TOOL_NAME);
+    super(
+      params,
+      messageBus,
+      _toolName ?? DELEGATE_TO_AGENT_TOOL_NAME,
+      _toolDisplayName,
+    );
   }
 
   getDescription(): string {
     return `Delegating to agent '${this.params.agent_name}'`;
+  }
+
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const definition = this.registry.getDefinition(this.params.agent_name);
+    if (!definition || definition.kind !== 'remote') {
+      // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
+      return false;
+    }
+
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
+    const invocation = this.buildSubInvocation(
+      definition,
+      agentArgs as AgentInputs,
+    );
+    return invocation.shouldConfirmExecute(abortSignal);
   }
 
   async execute(
@@ -161,22 +191,29 @@ class DelegateInvocation extends BaseToolInvocation<
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition) {
       throw new Error(
-        `Agent '${this.params.agent_name}' exists in the tool definition but could not be found in the registry.`,
+        `Agent '${this.params.agent_name}' not found in registry.`,
       );
     }
 
-    // Extract arguments (everything except agent_name)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { agent_name, ...agentArgs } = this.params;
-
-    // Instantiate the Subagent Loop
-    const subagentInvocation = new SubagentInvocation(
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
+    const invocation = this.buildSubInvocation(
+      definition,
       agentArgs as AgentInputs,
+    );
+
+    return invocation.execute(signal, updateOutput);
+  }
+
+  private buildSubInvocation(
+    definition: AgentDefinition,
+    agentArgs: AgentInputs,
+  ): ToolInvocation<AgentInputs, ToolResult> {
+    const wrapper = new SubagentToolWrapper(
       definition,
       this.config,
       this.messageBus,
     );
 
-    return subagentInvocation.execute(signal, updateOutput);
+    return wrapper.build(agentArgs);
   }
 }

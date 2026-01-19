@@ -6,7 +6,6 @@
 
 import type { GenerateContentResponse } from '@google/genai';
 import { ApiError } from '@google/genai';
-import { AuthType } from '../core/contentGenerator.js';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
@@ -16,8 +15,6 @@ import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
-import { classifyFailureKind } from '../availability/errorClassification.js';
-import { applyAvailabilityTransition } from '../availability/policyHelpers.js';
 
 export type { RetryAvailabilityContext };
 
@@ -35,10 +32,11 @@ export interface RetryOptions {
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
+  onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 3,
+  maxAttempts: 10,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -152,6 +150,7 @@ export async function retryWithBackoff<T>(
     retryFetchErrors,
     signal,
     getAvailabilityContext,
+    onRetry,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -175,6 +174,9 @@ export async function retryWithBackoff<T>(
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
+        if (onRetry) {
+          onRetry(attempt, new Error('Invalid content'), delayWithJitter);
+        }
         await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
@@ -192,12 +194,6 @@ export async function retryWithBackoff<T>(
       }
 
       const classifiedError = classifyGoogleError(error);
-      const failureKind = classifyFailureKind(classifiedError);
-      const appliedImmediate =
-        failureKind === 'terminal' || failureKind === 'not_found';
-      if (appliedImmediate) {
-        applyAvailabilityTransition(getAvailabilityContext, failureKind);
-      }
 
       const errorCode = getErrorStatus(error);
 
@@ -205,7 +201,7 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof TerminalQuotaError ||
         classifiedError instanceof ModelNotFoundError
       ) {
-        if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
+        if (onPersistent429) {
           try {
             const fallbackModel = await onPersistent429(
               authType,
@@ -229,7 +225,12 @@ export async function retryWithBackoff<T>(
 
       if (classifiedError instanceof RetryableQuotaError || is500) {
         if (attempt >= maxAttempts) {
-          if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
+          const errorMessage =
+            classifiedError instanceof Error ? classifiedError.message : '';
+          debugLogger.warn(
+            `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
+          );
+          if (onPersistent429) {
             try {
               const fallbackModel = await onPersistent429(
                 authType,
@@ -241,21 +242,24 @@ export async function retryWithBackoff<T>(
                 continue;
               }
             } catch (fallbackError) {
-              console.warn('Model fallback failed:', fallbackError);
+              debugLogger.warn('Model fallback failed:', fallbackError);
             }
-          }
-          if (!appliedImmediate) {
-            applyAvailabilityTransition(getAvailabilityContext, failureKind);
           }
           throw classifiedError instanceof RetryableQuotaError
             ? classifiedError
             : error;
         }
 
-        if (classifiedError instanceof RetryableQuotaError) {
-          console.warn(
+        if (
+          classifiedError instanceof RetryableQuotaError &&
+          classifiedError.retryDelayMs !== undefined
+        ) {
+          debugLogger.warn(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
           );
+          if (onRetry) {
+            onRetry(attempt, error, classifiedError.retryDelayMs);
+          }
           await delay(classifiedError.retryDelayMs, signal);
           continue;
         } else {
@@ -265,6 +269,9 @@ export async function retryWithBackoff<T>(
           // Exponential backoff with jitter for non-quota errors
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
           const delayWithJitter = Math.max(0, currentDelay + jitter);
+          if (onRetry) {
+            onRetry(attempt, error, delayWithJitter);
+          }
           await delay(delayWithJitter, signal);
           currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
@@ -276,9 +283,6 @@ export async function retryWithBackoff<T>(
         attempt >= maxAttempts ||
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
-        if (!appliedImmediate) {
-          applyAvailabilityTransition(getAvailabilityContext, failureKind);
-        }
         throw error;
       }
 
@@ -288,6 +292,9 @@ export async function retryWithBackoff<T>(
       // Exponential backoff with jitter for non-quota errors
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
       const delayWithJitter = Math.max(0, currentDelay + jitter);
+      if (onRetry) {
+        onRetry(attempt, error, delayWithJitter);
+      }
       await delay(delayWithJitter, signal);
       currentDelay = Math.min(maxDelayMs, currentDelay * 2);
     }
@@ -315,7 +322,7 @@ function logRetryAttempt(
   if (errorStatus === 429) {
     debugLogger.warn(message, error);
   } else if (errorStatus && errorStatus >= 500 && errorStatus < 600) {
-    console.error(message, error);
+    debugLogger.warn(message, error);
   } else if (error instanceof Error) {
     // Fallback for errors that might not have a status but have a message
     if (error.message.includes('429')) {
@@ -324,7 +331,7 @@ function logRetryAttempt(
         error,
       );
     } else if (error.message.match(/5\d{2}/)) {
-      console.error(
+      debugLogger.warn(
         `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
         error,
       );

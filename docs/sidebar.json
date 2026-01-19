@@ -24,7 +24,7 @@
         "slug": "docs/get-started"
       },
       {
-        "label": "Gemini 3 Pro on Gemini CLI",
+        "label": "Gemini 3 on Gemini CLI",
         "slug": "docs/get-started/gemini-3"
       },
       {
@@ -81,12 +81,20 @@
         "slug": "docs/cli/model"
       },
       {
+        "label": "Rewind",
+        "slug": "docs/cli/rewind"
+      },
+      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
       {
         "label": "Session Management",
         "slug": "docs/cli/session-management"
+      },
+      {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
       },
       {
         "label": "Settings",
@@ -115,6 +123,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -203,6 +215,10 @@
       {
         "label": "Writing hooks",
         "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
       },
       {
         "label": "Best practices",

@@ -79,7 +79,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().ui?.properties?.accessibility.properties
-          ?.disableLoadingPhrases.type,
+          ?.enableLoadingPhrases.type,
       ).toBe('boolean');
     });
 
@@ -170,7 +170,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.disableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
@@ -352,22 +352,54 @@ describe('SettingsSchema', () => {
       expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe('Enable local and remote subagents.');
+      expect(setting.description).toBe(
+        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
+      );
     });
 
-    it('should have isModelAvailabilityServiceEnabled setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties
-          .isModelAvailabilityServiceEnabled;
+    it('should have skills setting enabled by default', () => {
+      const setting = getSettingsSchema().skills.properties.enabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Agent Skills.');
+    });
+
+    it('should have plan setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.plan;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
       expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(false);
+      expect(setting.showInDialog).toBe(true);
       expect(setting.description).toBe(
-        'Enable model routing using new availability service.',
+        'Enable planning features (Plan Mode and tools).',
       );
+    });
+
+    it('should have hooks.notifications setting in schema', () => {
+      const setting = getSettingsSchema().hooks.properties.notifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+    });
+
+    it('should have name and description in hook definitions', () => {
+      const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
+      expect(hookDef).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hookItemProperties = (hookDef as any).items.properties.hooks.items
+        .properties;
+      expect(hookItemProperties.name).toBeDefined();
+      expect(hookItemProperties.name.type).toBe('string');
+      expect(hookItemProperties.description).toBeDefined();
+      expect(hookItemProperties.description.type).toBe('string');
     });
   });
 
