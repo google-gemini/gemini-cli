@@ -787,6 +787,74 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  modelSelector: {
+    type: 'object',
+    label: 'Model Selector',
+    category: 'Model',
+    requiresRestart: false,
+    default: {},
+    description: oneLine`
+      Multi-provider AI model configuration.
+      Enables switching between Gemini, Claude, OpenAI, and Ollama providers.
+    `,
+    showInDialog: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Multi-Provider',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable multi-provider model selection.',
+        showInDialog: true,
+      },
+      defaultProvider: {
+        type: 'enum',
+        label: 'Default Provider',
+        category: 'Model',
+        requiresRestart: false,
+        default: 'gemini',
+        description: 'Default AI provider to use.',
+        showInDialog: true,
+        options: [
+          { value: 'gemini', label: 'Gemini (Google)' },
+          { value: 'claude', label: 'Claude (Anthropic)' },
+          { value: 'openai', label: 'OpenAI' },
+          { value: 'ollama', label: 'Ollama (Local)' },
+        ],
+      },
+      defaultModels: {
+        type: 'object',
+        label: 'Default Models',
+        category: 'Model',
+        requiresRestart: false,
+        default: {} as Record<string, string>,
+        description: 'Default model for each provider.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'string',
+          description: 'Model ID for the provider.',
+        },
+      },
+      providerOverrides: {
+        type: 'object',
+        label: 'Provider Overrides',
+        category: 'Model',
+        requiresRestart: false,
+        default: {} as Record<string, Record<string, unknown>>,
+        description: oneLine`
+          Per-provider configuration overrides.
+          Useful for custom base URLs (like Ollama) or provider-specific options.
+        `,
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          description: 'Provider-specific configuration.',
+        },
+      },
+    },
+  },
+
   agents: {
     type: 'object',
     label: 'Agents',

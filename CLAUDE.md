@@ -70,6 +70,24 @@ tmux new-session -d -s gemini-dev "GEMINI_API_KEY=YOUR_DEV_KEY node bundle/gemin
 tmux attach -t gemini-dev
 ```
 
+## Agent Coordination
+
+If multiple code agents (Claude/Codex/Gemini/etc) are working in this repo at
+the same time, AgentCoord prevents clobbering by coordinating via
+`.agent-state/` (gitignored). If you're solo, skip it.
+
+Quick start:
+
+```bash
+export AGENT_ID=claude
+npm run agent:heartbeat
+npm run agent:inbox
+npm run agent:who
+npm run agent:tasks
+```
+
+Docs: `docs/AGENT_COORDINATION.md`
+
 ## Current Configuration
 
 ### gemini-dev Status
@@ -262,4 +280,211 @@ gemini-dev -p "Hello, confirm you are running"
 # Start interactive session
 tmux new-session -d -s gemini-dev "gemini-dev"
 tmux attach -t gemini-dev
+```
+
+## 🔄 Mandatory PR Review Process with @codex and Copilot
+
+### Every Commit Must Be Reviewed
+
+**ALL code changes must go through review by @codex and GitHub Copilot before
+merging.**
+
+### Complete PR Workflow
+
+#### Step 1: Create Feature Branch
+
+```bash
+# Create and switch to feature branch
+git checkout -b feat/your-feature-name
+
+# Make your changes...
+```
+
+#### Step 2: Run Tests and Verify
+
+```bash
+# Run all checks before committing
+npm run preflight
+
+# Or run tests individually
+npm test
+npm run typecheck
+npm run lint
+```
+
+#### Step 3: Stage and Commit
+
+```bash
+# Stage changes
+git add .
+
+# Commit with conventional commit format and co-author
+git commit -m "$(cat <<'EOF'
+feat: your feature description
+
+Detailed description of changes.
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+#### Step 4: Push and Create PR
+
+```bash
+# Push branch with upstream tracking
+git push -u origin feat/your-feature-name
+
+# Create PR using gh CLI
+gh pr create --title "feat: your feature" --body "$(cat <<'EOF'
+## Summary
+- Description of changes
+
+## Test plan
+- [x] All tests pass (`npm run preflight`)
+- [x] Manual verification done
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+#### Step 5: Open PR in Chrome DevTools and Add Reviewers
+
+```bash
+# Get PR URL and open in browser
+gh pr view --web
+
+# Or get PR number for manual operations
+PR_NUM=$(gh pr view --json number -q '.number')
+echo "PR #$PR_NUM created"
+```
+
+**In Chrome DevTools (use MCP chrome-devtools tools):**
+
+1. Navigate to the PR page using `mcp__chrome-devtools__navigate_page`
+2. Take snapshot to find reviewer elements:
+   `mcp__chrome-devtools__take_snapshot`
+3. Click "Reviewers" gear icon to add reviewers
+4. Add **@codex** and **GitHub Copilot** as reviewers
+
+**Or via gh CLI:**
+
+```bash
+# Request @codex review via comment
+gh pr comment $PR_NUM --body "@codex please review this PR for code quality, security, and best practices."
+
+# Request Copilot review (if available via API)
+gh api repos/MegaPhoenix92/gemini-cli/pulls/$PR_NUM/requested_reviewers \
+  -f "reviewers[]=copilot" 2>/dev/null || echo "Add Copilot via GitHub UI"
+```
+
+#### Step 6: Monitor Review Status
+
+```bash
+# Check PR status and reviews
+gh pr status
+gh pr checks
+
+# View review comments
+gh pr view $PR_NUM --comments
+
+# Or via API for detailed review info
+gh api repos/MegaPhoenix92/gemini-cli/pulls/$PR_NUM/reviews \
+  --jq '.[] | {user: .user.login, state: .state, body: .body}'
+```
+
+#### Step 7: Apply Fixes from Review Feedback
+
+When @codex or Copilot finds issues:
+
+```bash
+# Option 1: Ask @codex to fix automatically
+gh pr comment $PR_NUM --body "@codex please address that feedback"
+
+# Option 2: Fix manually
+# Make fixes based on review comments...
+git add .
+git commit -m "$(cat <<'EOF'
+fix: address review feedback
+
+- Fixed issue X noted by @codex
+- Applied suggestion Y from Copilot
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+EOF
+)"
+git push
+
+# Request re-review after fixes
+gh pr comment $PR_NUM --body "@codex please re-review"
+```
+
+#### Step 8: Merge After Approval
+
+```bash
+# Verify all checks pass
+gh pr checks --watch
+
+# Merge with squash (recommended)
+gh pr merge --squash --delete-branch
+
+# Or merge with merge commit
+gh pr merge --merge --delete-branch
+```
+
+### @codex Review Response Guide
+
+| Response                                   | Badge     | Meaning          | Action Required           |
+| ------------------------------------------ | --------- | ---------------- | ------------------------- |
+| "Didn't find any major issues. Nice work!" | ✅        | All good         | Proceed to merge          |
+| P1 Badge                                   | 🔴 Red    | Critical issue   | **Must fix** before merge |
+| P2 Badge                                   | 🟡 Yellow | Important issue  | Should fix before merge   |
+| P3 Badge                                   | 🔵 Blue   | Minor suggestion | Nice to have              |
+
+### Using Chrome DevTools MCP for PR Review
+
+The Chrome DevTools MCP server enables interactive PR management:
+
+```bash
+# 1. Open PR in Chrome
+gh pr view --web
+
+# 2. Use MCP tools to interact with GitHub UI
+# Take snapshot to see page elements
+mcp__chrome-devtools__take_snapshot
+
+# 3. Click on elements to add reviewers, approve, etc.
+mcp__chrome-devtools__click --uid "reviewer-button-uid"
+
+# 4. Fill in review comment
+mcp__chrome-devtools__fill --uid "comment-textarea-uid" --value "LGTM!"
+```
+
+### Pre-PR Checklist
+
+Before creating a PR, verify:
+
+- [ ] All tests pass locally (`npm run preflight`)
+- [ ] No TypeScript/ESLint errors
+- [ ] Code follows project conventions (see CONTRIBUTING.md)
+- [ ] No sensitive data (API keys, passwords) committed
+- [ ] Commit messages follow
+      [Conventional Commits](https://www.conventionalcommits.org/)
+- [ ] PR description includes summary and test plan
+- [ ] Changes are rebased on latest main (if needed)
+
+### Quick Reference Commands
+
+```bash
+# Full PR workflow in one go
+git checkout -b feat/my-feature
+# ... make changes ...
+npm run preflight
+git add . && git commit -m "feat: description
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+git push -u origin feat/my-feature
+gh pr create --title "feat: description" --body "Summary and test plan"
+gh pr view --web  # Opens in Chrome for reviewer assignment
 ```

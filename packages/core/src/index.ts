@@ -178,3 +178,6 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export multi-provider system
+export * from './providers/index.js';

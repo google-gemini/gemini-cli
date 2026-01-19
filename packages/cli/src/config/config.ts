@@ -11,6 +11,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import { providersCommand } from '../commands/providers.js';
 import {
   Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -83,6 +84,10 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  // Model selector options
+  provider: 'gemini' | 'claude' | 'openai' | 'ollama' | undefined;
+  listProviders: boolean | undefined;
+  listModels: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -112,7 +117,23 @@ export async function parseArguments(
           alias: 'm',
           type: 'string',
           nargs: 1,
-          description: `Model`,
+          description: `Model (can be provider-specific, e.g., 'claude-sonnet-4-20250514')`,
+        })
+        .option('provider', {
+          alias: 'P',
+          type: 'string',
+          nargs: 1,
+          choices: ['gemini', 'claude', 'openai', 'ollama'],
+          description: 'AI provider to use (gemini, claude, openai, ollama)',
+        })
+        .option('list-providers', {
+          type: 'boolean',
+          description: 'List available AI providers and their models',
+        })
+        .option('list-models', {
+          type: 'boolean',
+          description:
+            'List available models for the current or specified provider',
         })
         .option('prompt', {
           alias: 'p',
@@ -252,6 +273,8 @@ export async function parseArguments(
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    // Register providers subcommands (model selector)
+    .command(providersCommand)
     // Ensure validation flows through .fail() for clean UX
     .fail((msg, err) => {
       if (err) throw err;
