@@ -6,6 +6,7 @@
 import { Octokit } from '@octokit/rest';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import prompts from 'prompts';
 
 if (!process.env.GITHUB_TOKEN) {
   console.error('Error: GITHUB_TOKEN environment variable is required.');
@@ -47,6 +48,12 @@ const argv = yargs(hideBin(process.argv))
     default: false,
     description: 'Run without making actual changes (read-only mode)',
   })
+  .option('auto', {
+    type: 'boolean',
+    default: false,
+    description:
+      'Automatically close all duplicates without prompting (batch mode)',
+  })
   .help()
   .parse();
 
@@ -54,7 +61,7 @@ const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 });
 
-const { query, canonical, pr, owner, repo, dryRun } = argv;
+const { query, canonical, pr, owner, repo, dryRun, auto } = argv;
 
 // Construct the full search query ensuring it targets the specific repo and open issues
 const fullSearchQuery = `repo:${owner}/${repo} is:issue is:open ${query}`;
@@ -81,7 +88,23 @@ async function run() {
         continue;
       }
 
-      console.log(`Processing issue #${issue.number}: ${issue.title}`);
+      console.log(
+        `Processing issue #${issue.number}: ${issue.title} (by @${issue.user?.login})`,
+      );
+
+      if (!auto && !dryRun) {
+        const response = await prompts({
+          type: 'confirm',
+          name: 'value',
+          message: `Close issue #${issue.number} "${issue.title}" created by @${issue.user?.login}?`,
+          initial: true,
+        });
+
+        if (!response.value) {
+          console.log(`Skipping issue #${issue.number}`);
+          continue;
+        }
+      }
 
       let commentBody = `Closing this issue as a duplicate of #${canonical}.`;
       if (pr) {
