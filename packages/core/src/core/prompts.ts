@@ -293,10 +293,10 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 ${(function () {
   if (interactiveMode) {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes) unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
   } else {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Only execute non-interactive commands.`;
+- **Interactive Commands:** Only execute non-interactive commands. e.g.: use 'git --no-pager'`;
   }
 })()}
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.${interactiveMode ? ` If unsure whether to save something, you can ask the user, "Should I remember that for you?"` : ''}
@@ -334,7 +334,9 @@ ${(function () {
     return `
 # Git Repository
 - The current working (project) directory is being managed by a git repository.
-- NEVER stage or commit changes, unless explicitly instructed to.
+- **NEVER** stage or commit your changes, unless you are explicitly instructed to commit. For example:
+  - "Commit the change" -> add changed files and commit.
+  - "Wrap up this PR for me" -> do not commit.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
   - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add ...\` as needed.
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
