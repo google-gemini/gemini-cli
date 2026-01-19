@@ -6,7 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName, ConfigSource } from './types.js';
+import { HookEventName, ConfigSource, HOOKS_CONFIG_FIELDS } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { TrustedHooksManager } from './trustedHooks.js';
 import { coreEvents } from '../utils/events.js';
@@ -169,8 +169,15 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     source: ConfigSource,
   ): void {
     for (const [eventName, definitions] of Object.entries(hooksConfig)) {
+      if (HOOKS_CONFIG_FIELDS.includes(eventName)) {
+        continue;
+      }
+
       if (!this.isValidEventName(eventName)) {
-        debugLogger.warn(`Invalid hook event name: ${eventName}`);
+        coreEvents.emitFeedback(
+          'warning',
+          `Invalid hook event name: "${eventName}" from ${source} config. Skipping.`,
+        );
         continue;
       }
 

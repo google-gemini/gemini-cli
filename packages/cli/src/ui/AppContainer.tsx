@@ -186,6 +186,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
+  const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -395,9 +396,18 @@ export const AppContainer = (props: AppContainerProps) => {
       setSettingsNonce((prev) => prev + 1);
     };
 
+    const handleAdminSettingsChanged = () => {
+      setAdminSettingsChanged(true);
+    };
+
     coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
+    coreEvents.on(CoreEvent.AdminSettingsChanged, handleAdminSettingsChanged);
     return () => {
       coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
+      coreEvents.off(
+        CoreEvent.AdminSettingsChanged,
+        handleAdminSettingsChanged,
+      );
     };
   }, []);
 
@@ -729,7 +739,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
-    shellConfirmationRequest,
     confirmationRequest,
   } = useSlashCommandProcessor(
     config,
@@ -1379,7 +1388,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
-  // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
     // Respect hideWindowTitle settings
     if (settings.merged.ui.hideWindowTitle) return;
@@ -1387,10 +1395,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming:
-        !!shellConfirmationRequest ||
-        !!confirmationRequest ||
-        showShellActionRequired,
+      isConfirming: !!confirmationRequest || showShellActionRequired,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
@@ -1405,7 +1410,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    shellConfirmationRequest,
     confirmationRequest,
     showShellActionRequired,
     settings.merged.ui.showStatusInTitle,
@@ -1483,7 +1487,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const dialogsVisible =
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
-    !!shellConfirmationRequest ||
+    adminSettingsChanged ||
     !!confirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
@@ -1579,7 +1583,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
@@ -1650,6 +1653,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
+      adminSettingsChanged,
     }),
     [
       isThemeDialogOpen,
@@ -1672,7 +1676,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
@@ -1745,6 +1748,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       bannerVisible,
       config,
       settingsNonce,
+      adminSettingsChanged,
     ],
   );
 
@@ -1789,6 +1793,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
+      handleRestart: async () => {
+        await runExitCleanup();
+        process.exit(RELAUNCH_EXIT_CODE);
+      },
     }),
     [
       handleThemeSelect,
