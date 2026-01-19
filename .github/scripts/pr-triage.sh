@@ -142,7 +142,7 @@ JQ_EXTRACT_FIELDS='{
     labels: [.labels[].name] | join(",")
 }'
 
-JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // \"null\") | tostring)\t\(.labels)"' # Corrected escaping for quotes within the string literal
+JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // null) | tostring)\t\(.labels)"'
 
 if [[ -n "${PR_NUMBER:-}" ]]; then
     echo "🔄 Processing single PR #${PR_NUMBER}"
