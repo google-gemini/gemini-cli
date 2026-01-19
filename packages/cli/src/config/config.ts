@@ -717,7 +717,7 @@ export async function loadCliConfig(
     interactiveShell: settings.tools?.shell?.interactiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     shellOutputEfficiency: settings.tools?.shell?.shellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
+    skipNextSpeakerCheck: !settings.model?.nextSpeakerCheck,
     promptCompletion: settings.general?.promptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,

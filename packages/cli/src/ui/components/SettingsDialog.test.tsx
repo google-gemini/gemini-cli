@@ -1321,7 +1321,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 100,
-            skipNextSpeakerCheck: false,
+            nextSpeakerCheck: true,
           },
         },
         systemSettings: {},
@@ -1393,7 +1393,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 50,
-            skipNextSpeakerCheck: true,
+            nextSpeakerCheck: false,
           },
         },
         systemSettings: {},

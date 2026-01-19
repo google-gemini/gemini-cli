@@ -35,7 +35,7 @@ describe('settings-validation', () => {
       const invalidSettings = {
         model: {
           name: {
-            skipNextSpeakerCheck: true,
+            nextSpeakerCheck: true,
           },
         },
       };
