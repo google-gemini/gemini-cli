@@ -440,7 +440,12 @@ export function getDisplayValue(
 
   let valueString: string;
   if (typeof value === 'boolean') {
-    valueString = value ? 'Enabled' : 'Disabled';
+    if (key === 'security.blockGitExtensions') {
+      // Invert logic for display: true (blocked) -> Off, false (allowed) -> On
+      valueString = value ? 'Off' : 'On';
+    } else {
+      valueString = value ? 'On' : 'Off';
+    }
   } else {
     valueString = String(value);
   }

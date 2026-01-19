@@ -1184,11 +1184,15 @@ export function SettingsDialog({
                       <Box flexShrink={0}>
                         <Text
                           color={
-                            isActive
+                            displayValue.startsWith('On')
                               ? theme.status.success
-                              : shouldBeGreyedOut
+                              : displayValue.startsWith('Off')
                                 ? theme.text.secondary
-                                : theme.text.primary
+                                : isActive
+                                  ? theme.status.success
+                                  : shouldBeGreyedOut
+                                    ? theme.text.secondary
+                                    : theme.text.primary
                           }
                         >
                           {displayValue}
