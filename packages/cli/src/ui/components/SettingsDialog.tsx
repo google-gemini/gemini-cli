@@ -33,6 +33,7 @@ import {
   setPendingSettingValueAny,
   getNestedValue,
   getEffectiveValue,
+  getDialogSettingsByCategory,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -46,6 +47,7 @@ import {
 import {
   type SettingsValue,
   TOGGLE_TYPES,
+  type SettingsType,
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
@@ -72,6 +74,37 @@ interface SettingsDialogProps {
 
 const MAX_ITEMS_TO_SHOW = 8;
 
+const CATEGORY_ORDER = [
+  'Core & Intelligence',
+  'Appearance & UI',
+  'Editor & Input',
+  'File System & Context',
+  'System & Maintenance',
+  'General',
+  'UI',
+  'Tools',
+  'Model',
+  'Security',
+  'Privacy',
+  'Experimental',
+  'Advanced',
+];
+
+type SettingsDialogItem =
+  | {
+      type: 'header';
+      label: string;
+      value: string; // Used for key
+    }
+  | {
+      type: 'setting';
+      settingType: SettingsType;
+      label: string;
+      description?: string;
+      value: string; // The setting key
+      toggle: () => void;
+    };
+
 export function SettingsDialog({
   settings,
   onSelect,
@@ -90,8 +123,8 @@ export function SettingsDialog({
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
-  // Active indices
-  const [activeSettingIndex, setActiveSettingIndex] = useState(0);
+  // Active indices - Start at 1 if the first item is a header (handled in useEffect/init)
+  const [activeSettingIndex, setActiveSettingIndex] = useState(1);
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
@@ -224,133 +257,198 @@ export function SettingsDialog({
     return max;
   }, [selectedScope, settings]);
 
-  const generateSettingsItems = () => {
-    const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
+  const generateSettingsItems = (): SettingsDialogItem[] => {
+    if (searchQuery.trim()) {
+      // Flat list for search results
+      return filteredKeys.map((key) => {
+        const definition = getSettingDefinition(key);
+        return {
+          type: 'setting',
+          settingType: definition?.type || 'string',
+          label: definition?.label || key,
+          description: definition?.description,
+          value: key,
+          toggle: () => handleToggle(key, definition?.type),
+        };
+      });
+    }
 
-    return settingKeys.map((key: string) => {
-      const definition = getSettingDefinition(key);
+    // Grouped list
+    const items: SettingsDialogItem[] = [];
+    const categories = getDialogSettingsByCategory();
+    const availableCategories = Object.keys(categories);
 
-      return {
-        label: definition?.label || key,
-        description: definition?.description,
-        value: key,
-        type: definition?.type,
-        toggle: () => {
-          if (!TOGGLE_TYPES.has(definition?.type)) {
-            return;
-          }
-          const currentValue = getEffectiveValue(key, pendingSettings, {});
-          let newValue: SettingsValue;
-          if (definition?.type === 'boolean') {
-            newValue = !(currentValue as boolean);
-            setPendingSettings((prev) =>
-              setPendingSettingValue(key, newValue as boolean, prev),
-            );
-          } else if (definition?.type === 'enum' && definition.options) {
-            const options = definition.options;
-            const currentIndex = options?.findIndex(
-              (opt) => opt.value === currentValue,
-            );
-            if (currentIndex !== -1 && currentIndex < options.length - 1) {
-              newValue = options[currentIndex + 1].value;
-            } else {
-              newValue = options[0].value; // loop back to start.
-            }
-            setPendingSettings((prev) =>
-              setPendingSettingValueAny(key, newValue, prev),
-            );
-          }
+    // Filter order to include only present categories, then add any remaining
+    const sortedCategories = [
+      ...CATEGORY_ORDER.filter((c) => availableCategories.includes(c)),
+      ...availableCategories.filter((c) => !CATEGORY_ORDER.includes(c)).sort(),
+    ];
 
-          if (!requiresRestart(key)) {
-            const immediateSettings = new Set([key]);
-            const currentScopeSettings =
-              settings.forScope(selectedScope).settings;
-            const immediateSettingsObject = setPendingSettingValueAny(
-              key,
-              newValue,
-              currentScopeSettings,
-            );
-            debugLogger.log(
-              `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
-              newValue,
-            );
-            saveModifiedSettings(
-              immediateSettings,
-              immediateSettingsObject,
-              settings,
-              selectedScope,
-            );
-
-            // Special handling for vim mode to sync with VimModeContext
-            if (key === 'general.vimMode' && newValue !== vimEnabled) {
-              // Call toggleVimEnabled to sync the VimModeContext local state
-              toggleVimEnabled().catch((error) => {
-                coreEvents.emitFeedback(
-                  'error',
-                  'Failed to toggle vim mode:',
-                  error,
-                );
-              });
-            }
-
-            // Remove from modifiedSettings since it's now saved
-            setModifiedSettings((prev) => {
-              const updated = new Set(prev);
-              updated.delete(key);
-              return updated;
-            });
-
-            // Also remove from restart-required settings if it was there
-            setRestartRequiredSettings((prev) => {
-              const updated = new Set(prev);
-              updated.delete(key);
-              return updated;
-            });
-
-            // Remove from global pending changes if present
-            setGlobalPendingChanges((prev) => {
-              if (!prev.has(key)) return prev;
-              const next = new Map(prev);
-              next.delete(key);
-              return next;
-            });
-
-            if (key === 'general.previewFeatures') {
-              config?.setPreviewFeatures(newValue as boolean);
-            }
-          } else {
-            // For restart-required settings, track as modified
-            setModifiedSettings((prev) => {
-              const updated = new Set(prev).add(key);
-              const needsRestart = hasRestartRequiredSettings(updated);
-              debugLogger.log(
-                `[DEBUG SettingsDialog] Modified settings:`,
-                Array.from(updated),
-                'Needs restart:',
-                needsRestart,
-              );
-              if (needsRestart) {
-                setShowRestartPrompt(true);
-                setRestartRequiredSettings((prevRestart) =>
-                  new Set(prevRestart).add(key),
-                );
-              }
-              return updated;
-            });
-
-            // Add/update pending change globally so it persists across scopes
-            setGlobalPendingChanges((prev) => {
-              const next = new Map(prev);
-              next.set(key, newValue as PendingValue);
-              return next;
-            });
-          }
-        },
-      };
+    sortedCategories.forEach((category) => {
+      const categorySettings = categories[category];
+      if (categorySettings && categorySettings.length > 0) {
+        items.push({
+          type: 'header',
+          label: category,
+          value: `__header_${category}`,
+        });
+        categorySettings.forEach((def) => {
+          items.push({
+            type: 'setting',
+            settingType: def.type,
+            label: def.label || def.key,
+            description: def.description,
+            value: def.key,
+            toggle: () => handleToggle(def.key, def.type),
+          });
+        });
+      }
     });
+
+    return items;
+  };
+
+  const handleToggle = (key: string, type?: SettingsType) => {
+    if (!TOGGLE_TYPES.has(type)) {
+      return;
+    }
+    const definition = getSettingDefinition(key);
+    const currentValue = getEffectiveValue(key, pendingSettings, {});
+    let newValue: SettingsValue;
+    if (type === 'boolean') {
+      newValue = !(currentValue as boolean);
+      setPendingSettings((prev) =>
+        setPendingSettingValue(key, newValue as boolean, prev),
+      );
+    } else if (type === 'enum' && definition?.options) {
+      const options = definition.options;
+      const currentIndex = options?.findIndex(
+        (opt) => opt.value === currentValue,
+      );
+      if (currentIndex !== -1 && currentIndex < options.length - 1) {
+        newValue = options[currentIndex + 1].value;
+      } else {
+        newValue = options[0].value; // loop back to start.
+      }
+      setPendingSettings((prev) =>
+        setPendingSettingValueAny(key, newValue, prev),
+      );
+    } else {
+      return;
+    }
+
+    if (!requiresRestart(key)) {
+      const immediateSettings = new Set([key]);
+      const currentScopeSettings = settings.forScope(selectedScope).settings;
+      const immediateSettingsObject = setPendingSettingValueAny(
+        key,
+        newValue,
+        currentScopeSettings,
+      );
+      debugLogger.log(
+        `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
+        newValue,
+      );
+      saveModifiedSettings(
+        immediateSettings,
+        immediateSettingsObject,
+        settings,
+        selectedScope,
+      );
+
+      // Special handling for vim mode to sync with VimModeContext
+      if (key === 'general.vimMode' && newValue !== vimEnabled) {
+        // Call toggleVimEnabled to sync the VimModeContext local state
+        toggleVimEnabled().catch((error) => {
+          coreEvents.emitFeedback('error', 'Failed to toggle vim mode:', error);
+        });
+      }
+
+      // Remove from modifiedSettings since it's now saved
+      setModifiedSettings((prev) => {
+        const updated = new Set(prev);
+        updated.delete(key);
+        return updated;
+      });
+
+      // Also remove from restart-required settings if it was there
+      setRestartRequiredSettings((prev) => {
+        const updated = new Set(prev);
+        updated.delete(key);
+        return updated;
+      });
+
+      // Remove from global pending changes if present
+      setGlobalPendingChanges((prev) => {
+        if (!prev.has(key)) return prev;
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+
+      if (key === 'general.previewFeatures') {
+        config?.setPreviewFeatures(newValue as boolean);
+      }
+    } else {
+      // For restart-required settings, track as modified
+      setModifiedSettings((prev) => {
+        const updated = new Set(prev).add(key);
+        const needsRestart = hasRestartRequiredSettings(updated);
+        debugLogger.log(
+          `[DEBUG SettingsDialog] Modified settings:`,
+          Array.from(updated),
+          'Needs restart:',
+          needsRestart,
+        );
+        if (needsRestart) {
+          setShowRestartPrompt(true);
+          setRestartRequiredSettings((prevRestart) =>
+            new Set(prevRestart).add(key),
+          );
+        }
+        return updated;
+      });
+
+      // Add/update pending change globally so it persists across scopes
+      setGlobalPendingChanges((prev) => {
+        const next = new Map(prev);
+        next.set(key, newValue as PendingValue);
+        return next;
+      });
+    }
   };
 
   const items = generateSettingsItems();
+
+  // Ensure activeSettingIndex is valid (not on a header)
+  useEffect(() => {
+    if (
+      items.length > 0 &&
+      activeSettingIndex < items.length &&
+      items[activeSettingIndex].type === 'header'
+    ) {
+      // Find next setting
+      let nextIndex = activeSettingIndex + 1;
+      while (nextIndex < items.length && items[nextIndex].type === 'header') {
+        nextIndex++;
+      }
+      if (nextIndex < items.length) {
+        setActiveSettingIndex(nextIndex);
+      } else {
+        // Fallback to searching backwards
+        let prevIndex = activeSettingIndex - 1;
+        while (prevIndex >= 0 && items[prevIndex].type === 'header') {
+          prevIndex--;
+        }
+        if (prevIndex >= 0) {
+          setActiveSettingIndex(prevIndex);
+        }
+      }
+    } else if (items.length > 0 && activeSettingIndex >= items.length) {
+      // Out of bounds fix
+      setActiveSettingIndex(items.length - 1);
+    }
+  }, [items, activeSettingIndex]);
 
   // Generic edit state
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -510,6 +608,7 @@ export function SettingsDialog({
   );
 
   // Each setting item takes up to 3 lines (label/value row, description row, and spacing)
+  // Headers take 2 lines roughly
   let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
 
   // Decide whether to show scope selection based on remaining space
@@ -691,49 +790,63 @@ export function SettingsDialog({
           // Block other keys while editing
           return;
         }
+
+        const navigate = (direction: 'up' | 'down') => {
+          let newIndex = activeSettingIndex;
+          let loopCount = 0;
+          const maxLoops = items.length; // Prevent infinite loops
+
+          do {
+            if (direction === 'up') {
+              newIndex = newIndex > 0 ? newIndex - 1 : items.length - 1;
+            } else {
+              newIndex = newIndex < items.length - 1 ? newIndex + 1 : 0;
+            }
+            loopCount++;
+          } while (items[newIndex].type === 'header' && loopCount < maxLoops);
+
+          if (items[newIndex].type !== 'header') {
+            setActiveSettingIndex(newIndex);
+
+            // Adjust scroll offset
+            if (newIndex < scrollOffset) {
+              setScrollOffset(newIndex);
+            } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
+              setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
+            }
+          }
+        };
+
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);
           }
-          const newIndex =
-            activeSettingIndex > 0 ? activeSettingIndex - 1 : items.length - 1;
-          setActiveSettingIndex(newIndex);
-          // Adjust scroll offset for wrap-around
-          if (newIndex === items.length - 1) {
-            setScrollOffset(
-              Math.max(0, items.length - effectiveMaxItemsToShow),
-            );
-          } else if (newIndex < scrollOffset) {
-            setScrollOffset(newIndex);
-          }
+          navigate('up');
         } else if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);
           }
-          const newIndex =
-            activeSettingIndex < items.length - 1 ? activeSettingIndex + 1 : 0;
-          setActiveSettingIndex(newIndex);
-          // Adjust scroll offset for wrap-around
-          if (newIndex === 0) {
-            setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
-            setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
-          }
+          navigate('down');
         } else if (keyMatchers[Command.RETURN](key)) {
           const currentItem = items[activeSettingIndex];
-          if (
-            currentItem?.type === 'number' ||
-            currentItem?.type === 'string'
-          ) {
-            startEditing(currentItem.value);
-          } else {
-            currentItem?.toggle();
+          if (currentItem.type === 'setting') {
+            if (
+              currentItem.settingType === 'number' ||
+              currentItem.settingType === 'string'
+            ) {
+              startEditing(currentItem.value);
+            } else {
+              currentItem.toggle();
+            }
           }
         } else if (/^[0-9]$/.test(key.sequence || '') && !editingKey) {
           const currentItem = items[activeSettingIndex];
-          if (currentItem?.type === 'number') {
+          if (
+            currentItem.type === 'setting' &&
+            currentItem.settingType === 'number'
+          ) {
             startEditing(currentItem.value, key.sequence);
           }
         } else if (
@@ -741,16 +854,17 @@ export function SettingsDialog({
           keyMatchers[Command.CLEAR_SCREEN](key)
         ) {
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
-          const currentSetting = items[activeSettingIndex];
-          if (currentSetting) {
-            const defaultValue = getDefaultValue(currentSetting.value);
-            const defType = currentSetting.type;
+          const currentItem = items[activeSettingIndex];
+          if (currentItem.type === 'setting') {
+            const defaultValue = getDefaultValue(currentItem.value);
+            const defType = currentItem.settingType;
+
             if (defType === 'boolean') {
               const booleanDefaultValue =
                 typeof defaultValue === 'boolean' ? defaultValue : false;
               setPendingSettings((prev) =>
                 setPendingSettingValue(
-                  currentSetting.value,
+                  currentItem.value,
                   booleanDefaultValue,
                   prev,
                 ),
@@ -762,7 +876,7 @@ export function SettingsDialog({
               ) {
                 setPendingSettings((prev) =>
                   setPendingSettingValueAny(
-                    currentSetting.value,
+                    currentItem.value,
                     defaultValue,
                     prev,
                   ),
@@ -773,22 +887,22 @@ export function SettingsDialog({
             // Remove from modified settings since it's now at default
             setModifiedSettings((prev) => {
               const updated = new Set(prev);
-              updated.delete(currentSetting.value);
+              updated.delete(currentItem.value);
               return updated;
             });
 
             // Remove from restart-required settings if it was there
             setRestartRequiredSettings((prev) => {
               const updated = new Set(prev);
-              updated.delete(currentSetting.value);
+              updated.delete(currentItem.value);
               return updated;
             });
 
             // If this setting doesn't require restart, save it immediately
-            if (!requiresRestart(currentSetting.value)) {
-              const immediateSettings = new Set([currentSetting.value]);
+            if (!requiresRestart(currentItem.value)) {
+              const immediateSettings = new Set([currentItem.value]);
               const toSaveValue =
-                currentSetting.type === 'boolean'
+                currentItem.settingType === 'boolean'
                   ? typeof defaultValue === 'boolean'
                     ? defaultValue
                     : false
@@ -801,7 +915,7 @@ export function SettingsDialog({
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
-                      currentSetting.value,
+                      currentItem.value,
                       toSaveValue,
                       currentScopeSettings,
                     )
@@ -816,24 +930,24 @@ export function SettingsDialog({
 
               // Remove from global pending changes if present
               setGlobalPendingChanges((prev) => {
-                if (!prev.has(currentSetting.value)) return prev;
+                if (!prev.has(currentItem.value)) return prev;
                 const next = new Map(prev);
-                next.delete(currentSetting.value);
+                next.delete(currentItem.value);
                 return next;
               });
             } else {
               // Track default reset as a pending change if restart required
               if (
-                (currentSetting.type === 'boolean' &&
+                (currentItem.settingType === 'boolean' &&
                   typeof defaultValue === 'boolean') ||
-                (currentSetting.type === 'number' &&
+                (currentItem.settingType === 'number' &&
                   typeof defaultValue === 'number') ||
-                (currentSetting.type === 'string' &&
+                (currentItem.settingType === 'string' &&
                   typeof defaultValue === 'string')
               ) {
                 setGlobalPendingChanges((prev) => {
                   const next = new Map(prev);
-                  next.set(currentSetting.value, defaultValue as PendingValue);
+                  next.set(currentItem.value, defaultValue as PendingValue);
                   return next;
                 });
               }
@@ -931,6 +1045,21 @@ export function SettingsDialog({
                 focusSection === 'settings' &&
                 activeSettingIndex === idx + scrollOffset;
 
+              if (item.type === 'header') {
+                return (
+                  <Box
+                    key={item.value}
+                    marginTop={1}
+                    marginBottom={0}
+                    marginX={1}
+                  >
+                    <Text bold color={theme.text.primary} underline>
+                      {item.label}
+                    </Text>
+                  </Box>
+                );
+              }
+
               const scopeSettings = settings.forScope(selectedScope).settings;
               const mergedSettings = settings.merged;
 
@@ -958,7 +1087,10 @@ export function SettingsDialog({
                   // Cursor not visible
                   displayValue = editBuffer;
                 }
-              } else if (item.type === 'number' || item.type === 'string') {
+              } else if (
+                item.settingType === 'number' ||
+                item.settingType === 'string'
+              ) {
                 // For numbers/strings, get the actual current value from pending settings
                 const path = item.value.split('.');
                 const currentValue = getNestedValue(pendingSettings, path);
