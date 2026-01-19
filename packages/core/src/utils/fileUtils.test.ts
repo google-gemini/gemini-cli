@@ -1123,9 +1123,9 @@ describe('fileUtils', () => {
       const formatted = formatTruncatedToolOutput(content, outputFile);
 
       expect(formatted).toContain(
-        'Output too large. Showing the last 10,000 characters',
+        'Output too large. Showing the last 4,000 characters',
       );
-      expect(formatted.endsWith(content.slice(-10000))).toBe(true);
+      expect(formatted.endsWith(content.slice(-4000))).toBe(true);
     });
   });
 });
