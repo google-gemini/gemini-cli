@@ -38,7 +38,8 @@ describe('git repo eval', () => {
           const args = JSON.parse(log.toolRequest.args);
           return (
             args.command &&
-            !(args.command.includes('git') && args.command.includes('commit'))
+            args.command.includes('git') &&
+            args.command.includes('commit')
           );
         } catch {
           return false;
