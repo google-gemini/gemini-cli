@@ -80,16 +80,22 @@ export function getInstallationInfo(
     // Check for Homebrew
     if (process.platform === 'darwin') {
       try {
-        // The package name in homebrew is gemini-cli
-        childProcess.execSync('brew list -1 | grep -q "^gemini-cli$"', {
-          stdio: 'ignore',
-        });
-        return {
-          packageManager: PackageManager.HOMEBREW,
-          isGlobal: true,
-          updateMessage:
-            'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
-        };
+        const brewPrefix = childProcess
+          .execSync('brew --prefix gemini-cli', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          })
+          .trim();
+        const brewRealPath = fs.realpathSync(brewPrefix);
+
+        if (realPath.startsWith(brewRealPath)) {
+          return {
+            packageManager: PackageManager.HOMEBREW,
+            isGlobal: true,
+            updateMessage:
+              'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+          };
+        }
       } catch (_error) {
         // Brew is not installed or gemini-cli is not installed via brew.
         // Continue to the next check.
