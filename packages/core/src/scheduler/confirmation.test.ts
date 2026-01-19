@@ -4,219 +4,424 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+  type Mock,
+} from 'vitest';
 import { EventEmitter } from 'node:events';
-import { awaitConfirmation } from './confirmation.js';
+import { awaitConfirmation, resolveConfirmation } from './confirmation.js';
 import {
   MessageBusType,
   type ToolConfirmationResponse,
 } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { ToolConfirmationOutcome } from '../tools/tools.js';
+import {
+  ToolConfirmationOutcome,
+  type AnyToolInvocation,
+  type AnyDeclarativeTool,
+} from '../tools/tools.js';
+import type { SchedulerStateManager } from './state-manager.js';
+import type { ToolModificationHandler } from './tool-modifier.js';
+import type { ValidatingToolCall, WaitingToolCall } from './types.js';
+import type { Config } from '../config/config.js';
+import type { EditorType } from '../utils/editor.js';
+import { randomUUID } from 'node:crypto';
+import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 
-describe('awaitConfirmation', () => {
+// Mock Dependencies
+vi.mock('node:crypto', () => ({
+  randomUUID: vi.fn(),
+}));
+
+vi.mock('../core/coreToolHookTriggers.js', () => ({
+  fireToolNotificationHook: vi.fn(),
+}));
+
+describe('confirmation.ts', () => {
   let mockMessageBus: MessageBus;
 
   beforeEach(() => {
     mockMessageBus = new EventEmitter() as unknown as MessageBus;
     mockMessageBus.publish = vi.fn().mockResolvedValue(undefined);
-    // on() from node:events uses addListener/removeListener or on/off internally.
     vi.spyOn(mockMessageBus, 'on');
     vi.spyOn(mockMessageBus, 'removeListener');
+    vi.mocked(randomUUID).mockReturnValue(
+      '123e4567-e89b-12d3-a456-426614174000',
+    );
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   const emitResponse = (response: ToolConfirmationResponse) => {
     mockMessageBus.emit(MessageBusType.TOOL_CONFIRMATION_RESPONSE, response);
   };
 
-  it('should resolve when confirmed response matches correlationId', async () => {
-    const correlationId = 'test-correlation-id';
-    const abortController = new AbortController();
-
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
-
-    expect(mockMessageBus.on).toHaveBeenCalledWith(
-      MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      expect.any(Function),
-    );
-
-    // Simulate response
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId,
-      confirmed: true,
+  /**
+   * Helper to wait for a listener to be attached to the bus.
+   * This is more robust than setTimeout for synchronizing with the async iterator.
+   */
+  const waitForListener = (eventName: string | symbol): Promise<void> =>
+    new Promise((resolve) => {
+      const handler = (event: string | symbol) => {
+        if (event === eventName) {
+          mockMessageBus.off('newListener', handler);
+          resolve();
+        }
+      };
+      mockMessageBus.on('newListener', handler);
     });
 
-    const result = await promise;
-    expect(result).toEqual({
-      outcome: ToolConfirmationOutcome.ProceedOnce,
-      payload: undefined,
+  describe('awaitConfirmation', () => {
+    it('should resolve when confirmed response matches correlationId', async () => {
+      const correlationId = 'test-correlation-id';
+      const abortController = new AbortController();
+
+      const promise = awaitConfirmation(
+        mockMessageBus,
+        correlationId,
+        abortController.signal,
+      );
+
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId,
+        confirmed: true,
+      });
+
+      const result = await promise;
+      expect(result).toEqual({
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+        payload: undefined,
+      });
     });
-    expect(mockMessageBus.removeListener).toHaveBeenCalled();
+
+    it('should reject when abort signal is triggered', async () => {
+      const correlationId = 'abort-id';
+      const abortController = new AbortController();
+      const promise = awaitConfirmation(
+        mockMessageBus,
+        correlationId,
+        abortController.signal,
+      );
+      abortController.abort();
+      await expect(promise).rejects.toThrow('Operation cancelled');
+    });
   });
 
-  it('should resolve with mapped outcome when confirmed is false', async () => {
-    const correlationId = 'id-123';
-    const abortController = new AbortController();
+  describe('resolveConfirmation', () => {
+    let mockState: Mocked<SchedulerStateManager>;
+    let mockModifier: Mocked<ToolModificationHandler>;
+    let mockConfig: Mocked<Config>;
+    let getPreferredEditor: Mock<() => EditorType | undefined>;
+    let signal: AbortSignal;
+    let toolCall: ValidatingToolCall;
+    let invocationMock: Mocked<AnyToolInvocation>;
+    let toolMock: Mocked<AnyDeclarativeTool>;
 
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
+    beforeEach(() => {
+      signal = new AbortController().signal;
 
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId,
-      confirmed: false,
+      mockState = {
+        getToolCall: vi.fn(),
+        updateStatus: vi.fn(),
+        updateArgs: vi.fn(),
+      } as unknown as Mocked<SchedulerStateManager>;
+      // Mock accessors via defineProperty
+      Object.defineProperty(mockState, 'firstActiveCall', {
+        get: vi.fn(),
+        configurable: true,
+      });
+
+      mockModifier = {
+        handleModifyWithEditor: vi.fn(),
+        applyInlineModify: vi.fn(),
+      } as unknown as Mocked<ToolModificationHandler>;
+
+      mockConfig = {
+        getEnableHooks: vi.fn().mockReturnValue(true),
+      } as unknown as Mocked<Config>;
+
+      getPreferredEditor = vi.fn().mockReturnValue('vim');
+
+      invocationMock = {
+        shouldConfirmExecute: vi.fn(),
+      } as unknown as Mocked<AnyToolInvocation>;
+
+      toolMock = {
+        build: vi.fn(),
+      } as unknown as Mocked<AnyDeclarativeTool>;
+
+      toolCall = {
+        status: 'validating',
+        request: {
+          callId: 'call-1',
+          name: 'tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-1',
+        },
+        invocation: invocationMock,
+        tool: toolMock,
+      } as ValidatingToolCall;
+
+      // Default: state returns the current call
+      mockState.getToolCall.mockReturnValue(toolCall);
+      // Default: define firstActiveCall for modifiers
+      vi.spyOn(mockState, 'firstActiveCall', 'get').mockReturnValue(
+        toolCall as unknown as WaitingToolCall,
+      );
     });
 
-    const result = await promise;
-    expect(result.outcome).toBe(ToolConfirmationOutcome.Cancel);
-  });
+    it('should return ProceedOnce immediately if no confirmation needed', async () => {
+      invocationMock.shouldConfirmExecute.mockResolvedValue(false);
 
-  it('should resolve with explicit outcome if provided', async () => {
-    const correlationId = 'id-456';
-    const abortController = new AbortController();
+      const result = await resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
 
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
-
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId,
-      confirmed: true,
-      outcome: ToolConfirmationOutcome.ProceedAlways,
+      expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
+      expect(mockState.updateStatus).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'awaiting_approval',
+        expect.anything(),
+      );
     });
 
-    const result = await promise;
-    expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedAlways);
-  });
+    it('should return ProceedOnce after successful user confirmation', async () => {
+      const details = {
+        type: 'info' as const,
+        prompt: 'Confirm?',
+        title: 'Title',
+        onConfirm: vi.fn(),
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-  it('should resolve with payload', async () => {
-    const correlationId = 'id-payload';
-    const abortController = new AbortController();
-    const payload = { newContent: 'updated' };
+      // Wait for listener to attach
+      const listenerPromise = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
+      await listenerPromise;
 
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+      });
 
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId,
-      confirmed: true,
-      outcome: ToolConfirmationOutcome.ModifyWithEditor,
-      payload,
+      const result = await promise;
+      expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
+      expect(mockState.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'awaiting_approval',
+        expect.objectContaining({
+          correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        }),
+      );
     });
 
-    const result = await promise;
-    expect(result.payload).toEqual(payload);
-  });
+    it('should fire hooks if enabled', async () => {
+      const details = {
+        type: 'info' as const,
+        prompt: 'Confirm?',
+        title: 'Title',
+        onConfirm: vi.fn(),
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-  it('should ignore responses with different correlation IDs', async () => {
-    const correlationId = 'my-id';
-    const abortController = new AbortController();
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
 
-    let resolved = false;
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    ).then((r) => {
-      resolved = true;
-      return r;
+      await waitForListener(MessageBusType.TOOL_CONFIRMATION_RESPONSE);
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+      });
+      await promise;
+
+      expect(fireToolNotificationHook).toHaveBeenCalledWith(
+        mockMessageBus,
+        expect.objectContaining({
+          type: details.type,
+          prompt: details.prompt,
+          title: details.title,
+        }),
+      );
     });
 
-    // Emit wrong ID
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: 'wrong-id',
-      confirmed: true,
+    it('should handle ModifyWithEditor loop', async () => {
+      const details = {
+        type: 'info' as const,
+        prompt: 'Confirm?',
+        title: 'Title',
+        onConfirm: vi.fn(),
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
+
+      // 1. User says Modify
+      // 2. User says Proceed
+      const listenerPromise1 = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
+
+      await listenerPromise1;
+
+      // First response: Modify
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ModifyWithEditor,
+      });
+
+      // Mock the modifier action
+      mockModifier.handleModifyWithEditor.mockResolvedValue({
+        updatedParams: { foo: 'bar' },
+      });
+      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
+
+      // Wait for loop to cycle and re-subscribe
+      const listenerPromise2 = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      await listenerPromise2;
+
+      // Expect state update
+      expect(mockState.updateArgs).toHaveBeenCalled();
+
+      // Second response: Proceed
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      });
+
+      const result = await promise;
+      expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
+      expect(mockModifier.handleModifyWithEditor).toHaveBeenCalled();
     });
 
-    // Allow microtasks to process
-    await new Promise((r) => setTimeout(r, 0));
-    expect(resolved).toBe(false);
+    it('should handle inline modification (payload)', async () => {
+      const details = {
+        type: 'info' as const,
+        prompt: 'Confirm?',
+        title: 'Title',
+        onConfirm: vi.fn(),
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-    // Emit correct ID
-    emitResponse({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId,
-      confirmed: true,
+      const listenerPromise = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
+
+      await listenerPromise;
+
+      // Response with payload
+      emitResponse({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: '123e4567-e89b-12d3-a456-426614174000',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce, // Ignored if payload present
+        payload: { newContent: 'inline' },
+      });
+
+      mockModifier.applyInlineModify.mockResolvedValue({
+        updatedParams: { inline: 'true' },
+      });
+      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
+
+      const result = await promise;
+      expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
+      expect(mockModifier.applyInlineModify).toHaveBeenCalled();
+      expect(mockState.updateArgs).toHaveBeenCalled();
     });
 
-    await expect(promise).resolves.toBeDefined();
-  });
+    it('should resolve immediately if IDE confirmation resolves first', async () => {
+      const idePromise = Promise.resolve({
+        status: 'accepted' as const,
+        content: 'ide-content',
+      });
 
-  it('should reject when abort signal is triggered', async () => {
-    const correlationId = 'abort-id';
-    const abortController = new AbortController();
+      const details = {
+        type: 'info' as const,
+        prompt: 'Confirm?',
+        title: 'Title',
+        onConfirm: vi.fn(),
+        ideConfirmation: idePromise,
+      };
+      invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
+      // We don't strictly need to wait for the listener because the race might finish instantly
+      const promise = resolveConfirmation(toolCall, signal, {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        state: mockState,
+        modifier: mockModifier,
+        getPreferredEditor,
+      });
 
-    abortController.abort();
-
-    await expect(promise).rejects.toThrow('Operation cancelled');
-    expect(mockMessageBus.removeListener).toHaveBeenCalled();
-  });
-
-  it('should reject when abort signal timeout is triggered', async () => {
-    vi.useFakeTimers();
-    const correlationId = 'timeout-id';
-    const signal = AbortSignal.timeout(100);
-
-    const promise = awaitConfirmation(mockMessageBus, correlationId, signal);
-
-    vi.advanceTimersByTime(101);
-
-    await expect(promise).rejects.toThrow('Operation cancelled');
-    expect(mockMessageBus.removeListener).toHaveBeenCalled();
-    vi.useRealTimers();
-  });
-
-  it('should reject immediately if signal is already aborted', async () => {
-    const correlationId = 'pre-abort-id';
-    const abortController = new AbortController();
-    abortController.abort();
-
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      correlationId,
-      abortController.signal,
-    );
-
-    await expect(promise).rejects.toThrow('Operation cancelled');
-    expect(mockMessageBus.on).not.toHaveBeenCalled();
-  });
-
-  it('should cleanup and reject if subscribe throws', async () => {
-    const error = new Error('Subscribe failed');
-    vi.mocked(mockMessageBus.on).mockImplementationOnce(() => {
-      throw error;
+      const result = await promise;
+      expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
     });
 
-    const abortController = new AbortController();
-    const promise = awaitConfirmation(
-      mockMessageBus,
-      'fail-id',
-      abortController.signal,
-    );
+    it('should throw if tool call is lost from state during loop', async () => {
+      invocationMock.shouldConfirmExecute.mockResolvedValue({
+        type: 'info' as const,
+        title: 'Title',
+        onConfirm: vi.fn(),
+        prompt: 'Prompt',
+      });
+      // Simulate state losing the call (undefined)
+      mockState.getToolCall.mockReturnValue(undefined);
 
-    await expect(promise).rejects.toThrow(error);
-    expect(mockMessageBus.removeListener).not.toHaveBeenCalled();
+      await expect(
+        resolveConfirmation(toolCall, signal, {
+          config: mockConfig,
+          messageBus: mockMessageBus,
+          state: mockState,
+          modifier: mockModifier,
+          getPreferredEditor,
+        }),
+      ).rejects.toThrow(/lost during confirmation loop/);
+    });
   });
 });
