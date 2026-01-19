@@ -16,6 +16,8 @@ import type {
   ClientMetadata,
   RetrieveUserQuotaRequest,
   RetrieveUserQuotaResponse,
+  FetchAdminControlsRequest,
+  FetchAdminControlsResponse,
   ConversationOffered,
   ConversationInteraction,
   StreamingLatency,
@@ -180,6 +182,15 @@ export class CodeAssistServer implements ContentGenerator {
         throw e;
       }
     }
+  }
+
+  async fetchAdminControls(
+    req: FetchAdminControlsRequest,
+  ): Promise<FetchAdminControlsResponse> {
+    return this.requestPost<FetchAdminControlsResponse>(
+      'fetchAdminControls',
+      req,
+    );
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
