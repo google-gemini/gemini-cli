@@ -1901,12 +1901,12 @@ export class Config {
       this.getCodebaseInvestigatorSettings().enabled ||
       this.getCliHelpAgentSettings().enabled
     ) {
-      // Check if the delegate tool itself is allowed (if allowedTools is set)
-      const allowedTools = this.getAllowedTools();
-      const isAllowed =
-        !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
+      // Check if the delegate tool is enabled via coreTools (if coreTools is set)
+      const coreTools = this.getCoreTools();
+      const isEnabled =
+        !coreTools || coreTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
 
-      if (isAllowed) {
+      if (isEnabled) {
         const delegateTool = new DelegateToAgentTool(
           this.agentRegistry,
           this,
