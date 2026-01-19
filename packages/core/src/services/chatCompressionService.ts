@@ -375,7 +375,7 @@ export class ChatCompressionService {
       });
 
     const finalSummary = (
-      getResponseText(verificationResponse) ?? summary
+      getResponseText(verificationResponse)?.trim() || summary
     ).trim();
 
     if (!finalSummary) {

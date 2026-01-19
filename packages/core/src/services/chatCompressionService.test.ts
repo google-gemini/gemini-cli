@@ -282,6 +282,42 @@ describe('ChatCompressionService', () => {
     );
   });
 
+  it('should fall back to initial summary if verification response is empty', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+    // Completely override the LLM client for this test to avoid conflicting with beforeEach mocks
+    const mockLlmClient = {
+      generateContent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          candidates: [{ content: { parts: [{ text: 'Initial Summary' }] } }],
+        } as unknown as GenerateContentResponse)
+        .mockResolvedValueOnce({
+          candidates: [{ content: { parts: [{ text: '   ' }] } }],
+        } as unknown as GenerateContentResponse),
+    };
+    vi.mocked(mockConfig.getBaseLlmClient).mockReturnValue(
+      mockLlmClient as unknown as BaseLlmClient,
+    );
+
+    const result = await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+    expect(result.newHistory![0].parts![0].text).toBe('Initial Summary');
+  });
+
   it('should use anchored instruction when a previous snapshot is present', async () => {
     const history: Content[] = [
       {
