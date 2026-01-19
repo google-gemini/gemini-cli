@@ -295,16 +295,22 @@ export class TestRig {
     const sanitizedName = sanitizeTestName(testName);
     const testFileDir =
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
-    this.testDir = join(testFileDir, sanitizedName);
-    this.homeDir = join(testFileDir, sanitizedName + '-home');
+    const newTestDir = join(testFileDir, sanitizedName);
+    const newHomeDir = join(testFileDir, sanitizedName + '-home');
 
-    // Clean up if directories already exist (e.g. from a previous failed run or retry)
-    try {
-      fs.rmSync(this.testDir, { recursive: true, force: true });
-      fs.rmSync(this.homeDir, { recursive: true, force: true });
-    } catch {
-      // Ignore errors if they don't exist
+    // Clean up if directories already exist and we haven't already set up for this directory
+    // (e.g. from a previous failed run or retry)
+    if (this.testDir !== newTestDir || this.homeDir !== newHomeDir) {
+      try {
+        fs.rmSync(newTestDir, { recursive: true, force: true });
+        fs.rmSync(newHomeDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors if they don't exist
+      }
     }
+
+    this.testDir = newTestDir;
+    this.homeDir = newHomeDir;
 
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
