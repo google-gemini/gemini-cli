@@ -64,3 +64,21 @@ export function detectLineEnding(content: string): '\r\n' | '\n' {
   // This is a simple but effective heuristic.
   return content.includes('\r\n') ? '\r\n' : '\n';
 }
+
+/**
+ * Truncates a string to a maximum length, appending a suffix if truncated.
+ * @param str The string to truncate.
+ * @param maxLength The maximum length of the string.
+ * @param suffix The suffix to append if truncated (default: '...[TRUNCATED]').
+ * @returns The truncated string.
+ */
+export function truncateString(
+  str: string,
+  maxLength: number,
+  suffix = '...[TRUNCATED]',
+): string {
+  if (str.length <= maxLength) {
+    return str;
+  }
+  return str.slice(0, maxLength) + suffix;
+}

@@ -42,7 +42,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const settings = useSettings();
   const allowPermanentApproval =
-    settings.merged.security?.enablePermanentToolApproval ?? false;
+    settings.merged.security.enablePermanentToolApproval;
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
@@ -139,7 +139,11 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
 
-      question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      if (executionProps.commands && executionProps.commands.length > 1) {
+        question = `Allow execution of ${executionProps.commands.length} commands?`;
+      } else {
+        question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      }
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -276,8 +280,18 @@ export const ToolConfirmationMessage: React.FC<
           maxHeight={bodyContentHeight}
           maxWidth={Math.max(terminalWidth, 1)}
         >
-          <Box>
-            <Text color={theme.text.link}>{executionProps.command}</Text>
+          <Box flexDirection="column">
+            {executionProps.commands && executionProps.commands.length > 1 ? (
+              executionProps.commands.map((cmd, idx) => (
+                <Text key={idx} color={theme.text.link}>
+                  {cmd}
+                </Text>
+              ))
+            ) : (
+              <Box>
+                <Text color={theme.text.link}>{executionProps.command}</Text>
+              </Box>
+            )}
           </Box>
         </MaxSizedBox>
       );
