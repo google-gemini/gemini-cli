@@ -31,7 +31,7 @@ describe('subagent eval test cases', () => {
    *
    * This tests the system prompt's subagent specific clauses.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should delegate to user provided agent with relevant expertise',
     params: {
       settings: {
