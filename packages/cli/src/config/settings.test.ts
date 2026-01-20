@@ -2200,6 +2200,23 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
+
+    it('should set skills based on advancedFeaturesEnabled', () => {
+      const loadedSettings = loadSettings();
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          advancedFeaturesEnabled: true,
+        },
+      });
+      expect(loadedSettings.merged.admin.skills?.enabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          advancedFeaturesEnabled: false,
+        },
+      });
+      expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
+    });
   });
 
   describe('getDefaultsFromSchema', () => {
