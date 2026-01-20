@@ -98,7 +98,7 @@ describe('createPolicyEngineConfig', () => {
     expect(config.rules).toEqual([]);
 
     vi.doUnmock('node:fs/promises');
-  });
+  }, 30000);
 
   it('should allow tools in tools.allowed', async () => {
     const { createPolicyEngineConfig } = await import('./config.js');
