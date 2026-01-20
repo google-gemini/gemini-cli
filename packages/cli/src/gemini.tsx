@@ -648,18 +648,22 @@ export async function main() {
     const sessionStartSource = resumedSessionData
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
-    const result = await config
-      .getHookSystem()
-      ?.fireSessionStartEvent(sessionStartSource);
 
-    if (result?.finalOutput) {
-      if (result.finalOutput.systemMessage) {
-        writeToStderr(result.finalOutput.systemMessage + '\n');
-      }
-      const additionalContext = result.finalOutput.getAdditionalContext();
-      if (additionalContext) {
-        // Prepend context to input (System Context -> Stdin -> Question)
-        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+      if (result) {
+        if (result.systemMessage) {
+          writeToStderr(result.systemMessage + '\n');
+        }
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          // Prepend context to input (System Context -> Stdin -> Question)
+          input = input
+            ? `${additionalContext}\n\n${input}`
+            : additionalContext;
+        }
       }
     }
 
