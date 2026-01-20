@@ -200,4 +200,83 @@ describe('<AppHeader />', () => {
     expect(lastFrame()).not.toContain('First line\\nSecond line');
     unmount();
   });
+
+  it('should render Tips when tipsShown is false', () => {
+    persistentStateMock.get.mockImplementation((key) => {
+      if (key === 'tipsShown') return false;
+      return {};
+    });
+
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      history: [],
+      bannerData: {
+        defaultText: 'First line\\nSecond line',
+        warningText: '',
+      },
+      bannerVisible: true,
+    };
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig, uiState },
+    );
+
+    expect(lastFrame()).toContain('Tips');
+
+    expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', true);
+    unmount();
+  });
+
+  it('should NOT render Tips when tipsShown is true', () => {
+    persistentStateMock.get.mockImplementation((key) => {
+      if (key === 'tipsShown') return true;
+      return {};
+    });
+
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      { config: mockConfig },
+    );
+
+    expect(lastFrame()).not.toContain('Tips');
+    unmount();
+  });
+
+  it('should show tips on the first run and hide them on the second run (persistence flow)', () => {
+    const fakeStore: Record<string, boolean> = {};
+
+    persistentStateMock.get.mockImplementation((key) => fakeStore[key]);
+    persistentStateMock.set.mockImplementation((key, val) => {
+      fakeStore[key] = val;
+    });
+
+    const mockConfig = makeFakeConfig();
+    const uiState = {
+      history: [],
+      bannerData: {
+        defaultText: 'First line\\nSecond line',
+        warningText: '',
+      },
+      bannerVisible: true,
+    };
+    const session1 = renderWithProviders(<AppHeader version="1.0.0" />, {
+      config: mockConfig,
+      uiState,
+    });
+
+    expect(session1.lastFrame()).toContain('Tips');
+
+    expect(fakeStore['tipsShown']).toBe(true);
+
+    session1.unmount();
+
+    const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
+      config: mockConfig,
+    });
+
+    expect(session2.lastFrame()).not.toContain('Tips');
+
+    session2.unmount();
+  });
 });

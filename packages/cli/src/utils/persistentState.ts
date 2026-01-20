@@ -12,6 +12,7 @@ const STATE_FILENAME = 'state.json';
 
 interface PersistentStateData {
   defaultBannerShownCount?: Record<string, number>;
+  tipsShown?: boolean;
   // Add other persistent state keys here as needed
 }
 
