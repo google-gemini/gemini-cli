@@ -720,10 +720,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
 
   it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
     process.argv = ['node', 'script.js'];
-    const includeDir = path.resolve('/path/to/include');
+    const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
       context: {
-        includeDirectories: ['/path/to/include'],
+        includeDirectories: [includeDir],
         loadMemoryFromIncludeDirectories: true,
       },
     });
