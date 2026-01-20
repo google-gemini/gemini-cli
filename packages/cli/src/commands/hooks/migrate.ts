@@ -230,7 +230,7 @@ export async function handleMigrateFromClaude() {
   const settings = loadSettings(workingDir);
 
   // Merge migrated hooks with existing hooks
-  const existingHooks = (settings.merged.hooksConfig?.hooks || {}) as Record<
+  const existingHooks = (settings.merged?.hooks || {}) as Record<
     string,
     unknown
   >;
@@ -238,7 +238,7 @@ export async function handleMigrateFromClaude() {
 
   // Update settings (setValue automatically saves)
   try {
-    settings.setValue(SettingScope.Workspace, 'hooksConfig.hooks', mergedHooks);
+    settings.setValue(SettingScope.Workspace, 'hooks', mergedHooks);
 
     debugLogger.log('✓ Hooks successfully migrated to .gemini/settings.json');
     debugLogger.log(

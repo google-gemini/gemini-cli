@@ -109,7 +109,7 @@ describe('migrate command', () => {
 
     expect(mockSetValue).toHaveBeenCalledWith(
       SettingScope.Workspace,
-      'hooksConfig.hooks',
+      'hooks',
       expect.objectContaining({
         BeforeTool: expect.arrayContaining([
           expect.objectContaining({
@@ -164,7 +164,7 @@ describe('migrate command', () => {
     );
     expect(mockSetValue).toHaveBeenCalledWith(
       SettingScope.Workspace,
-      'hooksConfig.hooks',
+      'hooks',
       expect.objectContaining({
         SessionStart: expect.any(Array),
       }),
@@ -313,14 +313,12 @@ describe('migrate command', () => {
 
     mockedLoadSettings.mockReturnValue({
       merged: {
-        hooksConfig: {
-          hooks: {
-            AfterTool: [
-              {
-                hooks: [{ type: 'command', command: 'echo "existing"' }],
-              },
-            ],
-          },
+        hooks: {
+          AfterTool: [
+            {
+              hooks: [{ type: 'command', command: 'echo "existing"' }],
+            },
+          ],
         },
       },
       setValue: mockSetValue,
@@ -364,7 +362,7 @@ describe('migrate command', () => {
 
     expect(mockSetValue).toHaveBeenCalledWith(
       expect.any(String),
-      'hooksConfig.hooks',
+      'hooks',
       expect.any(Object),
     );
   });

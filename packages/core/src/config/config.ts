@@ -718,8 +718,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
 
     if (params.hooks) {
-      const { disabled: _, ...restOfHooks } = params.hooks;
-      this.hooks = restOfHooks;
+      this.hooks = params.hooks;
     }
     if (params.projectHooks) {
       this.projectHooks = params.projectHooks;

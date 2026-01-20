@@ -763,7 +763,7 @@ export async function loadCliConfig(
       (settings.tools?.enableHooks ?? true) &&
       (settings.hooksConfig?.enabled ?? false),
     enableHooksUI: settings.tools?.enableHooks ?? true,
-    hooks: settings.hooksConfig?.hooks || {},
+    hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),

@@ -26,7 +26,7 @@ describe('hooksCommand', () => {
   };
   let mockSettings: {
     merged: {
-      hooks?: {
+      hooksConfig?: {
         disabled?: string[];
       };
       tools?: {
@@ -58,7 +58,7 @@ describe('hooksCommand', () => {
     // Create mock settings
     mockSettings = {
       merged: {
-        hooks: {
+        hooksConfig: {
           disabled: [],
         },
       },

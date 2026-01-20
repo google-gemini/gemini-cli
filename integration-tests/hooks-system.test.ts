@@ -34,22 +34,22 @@ describe('Hooks System Integration', () => {
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                BeforeTool: [
-                  {
-                    matcher: 'write_file',
-                    sequential: true,
-                    hooks: [
-                      {
-                        type: 'command',
-                        command:
-                          "node -e \"console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))\"",
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  sequential: true,
+                  hooks: [
+                    {
+                      type: 'command',
+                      command:
+                        "node -e \"console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))\"",
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
@@ -86,8 +86,10 @@ describe('Hooks System Integration', () => {
             'hooks-system.block-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -145,21 +147,21 @@ describe('Hooks System Integration', () => {
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                BeforeTool: [
-                  {
-                    matcher: 'write_file',
-                    hooks: [
-                      {
-                        type: 'command',
-                        command:
-                          "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))\"",
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command:
+                        "node -e \"console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))\"",
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
@@ -195,20 +197,20 @@ describe('Hooks System Integration', () => {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              AfterTool: [
-                {
-                  matcher: 'read_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: command,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            AfterTool: [
+              {
+                matcher: 'read_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: command,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -270,19 +272,19 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeModel: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeModel: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -329,8 +331,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns deny decision',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   hooks: [
@@ -372,8 +376,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns block decision',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   hooks: [
@@ -439,19 +445,19 @@ console.log(JSON.stringify({
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                AfterModel: [
-                  {
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: `node "${scriptPath}"`,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              AfterModel: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         });
@@ -488,19 +494,19 @@ console.log(JSON.stringify({
           hooksConfig: {
             enabled: true,
           },
-              hooks: {
-              BeforeToolSelection: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: hookCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+          hooks: {
+            BeforeToolSelection: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: hookCommand,
+                    timeout: 5000,
+                  },
+                ],
               },
+            ],
+          },
         },
       });
 
@@ -554,19 +560,19 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -602,20 +608,20 @@ console.log(JSON.stringify({
           },
           hooksConfig: {
             enabled: true,
-            hooks: {
-              Notification: [
-                {
-                  matcher: 'ToolPermission',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: hookCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            Notification: [
+              {
+                matcher: 'ToolPermission',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: hookCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -695,25 +701,25 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeAgent: [
-                {
-                  sequential: true,
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: hook1Command,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: hook2Command,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeAgent: [
+              {
+                sequential: true,
+                hooks: [
+                  {
+                    type: 'command',
+                    command: hook1Command,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: hook2Command,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -777,19 +783,19 @@ try {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -820,8 +826,10 @@ try {
             'hooks-system.allow-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -874,43 +882,43 @@ try {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: beforeAgentCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: beforeToolCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              AfterTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: afterToolCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: beforeAgentCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: beforeToolCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            AfterTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: afterToolCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -989,24 +997,24 @@ try {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: failingCommand,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: workingCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: failingCommand,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: workingCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1043,19 +1051,19 @@ try {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: hookCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: hookCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1086,20 +1094,20 @@ try {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              SessionStart: [
-                {
-                  matcher: 'startup',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionStartCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            SessionStart: [
+              {
+                matcher: 'startup',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionStartCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1159,20 +1167,20 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              SessionStart: [
-                {
-                  matcher: 'startup',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            SessionStart: [
+              {
+                matcher: 'startup',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1244,20 +1252,20 @@ console.log(JSON.stringify({
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                SessionStart: [
-                  {
-                    matcher: 'startup',
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: `node "${scriptPath}"`,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
@@ -1314,32 +1322,32 @@ console.log(JSON.stringify({
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                SessionEnd: [
-                  {
-                    matcher: '*',
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: sessionEndCommand,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-                SessionStart: [
-                  {
-                    matcher: '*',
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: sessionStartCommand,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              SessionEnd: [
+                {
+                  matcher: '*',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionEndCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              SessionStart: [
+                {
+                  matcher: '*',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: sessionStartCommand,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
@@ -1488,20 +1496,20 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              PreCompress: [
-                {
-                  matcher: 'auto',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: preCompressCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            PreCompress: [
+              {
+                matcher: 'auto',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: preCompressCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
           // Configure automatic compression with a very low threshold
           // This will trigger auto-compression after the first response
@@ -1555,20 +1563,20 @@ console.log(JSON.stringify({
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              SessionEnd: [
-                {
-                  matcher: 'exit',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionEndCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            SessionEnd: [
+              {
+                matcher: 'exit',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionEndCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1656,24 +1664,24 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           hooksConfig: {
             enabled: true,
             disabled: [`node "${disabledPath}"`], // Disable the second hook
-            hooks: {
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${enabledPath}"`,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: `node "${disabledPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${enabledPath}"`,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: `node "${disabledPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -1734,24 +1742,24 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
             enabled: true,
             disabled: [`node "${disabledPath}"`], // Disable the second hook,
           },
-              hooks: {
-              BeforeTool: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${activePath}"`,
-                      timeout: 5000,
-                    },
-                    {
-                      type: 'command',
-                      command: `node "${disabledPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${activePath}"`,
+                    timeout: 5000,
+                  },
+                  {
+                    type: 'command',
+                    command: `node "${disabledPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+          },
         },
       });
 
@@ -1840,21 +1848,21 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           hooksConfig: {
             enabled: true,
           },
-              hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${commandPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${commandPath}"`,
+                    timeout: 5000,
+                  },
+                ],
               },
+            ],
           },
+        },
       });
 
       // Run the agent. The fake response will attempt to call write_file with
@@ -1925,20 +1933,20 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${commandPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${commandPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });

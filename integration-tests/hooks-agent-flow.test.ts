@@ -55,19 +55,19 @@ describe('Hooks Agent Flow', () => {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -120,19 +120,19 @@ describe('Hooks Agent Flow', () => {
         settings: {
           hooksConfig: {
             enabled: true,
-            hooks: {
-              AfterAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+          },
+          hooks: {
+            AfterAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
       });
@@ -169,30 +169,30 @@ describe('Hooks Agent Flow', () => {
           settings: {
             hooksConfig: {
               enabled: true,
-              hooks: {
-                BeforeAgent: [
-                  {
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: `node -e "console.log('BeforeAgent Fired')"`,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-                AfterAgent: [
-                  {
-                    hooks: [
-                      {
-                        type: 'command',
-                        command: `node -e "console.log('AfterAgent Fired')"`,
-                        timeout: 5000,
-                      },
-                    ],
-                  },
-                ],
-              },
+            },
+            hooks: {
+              BeforeAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node -e "console.log('BeforeAgent Fired')"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+              AfterAgent: [
+                {
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node -e "console.log('AfterAgent Fired')"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
             },
           },
         },
