@@ -52,16 +52,14 @@ export function mapToDisplay(
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
-    let displayName: string;
     let description: string;
     let renderOutputAsMarkdown = false;
 
+    const displayName = call.tool?.displayName ?? call.request.name;
+
     if (call.status === 'error') {
-      displayName =
-        call.tool === undefined ? call.request.name : call.tool.displayName;
       description = JSON.stringify(call.request.args);
     } else {
-      displayName = call.tool.displayName;
       description = call.invocation.getDescription();
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
     }
@@ -91,12 +89,10 @@ export function mapToDisplay(
       case 'awaiting_approval':
         // Only map if it's the legacy callback-based details.
         // Serializable details will be handled in a later milestone.
-        // We cast to any here to allow checking for onConfirm without TS complaining
-        // that the types are incompatible.
         if (
           call.confirmationDetails &&
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          typeof (call.confirmationDetails as any).onConfirm === 'function'
+          'onConfirm' in call.confirmationDetails &&
+          typeof call.confirmationDetails.onConfirm === 'function'
         ) {
           confirmationDetails =
             call.confirmationDetails as ToolCallConfirmationDetails;

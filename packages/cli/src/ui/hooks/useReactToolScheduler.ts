@@ -59,6 +59,9 @@ export type TrackedToolCall =
 
 /**
  * Legacy scheduler implementation based on CoreToolScheduler callbacks.
+ *
+ * This is currently the default implementation used by useGeminiStream.
+ * It will be phased out once the event-driven scheduler migration is complete.
  */
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
