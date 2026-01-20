@@ -69,6 +69,9 @@ describe('useQuotaAndFallback', () => {
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
+    vi.spyOn(mockConfig, 'setModel');
+    vi.spyOn(mockConfig, 'setActiveModel');
+    vi.spyOn(mockConfig, 'activateFallbackMode');
   });
 
   afterEach(() => {
@@ -328,6 +331,7 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
 
         const intent = await promise!;
         expect(intent).toBe('retry_always');
+
         expect(result.current.proQuotaRequest).toBeNull();
       });
     });
@@ -410,6 +414,10 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const intent = await promise!;
       expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
+
+      // Verify quota error flags are reset
+      expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(false);
+      expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(false);
 
       // Check for the "Switched to fallback model" message
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);

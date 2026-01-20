@@ -110,13 +110,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
-- **`general.disableAutoUpdate`** (boolean):
-  - **Description:** Disable automatic updates
-  - **Default:** `false`
+- **`general.enableAutoUpdate`** (boolean):
+  - **Description:** Enable automatic updates.
+  - **Default:** `true`
 
-- **`general.disableUpdateNag`** (boolean):
-  - **Description:** Disable update notification prompts.
-  - **Default:** `false`
+- **`general.enableAutoUpdateNotification`** (boolean):
+  - **Description:** Enable update notification prompts.
+  - **Default:** `true`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -159,7 +159,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `output`
 
 - **`output.format`** (enum):
-  - **Description:** The format of the CLI output.
+  - **Description:** The format of the CLI output. Can be `text` or `json`.
   - **Default:** `"text"`
   - **Values:** `"text"`, `"json"`
 
@@ -180,9 +180,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.showStatusInTitle`** (boolean):
-  - **Description:** Show Gemini CLI status and thoughts in the terminal window
-    title
+  - **Description:** Show Gemini CLI model thoughts in the terminal window title
+    during the working phase
   - **Default:** `false`
+
+- **`ui.dynamicWindowTitle`** (boolean):
+  - **Description:** Update the terminal window title with current status icons
+    (Ready: ◇, Action Required: ✋, Working: ✦)
+  - **Default:** `true`
+
+- **`ui.showHomeDirectoryWarning`** (boolean):
+  - **Description:** Show a warning when running Gemini CLI in the home
+    directory.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
@@ -255,9 +266,9 @@ their corresponding top-level category object in your `settings.json` file.
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
-- **`ui.accessibility.disableLoadingPhrases`** (boolean):
-  - **Description:** Disable loading phrases for accessibility
-  - **Default:** `false`
+- **`ui.accessibility.enableLoadingPhrases`** (boolean):
+  - **Description:** Enable loading phrases during operations.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.accessibility.screenReader`** (boolean):
@@ -269,7 +280,7 @@ their corresponding top-level category object in your `settings.json` file.
 #### `ide`
 
 - **`ide.enabled`** (boolean):
-  - **Description:** Enable IDE integration mode
+  - **Description:** Enable IDE integration mode.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -546,6 +557,14 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+#### `agents`
+
+- **`agents.overrides`** (object):
+  - **Description:** Override settings for specific agents, e.g. to disable the
+    agent, set a custom model config, or run config.
+  - **Default:** `{}`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -573,12 +592,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
-  - **Description:** Respect .gitignore files when searching
+  - **Description:** Respect .gitignore files when searching.
   - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`context.fileFiltering.respectGeminiIgnore`** (boolean):
-  - **Description:** Respect .geminiignore files when searching
+  - **Description:** Respect .geminiignore files when searching.
   - **Default:** `true`
   - **Requires restart:** Yes
 
@@ -588,9 +607,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.disableFuzzySearch`** (boolean):
-  - **Description:** Disable fuzzy search when searching for files.
-  - **Default:** `false`
+- **`context.fileFiltering.enableFuzzySearch`** (boolean):
+  - **Description:** Enable fuzzy search when searching for files.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `tools`
@@ -620,6 +639,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The maximum time in seconds allowed without output from the
     shell command. Defaults to 5 minutes.
   - **Default:** `300`
+
+- **`tools.shell.enableShellOutputEfficiency`** (boolean):
+  - **Description:** Enable shell output efficiency optimizations for better
+    performance.
+  - **Default:** `true`
 
 - **`tools.autoAccept`** (boolean):
   - **Description:** Automatically accept and execute tool calls that are
@@ -679,20 +703,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `1000`
   - **Requires restart:** Yes
 
-- **`tools.enableMessageBusIntegration`** (boolean):
-  - **Description:** Enable policy-based tool confirmation via message bus
-    integration. When enabled, tools automatically respect policy engine
-    decisions (ALLOW/DENY/ASK_USER) without requiring individual tool
-    implementations.
-  - **Default:** `true`
+- **`tools.disableLLMCorrection`** (boolean):
+  - **Description:** Disable LLM-based error correction for edit tools. When
+    enabled, tools will fail immediately if exact string matches are not found,
+    instead of attempting to self-correct.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
-  - **Description:** Enable the hooks system for intercepting and customizing
-    Gemini CLI behavior. When enabled, hooks configured in settings will execute
-    at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.).
-    Requires MessageBus integration.
-  - **Default:** `false`
+  - **Description:** Enables the hooks system experiment. When disabled, the
+    hooks system is completely deactivated regardless of other settings.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `mcp`
@@ -711,12 +732,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** A list of MCP servers to exclude.
   - **Default:** `undefined`
   - **Requires restart:** Yes
-
-#### `useSmartEdit`
-
-- **`useSmartEdit`** (boolean):
-  - **Description:** Enable the smart-edit tool instead of the replace tool.
-  - **Default:** `true`
 
 #### `useWriteTodos`
 
@@ -743,6 +758,22 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.allowed`** (array):
+  - **Description:** Environment variables to always allow (bypass redaction).
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.blocked`** (array):
+  - **Description:** Environment variables to always redact.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`security.environmentVariableRedaction.enabled`** (boolean):
+  - **Description:** Enable redaction of environment variables that may contain
+    secrets.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -799,6 +830,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.extensionConfig`** (boolean):
+  - **Description:** Enable requesting and fetching of extension settings.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.enableEventDrivenScheduler`** (boolean):
+  - **Description:** Enables event-driven scheduler within the CLI session.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
@@ -806,6 +847,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -836,12 +882,43 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"auto"`
   - **Requires restart:** Yes
 
+- **`experimental.useOSC52Paste`** (boolean):
+  - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
+    (useful for remote sessions).
+  - **Default:** `false`
+
+- **`experimental.cliHelpAgentSettings.enabled`** (boolean):
+  - **Description:** Enable the CLI Help Agent.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.plan`** (boolean):
+  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+#### `skills`
+
+- **`skills.disabled`** (array):
+  - **Description:** List of disabled skills.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `hooks`
+
+- **`hooks.enabled`** (boolean):
+  - **Description:** Canonical toggle for the hooks system. When disabled, no
+    hooks will be executed.
+  - **Default:** `false`
 
 - **`hooks.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
     Hooks in this list will not execute even if configured.
   - **Default:** `[]`
+
+- **`hooks.notifications`** (boolean):
+  - **Description:** Show visual indicators when hooks are executing.
+  - **Default:** `true`
 
 - **`hooks.BeforeTool`** (array):
   - **Description:** Hooks that execute before tool execution. Can intercept,
@@ -897,6 +974,25 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `admin`
+
+- **`admin.secureModeEnabled`** (boolean):
+  - **Description:** If true, disallows yolo mode from being used.
+  - **Default:** `false`
+
+- **`admin.extensions.enabled`** (boolean):
+  - **Description:** If false, disallows extensions from being installed or
+    used.
+  - **Default:** `true`
+
+- **`admin.mcp.enabled`** (boolean):
+  - **Description:** If false, disallows MCP servers from being used.
+  - **Default:** `true`
+
+- **`admin.skills.enabled`** (boolean):
+  - **Description:** If false, disallows agent skills from being used.
+  - **Default:** `true`
   <!-- SETTINGS-AUTOGEN:END -->
 
 #### `mcpServers`
@@ -1074,7 +1170,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
-  - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
@@ -1129,6 +1225,18 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
+- **`GEMINI_SYSTEM_MD`**:
+  - Replaces the built‑in system prompt with content from a Markdown file.
+  - `true`/`1`: Use project default path `./.gemini/system.md`.
+  - Any other string: Treat as a path (relative/absolute supported, `~`
+    expands).
+  - `false`/`0` or unset: Use the built‑in prompt. See
+    [System Prompt Override](../cli/system-prompt.md).
+- **`GEMINI_WRITE_SYSTEM_MD`**:
+  - Writes the current built‑in system prompt to a file for review.
+  - `true`/`1`: Write to `./.gemini/system.md`. Otherwise treat the value as a
+    path.
+  - Run the CLI once with this set to generate the file.
 - **`SEATBELT_PROFILE`** (macOS specific):
   - Switches the Seatbelt (`sandbox-exec`) profile on macOS.
   - `permissive-open`: (Default) Restricts writes to the project folder (and a
@@ -1154,6 +1262,52 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
 
+### Environment variable redaction
+
+To prevent accidental leakage of sensitive information, Gemini CLI automatically
+redacts potential secrets from environment variables when executing tools (such
+as shell commands). This "best effort" redaction applies to variables inherited
+from the system or loaded from `.env` files.
+
+**Default Redaction Rules:**
+
+- **By Name:** Variables are redacted if their names contain sensitive terms
+  like `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`, or
+  `CERT`.
+- **By Value:** Variables are redacted if their values match known secret
+  patterns, such as:
+  - Private keys (RSA, OpenSSH, PGP, etc.)
+  - Certificates
+  - URLs containing credentials
+  - API keys and tokens (GitHub, Google, AWS, Stripe, Slack, etc.)
+- **Specific Blocklist:** Certain variables like `CLIENT_ID`, `DB_URI`,
+  `DATABASE_URL`, and `CONNECTION_STRING` are always redacted by default.
+
+**Allowlist (Never Redacted):**
+
+- Common system variables (e.g., `PATH`, `HOME`, `USER`, `SHELL`, `TERM`,
+  `LANG`).
+- Variables starting with `GEMINI_CLI_`.
+- GitHub Action specific variables.
+
+**Configuration:**
+
+You can customize this behavior in your `settings.json` file:
+
+- **`security.allowedEnvironmentVariables`**: A list of variable names to
+  _never_ redact, even if they match sensitive patterns.
+- **`security.blockedEnvironmentVariables`**: A list of variable names to
+  _always_ redact, even if they don't match sensitive patterns.
+
+```json
+{
+  "security": {
+    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
+    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+  }
+}
+```
+
 ## Command-line arguments
 
 Arguments passed directly when running the CLI can override other configurations
@@ -1161,7 +1315,7 @@ for that specific session.
 
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
-  - Example: `npm start -- --model gemini-1.5-pro-latest`
+  - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
@@ -1184,7 +1338,8 @@ for that specific session.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--debug`** (**`-d`**):
-  - Enables debug mode for this session, providing more verbose output.
+  - Enables debug mode for this session, providing more verbose output. Open the
+    debug console with F12 to see the additional logging.
 
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
@@ -1196,6 +1351,10 @@ for that specific session.
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
+    - `plan`: Read-only mode for tool calls (requires experimental planning to
+      be enabled).
+      > **Note:** This mode is currently under development and not yet fully
+      > functional.
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`

@@ -123,8 +123,62 @@ describe('calculateRequestTokenCount', () => {
 
     // Should fallback to estimation:
     // 'Hello': 5 chars * 0.25 = 1.25
-    // inlineData: JSON.stringify length / 4
-    expect(count).toBeGreaterThan(0);
+    // inlineData: 3000
+    // Total: 3001.25 -> 3001
+    expect(count).toBe(3001);
     expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
+
+  it('should use fixed estimate for images in fallback', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+      new Error('API error'),
+    );
+    const request = [
+      { inlineData: { mimeType: 'image/png', data: 'large_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    expect(count).toBe(3000);
+  });
+
+  it('should use countTokens API for PDF requests', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+      totalTokens: 5160,
+    });
+    const request = [
+      { inlineData: { mimeType: 'application/pdf', data: 'pdf_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    expect(count).toBe(5160);
+    expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
+
+  it('should use fixed estimate for PDFs in fallback', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+      new Error('API error'),
+    );
+    const request = [
+      { inlineData: { mimeType: 'application/pdf', data: 'large_pdf_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    // PDF estimate: 25800 tokens (~100 pages at 258 tokens/page)
+    expect(count).toBe(25800);
   });
 });

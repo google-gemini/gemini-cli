@@ -14,11 +14,18 @@ import type { HookRegistryEntry } from './hookRegistry.js';
 import { logs, type Logger } from '@opentelemetry/api-logs';
 import { SERVICE_NAME } from '../telemetry/constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
+import type {
+  SessionStartSource,
+  SessionEndReason,
+  PreCompressTrigger,
+  DefaultHookOutput,
+} from './types.js';
+import type { AggregatedHookResult } from './hookAggregator.js';
 /**
  * Main hook system that coordinates all hook-related functionality
  */
 export class HookSystem {
+  private readonly config: Config;
   private readonly hookRegistry: HookRegistry;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
@@ -26,12 +33,13 @@ export class HookSystem {
   private readonly hookEventHandler: HookEventHandler;
 
   constructor(config: Config) {
+    this.config = config;
     const logger: Logger = logs.getLogger(SERVICE_NAME);
     const messageBus = config.getMessageBus();
 
     // Initialize components
     this.hookRegistry = new HookRegistry(config);
-    this.hookRunner = new HookRunner();
+    this.hookRunner = new HookRunner(config);
     this.hookAggregator = new HookAggregator();
     this.hookPlanner = new HookPlanner(this.hookRegistry);
     this.hookEventHandler = new HookEventHandler(
@@ -78,5 +86,63 @@ export class HookSystem {
    */
   getAllHooks(): HookRegistryEntry[] {
     return this.hookRegistry.getAllHooks();
+  }
+
+  /**
+   * Fire hook events directly
+   * Returns undefined if hooks are disabled
+   */
+  async fireSessionStartEvent(
+    source: SessionStartSource,
+  ): Promise<DefaultHookOutput | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    const result = await this.hookEventHandler.fireSessionStartEvent(source);
+    return result.finalOutput;
+  }
+
+  async fireSessionEndEvent(
+    reason: SessionEndReason,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.fireSessionEndEvent(reason);
+  }
+
+  async firePreCompressEvent(
+    trigger: PreCompressTrigger,
+  ): Promise<AggregatedHookResult | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    return this.hookEventHandler.firePreCompressEvent(trigger);
+  }
+
+  async fireBeforeAgentEvent(
+    prompt: string,
+  ): Promise<DefaultHookOutput | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    const result = await this.hookEventHandler.fireBeforeAgentEvent(prompt);
+    return result.finalOutput;
+  }
+
+  async fireAfterAgentEvent(
+    prompt: string,
+    response: string,
+    stopHookActive: boolean = false,
+  ): Promise<DefaultHookOutput | undefined> {
+    if (!this.config.getEnableHooks()) {
+      return undefined;
+    }
+    const result = await this.hookEventHandler.fireAfterAgentEvent(
+      prompt,
+      response,
+      stopHookActive,
+    );
+    return result.finalOutput;
   }
 }

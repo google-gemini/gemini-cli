@@ -58,9 +58,13 @@ import type {
 } from '../utils/workspaceContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from '../services/environmentSanitization.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -140,6 +144,7 @@ export class McpClient {
         this.serverConfig,
         this.debugMode,
         this.workspaceContext,
+        this.cliConfig.sanitizationConfig,
       );
 
       this.registerNotificationHandlers();
@@ -901,6 +906,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       debugMode,
       workspaceContext,
+      cliConfig.sanitizationConfig,
     );
 
     mcpClient.onerror = (error) => {
@@ -969,7 +975,7 @@ export async function discoverTools(
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
   cliConfig: Config,
-  messageBus?: MessageBus,
+  messageBus: MessageBus,
   options?: { timeout?: number; signal?: AbortSignal },
 ): Promise<DiscoveredMCPTool[]> {
   try {
@@ -996,12 +1002,12 @@ export async function discoverTools(
           toolDef.name,
           toolDef.description ?? '',
           toolDef.inputSchema ?? { type: 'object', properties: {} },
+          messageBus,
           mcpServerConfig.trust,
           undefined,
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
-          messageBus,
         );
 
         discoveredTools.push(tool);
@@ -1402,6 +1408,7 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  sanitizationConfig: EnvironmentSanitizationConfig,
 ): Promise<Client> {
   const mcpClient = new Client(
     {
@@ -1468,6 +1475,7 @@ export async function connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      sanitizationConfig,
     );
     try {
       await mcpClient.connect(transport, {
@@ -1784,6 +1792,7 @@ export async function createTransport(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  sanitizationConfig: EnvironmentSanitizationConfig,
 ): Promise<Transport> {
   const noUrl = !mcpServerConfig.url && !mcpServerConfig.httpUrl;
   if (noUrl) {
@@ -1855,7 +1864,7 @@ export async function createTransport(
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
       env: {
-        ...process.env,
+        ...sanitizeEnvironment(process.env, sanitizationConfig),
         ...(mcpServerConfig.env || {}),
       } as Record<string, string>,
       cwd: mcpServerConfig.cwd,
