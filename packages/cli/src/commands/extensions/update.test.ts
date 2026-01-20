@@ -84,6 +84,45 @@ describe('extensions update command', () => {
   });
 
   describe('handleUpdate', () => {
+    it('should list installed extensions when requested extension is not found', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const extensions = [
+        { name: 'ext1', version: '1.0.0' },
+        { name: 'ext2', version: '2.0.0' },
+      ];
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue(extensions);
+      mockExtensionManager.prototype.toOutputString = vi.fn(
+        (ext) => `${ext.name}@${ext.version}`,
+      );
+
+      await handleUpdate({ name: 'missing-extension' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "missing-extension" not found.\n\nInstalled extensions:\n\next1@1.0.0\n\next2@2.0.0',
+      );
+      expect(mockUpdateExtension).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
+    it('should log a helpful message when no extensions are installed and requested extension is not found', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue([]);
+
+      await handleUpdate({ name: 'missing-extension' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "missing-extension" not found.\n\nNo extensions installed.',
+      );
+      expect(mockUpdateExtension).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
     it.each([
       {
         state: ExtensionUpdateState.UPDATE_AVAILABLE,
