@@ -48,6 +48,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('../services/chatCompressionService.js');
 
@@ -290,6 +291,7 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   afterEach(() => {
+    client.dispose();
     vi.restoreAllMocks();
   });
 
@@ -1576,6 +1578,55 @@ ${JSON.stringify(
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           { model: 'new-routed-model' },
           [{ text: 'A new topic' }],
+          expect.any(AbortSignal),
+        );
+      });
+
+      it('should re-route within the same prompt when the configured model changes', async () => {
+        mockTurnRunFn.mockClear();
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: 'content', value: 'Hello' };
+        });
+
+        mockRouterService.route.mockResolvedValueOnce({
+          model: 'original-model',
+          reason: 'test',
+        });
+
+        let stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(1);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          1,
+          { model: 'original-model' },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
+        );
+
+        mockRouterService.route.mockResolvedValue({
+          model: 'fallback-model',
+          reason: 'test',
+        });
+        vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-flash');
+        coreEvents.emitModelChanged('gemini-2.5-flash');
+
+        stream = client.sendMessageStream(
+          [{ text: 'Continue' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          { model: 'fallback-model' },
+          [{ text: 'Continue' }],
           expect.any(AbortSignal),
         );
       });
