@@ -46,6 +46,7 @@ export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
+  PLAN = 'plan',
 }
 
 /**
@@ -135,6 +136,12 @@ export interface PolicyRule {
    * Only applies when decision is ALLOW.
    */
   allowRedirection?: boolean;
+
+  /**
+   * Effect of the rule's source.
+   * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
+   */
+  source?: string;
 }
 
 export interface SafetyCheckerRule {
@@ -257,4 +264,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+}
+
+export interface CheckResult {
+  decision: PolicyDecision;
+  rule?: PolicyRule;
 }

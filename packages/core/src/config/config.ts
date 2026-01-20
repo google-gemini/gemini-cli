@@ -64,6 +64,8 @@ import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -92,7 +94,7 @@ import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { GeminiCodeAssistSetting } from '../code_assist/types.js';
+import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -105,9 +107,14 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+import {
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
+import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -170,7 +177,7 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
-  disabled?: boolean;
+  enabled?: boolean;
 }
 
 export interface AgentSettings {
@@ -309,7 +316,9 @@ export interface ConfigParameters {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
-    disableFuzzySearch?: boolean;
+    enableFuzzySearch?: boolean;
+    maxFileCount?: number;
+    searchTimeout?: number;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -375,11 +384,13 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableAgents?: boolean;
+  enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   disableLLMCorrection?: boolean;
+  plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -387,6 +398,7 @@ export interface ConfigParameters {
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
+    agents?: AgentSettings;
   }>;
 }
 
@@ -438,7 +450,9 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
-    disableFuzzySearch: boolean;
+    enableFuzzySearch: boolean;
+    maxFileCount: number;
+    searchTimeout: number;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -482,6 +496,7 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
+  private compressionTruncationCounter = 0;
   private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
@@ -503,13 +518,11 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
-  private readonly hooks:
-    | { [K in HookEventName]?: HookDefinition[] }
-    | undefined;
-  private readonly projectHooks:
+  private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
+  private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
-  private readonly disabledHooks: string[];
+  private disabledHooks: string[];
   private experiments: Experiments | undefined;
   private experimentsPromise: Promise<void> | undefined;
   private hookSystem?: HookSystem;
@@ -518,21 +531,25 @@ export class Config {
     | (() => Promise<{
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
       }>)
     | undefined;
 
   private readonly enableAgents: boolean;
-  private readonly agents: AgentSettings;
+  private agents: AgentSettings;
+  private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
+  private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
-  private remoteAdminSettings: GeminiCodeAssistSetting | undefined;
+  private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
+  private lastModeSwitchTime: number = Date.now();
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -588,7 +605,15 @@ export class Config {
         DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
-      disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
+      enableFuzzySearch: params.fileFiltering?.enableFuzzySearch ?? true,
+      maxFileCount:
+        params.fileFiltering?.maxFileCount ??
+        DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount ??
+        20000,
+      searchTimeout:
+        params.fileFiltering?.searchTimeout ??
+        DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
+        5000,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -600,6 +625,9 @@ export class Config {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.planEnabled = params.plan ?? false;
+    this.enableEventDrivenScheduler =
+      params.enableEventDrivenScheduler ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -691,8 +719,15 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.hooks = params.hooks;
-    this.projectHooks = params.projectHooks;
+
+    if (params.hooks) {
+      const { disabled: _, ...restOfHooks } = params.hooks;
+      this.hooks = restOfHooks;
+    }
+    if (params.projectHooks) {
+      this.projectHooks = params.projectHooks;
+    }
+
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
@@ -779,12 +814,14 @@ export class Config {
       this,
       this.eventEmitter,
     );
-    const initMcpHandle = startupProfiler.start('initialize_mcp_clients');
-    await Promise.all([
-      await this.mcpClientManager.startConfiguredMcpServers(),
-      await this.getExtensionLoader().start(this),
-    ]);
-    initMcpHandle?.end();
+    // We do not await this promise so that the CLI can start up even if
+    // MCP servers are slow to connect.
+    Promise.all([
+      this.mcpClientManager.startConfiguredMcpServers(),
+      this.getExtensionLoader().start(this),
+    ]).catch((error) => {
+      debugLogger.error('Error initializing MCP clients:', error);
+    });
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -889,6 +926,22 @@ export class Config {
     if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
+
+    // Fetch admin controls
+    await this.ensureExperimentsLoaded();
+    const adminControlsEnabled =
+      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+        ?.boolValue ?? false;
+    const adminControls = await fetchAdminControls(
+      codeAssistServer,
+      this.getRemoteAdminSettings(),
+      adminControlsEnabled,
+      (newSettings: FetchAdminControlsResponse) => {
+        this.setRemoteAdminSettings(newSettings);
+        coreEvents.emitAdminSettingsChanged();
+      },
+    );
+    this.setRemoteAdminSettings(adminControls);
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -947,11 +1000,11 @@ export class Config {
     this.latestApiRequest = req;
   }
 
-  getRemoteAdminSettings(): GeminiCodeAssistSetting | undefined {
+  getRemoteAdminSettings(): FetchAdminControlsResponse | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: GeminiCodeAssistSetting): void {
+  setRemoteAdminSettings(settings: FetchAdminControlsResponse): void {
     this.remoteAdminSettings = settings;
   }
 
@@ -1231,6 +1284,24 @@ export class Config {
     return this.userMemory;
   }
 
+  /**
+   * Refreshes the MCP context, including memory, tools, and system instructions.
+   */
+  async refreshMcpContext(): Promise<void> {
+    if (this.experimentalJitContext && this.contextManager) {
+      await this.contextManager.refresh();
+    } else {
+      const { refreshServerHierarchicalMemory } = await import(
+        '../utils/memoryDiscovery.js'
+      );
+      await refreshServerHierarchicalMemory(this);
+    }
+    if (this.geminiClient?.isInitialized()) {
+      await this.geminiClient.setTools();
+      await this.geminiClient.updateSystemInstruction();
+    }
+  }
+
   setUserMemory(newUserMemory: string): void {
     this.userMemory = newUserMemory;
   }
@@ -1283,7 +1354,30 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
+
+    const currentMode = this.getApprovalMode();
+    if (currentMode !== mode) {
+      this.logCurrentModeDuration(this.getApprovalMode());
+      logApprovalModeSwitch(
+        this,
+        new ApprovalModeSwitchEvent(currentMode, mode),
+      );
+      this.lastModeSwitchTime = Date.now();
+    }
+
     this.policyEngine.setApprovalMode(mode);
+  }
+
+  /**
+   * Logs the duration of the current approval mode.
+   */
+  logCurrentModeDuration(mode: ApprovalMode): void {
+    const now = Date.now();
+    const duration = now - this.lastModeSwitchTime;
+    logApprovalModeDuration(
+      this,
+      new ApprovalModeDurationEvent(mode, duration),
+    );
   }
 
   isYoloModeDisabled(): boolean {
@@ -1365,8 +1459,8 @@ export class Config {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
 
-  getFileFilteringDisableFuzzySearch(): boolean {
-    return this.fileFiltering.disableFuzzySearch;
+  getFileFilteringEnableFuzzySearch(): boolean {
+    return this.fileFiltering.enableFuzzySearch;
   }
 
   getFileFilteringRespectGitIgnore(): boolean {
@@ -1380,6 +1474,8 @@ export class Config {
     return {
       respectGitIgnore: this.fileFiltering.respectGitIgnore,
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+      maxFileCount: this.fileFiltering.maxFileCount,
+      searchTimeout: this.fileFiltering.searchTimeout,
     };
   }
 
@@ -1467,8 +1563,16 @@ export class Config {
     return this.disableLLMCorrection;
   }
 
+  isPlanEnabled(): boolean {
+    return this.planEnabled;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
+  }
+
+  isEventDrivenSchedulerEnabled(): boolean {
+    return this.enableEventDrivenScheduler;
   }
 
   getNoBrowser(): boolean {
@@ -1634,6 +1738,18 @@ export class Config {
     await this.updateSystemInstructionIfInitialized();
   }
 
+  /**
+   * Reloads agent settings.
+   */
+  async reloadAgents(): Promise<void> {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.agents) {
+        this.agents = refreshed.agents;
+      }
+    }
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -1706,6 +1822,10 @@ export class Config {
 
   getTruncateToolOutputLines(): number {
     return this.truncateToolOutputLines;
+  }
+
+  getNextCompressionTruncationId(): number {
+    return ++this.compressionTruncationCounter;
   }
 
   getUseWriteTodos(): boolean {
@@ -1876,6 +1996,15 @@ export class Config {
   }
 
   /**
+   * Update the list of disabled hooks dynamically.
+   * This is used to keep the running system in sync with settings changes
+   * without risk of loading new hook definitions into memory.
+   */
+  updateDisabledHooks(disabledHooks: string[]): void {
+    this.disabledHooks = disabledHooks;
+  }
+
+  /**
    * Get disabled hooks list
    */
   getDisabledHooks(): string[] {
@@ -1954,10 +2083,10 @@ export class Config {
    * Disposes of resources and removes event listeners.
    */
   async dispose(): Promise<void> {
+    this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-    if (this.agentRegistry) {
-      this.agentRegistry.dispose();
-    }
+    this.agentRegistry?.dispose();
+    this.geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }

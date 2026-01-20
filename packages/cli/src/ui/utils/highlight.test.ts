@@ -212,13 +212,13 @@ describe('parseInputForHighlighting with Transformations', () => {
   });
 
   it('should handle empty transformations array', () => {
-    const line = 'Check out @test.png';
+    const line = 'Check out @test_no_transform.png';
     const result = parseInputForHighlighting(line, 0, [], 0);
 
     // Should fall back to default highlighting
     expect(result).toEqual([
       { text: 'Check out ', type: 'default' },
-      { text: '@test.png', type: 'file' },
+      { text: '@test_no_transform.png', type: 'file' },
     ]);
   });
 
