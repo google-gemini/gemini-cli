@@ -35,6 +35,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",

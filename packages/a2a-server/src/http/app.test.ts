@@ -16,7 +16,6 @@ import type {
 } from '@a2a-js/sdk';
 import express from 'express';
 import type { Server } from 'node:http';
-import { spawnSync } from 'node:child_process';
 import request from 'supertest';
 import {
   afterAll,
@@ -28,6 +27,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import { canListenOnLocalhost } from '@google/gemini-cli-test-utils';
 import { createApp, main } from './app.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import {
@@ -43,17 +43,7 @@ import type { Command, CommandContext } from '../commands/types.js';
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
 
-const canListen = (() => {
-  const result = spawnSync(
-    process.execPath,
-    [
-      '-e',
-      "const net=require('net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));server.on('error',()=>process.exit(1));",
-    ],
-    { timeout: 2000 },
-  );
-  return result.status === 0;
-})();
+const canListen = canListenOnLocalhost();
 
 const describeIfListening = canListen ? describe : describe.skip;
 

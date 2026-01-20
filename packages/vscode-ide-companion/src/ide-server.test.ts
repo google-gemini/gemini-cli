@@ -10,7 +10,7 @@ import * as fs from 'node:fs/promises';
 import type * as os from 'node:os';
 import * as path from 'node:path';
 import * as http from 'node:http';
-import { spawnSync } from 'node:child_process';
+import { canListenOnLocalhost } from '@google/gemini-cli-test-utils';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
@@ -18,17 +18,7 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(() => 'test-auth-token'),
 }));
 
-const canListen = (() => {
-  const result = spawnSync(
-    process.execPath,
-    [
-      '-e',
-      "const net=require('net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));server.on('error',()=>process.exit(1));",
-    ],
-    { timeout: 2000 },
-  );
-  return result.status === 0;
-})();
+const canListen = canListenOnLocalhost();
 
 const describeIfListening = canListen ? describe : describe.skip;
 

@@ -5,4 +5,5 @@
  */
 
 export * from './file-system-test-helpers.js';
+export * from './network.js';
 export * from './test-rig.js';

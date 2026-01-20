@@ -12,24 +12,14 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { spawnSync } from 'node:child_process';
+import { canListenOnLocalhost } from '@google/gemini-cli-test-utils';
 
 import { createApp, updateCoderAgentCardUrl } from './app.js';
 import type { TaskMetadata } from '../types.js';
 import { createMockConfig } from '../utils/testing_utils.js';
 import { debugLogger, type Config } from '@google/gemini-cli-core';
 
-const canListen = (() => {
-  const result = spawnSync(
-    process.execPath,
-    [
-      '-e',
-      "const net=require('net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>server.close(()=>process.exit(0)));server.on('error',()=>process.exit(1));",
-    ],
-    { timeout: 2000 },
-  );
-  return result.status === 0;
-})();
+const canListen = canListenOnLocalhost();
 
 const describeIfListening = canListen ? describe : describe.skip;
 
