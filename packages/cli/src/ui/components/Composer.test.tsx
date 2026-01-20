@@ -100,7 +100,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showErrorDetails: false,
     constrainHeight: false,
     isInputActive: true,
-    buffer: '',
+    buffer: { text: '' },
     inputWidth: 80,
     suggestionsWidth: 40,
     userMessages: [],
