@@ -279,8 +279,8 @@ describe('HookSystem Integration', () => {
               ],
             },
           ],
-          disabled: ['echo "disabled-hook"'], // Disable the second hook
         },
+        disabledHooks: ['echo "disabled-hook"'], // Disable the second hook
       });
 
       (

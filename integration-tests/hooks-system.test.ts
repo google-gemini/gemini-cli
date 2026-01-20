@@ -32,8 +32,10 @@ describe('Hooks System Integration', () => {
             'hooks-system.block-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -84,8 +86,10 @@ describe('Hooks System Integration', () => {
             'hooks-system.block-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -141,8 +145,10 @@ describe('Hooks System Integration', () => {
             'hooks-system.allow-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -189,8 +195,10 @@ describe('Hooks System Integration', () => {
           'hooks-system.after-tool-context.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             AfterTool: [
               {
                 matcher: 'read_file',
@@ -262,8 +270,10 @@ console.log(JSON.stringify({
 
       rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeModel: [
               {
                 hooks: [
@@ -321,8 +331,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns deny decision',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   hooks: [
@@ -364,8 +376,10 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns block decision',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeModel: [
                 {
                   hooks: [
@@ -429,8 +443,10 @@ console.log(JSON.stringify({
 
         rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               AfterModel: [
                 {
                   hooks: [
@@ -475,8 +491,10 @@ console.log(JSON.stringify({
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         settings: {
           debugMode: true,
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeToolSelection: [
               {
                 hooks: [
@@ -540,8 +558,10 @@ console.log(JSON.stringify({
 
       rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeAgent: [
               {
                 hooks: [
@@ -586,8 +606,10 @@ console.log(JSON.stringify({
             approval: 'ASK', // Disable YOLO mode to show permission prompts
             confirmationRequired: ['run_shell_command'],
           },
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             Notification: [
               {
                 matcher: 'ToolPermission',
@@ -677,8 +699,10 @@ console.log(JSON.stringify({
           'hooks-system.sequential-execution.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeAgent: [
               {
                 sequential: true,
@@ -757,8 +781,10 @@ try {
 
       rig.setup('should provide correct input format to hooks', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeTool: [
               {
                 hooks: [
@@ -800,8 +826,10 @@ try {
             'hooks-system.allow-tool.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -852,8 +880,10 @@ try {
           'hooks-system.multiple-events.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeAgent: [
               {
                 hooks: [
@@ -965,8 +995,10 @@ try {
 
       rig.setup('should handle hook failures gracefully', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeTool: [
               {
                 hooks: [
@@ -1017,8 +1049,10 @@ try {
           'hooks-system.telemetry.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeTool: [
               {
                 hooks: [
@@ -1058,8 +1092,10 @@ try {
           'hooks-system.session-startup.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             SessionStart: [
               {
                 matcher: 'startup',
@@ -1129,8 +1165,10 @@ console.log(JSON.stringify({
 
       rig.setup('should fire SessionStart hook and inject context', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             SessionStart: [
               {
                 matcher: 'startup',
@@ -1212,8 +1250,10 @@ console.log(JSON.stringify({
         'should fire SessionStart hook and display systemMessage in interactive mode',
         {
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               SessionStart: [
                 {
                   matcher: 'startup',
@@ -1280,8 +1320,10 @@ console.log(JSON.stringify({
             'hooks-system.session-clear.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               SessionEnd: [
                 {
                   matcher: '*',
@@ -1452,8 +1494,10 @@ console.log(JSON.stringify({
           'hooks-system.compress-auto.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             PreCompress: [
               {
                 matcher: 'auto',
@@ -1517,8 +1561,10 @@ console.log(JSON.stringify({
           'hooks-system.session-startup.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             SessionEnd: [
               {
                 matcher: 'exit',
@@ -1615,8 +1661,11 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
 
       rig.setup('should not execute hooks disabled in settings file', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+            disabled: [`node "${disabledPath}"`], // Disable the second hook
+          },
+          hooks: {
             BeforeTool: [
               {
                 hooks: [
@@ -1633,7 +1682,6 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 ],
               },
             ],
-            disabled: [`node "${disabledPath}"`], // Disable the second hook
           },
         },
       });
@@ -1690,8 +1738,11 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
 
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+            disabled: [`node "${disabledPath}"`], // Disable the second hook,
+          },
+          hooks: {
             BeforeTool: [
               {
                 hooks: [
@@ -1708,7 +1759,6 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 ],
               },
             ],
-            disabled: [`node "${disabledPath}"`], // Disable the second hook
           },
         },
       });
@@ -1795,8 +1845,10 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           'hooks-system.input-modification.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeTool: [
               {
                 matcher: 'write_file',
@@ -1879,8 +1931,10 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           'hooks-system.before-tool-stop.responses',
         ),
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeTool: [
               {
                 matcher: 'write_file',

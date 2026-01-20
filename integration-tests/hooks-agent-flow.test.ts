@@ -53,8 +53,10 @@ describe('Hooks Agent Flow', () => {
 
       await rig.setup('should inject additional context via BeforeAgent hook', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeAgent: [
               {
                 hooks: [
@@ -116,8 +118,10 @@ describe('Hooks Agent Flow', () => {
 
       await rig.setup('should receive prompt and response in AfterAgent hook', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             AfterAgent: [
               {
                 hooks: [
@@ -163,8 +167,10 @@ describe('Hooks Agent Flow', () => {
             'hooks-agent-flow-multistep.responses',
           ),
           settings: {
-            hooks: {
+            hooksConfig: {
               enabled: true,
+            },
+            hooks: {
               BeforeAgent: [
                 {
                   hooks: [

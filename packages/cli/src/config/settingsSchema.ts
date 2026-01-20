@@ -1631,9 +1631,9 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  hooks: {
+  hooksConfig: {
     type: 'object',
-    label: 'Hooks',
+    label: 'HooksConfig',
     category: 'Advanced',
     requiresRestart: false,
     default: {},
@@ -1675,6 +1675,18 @@ const SETTINGS_SCHEMA = {
         description: 'Show visual indicators when hooks are executing.',
         showInDialog: true,
       },
+    },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hook Events',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Event-specific hook configurations.',
+    showInDialog: false,
+    properties: {
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',

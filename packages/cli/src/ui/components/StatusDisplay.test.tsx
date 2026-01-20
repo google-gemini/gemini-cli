@@ -52,7 +52,7 @@ const createMockConfig = (overrides = {}) => ({
 
 const createMockSettings = (merged = {}) => ({
   merged: {
-    hooks: { notifications: true },
+    hooksConfig: { notifications: true },
     ui: { hideContextSummary: false },
     ...merged,
   },
@@ -185,7 +185,7 @@ describe('StatusDisplay', () => {
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const settings = createMockSettings({
-      hooks: { notifications: false },
+      hooksConfig: { notifications: false },
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },

@@ -512,7 +512,7 @@ describe('migrate command', () => {
       '\nMigration complete! Please review the migrated hooks in .gemini/settings.json',
     );
     expect(debugLoggerLogSpy).toHaveBeenCalledWith(
-      'Note: Set hooks.enabled to true in your settings to enable the hook system.',
+      'Note: Set hooksConfig.enabled to true in your settings to enable the hook system.',
     );
   });
 });

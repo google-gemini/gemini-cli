@@ -52,7 +52,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
   }
 
-  if (uiState.activeHooks.length > 0 && settings.merged.hooks.notifications) {
+  if (
+    uiState.activeHooks.length > 0 &&
+    settings.merged.hooksConfig.notifications
+  ) {
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
