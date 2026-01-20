@@ -289,7 +289,11 @@ export class McpClientManager {
    */
   async restart(): Promise<void> {
     await Promise.all(
-      Array.from(this.clients.entries()).map(async ([name, client]) => {
+      Array.from(this.clients.keys()).map(async (name) => {
+        const client = this.clients.get(name);
+        if (!client) {
+          return;
+        }
         try {
           await this.maybeDiscoverMcpServer(name, client.getServerConfig());
         } catch (error) {
