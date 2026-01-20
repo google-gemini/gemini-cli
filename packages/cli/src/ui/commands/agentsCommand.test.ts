@@ -149,7 +149,7 @@ describe('agentsCommand', () => {
     });
     // Add agent to disabled overrides so validation passes
     mockContext.services.settings.merged.agents.overrides['test-agent'] = {
-      disabled: true,
+      enabled: false,
     };
 
     vi.mocked(enableAgent).mockReturnValue({
@@ -264,7 +264,7 @@ describe('agentsCommand', () => {
   it('should show info message if agent is already disabled', async () => {
     mockConfig.getAgentRegistry().getAllAgentNames.mockReturnValue([]);
     mockContext.services.settings.merged.agents.overrides['test-agent'] = {
-      disabled: true,
+      enabled: false,
     };
 
     const disableCommand = agentsCommand.subCommands?.find(
