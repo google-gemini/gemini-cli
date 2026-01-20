@@ -508,10 +508,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } else {
           // Second ESC
           resetEscapeState();
-          if (keyMatchers[Command.ESCAPE](key) && buffer.text.length > 0) {
+          if (buffer.text.length > 0) {
             buffer.setText('');
             resetCompletionState();
-          } else if (keyMatchers[Command.ESCAPE](key)) {
+          } else {
             if (history.length > 0) {
               onSubmit('/rewind');
             }
