@@ -220,8 +220,8 @@ function findCodeSpansDirectly(
     fencedRanges.push([match.index, match.index + match[0].length]);
   }
 
-  // Match inline code spans (single or double backticks), avoiding fenced regions
-  const inlineRegex = /``[\s\S]*?``|`[^`\n\r]*`/g;
+  // Match inline code spans (any number of backticks per CommonMark spec), avoiding fenced regions
+  const inlineRegex = /(`+)([\s\S]*?)\1/g;
   while ((match = inlineRegex.exec(content)) !== null) {
     // Skip if this match is inside a fenced code block
     const matchStart = match.index;

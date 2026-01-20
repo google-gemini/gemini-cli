@@ -457,6 +457,24 @@ describe('memoryImportProcessor', () => {
       expect(mockedFs.access).not.toHaveBeenCalled();
     });
 
+    it('should not import when @ is inside double or triple backtick code spans', async () => {
+      // CommonMark allows any number of backticks for inline code spans
+      // Double backticks: ``code with ` inside``
+      // Triple backticks: ```code with `` inside```
+      const content = `Use double backticks for literal backticks: \`\`@import/path\`\`
+And triple backticks work too: \`\`\`@another/import\`\`\`
+But regular imports work: @./real-file.md`;
+      const testRootDir = testPath('test', 'project');
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue('imported content');
+      await processImports(content, testRootDir);
+      // Only the real-file.md should be imported, not the ones in code spans
+      expect(mockedFs.access).toHaveBeenCalledTimes(1);
+      expect(mockedFs.access).toHaveBeenCalledWith(
+        expect.stringContaining('real-file.md'),
+      );
+    });
+
     it('should allow imports from parent and subdirectories within project root', async () => {
       const content =
         'Parent import: @../parent.md Subdir import: @./components/sub.md';
