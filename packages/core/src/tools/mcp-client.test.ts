@@ -687,11 +687,11 @@ describe('mcp-client', () => {
         promptRegistry,
         resourceRegistry,
         workspaceContext,
-        {} as Config,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
       );
       await client.connect();
-      await client.discover({} as Config);
+      await client.discover({ sanitizationConfig: EMPTY_CONFIG } as Config);
 
       expect(mockedClient.setNotificationHandler).toHaveBeenCalledOnce();
       expect(promptListHandler).toBeDefined();
