@@ -8,12 +8,7 @@ import { CoreToolScheduler } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { renderHook } from '../../test-utils/render.js';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import {
-  mapToDisplay,
-  useReactToolScheduler,
-  type TrackedToolCall,
-} from './useReactToolScheduler.js';
-import { Verbosity } from '../types.js';
+import { useReactToolScheduler } from './useReactToolScheduler.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -78,37 +73,5 @@ describe('useReactToolScheduler', () => {
       getPreferredEditor: newGetPreferredEditor,
     });
     expect(mockCoreToolScheduler).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('mapToDisplay', () => {
-  const createMockToolCall = (isClientInitiated: boolean): TrackedToolCall =>
-    ({
-      request: {
-        callId: 'call-1',
-        name: 'testTool',
-        args: {},
-        isClientInitiated,
-      },
-      status: 'scheduled',
-      tool: {
-        displayName: 'Test Tool',
-        isOutputMarkdown: false,
-      },
-      invocation: {
-        getDescription: () => 'Test description',
-      },
-    }) as unknown as TrackedToolCall;
-
-  it('sets verbosity to INFO for client-initiated tools', () => {
-    const toolCall = createMockToolCall(true);
-    const display = mapToDisplay(toolCall);
-    expect(display.verbosity).toBe(Verbosity.INFO);
-  });
-
-  it('sets verbosity to undefined (defaulting to VERBOSE) for autonomous tools', () => {
-    const toolCall = createMockToolCall(false);
-    const display = mapToDisplay(toolCall);
-    expect(display.verbosity).toBeUndefined();
   });
 });

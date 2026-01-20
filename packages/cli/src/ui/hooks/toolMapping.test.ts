@@ -20,7 +20,7 @@ import {
   type WaitingToolCall,
   type CancelledToolCall,
 } from '@google/gemini-cli-core';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, Verbosity } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -231,6 +231,28 @@ describe('toolMapping', () => {
 
       expect(displayTool.status).toBe(ToolCallStatus.Canceled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
+    });
+
+    it('sets verbosity to INFO for client-initiated tools', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: { ...mockRequest, isClientInitiated: true },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+      const result = mapToDisplay(toolCall);
+      expect(result.verbosity).toBe(Verbosity.INFO);
+    });
+
+    it('sets verbosity to undefined (defaulting to VERBOSE) for autonomous tools', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: { ...mockRequest, isClientInitiated: false },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+      const result = mapToDisplay(toolCall);
+      expect(result.verbosity).toBeUndefined();
     });
   });
 });

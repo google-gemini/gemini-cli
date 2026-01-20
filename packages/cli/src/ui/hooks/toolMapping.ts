@@ -13,6 +13,7 @@ import {
 } from '@google/gemini-cli-core';
 import {
   ToolCallStatus,
+  Verbosity,
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
@@ -50,6 +51,9 @@ export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
+  const isClientInitiated = toolCalls.some(
+    (tc) => tc.request.isClientInitiated,
+  );
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -128,6 +132,7 @@ export function mapToDisplay(
 
   return {
     type: 'tool_group',
+    verbosity: isClientInitiated ? Verbosity.INFO : undefined,
     tools: toolDisplays,
   };
 }
