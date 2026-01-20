@@ -52,14 +52,11 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
   }
 
-  if (
-    uiState.activeHooks.length > 0 &&
-    (settings.merged.hooks?.notifications ?? true)
-  ) {
+  if (uiState.activeHooks.length > 0 && settings.merged.hooks.notifications) {
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
-  if (!settings.merged.ui?.hideContextSummary && !hideContextSummary) {
+  if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}

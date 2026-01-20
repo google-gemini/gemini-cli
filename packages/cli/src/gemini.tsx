@@ -61,6 +61,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -95,6 +96,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -213,12 +215,12 @@ export async function startInteractiveUI(
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
           config={config}
-          debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
+          debugKeystrokeLogging={settings.merged.general.debugKeystrokeLogging}
         >
           <MouseProvider
             mouseEventsEnabled={mouseEventsEnabled}
             debugKeystrokeLogging={
-              settings.merged.general?.debugKeystrokeLogging
+              settings.merged.general.debugKeystrokeLogging
             }
           >
             <ScrollProvider>
@@ -263,8 +265,7 @@ export async function startInteractiveUI(
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
-        settings.merged.ui?.incrementalRendering !== false &&
-        useAlternateBuffer,
+        settings.merged.ui.incrementalRendering !== false && useAlternateBuffer,
     },
   );
 
@@ -284,6 +285,14 @@ export async function startInteractiveUI(
 
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
+
+  // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
+  // sandbox mode, we re-fetch the admin controls from the server once we enter
+  // the sandbox.
+  // TODO: Cache settings in sandbox mode as well.
+  const adminControlsListner = setupAdminControlsListener();
+  registerCleanup(adminControlsListner.cleanup);
+
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -336,13 +345,13 @@ export async function main() {
   registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
-    validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
+    validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
   );
 
   // Set a default auth type if one isn't set or is set to a legacy type
   if (
-    !settings.merged.security?.auth?.selectedType ||
-    settings.merged.security?.auth?.selectedType === AuthType.LEGACY_CLOUD_SHELL
+    !settings.merged.security.auth.selectedType ||
+    settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
   ) {
     if (
       process.env['CLOUD_SHELL'] === 'true' ||
@@ -359,13 +368,14 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+  adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   if (
-    settings.merged.security?.auth?.selectedType &&
-    !settings.merged.security?.auth?.useExternal
+    settings.merged.security.auth.selectedType &&
+    !settings.merged.security.auth.useExternal
   ) {
     try {
       if (partialConfig.isInteractive()) {
@@ -381,8 +391,8 @@ export async function main() {
         );
       } else {
         const authType = await validateNonInteractiveAuth(
-          settings.merged.security?.auth?.selectedType,
-          settings.merged.security?.auth?.useExternal,
+          settings.merged.security.auth.selectedType,
+          settings.merged.security.auth.useExternal,
           partialConfig,
           settings,
         );
@@ -401,9 +411,12 @@ export async function main() {
     settings.setRemoteAdminSettings(remoteAdminSettings);
   }
 
+  // Run deferred command now that we have admin settings.
+  await runDeferredCommand(settings.merged);
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.advanced?.autoConfigureMemory
+    const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
@@ -452,7 +465,7 @@ export async function main() {
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, []);
+      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
@@ -465,6 +478,7 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+    adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
@@ -506,7 +520,7 @@ export async function main() {
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       // Attempt auth for summary generation (gracefully skips if not configured)
-      const authType = settings.merged.security?.auth?.selectedType;
+      const authType = settings.merged.security.auth.selectedType;
       if (authType) {
         try {
           await config.refreshAuth(authType);
@@ -566,7 +580,7 @@ export async function main() {
     initAppHandle?.end();
 
     if (
-      settings.merged.security?.auth?.selectedType ===
+      settings.merged.security.auth.selectedType ===
         AuthType.LOGIN_WITH_GOOGLE &&
       config.isBrowserLaunchSuppressed()
     ) {
@@ -638,18 +652,22 @@ export async function main() {
     const sessionStartSource = resumedSessionData
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
-    const result = await config
-      .getHookSystem()
-      ?.fireSessionStartEvent(sessionStartSource);
 
-    if (result?.finalOutput) {
-      if (result.finalOutput.systemMessage) {
-        writeToStderr(result.finalOutput.systemMessage + '\n');
-      }
-      const additionalContext = result.finalOutput.getAdditionalContext();
-      if (additionalContext) {
-        // Prepend context to input (System Context -> Stdin -> Question)
-        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+      if (result) {
+        if (result.systemMessage) {
+          writeToStderr(result.systemMessage + '\n');
+        }
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          // Prepend context to input (System Context -> Stdin -> Question)
+          input = input
+            ? `${additionalContext}\n\n${input}`
+            : additionalContext;
+        }
       }
     }
 
@@ -678,8 +696,8 @@ export async function main() {
     );
 
     const authType = await validateNonInteractiveAuth(
-      settings.merged.security?.auth?.selectedType,
-      settings.merged.security?.auth?.useExternal,
+      settings.merged.security.auth.selectedType,
+      settings.merged.security.auth.useExternal,
       config,
       settings,
     );
@@ -689,9 +707,6 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    const hasDeprecatedPromptArg = process.argv.some((arg) =>
-      arg.startsWith('--prompt'),
-    );
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
@@ -699,7 +714,6 @@ export async function main() {
       settings,
       input,
       prompt_id,
-      hasDeprecatedPromptArg,
       resumedSessionData,
     });
     // Call cleanup before process.exit, which causes cleanup to not run
@@ -709,14 +723,14 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.ui?.hideWindowTitle) {
+  if (!settings.merged.ui.hideWindowTitle) {
     // Initial state before React loop starts
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
       folderName: title,
-      showThoughts: !!settings.merged.ui?.showStatusInTitle,
-      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+      showThoughts: !!settings.merged.ui.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
     });
     writeToStdout(`\x1b]0;${windowTitle}\x07`);
 
@@ -760,4 +774,37 @@ export function initializeOutputListenersAndFlush() {
     }
   }
   coreEvents.drainBacklogs();
+}
+
+function setupAdminControlsListener() {
+  let pendingSettings: FetchAdminControlsResponse | undefined;
+  let config: Config | undefined;
+
+  const messageHandler = (msg: unknown) => {
+    const message = msg as {
+      type?: string;
+      settings?: FetchAdminControlsResponse;
+    };
+    if (message?.type === 'admin-settings' && message.settings) {
+      if (config) {
+        config.setRemoteAdminSettings(message.settings);
+      } else {
+        pendingSettings = message.settings;
+      }
+    }
+  };
+
+  process.on('message', messageHandler);
+
+  return {
+    setConfig: (newConfig: Config) => {
+      config = newConfig;
+      if (pendingSettings) {
+        config.setRemoteAdminSettings(pendingSettings);
+      }
+    },
+    cleanup: () => {
+      process.off('message', messageHandler);
+    },
+  };
 }

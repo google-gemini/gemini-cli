@@ -37,6 +37,7 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
+      'packages/core/src/skills/builtin/skill-creator/scripts/*.cjs',
     ],
   },
   eslint.configs.recommended,
@@ -301,6 +302,16 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // Examples should have access to standard globals like fetch
+  {
+    files: ['packages/cli/src/commands/extensions/examples/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        fetch: 'readonly',
+      },
     },
   },
   // extra settings for scripts that we run directly with node
