@@ -58,6 +58,7 @@ import {
 import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
 
@@ -94,7 +95,13 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
+
+    coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
   }
+
+  private handleModelChanged = () => {
+    this.currentSequenceModel = null;
+  };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -251,6 +258,10 @@ export class GeminiClient {
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
+  }
+
+  dispose() {
+    coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
   }
 
   async resumeChat(
@@ -535,6 +546,15 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    const compressed = await this.tryCompressChat(prompt_id, false);
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    }
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
     const estimatedRequestTokenCount = await calculateRequestTokenCount(
@@ -543,21 +563,12 @@ export class GeminiClient {
       modelForLimitCheck,
     );
 
-    const remainingTokenCount =
-      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
-
-    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+    if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
         value: { estimatedRequestTokenCount, remainingTokenCount },
       };
       return turn;
-    }
-
-    const compressed = await this.tryCompressChat(prompt_id, false);
-
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
     // Prevent context updates from being sent while a tool call is
@@ -626,10 +637,10 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
-    this.currentSequenceModel = modelToUse;
-    if (!signal.aborted) {
+    if (!signal.aborted && !this.currentSequenceModel) {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
+    this.currentSequenceModel = modelToUse;
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     let isError = false;
     let isInvalidStream = false;
