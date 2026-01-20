@@ -96,8 +96,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.CLEAR_INPUT,
-      positive: [createKey('c', { ctrl: true })],
-      negative: [createKey('c'), createKey('k', { ctrl: true })],
+      positive: [createKey('escape')],
+      negative: [
+        createKey('c', { ctrl: true }),
+        createKey('c'),
+        createKey('k', { ctrl: true }),
+      ],
     },
     {
       command: Command.DELETE_CHAR_LEFT,

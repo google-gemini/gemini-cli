@@ -143,7 +143,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Editing
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
   [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
-  [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
+  [Command.CLEAR_INPUT]: [{ key: 'escape' }],
   // Added command (meta/alt/option) for mac compatibility
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
