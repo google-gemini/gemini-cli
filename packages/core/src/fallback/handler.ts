@@ -131,7 +131,7 @@ async function processIntent(
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
-      config.setActiveModel(fallbackModel);
+      config.activateFallbackMode(fallbackModel);
       return true;
 
     case 'retry_once':

@@ -135,10 +135,6 @@ export function useQuotaAndFallback({
         config.setQuotaErrorOccurred(false);
 
         if (choice === 'retry_always') {
-          // Set the model to the fallback model for the current session.
-          // This ensures the Footer updates and future turns use this model.
-          // The change is not persisted, so the original model is restored on restart.
-          config.activateFallbackMode(proQuotaRequest.fallbackModel);
           historyManager.addItem(
             {
               type: MessageType.INFO,

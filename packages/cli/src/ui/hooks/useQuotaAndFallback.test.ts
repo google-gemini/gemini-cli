@@ -166,11 +166,6 @@ describe('useQuotaAndFallback', () => {
         const intent = await promise!;
         expect(intent).toBe('retry_always');
 
-        // Verify activateFallbackMode was called
-        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
-          'gemini-flash',
-        );
-
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
         expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
@@ -282,11 +277,6 @@ describe('useQuotaAndFallback', () => {
           const intent = await promise!;
           expect(intent).toBe('retry_always');
 
-          // Verify activateFallbackMode was called
-          expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
-            'model-B',
-          );
-
           // The pending request should be cleared from the state
           expect(result.current.proQuotaRequest).toBeNull();
           expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(true);
@@ -341,11 +331,6 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
 
         const intent = await promise!;
         expect(intent).toBe('retry_always');
-
-        // Verify activateFallbackMode was called
-        expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
-          'gemini-2.5-pro',
-        );
 
         expect(result.current.proQuotaRequest).toBeNull();
       });
@@ -429,11 +414,6 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
       const intent = await promise!;
       expect(intent).toBe('retry_always');
       expect(result.current.proQuotaRequest).toBeNull();
-
-      // Verify activateFallbackMode was called
-      expect(mockConfig.activateFallbackMode).toHaveBeenCalledWith(
-        'gemini-flash',
-      );
 
       // Verify quota error flags are reset
       expect(mockSetModelSwitchedFromQuotaError).toHaveBeenCalledWith(false);
