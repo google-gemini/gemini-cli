@@ -33,16 +33,18 @@ export const useTurnActivityMonitor = (
     const isNowResponding = streamingState === StreamingState.Responding;
     const ptyChanged = activePtyId !== prevPtyIdRef.current;
 
-    if (isNowResponding && (ptyChanged || operationStartTime === 0)) {
-      setOperationStartTime(Date.now());
-    }
-
-    if (!isNowResponding) {
+    if (isNowResponding) {
+      if (ptyChanged) {
+        setOperationStartTime(Date.now());
+      } else {
+        setOperationStartTime((prev) => (prev === 0 ? Date.now() : prev));
+      }
+    } else {
       setOperationStartTime(0);
     }
 
     prevPtyIdRef.current = activePtyId;
-  }, [streamingState, activePtyId, operationStartTime]);
+  }, [streamingState, activePtyId]);
 
   // Detect redirection in the current query or tool calls.
   // We derive this directly during render to ensure it's accurate from the first frame.
