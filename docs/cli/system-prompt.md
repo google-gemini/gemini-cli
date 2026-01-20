@@ -13,6 +13,12 @@ sections, or customize the compression prompt.
 | `GEMINI_PROMPT_*`              | Disable or replace individual prompt sections       |
 | `GEMINI_COMPRESSION_PROMPT_MD` | Customize or disable the compression prompt         |
 
+> **Note:** The default prompts are defined in TypeScript source code
+> ([`packages/core/src/core/prompts.ts`](../../packages/core/src/core/prompts.ts)),
+> not in external `.md` files. No `.gemini/system.md` file exists by default.
+> See [Export the default prompt](#export-the-default-prompt-recommended) to
+> extract the current defaults for review or customization.
+
 ---
 
 # Full System Prompt Override (GEMINI_SYSTEM_MD)
@@ -153,15 +159,18 @@ Each section can be controlled via `GEMINI_PROMPT_<SECTION>`:
 
 ## Examples
 
+Add to `.gemini/.env` or your shell configuration:
+
 ```bash
 # Disable git instructions for non-git projects
-GEMINI_PROMPT_GIT=0 gemini
+GEMINI_PROMPT_GIT=0
 
 # Use custom core mandates from a file
-GEMINI_PROMPT_COREMANDATES=~/.gemini/my-mandates.md gemini
+GEMINI_PROMPT_COREMANDATES=~/.gemini/my-mandates.md
 
 # Disable multiple sections
-GEMINI_PROMPT_GIT=0 GEMINI_PROMPT_SANDBOX=0 gemini
+GEMINI_PROMPT_GIT=0
+GEMINI_PROMPT_SANDBOX=0
 ```
 
 If the file path does not exist, the CLI will error with:
@@ -194,12 +203,14 @@ conversation into a structured snapshot.
 
 ## Examples
 
+Add to `.gemini/.env` or your shell configuration:
+
 ```bash
 # Disable automatic compression
-GEMINI_COMPRESSION_PROMPT_MD=0 gemini
+GEMINI_COMPRESSION_PROMPT_MD=0
 
 # Use a custom compression prompt
-GEMINI_COMPRESSION_PROMPT_MD=~/prompts/my-compression.md gemini
+GEMINI_COMPRESSION_PROMPT_MD=~/prompts/my-compression.md
 ```
 
 If the file path does not exist, the CLI will error with:
