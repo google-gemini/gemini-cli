@@ -2037,9 +2037,8 @@ export class Config {
    */
   async dispose(): Promise<void> {
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-    if (this.agentRegistry) {
-      this.agentRegistry.dispose();
-    }
+    this.agentRegistry?.dispose();
+    this.geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }
