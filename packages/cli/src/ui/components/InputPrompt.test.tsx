@@ -1901,6 +1901,11 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        {
+          uiState: {
+            history: [{ id: 1, type: 'user', text: 'test' }],
+          },
+        },
       );
 
       await act(async () => {
@@ -1912,7 +1917,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should clear the buff on esc esc if it has text', async () => {
+    it('should clear the buffer on esc esc if it has text', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('some text');

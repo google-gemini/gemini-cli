@@ -44,7 +44,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
-  if (uiState.showEscapePrompt) {
+  if (uiState.showEscapePrompt && uiState.history.length > 0) {
     const isPromptEmpty = uiState.buffer.text.length === 0;
     return (
       <Text color={theme.text.secondary}>

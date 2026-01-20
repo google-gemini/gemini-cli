@@ -138,7 +138,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId } = useUIState();
+  const { mainAreaWidth, activePtyId, history } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -511,8 +511,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (keyMatchers[Command.ESCAPE](key) && buffer.text.length > 0) {
             buffer.setText('');
             resetCompletionState();
-          } else {
-            onSubmit('/rewind');
+          } else if (keyMatchers[Command.ESCAPE](key)) {
+            if (history.length > 0) {
+              onSubmit('/rewind');
+            }
           }
         }
         return;
@@ -885,6 +887,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
+      history,
     ],
   );
 

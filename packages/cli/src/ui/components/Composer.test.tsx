@@ -389,6 +389,7 @@ describe('Composer', () => {
     it('shows escape prompt when showEscapePrompt is true', () => {
       const uiState = createMockUIState({
         showEscapePrompt: true,
+        history: [{ id: 1, type: 'user', text: 'test' }],
       });
 
       const { lastFrame } = renderComposer(uiState);
