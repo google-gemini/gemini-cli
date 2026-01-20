@@ -379,6 +379,13 @@ export class ChatCompressionService {
     ).trim();
 
     if (!finalSummary) {
+      logChatCompression(
+        config,
+        makeChatCompressionEvent({
+          tokens_before: originalTokenCount,
+          tokens_after: originalTokenCount, // No change since it failed
+        }),
+      );
       return {
         newHistory: null,
         info: {
