@@ -30,7 +30,7 @@ export async function runDeferredCommand(settings: MergedSettings) {
   const commandName = deferredCommand.commandName;
 
   if (commandName === 'mcp' && adminSettings?.mcp?.enabled === false) {
-    debugLogger.error('MCP commands are disabled by admin policy.');
+    debugLogger.error('Error: MCP is disabled by your admin.');
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
@@ -39,13 +39,13 @@ export async function runDeferredCommand(settings: MergedSettings) {
     commandName === 'extensions' &&
     adminSettings?.extensions?.enabled === false
   ) {
-    debugLogger.error('Extensions commands are disabled by admin policy.');
+    debugLogger.error('Error: Extensions are disabled by your admin.');
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
   if (commandName === 'skills' && adminSettings?.skills?.enabled === false) {
-    debugLogger.error('Skills commands are disabled by admin policy.');
+    debugLogger.error('Error: Agent skills are disabled by your admin.');
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }

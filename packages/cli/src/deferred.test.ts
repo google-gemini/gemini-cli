@@ -89,7 +89,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'MCP commands are disabled by admin policy.',
+        'Error: MCP is disabled by your admin.',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -106,7 +106,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Extensions commands are disabled by admin policy.',
+        'Error: Extensions are disabled by your admin.',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -123,7 +123,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Skills commands are disabled by admin policy.',
+        'Error: Agent skills are disabled by your admin.',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -195,7 +195,7 @@ describe('deferred', () => {
       await runDeferredCommand(mcpSettings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'MCP commands are disabled by admin policy.',
+        'Error: MCP is disabled by your admin.',
       );
     });
 
