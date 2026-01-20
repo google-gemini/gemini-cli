@@ -626,10 +626,10 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
-    this.currentSequenceModel = modelToUse;
-    if (!signal.aborted) {
+    if (!signal.aborted && !this.currentSequenceModel) {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
+    this.currentSequenceModel = modelToUse;
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     let isError = false;
     let isInvalidStream = false;
