@@ -15,7 +15,7 @@ import type { Config } from '@google/gemini-cli-core';
 vi.mock('../../utils/persistentState.js', () => ({
   persistentState: {
     get: vi.fn().mockImplementation((key) => {
-      if (key === 'tipsShown') return false;
+      if (key === 'tipsShown') return 0;
       if (key === 'defaultBannerShownCount') return {};
       return undefined;
     }),

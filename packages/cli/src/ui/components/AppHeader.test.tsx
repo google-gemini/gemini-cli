@@ -133,16 +133,7 @@ describe('<AppHeader />', () => {
   });
 
   it('should not render the default banner if shown count is 5 or more', () => {
-    persistentStateMock.get.mockImplementation((key) => {
-      if (key === 'defaultBannerShownCount') {
-        const hash = crypto
-          .createHash('sha256')
-          .update('This is the default banner')
-          .digest('hex');
-        return { [hash]: 5 };
-      }
-      return undefined;
-    });
+    persistentStateMock.get.mockReturnValue(5);
 
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -211,10 +202,10 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render Tips when tipsShown is false', () => {
+  it('should render Tips when tipsShown is less than 10', () => {
     persistentStateMock.get.mockImplementation((key) => {
-      if (key === 'tipsShown') return false;
-      return {};
+      if (key === 'tipsShown') return 5;
+      return undefined;
     });
 
     const mockConfig = makeFakeConfig();
@@ -232,15 +223,14 @@ describe('<AppHeader />', () => {
     );
 
     expect(lastFrame()).toContain('Tips');
-
-    expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', true);
+    expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', 6);
     unmount();
   });
 
-  it('should NOT render Tips when tipsShown is true', () => {
+  it('should NOT render Tips when tipsShown is 10 or more', () => {
     persistentStateMock.get.mockImplementation((key) => {
-      if (key === 'tipsShown') return true;
-      return {};
+      if (key === 'tipsShown') return 10;
+      return undefined;
     });
 
     const mockConfig = makeFakeConfig();
@@ -253,8 +243,10 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should show tips on the first run and hide them on the second run (persistence flow)', () => {
-    const fakeStore: Record<string, boolean> = {};
+  it('should show tips until they have been shown 10 times (persistence flow)', () => {
+    const fakeStore: Record<string, number> = {
+      tipsShown: 9,
+    };
 
     persistentStateMock.get.mockImplementation((key) => fakeStore[key]);
     persistentStateMock.set.mockImplementation((key, val) => {
@@ -276,9 +268,7 @@ describe('<AppHeader />', () => {
     });
 
     expect(session1.lastFrame()).toContain('Tips');
-
-    expect(fakeStore['tipsShown']).toBe(true);
-
+    expect(fakeStore['tipsShown']).toBe(10);
     session1.unmount();
 
     const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
@@ -286,7 +276,6 @@ describe('<AppHeader />', () => {
     });
 
     expect(session2.lastFrame()).not.toContain('Tips');
-
     session2.unmount();
   });
 });

@@ -12,10 +12,17 @@ import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { useIsScreenReaderEnabled } from 'ink';
 import * as fs from 'node:fs/promises';
 import { act } from 'react';
+import { persistentState } from '../../utils/persistentState.js';
 
 // Mock dependencies
 vi.mock('../contexts/AppContext.js');
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('../../utils/persistentState.js', () => ({
+  persistentState: {
+    get: vi.fn(),
+    set: vi.fn(),
+  },
+}));
 vi.mock('ink', async () => {
   const actual = await vi.importActual('ink');
   return {
@@ -30,6 +37,7 @@ vi.mock('node:fs/promises', async () => {
     access: vi.fn(),
     writeFile: vi.fn(),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
   };
 });
 vi.mock('node:os', () => ({
@@ -68,7 +76,9 @@ describe('Notifications', () => {
   const mockUseUIState = vi.mocked(useUIState);
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
   const mockFsAccess = vi.mocked(fs.access);
-  const mockFsWriteFile = vi.mocked(fs.writeFile);
+  const mockFsUnlink = vi.mocked(fs.unlink);
+  const mockPersistentStateGet = vi.mocked(persistentState.get);
+  const mockPersistentStateSet = vi.mocked(persistentState.set);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,6 +92,7 @@ describe('Notifications', () => {
       updateInfo: null,
     } as unknown as UIState);
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
+    mockPersistentStateGet.mockReturnValue(undefined);
   });
 
   it('renders nothing when no notifications', () => {
@@ -134,51 +145,45 @@ describe('Notifications', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders screen reader nudge when enabled and not seen', async () => {
+  it('renders screen reader nudge when enabled and not seen (no legacy file)', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
-
-    let rejectAccess: (err: Error) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          rejectAccess = reject;
-        }),
-    );
+    mockPersistentStateGet.mockReturnValue(false);
+    mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
     const { lastFrame } = render(<Notifications />);
 
-    // Trigger rejection inside act
-    await act(async () => {
-      rejectAccess(new Error('File not found'));
-    });
-
-    // Wait for effect to propagate
-    await vi.waitFor(() => {
-      expect(mockFsWriteFile).toHaveBeenCalled();
-    });
-
-    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toContain('screen reader-friendly view');
+    expect(mockPersistentStateSet).toHaveBeenCalledWith(
+      'hasSeenScreenReaderNudge',
+      true,
+    );
   });
 
-  it('does not render screen reader nudge when already seen', async () => {
+  it('migrates legacy screen reader nudge file', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    mockPersistentStateGet.mockReturnValue(undefined);
+    mockFsAccess.mockResolvedValue(undefined);
 
-    let resolveAccess: (val: undefined) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveAccess = resolve;
-        }),
-    );
+    render(<Notifications />);
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(mockPersistentStateSet).toHaveBeenCalledWith(
+          'hasSeenScreenReaderNudge',
+          true,
+        );
+        expect(mockFsUnlink).toHaveBeenCalled();
+      });
+    });
+  });
+
+  it('does not render screen reader nudge when already seen in persistent state', async () => {
+    mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    mockPersistentStateGet.mockReturnValue(true);
 
     const { lastFrame } = render(<Notifications />);
 
-    // Trigger resolution inside act
-    await act(async () => {
-      resolveAccess(undefined);
-    });
-
     expect(lastFrame()).toBe('');
-    expect(mockFsWriteFile).not.toHaveBeenCalled();
+    expect(mockPersistentStateSet).not.toHaveBeenCalled();
   });
 });
