@@ -22,16 +22,41 @@ export function resolveEnvVarsInString(
   customEnv?: Record<string, string>,
 ): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    const varName = varName1 || varName2;
-    if (customEnv && typeof customEnv[varName] === 'string') {
-      return customEnv[varName];
-    }
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName];
-    }
-    return match;
-  });
+  return value.replace(
+    envVarRegex,
+    (
+      match: string,
+      varName1: string | undefined,
+      varName2: string | undefined,
+    ): string => {
+      let varName = varName1 || varName2;
+      let defaultValue: string | undefined = undefined;
+      // Handle ${VAR_NAME:-default} format
+      if (varName2 && varName2.includes(':-')) {
+        const parts = varName2.split(':-');
+        varName = parts[0];
+        defaultValue = parts.slice(1).join(':-');
+      }
+
+      if (!varName) {
+        return match;
+      }
+
+      if (customEnv && typeof customEnv[varName] === 'string') {
+        return customEnv[varName];
+      }
+
+      if (process && process.env && typeof process.env[varName] === 'string') {
+        return process.env[varName] as string;
+      }
+
+      if (defaultValue !== undefined) {
+        return defaultValue;
+      }
+
+      return match;
+    },
+  );
 }
 
 /**

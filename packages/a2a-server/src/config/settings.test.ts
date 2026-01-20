@@ -203,4 +203,20 @@ describe('loadSettings', () => {
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
   });
+
+  it('should resolve environment variables in settings', () => {
+    process.env['TEST_ENV_VAR'] = 'env-value';
+    const settings = {
+      coreTools: [
+        '$TEST_ENV_VAR',
+        '${TEST_ENV_VAR}',
+        '${UNDEFINED_VAR:-default}',
+      ],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['env-value', 'env-value', 'default']);
+    delete process.env['TEST_ENV_VAR'];
+  });
 });

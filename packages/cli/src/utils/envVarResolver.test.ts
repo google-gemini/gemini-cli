@@ -46,6 +46,30 @@ describe('resolveEnvVarsInString', () => {
     expect(result).toBe('URL: http://localhost:3000/api');
   });
 
+  it('should resolve ${VAR_NAME:-default} format', () => {
+    process.env['TEST_VAR'] = 'test-value';
+    expect(resolveEnvVarsInString('Value is ${TEST_VAR:-default}')).toBe(
+      'Value is test-value',
+    );
+
+    delete process.env['TEST_VAR'];
+    expect(resolveEnvVarsInString('Value is ${TEST_VAR:-default}')).toBe(
+      'Value is default',
+    );
+  });
+
+  it('should handle empty default value in ${VAR_NAME:-} format', () => {
+    delete process.env['TEST_VAR'];
+    expect(resolveEnvVarsInString('Value is ${TEST_VAR:-}')).toBe('Value is ');
+  });
+
+  it('should handle multiple colons in default value', () => {
+    delete process.env['TEST_VAR'];
+    expect(resolveEnvVarsInString('Value is ${TEST_VAR:-val1:-val2}')).toBe(
+      'Value is val1:-val2',
+    );
+  });
+
   it('should leave undefined variables unchanged', () => {
     const result = resolveEnvVarsInString('Value is $UNDEFINED_VAR');
 
