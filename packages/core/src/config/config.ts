@@ -379,6 +379,7 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableAgents?: boolean;
+  enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
@@ -490,6 +491,7 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
+  private compressionTruncationCounter = 0;
   private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
@@ -530,6 +532,7 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
+  private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
@@ -617,6 +620,8 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.planEnabled = params.plan ?? false;
+    this.enableEventDrivenScheduler =
+      params.enableEventDrivenScheduler ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -1519,6 +1524,10 @@ export class Config {
     return this.enableAgents;
   }
 
+  isEventDrivenSchedulerEnabled(): boolean {
+    return this.enableEventDrivenScheduler;
+  }
+
   getNoBrowser(): boolean {
     return this.noBrowser;
   }
@@ -1584,6 +1593,8 @@ export class Config {
     if (this.compressionThreshold) {
       return this.compressionThreshold;
     }
+
+    await this.ensureExperimentsLoaded();
 
     const remoteThreshold =
       this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
@@ -1764,6 +1775,10 @@ export class Config {
 
   getTruncateToolOutputLines(): number {
     return this.truncateToolOutputLines;
+  }
+
+  getNextCompressionTruncationId(): number {
+    return ++this.compressionTruncationCounter;
   }
 
   getUseWriteTodos(): boolean {
