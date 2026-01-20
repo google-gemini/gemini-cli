@@ -575,7 +575,10 @@ export class Task {
       EDIT_TOOL_NAMES.has(request.name),
     );
 
-    if (restorableToolCalls.length > 0) {
+    if (
+      restorableToolCalls.length > 0 &&
+      this.config.getCheckpointingEnabled()
+    ) {
       const gitService = await this.config.getGitService();
       if (gitService) {
         const { checkpointsToWrite, toolCallToCheckpointMap, errors } =
