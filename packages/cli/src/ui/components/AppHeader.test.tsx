@@ -26,7 +26,7 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockReturnValue({});
+    persistentStateMock.get.mockReturnValue(undefined);
   });
 
   it('should render the banner with default text', () => {
