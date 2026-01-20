@@ -451,7 +451,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getCliVersion(),
+    clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
 
@@ -654,7 +654,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
-    clientVersion: await getCliVersion(),
+    clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
