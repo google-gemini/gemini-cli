@@ -54,10 +54,10 @@ export async function handleUpdate(args: UpdateArgs) {
         }
 
         const installedExtensions = extensions
-          .map((extension) => extensionManager.toOutputString(extension))
-          .join('\n\n');
+          .map((extension) => `${extension.name} (${extension.version})`)
+          .join('\n');
         debugLogger.log(
-          `Extension "${args.name}" not found.\n\nInstalled extensions:\n\n${installedExtensions}`,
+          `Extension "${args.name}" not found.\n\nInstalled extensions:\n${installedExtensions}\n\nRun "gemini extensions list" for details.`,
         );
         return;
       }
@@ -75,7 +75,6 @@ export async function handleUpdate(args: UpdateArgs) {
         debugLogger.log(`Extension "${args.name}" is already up to date.`);
         return;
       }
-      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
       const updatedExtensionInfo = (await updateExtension(
         extension,
         extensionManager,

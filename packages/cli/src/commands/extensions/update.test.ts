@@ -93,15 +93,12 @@ describe('extensions update command', () => {
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue(extensions);
-      mockExtensionManager.prototype.toOutputString = vi.fn(
-        (ext) => `${ext.name}@${ext.version}`,
-      );
 
       await handleUpdate({ name: 'missing-extension' });
 
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
-        'Extension "missing-extension" not found.\n\nInstalled extensions:\n\next1@1.0.0\n\next2@2.0.0',
+        'Extension "missing-extension" not found.\n\nInstalled extensions:\next1 (1.0.0)\next2 (2.0.0)\n\nRun "gemini extensions list" for details.',
       );
       expect(mockUpdateExtension).not.toHaveBeenCalled();
       mockCwd.mockRestore();
