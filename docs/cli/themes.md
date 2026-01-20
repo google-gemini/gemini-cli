@@ -86,7 +86,6 @@ color keys. For example:
 - `Gray`
 - `DiffAdded` (optional, for added lines in diffs)
 - `DiffRemoved` (optional, for removed lines in diffs)
-- `DiffModified` (optional, for modified lines in diffs)
 
 You can also override individual UI text roles by adding a nested `text` object.
 This object supports the keys `primary`, `secondary`, `link`, `accent`, and
@@ -157,7 +156,6 @@ custom theme defined in `settings.json`.
   "Gray": "#ABB2BF",
   "DiffAdded": "#A6E3A1",
   "DiffRemoved": "#F38BA8",
-  "DiffModified": "#89B4FA",
   "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
 }
 ```
