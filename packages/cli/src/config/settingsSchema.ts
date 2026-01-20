@@ -2143,8 +2143,8 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'] extends readonly unknown[]
-          ? Array<T[K]['default'][number]>
+        : T[K]['default'] extends ReadonlyArray<infer U>
+          ? U[]
           : T[K]['default'];
 };
 
