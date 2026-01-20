@@ -6,7 +6,10 @@
 
 import { it } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
+import { createUnauthorizedToolError } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
 
@@ -32,8 +35,40 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
     try {
-      await rig.setup(evalCase.name, evalCase.params);
+      rig.setup(evalCase.name, evalCase.params);
+
+      if (evalCase.files) {
+        for (const [filePath, content] of Object.entries(evalCase.files)) {
+          const fullPath = path.join(rig.testDir!, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+          fs.writeFileSync(fullPath, content);
+        }
+
+        const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
+        execSync('git init', execOptions);
+        execSync('git config user.email "test@example.com"', execOptions);
+        execSync('git config user.name "Test User"', execOptions);
+
+        // Temporarily disable the interactive editor and git pager
+        // to avoid hanging the tests. It seems the the agent isn't
+        // consistently honoring the instructions to avoid interactive
+        // commands.
+        execSync('git config core.editor "true"', execOptions);
+        execSync('git config core.pager "cat"', execOptions);
+        execSync('git add .', execOptions);
+        execSync('git commit --allow-empty -m "Initial commit"', execOptions);
+      }
+
       const result = await rig.run({ args: evalCase.prompt });
+
+      const unauthorizedErrorPrefix =
+        createUnauthorizedToolError('').split("'")[0];
+      if (result.includes(unauthorizedErrorPrefix)) {
+        throw new Error(
+          'Test failed due to unauthorized tool call in output: ' + result,
+        );
+      }
+
       await evalCase.assert(rig, result);
     } finally {
       await logToFile(
@@ -44,7 +79,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     }
   };
 
-  if (policy === 'USUALLY_PASSES' && !process.env.RUN_EVALS) {
+  if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
     it.skip(evalCase.name, fn);
   } else {
     it(evalCase.name, fn);
@@ -55,6 +90,7 @@ export interface EvalCase {
   name: string;
   params?: Record<string, any>;
   prompt: string;
+  files?: Record<string, string>;
   assert: (rig: TestRig, result: string) => Promise<void>;
 }
 
