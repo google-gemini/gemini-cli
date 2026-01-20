@@ -300,18 +300,18 @@ export const AppContainer = (props: AppContainerProps) => {
         .getHookSystem()
         ?.fireSessionStartEvent(sessionStartSource);
 
-      if (result?.finalOutput) {
-        if (result.finalOutput?.systemMessage) {
+      if (result) {
+        if (result.systemMessage) {
           historyManager.addItem(
             {
               type: MessageType.INFO,
-              text: result.finalOutput.systemMessage,
+              text: result.systemMessage,
             },
             Date.now(),
           );
         }
 
-        const additionalContext = result.finalOutput.getAdditionalContext();
+        const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
@@ -708,7 +708,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
-    shellConfirmationRequest,
     confirmationRequest,
   } = useSlashCommandProcessor(
     config,
@@ -1358,7 +1357,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useKeypress(handleGlobalKeypress, { isActive: true });
 
-  // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
     // Respect hideWindowTitle settings
     if (settings.merged.ui.hideWindowTitle) return;
@@ -1366,10 +1364,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming:
-        !!shellConfirmationRequest ||
-        !!confirmationRequest ||
-        showShellActionRequired,
+      isConfirming: !!confirmationRequest || showShellActionRequired,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
@@ -1384,7 +1379,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    shellConfirmationRequest,
     confirmationRequest,
     showShellActionRequired,
     settings.merged.ui.showStatusInTitle,
@@ -1463,7 +1457,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
-    !!shellConfirmationRequest ||
     !!confirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
@@ -1558,7 +1551,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
@@ -1650,7 +1642,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      shellConfirmationRequest,
       confirmationRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
