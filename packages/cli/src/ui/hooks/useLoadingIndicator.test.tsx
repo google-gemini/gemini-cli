@@ -15,6 +15,7 @@ import {
 } from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import type { RetryAttemptPayload } from '@google/gemini-cli-core';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -32,22 +33,26 @@ describe('useLoadingIndicator', () => {
     initialStreamingState: StreamingState,
     initialIsInteractiveShellWaiting: boolean = false,
     initialLastOutputTime: number = 0,
+    initialRetryStatus: RetryAttemptPayload | null = null,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
       isInteractiveShellWaiting,
       lastOutputTime,
+      retryStatus,
     }: {
       streamingState: StreamingState;
       isInteractiveShellWaiting?: boolean;
       lastOutputTime?: number;
+      retryStatus?: RetryAttemptPayload | null;
     }) {
       hookResult = useLoadingIndicator(
         streamingState,
         undefined,
         isInteractiveShellWaiting,
         lastOutputTime,
+        retryStatus,
       );
       return null;
     }
@@ -56,6 +61,7 @@ describe('useLoadingIndicator', () => {
         streamingState={initialStreamingState}
         isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
         lastOutputTime={initialLastOutputTime}
+        retryStatus={initialRetryStatus}
       />,
     );
     return {
@@ -68,6 +74,7 @@ describe('useLoadingIndicator', () => {
         streamingState: StreamingState;
         isInteractiveShellWaiting?: boolean;
         lastOutputTime?: number;
+        retryStatus?: RetryAttemptPayload | null;
       }) => rerender(<TestComponent {...newProps} />),
     };
   };
@@ -205,5 +212,24 @@ describe('useLoadingIndicator', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.elapsedTime).toBe(0);
+  });
+
+  it('should reflect retry status in currentLoadingPhrase when provided', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
+      maxAttempts: 3,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      0,
+      retryStatus,
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Trying to reach gemini-pro (Attempt 2/3)',
+    );
   });
 });

@@ -14,11 +14,7 @@ import { StreamingState } from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
 import { AppContext, type AppState } from './contexts/AppContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import {
-  type SettingScope,
-  LoadedSettings,
-  type SettingsFile,
-} from '../config/settings.js';
+import { LoadedSettings, type SettingsFile } from '../config/settings.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -92,7 +88,7 @@ describe('App', () => {
     mockSettingsFile,
     mockSettingsFile,
     true,
-    new Set<SettingScope>(),
+    [],
   );
 
   const mockAppState: AppState = {
@@ -140,7 +136,7 @@ describe('App', () => {
       pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
     } as UIState;
 
-    mockLoadedSettings.merged.ui = { useAlternateBuffer: true };
+    mockLoadedSettings.merged.ui.useAlternateBuffer = true;
 
     const { lastFrame } = renderWithProviders(<App />, quittingUIState);
 
@@ -148,7 +144,7 @@ describe('App', () => {
     expect(lastFrame()).toContain('Quitting...');
 
     // Reset settings
-    mockLoadedSettings.merged.ui = { useAlternateBuffer: false };
+    mockLoadedSettings.merged.ui.useAlternateBuffer = false;
   });
 
   it('should render dialog manager when dialogs are visible', () => {

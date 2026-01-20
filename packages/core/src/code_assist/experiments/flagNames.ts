@@ -10,6 +10,7 @@ export const ExperimentFlags = {
   BANNER_TEXT_NO_CAPACITY_ISSUES: 45740199,
   BANNER_TEXT_CAPACITY_ISSUES: 45740200,
   ENABLE_PREVIEW: 45740196,
+  ENABLE_ADMIN_CONTROLS: 45752213,
 } as const;
 
 export type ExperimentFlagName =

@@ -58,6 +58,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
@@ -70,6 +71,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
@@ -126,7 +128,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -136,7 +138,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     );
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -218,6 +220,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
         getPreviewFeatures: vi.fn().mockReturnValue(false),

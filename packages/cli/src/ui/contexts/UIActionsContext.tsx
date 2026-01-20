@@ -56,6 +56,8 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  setAuthContext: (context: { requiresRestart?: boolean }) => void;
+  handleRestart: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

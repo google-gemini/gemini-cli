@@ -80,6 +80,7 @@ export function resolvePathFromEnv(envVar?: string): {
 export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
+  interactiveOverride?: boolean,
 ): string {
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
@@ -115,7 +116,7 @@ export function getCoreSystemPrompt(
 
   const mandatesVariant = isGemini3
     ? `
-- **Do not call tools in silence:** You must provide to the user very short and concise natural explanation (one sentence) before calling tools.`
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.`
     : ``;
 
   const enableCodebaseInvestigator = config
@@ -128,7 +129,7 @@ export function getCoreSystemPrompt(
     .getAllToolNames()
     .includes(WriteTodosTool.Name);
 
-  const interactiveMode = config.isInteractive();
+  const interactiveMode = interactiveOverride ?? config.isInteractive();
 
   const skills = config.getSkillManager().getSkills();
   let skillsPrompt = '';
@@ -217,7 +218,7 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`,
       primaryWorkflows_suffix: `3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
-4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands.
+4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards.${interactiveMode ? " If unsure about these commands, you can ask the user if they'd like you to run them and if so how to." : ''}
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
 
@@ -271,7 +272,8 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.${(function () {
         if (isGemini3) {
-          return '';
+          return `
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.`;
         } else {
           return `
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
@@ -291,10 +293,10 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 ${(function () {
   if (interactiveMode) {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Prefer non-interactive commands when it makes sense; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
   } else {
     return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Only execute non-interactive commands.`;
+- **Interactive Commands:** Only execute non-interactive commands. e.g.: use 'git --no-pager'`;
   }
 })()}
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.${interactiveMode ? ` If unsure whether to save something, you can ask the user, "Should I remember that for you?"` : ''}
@@ -332,6 +334,9 @@ ${(function () {
     return `
 # Git Repository
 - The current working (project) directory is being managed by a git repository.
+- **NEVER** stage or commit your changes, unless you are explicitly instructed to commit. For example:
+  - "Commit the change" -> add changed files and commit.
+  - "Wrap up this PR for me" -> do not commit.
 - When asked to commit changes or prepare a commit, always start by gathering information using shell commands:
   - \`git status\` to ensure that all relevant files are tracked and staged, using \`git add ...\` as needed.
   - \`git diff HEAD\` to review all changes (including unstaged changes) to tracked files in work tree since last commit.
