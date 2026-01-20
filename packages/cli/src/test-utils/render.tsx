@@ -9,6 +9,7 @@ import { Box } from 'ink';
 import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
+export { act };
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';

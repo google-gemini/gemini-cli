@@ -20,6 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
+import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,
@@ -1274,8 +1275,12 @@ describe('AppContainer State Management', () => {
           pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
           cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [],
+          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          lastOutputTime: 0,
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime + 100, // Trigger aggressive delay
+          retryStatus: null,
         });
 
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
@@ -1305,6 +1310,81 @@ describe('AppContainer State Management', () => {
         );
         const lastTitle = titleWritesDelayed[titleWritesDelayed.length - 1][0];
         expect(lastTitle).toContain('✋  Action Required');
+
+        unmount();
+      });
+
+      it('should show Working… in title for redirected commands after 2 mins', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with redirection active
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [
+            {
+              request: {
+                name: 'run_shell_command',
+                args: { command: 'ls > out' },
+              },
+              status: 'executing',
+            } as unknown as TrackedToolCall,
+          ],
+          handleApprovalModeChange: vi.fn(),
+          activePtyId: 'pty-1',
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime,
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds - should still NOT be Action Required
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWritesMid = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesMid[titleWritesMid.length - 1][0]).not.toContain(
+          '✋  Action Required',
+        );
+
+        // Fast-forward to 2 minutes (120000ms)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60000);
+        });
+
+        const titleWritesEnd = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesEnd[titleWritesEnd.length - 1][0]).toContain(
+          '⏲  Working…',
+        );
 
         unmount();
       });
