@@ -83,12 +83,14 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  startupMessages?: string[];
 }
 
 export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
+  const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)
     .locale('en')
     .scriptName('gemini')
@@ -334,6 +336,9 @@ export async function parseArguments(
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
     if (process.stdin.isTTY) {
+      startupMessages.push(
+        'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
+      );
       result['promptInteractive'] = q;
     } else {
       result['prompt'] = q;
@@ -342,6 +347,7 @@ export async function parseArguments(
 
   // Keep CliArgs.query as a string for downstream typing
   (result as Record<string, unknown>)['query'] = q || undefined;
+  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument

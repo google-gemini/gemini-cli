@@ -357,6 +357,21 @@ describe('parseArguments', () => {
         }
       },
     );
+
+    it('should include a startup message when converting positional query to interactive prompt', async () => {
+      const originalIsTTY = process.stdin.isTTY;
+      process.stdin.isTTY = true;
+      process.argv = ['node', 'script.js', 'hello'];
+
+      try {
+        const argv = await parseArguments(createTestMergedSettings());
+        expect(argv.startupMessages).toContain(
+          'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
+        );
+      } finally {
+        process.stdin.isTTY = originalIsTTY;
+      }
+    });
   });
 
   it.each([
