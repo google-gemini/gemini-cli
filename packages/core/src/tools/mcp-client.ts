@@ -122,6 +122,7 @@ export class McpClient {
     private readonly workspaceContext: WorkspaceContext,
     private readonly cliConfig: Config,
     private readonly debugMode: boolean,
+    private readonly clientVersion: string,
     private readonly onToolsUpdated?: (signal?: AbortSignal) => Promise<void>,
   ) {}
 
@@ -137,6 +138,7 @@ export class McpClient {
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
       this.client = await connectToMcpServer(
+        this.clientVersion,
         this.serverName,
         this.serverConfig,
         this.debugMode,
@@ -715,6 +717,7 @@ async function createTransportWithOAuth(
  */
 
 export async function discoverMcpTools(
+  clientVersion: string,
   mcpServers: Record<string, MCPServerConfig>,
   mcpServerCommand: string | undefined,
   toolRegistry: ToolRegistry,
@@ -730,6 +733,7 @@ export async function discoverMcpTools(
     const discoveryPromises = Object.entries(mcpServers).map(
       ([mcpServerName, mcpServerConfig]) =>
         connectAndDiscover(
+          clientVersion,
           mcpServerName,
           mcpServerConfig,
           toolRegistry,
@@ -808,6 +812,7 @@ export function populateMcpServerCommand(
  * @returns Promise that resolves when discovery is complete
  */
 export async function connectAndDiscover(
+  clientVersion: string,
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   toolRegistry: ToolRegistry,
@@ -821,6 +826,7 @@ export async function connectAndDiscover(
   let mcpClient: Client | undefined;
   try {
     mcpClient = await connectToMcpServer(
+      clientVersion,
       mcpServerName,
       mcpServerConfig,
       debugMode,
@@ -1331,6 +1337,7 @@ async function retryWithOAuth(
  * @throws An error if the connection fails or the configuration is invalid.
  */
 export async function connectToMcpServer(
+  clientVersion: string,
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
@@ -1340,7 +1347,7 @@ export async function connectToMcpServer(
   const mcpClient = new Client(
     {
       name: 'gemini-cli-mcp-client',
-      version: '0.0.1',
+      version: clientVersion,
     },
     {
       // Use a tolerant validator so bad output schemas don't block discovery.
