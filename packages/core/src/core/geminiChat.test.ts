@@ -1344,6 +1344,60 @@ describe('GeminiChat', () => {
         ).toHaveBeenCalledTimes(1);
       });
 
+      it('should remove function response AND preceding function call on 400 error', async () => {
+        // Set up history with a user message and model function call
+        const initialUserMessage: Content = {
+          role: 'user',
+          parts: [{ text: 'Call a tool for me' }],
+        };
+        const modelFunctionCall: Content = {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        };
+        chat.addHistory(initialUserMessage);
+        chat.addHistory(modelFunctionCall);
+
+        // Verify initial history state
+        expect(chat.getHistory().length).toBe(2);
+
+        const error400 = new ApiError({ message: 'Bad Request', status: 400 });
+        vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+          error400,
+        );
+
+        // Send a function response that will fail with 400
+        const functionResponse = [
+          {
+            functionResponse: {
+              name: 'test_tool',
+              response: { invalid: 'data' },
+            },
+          },
+        ];
+
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-2.5-flash' },
+          functionResponse,
+          'prompt-id-400-fn',
+          new AbortController().signal,
+        );
+
+        await expect(
+          (async () => {
+            for await (const _ of stream) {
+              /* consume stream */
+            }
+          })(),
+        ).rejects.toThrow(error400);
+
+        // History should only contain the initial user message.
+        // Both the function response AND the model's function call should be removed
+        // to avoid a dangling function call state.
+        const history = chat.getHistory();
+        expect(history.length).toBe(1);
+        expect(history[0]).toEqual(initialUserMessage);
+      });
+
       it('should retry on 429 Rate Limit errors', async () => {
         const error429 = new ApiError({ message: 'Rate Limited', status: 429 });
 

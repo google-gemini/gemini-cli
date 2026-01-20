@@ -41,7 +41,10 @@ import {
   ContentRetryFailureEvent,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
+import {
+  isFunctionResponse,
+  isFunctionCall,
+} from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
@@ -387,8 +390,7 @@ export class GeminiChat {
             );
 
             if (isConnectionPhase && !isRetryable) {
-              // Remove failed user content to not break subsequent requests
-              this.history.pop();
+              this.popFailedUserContent();
               throw error;
             }
 
@@ -432,8 +434,7 @@ export class GeminiChat {
               new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
             );
           }
-          // Remove failed user content so it doesn't break subsequent requests
-          this.history.pop();
+          this.popFailedUserContent();
           throw lastError;
         }
       } finally {
@@ -676,6 +677,21 @@ export class GeminiChat {
    */
   clearHistory(): void {
     this.history = [];
+  }
+
+  /**
+   * Removes failed user content from history. If the content was a function
+   * response, also removes the preceding model function call to keep
+   * history consistent (avoids dangling function call state).
+   */
+  private popFailedUserContent(): void {
+    const popped = this.history.pop();
+    if (popped && isFunctionResponse(popped)) {
+      const prev = this.history[this.history.length - 1];
+      if (prev && isFunctionCall(prev)) {
+        this.history.pop();
+      }
+    }
   }
 
   /**
