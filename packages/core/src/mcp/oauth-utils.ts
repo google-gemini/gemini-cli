@@ -6,6 +6,17 @@
 
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
+
+/**
+ * Error thrown when the discovered resource metadata does not match the expected resource.
+ */
+export class ResourceMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResourceMismatchError';
+  }
+}
 
 /**
  * OAuth authorization server metadata as per RFC 8414.
@@ -36,6 +47,8 @@ export interface OAuthProtectedResourceMetadata {
   resource_encryption_alg_values_supported?: string[];
   resource_encryption_enc_values_supported?: string[];
 }
+
+export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
 /**
  * Utility class for common OAuth operations.
@@ -94,7 +107,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthProtectedResourceMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch protected resource metadata from ${resourceMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -117,7 +130,7 @@ export class OAuthUtils {
       }
       return (await response.json()) as OAuthAuthorizationServerMetadata;
     } catch (error) {
-      console.debug(
+      debugLogger.debug(
         `Failed to fetch authorization server metadata from ${authServerMetadataUrl}: ${getErrorMessage(error)}`,
       );
       return null;
@@ -205,7 +218,7 @@ export class OAuthUtils {
       }
     }
 
-    console.debug(
+    debugLogger.debug(
       `Metadata discovery failed for authorization server ${authServerUrl}`,
     );
     return null;
@@ -240,6 +253,18 @@ export class OAuthUtils {
         }
       }
 
+      if (resourceMetadata) {
+        // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
+        // it is using as the prefix for the metadata request exactly matches the value
+        // of the resource metadata parameter in the protected resource metadata document.
+        const expectedResource = this.buildResourceParameter(serverUrl);
+        if (resourceMetadata.resource !== expectedResource) {
+          throw new ResourceMismatchError(
+            `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+          );
+        }
+      }
+
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
@@ -249,7 +274,7 @@ export class OAuthUtils {
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
           if (authServerMetadata.registration_endpoint) {
-            console.log(
+            debugLogger.log(
               'Dynamic client registration is supported at:',
               authServerMetadata.registration_endpoint,
             );
@@ -259,14 +284,14 @@ export class OAuthUtils {
       }
 
       // Fallback: try well-known endpoints at the base URL
-      console.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
+      debugLogger.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
       const authServerMetadata =
         await this.discoverAuthorizationServerMetadata(serverUrl);
 
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
         if (authServerMetadata.registration_endpoint) {
-          console.log(
+          debugLogger.log(
             'Dynamic client registration is supported at:',
             authServerMetadata.registration_endpoint,
           );
@@ -276,7 +301,10 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
-      console.debug(
+      if (error instanceof ResourceMismatchError) {
+        throw error;
+      }
+      debugLogger.debug(
         `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
       return null;
@@ -302,10 +330,12 @@ export class OAuthUtils {
    * Discover OAuth configuration from WWW-Authenticate header.
    *
    * @param wwwAuthenticate The WWW-Authenticate header value
+   * @param mcpServerUrl Optional MCP server URL to validate against the resource metadata
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
+    mcpServerUrl?: string,
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -315,6 +345,17 @@ export class OAuthUtils {
 
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
+
+    if (resourceMetadata && mcpServerUrl) {
+      // Validate resource parameter per RFC 9728 Section 7.3
+      const expectedResource = this.buildResourceParameter(mcpServerUrl);
+      if (resourceMetadata.resource !== expectedResource) {
+        throw new ResourceMismatchError(
+          `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+        );
+      }
+    }
+
     if (!resourceMetadata?.authorization_servers?.length) {
       return null;
     }
@@ -359,6 +400,31 @@ export class OAuthUtils {
    */
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
-    return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  /**
+   * Parses a JWT string to extract its expiry time.
+   * @param idToken The JWT ID token.
+   * @returns The expiry time in **milliseconds**, or undefined if parsing fails.
+   */
+  static parseTokenExpiry(idToken: string): number | undefined {
+    try {
+      const payload = JSON.parse(
+        Buffer.from(idToken.split('.')[1], 'base64').toString(),
+      );
+
+      if (payload && typeof payload.exp === 'number') {
+        return payload.exp * 1000; // Convert seconds to milliseconds
+      }
+    } catch (e) {
+      debugLogger.error(
+        'Failed to parse ID token for expiry time with error:',
+        e,
+      );
+    }
+
+    // Return undefined if try block fails or 'exp' is missing/invalid
+    return undefined;
   }
 }

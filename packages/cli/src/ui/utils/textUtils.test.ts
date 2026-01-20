@@ -9,9 +9,32 @@ import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { escapeAnsiCtrlCodes } from './textUtils.js';
+import {
+  escapeAnsiCtrlCodes,
+  stripUnsafeCharacters,
+  getCachedStringWidth,
+} from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('getCachedStringWidth', () => {
+    it('should handle unicode characters that crash string-width', () => {
+      // U+0602 caused string-width to crash (see #16418)
+      const char = '؂';
+      expect(getCachedStringWidth(char)).toBe(1);
+    });
+
+    it('should handle unicode characters that crash string-width with ANSI codes', () => {
+      const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
+      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+    });
+  });
+
+  describe('stripUnsafeCharacters', () => {
+    it('should not strip tab characters', () => {
+      const input = 'hello	world';
+      expect(stripUnsafeCharacters(input)).toBe('hello	world');
+    });
+  });
   describe('escapeAnsiCtrlCodes', () => {
     describe('escapeAnsiCtrlCodes string case study', () => {
       it('should replace ANSI escape codes with a visible representation', () => {
@@ -40,6 +63,7 @@ describe('textUtils', () => {
             type: 'exec',
             command: '\u001b[31mmls -l\u001b[0m',
             rootCommand: '\u001b[32msudo apt-get update\u001b[0m',
+            rootCommands: ['sudo'],
             onConfirm: async () => {},
           };
 

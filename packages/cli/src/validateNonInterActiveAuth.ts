@@ -5,11 +5,17 @@
  */
 
 import type { Config } from '@google/gemini-cli-core';
-import { AuthType, OutputFormat } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  debugLogger,
+  OutputFormat,
+  ExitCodes,
+} from '@google/gemini-cli-core';
 import { USER_SETTINGS_PATH } from './config/settings.js';
 import { validateAuthMethod } from './config/auth.js';
 import { type LoadedSettings } from './config/settings.js';
 import { handleError } from './utils/errors.js';
+import { runExitCleanup } from './utils/cleanup.js';
 
 function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
@@ -31,24 +37,22 @@ export async function validateNonInteractiveAuth(
   settings: LoadedSettings,
 ) {
   try {
-    const enforcedType = settings.merged.security?.auth?.enforcedType;
-    if (enforcedType) {
-      const currentAuthType = getAuthTypeFromEnv();
-      if (currentAuthType !== enforcedType) {
-        const message = `The configured auth type is ${enforcedType}, but the current auth type is ${currentAuthType}. Please re-authenticate with the correct type.`;
-        throw new Error(message);
-      }
-    }
+    const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
 
-    const effectiveAuthType =
-      enforcedType || getAuthTypeFromEnv() || configuredAuthType;
+    const enforcedType = settings.merged.security.auth.enforcedType;
+    if (enforcedType && effectiveAuthType !== enforcedType) {
+      const message = effectiveAuthType
+        ? `The enforced authentication type is '${enforcedType}', but the current type is '${effectiveAuthType}'. Please re-authenticate with the correct type.`
+        : `The auth type '${enforcedType}' is enforced, but no authentication is configured.`;
+      throw new Error(message);
+    }
 
     if (!effectiveAuthType) {
       const message = `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`;
       throw new Error(message);
     }
 
-    const authType: AuthType = effectiveAuthType as AuthType;
+    const authType: AuthType = effectiveAuthType;
 
     if (!useExternalAuth) {
       const err = validateAuthMethod(String(authType));
@@ -57,18 +61,18 @@ export async function validateNonInteractiveAuth(
       }
     }
 
-    await nonInteractiveConfig.refreshAuth(authType);
-    return nonInteractiveConfig;
+    return authType;
   } catch (error) {
     if (nonInteractiveConfig.getOutputFormat() === OutputFormat.JSON) {
       handleError(
         error instanceof Error ? error : new Error(String(error)),
         nonInteractiveConfig,
-        1,
+        ExitCodes.FATAL_AUTHENTICATION_ERROR,
       );
     } else {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
+      debugLogger.error(error instanceof Error ? error.message : String(error));
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     }
   }
 }

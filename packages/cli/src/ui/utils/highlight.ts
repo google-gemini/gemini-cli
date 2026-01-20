@@ -4,69 +4,121 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { LRUCache } from 'mnemonist';
+import type { Transformation } from '../components/shared/text-buffer.js';
 import { cpLen, cpSlice } from './textUtils.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
 export type HighlightToken = {
   text: string;
   type: 'default' | 'command' | 'file';
 };
 
-const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[a-zA-Z0-9_./-])+)/g;
+// Matches slash commands (e.g., /help) and @ references (files or MCP resource URIs).
+// The @ pattern uses a negated character class to support URIs like `@file:///example.txt`
+// which contain colons. It matches any character except delimiters: comma, whitespace,
+// semicolon, common punctuation, and brackets.
+const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
+
+const highlightCache = new LRUCache<string, readonly HighlightToken[]>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
 
 export function parseInputForHighlighting(
   text: string,
   index: number,
+  transformations: Transformation[] = [],
+  cursorCol?: number,
 ): readonly HighlightToken[] {
+  let isCursorInsideTransform = false;
+  if (cursorCol !== undefined) {
+    for (const transform of transformations) {
+      if (cursorCol >= transform.logStart && cursorCol <= transform.logEnd) {
+        isCursorInsideTransform = true;
+        break;
+      }
+    }
+  }
+
+  const cacheKey = `${index === 0 ? 'F' : 'N'}:${isCursorInsideTransform ? cursorCol : 'NC'}:${text}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  HIGHLIGHT_REGEX.lastIndex = 0;
+
   if (!text) {
     return [{ text: '', type: 'default' }];
   }
 
+  const parseUntransformedInput = (text: string): HighlightToken[] => {
+    const tokens: HighlightToken[] = [];
+    if (!text) return tokens;
+
+    HIGHLIGHT_REGEX.lastIndex = 0;
+    let last = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = HIGHLIGHT_REGEX.exec(text)) !== null) {
+      const [fullMatch] = match;
+      const matchIndex = match.index;
+
+      if (matchIndex > last) {
+        tokens.push({ text: text.slice(last, matchIndex), type: 'default' });
+      }
+
+      const type = fullMatch.startsWith('/') ? 'command' : 'file';
+      if (type === 'command' && index !== 0) {
+        tokens.push({ text: fullMatch, type: 'default' });
+      } else {
+        tokens.push({ text: fullMatch, type });
+      }
+
+      last = matchIndex + fullMatch.length;
+    }
+
+    if (last < text.length) {
+      tokens.push({ text: text.slice(last), type: 'default' });
+    }
+
+    return tokens;
+  };
+
   const tokens: HighlightToken[] = [];
-  let lastIndex = 0;
-  let match;
 
-  while ((match = HIGHLIGHT_REGEX.exec(text)) !== null) {
-    const [fullMatch] = match;
-    const matchIndex = match.index;
+  let column = 0;
+  const sortedTransformations = (transformations ?? [])
+    .slice()
+    .sort((a, b) => a.logStart - b.logStart);
 
-    // Add the text before the match as a default token
-    if (matchIndex > lastIndex) {
-      tokens.push({
-        text: text.slice(lastIndex, matchIndex),
-        type: 'default',
-      });
-    }
+  for (const transformation of sortedTransformations) {
+    const textBeforeTransformation = cpSlice(
+      text,
+      column,
+      transformation.logStart,
+    );
+    tokens.push(...parseUntransformedInput(textBeforeTransformation));
 
-    // Add the matched token
-    const type = fullMatch.startsWith('/') ? 'command' : 'file';
-    // Only highlight slash commands if the index is 0.
-    if (type === 'command' && index !== 0) {
-      tokens.push({
-        text: fullMatch,
-        type: 'default',
-      });
-    } else {
-      tokens.push({
-        text: fullMatch,
-        type,
-      });
-    }
+    const isCursorInside =
+      cursorCol !== undefined &&
+      cursorCol >= transformation.logStart &&
+      cursorCol <= transformation.logEnd;
+    const transformationText = isCursorInside
+      ? transformation.logicalText
+      : transformation.collapsedText;
+    tokens.push({ text: transformationText, type: 'file' });
 
-    lastIndex = matchIndex + fullMatch.length;
+    column = transformation.logEnd;
   }
 
-  // Add any remaining text after the last match
-  if (lastIndex < text.length) {
-    tokens.push({
-      text: text.slice(lastIndex),
-      type: 'default',
-    });
-  }
+  const textAfterFinalTransformation = cpSlice(text, column);
+  tokens.push(...parseUntransformedInput(textAfterFinalTransformation));
+
+  highlightCache.set(cacheKey, tokens);
 
   return tokens;
 }
 
-export function buildSegmentsForVisualSlice(
+export function parseSegmentsFromTokens(
   tokens: readonly HighlightToken[],
   sliceStart: number,
   sliceEnd: number,
@@ -98,6 +150,5 @@ export function buildSegmentsForVisualSlice(
 
     tokenCpStart += tokenLen;
   }
-
   return segments;
 }

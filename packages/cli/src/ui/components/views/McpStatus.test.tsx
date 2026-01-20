@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { render } from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { McpStatus } from './McpStatus.js';
 import { MCPServerStatus } from '@google/gemini-cli-core';
@@ -36,6 +36,7 @@ describe('McpStatus', () => {
       },
     ],
     prompts: [],
+    resources: [],
     blockedServers: [],
     serverStatus: () => MCPServerStatus.CONNECTED,
     authStatus: {},
@@ -43,36 +44,39 @@ describe('McpStatus', () => {
     connectingServers: [],
     showDescriptions: true,
     showSchema: false,
-    showTips: false,
   };
 
   it('renders correctly with a connected server', () => {
-    const { lastFrame } = render(<McpStatus {...baseProps} />);
+    const { lastFrame, unmount } = render(<McpStatus {...baseProps} />);
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with authenticated OAuth status', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} authStatus={{ 'server-1': 'authenticated' }} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with expired OAuth status', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} authStatus={{ 'server-1': 'expired' }} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with unauthenticated OAuth status', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus
         {...baseProps}
         authStatus={{ 'server-1': 'unauthenticated' }}
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with a disconnected server', async () => {
@@ -80,26 +84,29 @@ describe('McpStatus', () => {
       await import('@google/gemini-cli-core'),
       'getMCPServerStatus',
     ).mockReturnValue(MCPServerStatus.DISCONNECTED);
-    const { lastFrame } = render(<McpStatus {...baseProps} />);
+    const { lastFrame, unmount } = render(<McpStatus {...baseProps} />);
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly when discovery is in progress', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} discoveryInProgress={true} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with schema enabled', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} showSchema={true} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with parametersJsonSchema', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus
         {...baseProps}
         tools={[
@@ -121,15 +128,11 @@ describe('McpStatus', () => {
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders correctly with tips enabled', () => {
-    const { lastFrame } = render(<McpStatus {...baseProps} showTips={true} />);
-    expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with prompts', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus
         {...baseProps}
         prompts={[
@@ -142,22 +145,57 @@ describe('McpStatus', () => {
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with resources', () => {
+    const { lastFrame, unmount } = render(
+      <McpStatus
+        {...baseProps}
+        resources={[
+          {
+            serverName: 'server-1',
+            name: 'resource-1',
+            uri: 'file:///tmp/resource-1.txt',
+            description: 'A test resource',
+          },
+        ]}
+      />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with a blocked server', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus
         {...baseProps}
         blockedServers={[{ name: 'server-1', extensionName: 'test-extension' }]}
       />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders correctly with a connecting server', () => {
-    const { lastFrame } = render(
+    const { lastFrame, unmount } = render(
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
     );
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('truncates resources when exceeding limit', () => {
+    const manyResources = Array.from({ length: 25 }, (_, i) => ({
+      serverName: 'server-1',
+      name: `resource-${i + 1}`,
+      uri: `file:///tmp/resource-${i + 1}.txt`,
+    }));
+
+    const { lastFrame, unmount } = render(
+      <McpStatus {...baseProps} resources={manyResources} />,
+    );
+    expect(lastFrame()).toContain('15 resources hidden');
+    unmount();
   });
 });

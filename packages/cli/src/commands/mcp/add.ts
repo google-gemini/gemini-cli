@@ -7,7 +7,8 @@
 // File for 'gemini mcp add' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import type { MCPServerConfig } from '@google/gemini-cli-core';
+import { debugLogger, type MCPServerConfig } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 async function addMcpServer(
   name: string,
@@ -41,7 +42,7 @@ async function addMcpServer(
   const inHome = settings.workspace.path === settings.user.path;
 
   if (scope === 'project' && inHome) {
-    console.error(
+    debugLogger.error(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
     process.exit(1);
@@ -68,6 +69,7 @@ async function addMcpServer(
     case 'sse':
       newServer = {
         url: commandOrUrl,
+        type: 'sse',
         headers,
         timeout,
         trust,
@@ -78,7 +80,8 @@ async function addMcpServer(
       break;
     case 'http':
       newServer = {
-        httpUrl: commandOrUrl,
+        url: commandOrUrl,
+        type: 'http',
         headers,
         timeout,
         trust,
@@ -116,7 +119,7 @@ async function addMcpServer(
 
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
-    console.log(
+    debugLogger.log(
       `MCP server "${name}" is already configured within ${scope} settings.`,
     );
   }
@@ -126,9 +129,9 @@ async function addMcpServer(
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
   if (isExistingServer) {
-    console.log(`MCP server "${name}" updated in ${scope} settings.`);
+    debugLogger.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {
-    console.log(
+    debugLogger.log(
       `MCP server "${name}" added to ${scope} settings. (${transport})`,
     );
   }
@@ -162,7 +165,7 @@ export const addCommand: CommandModule = {
         choices: ['user', 'project'],
       })
       .option('transport', {
-        alias: 't',
+        alias: ['t', 'type'],
         describe: 'Transport type (stdio, sse, http)',
         type: 'string',
         default: 'stdio',
@@ -173,6 +176,7 @@ export const addCommand: CommandModule = {
         describe: 'Set environment variables (e.g. -e KEY=value)',
         type: 'array',
         string: true,
+        nargs: 1,
       })
       .option('header', {
         alias: 'H',
@@ -180,6 +184,7 @@ export const addCommand: CommandModule = {
           'Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123")',
         type: 'array',
         string: true,
+        nargs: 1,
       })
       .option('timeout', {
         describe: 'Set connection timeout in milliseconds',
@@ -228,5 +233,6 @@ export const addCommand: CommandModule = {
         excludeTools: argv['excludeTools'] as string[] | undefined,
       },
     );
+    await exitCli();
   },
 };

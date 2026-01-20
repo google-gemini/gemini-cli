@@ -16,8 +16,8 @@ interface ContextSummaryDisplayProps {
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
-  showToolDescriptions?: boolean;
   ideContext?: IdeContext;
+  skillCount: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,8 +25,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   blockedMcpServers,
-  showToolDescriptions,
   ideContext,
+  skillCount,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -38,7 +38,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    openFileCount === 0
+    openFileCount === 0 &&
+    skillCount === 0
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
@@ -82,27 +83,26 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       }
       parts.push(blockedText);
     }
-    let text = parts.join(', ');
-    // Add ctrl+t hint when MCP servers are available
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      if (showToolDescriptions) {
-        text += ' (ctrl+t to toggle)';
-      } else {
-        text += ' (ctrl+t to view)';
-      }
-    }
-    return text;
+    return parts.join(', ');
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
+  const skillText = (() => {
+    if (skillCount === 0) {
+      return '';
+    }
+    return `${skillCount} skill${skillCount > 1 ? 's' : ''}`;
+  })();
+
+  const summaryParts = [openFilesText, geminiMdText, mcpText, skillText].filter(
+    Boolean,
+  );
 
   if (isNarrow) {
     return (
-      <Box flexDirection="column">
-        <Text color={theme.text.secondary}>Using:</Text>
+      <Box flexDirection="column" paddingX={1}>
         {summaryParts.map((part, index) => (
           <Text key={index} color={theme.text.secondary}>
-            {'  '}- {part}
+            - {part}
           </Text>
         ))}
       </Box>
@@ -110,10 +110,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   }
 
   return (
-    <Box>
-      <Text color={theme.text.secondary}>
-        Using: {summaryParts.join(' | ')}
-      </Text>
+    <Box paddingX={1}>
+      <Text color={theme.text.secondary}>{summaryParts.join(' | ')}</Text>
     </Box>
   );
 };

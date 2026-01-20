@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   getSettingsSchema,
+  SETTINGS_SCHEMA_DEFINITIONS,
+  type SettingCollectionDefinition,
   type SettingDefinition,
   type Settings,
   type SettingsSchema,
@@ -31,7 +33,7 @@ describe('SettingsSchema', () => {
       ];
 
       expectedSettings.forEach((setting) => {
-        expect(getSettingsSchema()[setting as keyof Settings]).toBeDefined();
+        expect(getSettingsSchema()[setting]).toBeDefined();
       });
     });
 
@@ -64,9 +66,7 @@ describe('SettingsSchema', () => {
       ];
 
       nestedSettings.forEach((setting) => {
-        const definition = getSettingsSchema()[
-          setting as keyof Settings
-        ] as SettingDefinition;
+        const definition = getSettingsSchema()[setting] as SettingDefinition;
         expect(definition.type).toBe('object');
         expect(definition.properties).toBeDefined();
         expect(typeof definition.properties).toBe('object');
@@ -79,7 +79,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().ui?.properties?.accessibility.properties
-          ?.disableLoadingPhrases.type,
+          ?.enableLoadingPhrases.type,
       ).toBe('boolean');
     });
 
@@ -140,7 +140,7 @@ describe('SettingsSchema', () => {
     it('should have consistent default values for boolean settings', () => {
       const checkBooleanDefaults = (schema: SettingsSchema) => {
         Object.entries(schema).forEach(([, definition]) => {
-          const def = definition as SettingDefinition;
+          const def = definition;
           if (def.type === 'boolean') {
             // Boolean settings can have boolean or undefined defaults (for optional settings)
             expect(['boolean', 'undefined']).toContain(typeof def.default);
@@ -159,6 +159,10 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().ui.properties.showMemoryUsage.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.footer.properties
+          .hideContextPercentage.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().general.properties.vimMode.showInDialog).toBe(
         true,
       );
@@ -166,7 +170,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.disableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
@@ -316,19 +320,146 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
-    it('should have useModelRouter setting in schema', () => {
+    it('should have previewFeatures setting in schema', () => {
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter,
+        getSettingsSchema().general.properties.previewFeatures,
       ).toBeDefined();
+      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
+        'boolean',
+      );
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.type,
-      ).toBe('boolean');
+        getSettingsSchema().general.properties.previewFeatures.category,
+      ).toBe('General');
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.category,
-      ).toBe('Experimental');
+        getSettingsSchema().general.properties.previewFeatures.default,
+      ).toBe(false);
       expect(
-        getSettingsSchema().experimental.properties.useModelRouter.default,
+        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.showInDialog,
       ).toBe(true);
+      expect(
+        getSettingsSchema().general.properties.previewFeatures.description,
+      ).toBe('Enable preview features (e.g., preview models).');
+    });
+
+    it('should have enableAgents setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.enableAgents;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
+      );
+    });
+
+    it('should have skills setting enabled by default', () => {
+      const setting = getSettingsSchema().skills.properties.enabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Agent Skills.');
+    });
+
+    it('should have plan setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.plan;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe(
+        'Enable planning features (Plan Mode and tools).',
+      );
+    });
+
+    it('should have enableEventDrivenScheduler setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enables event-driven scheduler within the CLI session.',
+      );
+    });
+
+    it('should have hooks.notifications setting in schema', () => {
+      const setting = getSettingsSchema().hooks.properties.notifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+    });
+
+    it('should have name and description in hook definitions', () => {
+      const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
+      expect(hookDef).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hookItemProperties = (hookDef as any).items.properties.hooks.items
+        .properties;
+      expect(hookItemProperties.name).toBeDefined();
+      expect(hookItemProperties.name.type).toBe('string');
+      expect(hookItemProperties.description).toBeDefined();
+      expect(hookItemProperties.description.type).toBe('string');
+    });
+  });
+
+  it('has JSON schema definitions for every referenced ref', () => {
+    const schema = getSettingsSchema();
+    const referenced = new Set<string>();
+
+    const visitDefinition = (definition: SettingDefinition) => {
+      if (definition.ref) {
+        referenced.add(definition.ref);
+        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(definition.ref);
+      }
+      if (definition.properties) {
+        Object.values(definition.properties).forEach(visitDefinition);
+      }
+      if (definition.items) {
+        visitCollection(definition.items);
+      }
+      if (definition.additionalProperties) {
+        visitCollection(definition.additionalProperties);
+      }
+    };
+
+    const visitCollection = (collection: SettingCollectionDefinition) => {
+      if (collection.ref) {
+        referenced.add(collection.ref);
+        expect(SETTINGS_SCHEMA_DEFINITIONS).toHaveProperty(collection.ref);
+        return;
+      }
+      if (collection.properties) {
+        Object.values(collection.properties).forEach(visitDefinition);
+      }
+      if (collection.type === 'array' && collection.properties) {
+        Object.values(collection.properties).forEach(visitDefinition);
+      }
+    };
+
+    Object.values(schema).forEach(visitDefinition);
+
+    // Ensure definitions map doesn't accumulate stale entries.
+    Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {
+      if (!referenced.has(key)) {
+        throw new Error(
+          `Definition "${key}" is exported but never referenced in the schema`,
+        );
+      }
     });
   });
 });

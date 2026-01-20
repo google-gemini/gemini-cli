@@ -9,11 +9,12 @@
  * @author Ahmad Awais <https://twitter.com/mrahmadawais/>
  */
 import { type ColorsTheme, Theme } from './theme.js';
+import { interpolateColor } from './color-utils.js';
 
 const shadesOfPurpleColors: ColorsTheme = {
   type: 'dark',
   // Required colors for ColorsTheme interface
-  Background: '#2d2b57', // Main background
+  Background: '#1e1e3f', // Main background in the VSCode terminal.
   Foreground: '#e3dfff', // Default text color (hljs, hljs-subst)
   LightBlue: '#847ace', // Light blue/purple accent
   AccentBlue: '#a599e9', // Borders, secondary blue
@@ -26,6 +27,7 @@ const shadesOfPurpleColors: ColorsTheme = {
   DiffRemoved: '#572244',
   Comment: '#B362FF', // Comment color (same as AccentPurple)
   Gray: '#726c86', // Gray color
+  DarkGray: interpolateColor('#726c86', '#2d2b57', 0.5),
   GradientColors: ['#4d21fc', '#847ace', '#ff628c'],
 };
 

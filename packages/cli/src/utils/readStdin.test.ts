@@ -6,6 +6,13 @@
 
 import { vi, describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { readStdin } from './readStdin.js';
+import { debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', () => ({
+  debugLogger: {
+    warn: vi.fn(),
+  },
+}));
 
 // Mock process.stdin
 const mockStdin = {
@@ -14,12 +21,15 @@ const mockStdin = {
   on: vi.fn(),
   removeListener: vi.fn(),
   destroy: vi.fn(),
+  listeners: vi.fn().mockReturnValue([]),
+  listenerCount: vi.fn().mockReturnValue(0),
 };
 
 describe('readStdin', () => {
   let originalStdin: typeof process.stdin;
   let onReadableHandler: () => void;
   let onEndHandler: () => void;
+  let onErrorHandler: (err: Error) => void;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,10 +43,15 @@ describe('readStdin', () => {
     });
 
     // Capture event handlers
-    mockStdin.on.mockImplementation((event: string, handler: () => void) => {
-      if (event === 'readable') onReadableHandler = handler;
-      if (event === 'end') onEndHandler = handler;
-    });
+    mockStdin.on.mockImplementation(
+      (event: string, handler: (...args: unknown[]) => void) => {
+        if (event === 'readable') onReadableHandler = handler as () => void;
+        if (event === 'end') onEndHandler = handler as () => void;
+        if (event === 'error') onErrorHandler = handler as (err: Error) => void;
+      },
+    );
+    mockStdin.listeners.mockReturnValue([]);
+    mockStdin.listenerCount.mockReturnValue(0);
   });
 
   afterEach(() => {
@@ -108,5 +123,27 @@ describe('readStdin', () => {
     onEndHandler();
 
     await expect(promise).resolves.toBe('chunk1chunk2');
+  });
+
+  it('should truncate input if it exceeds MAX_STDIN_SIZE', async () => {
+    const MAX_STDIN_SIZE = 8 * 1024 * 1024;
+    const largeChunk = 'a'.repeat(MAX_STDIN_SIZE + 100);
+    mockStdin.read.mockReturnValueOnce(largeChunk).mockReturnValueOnce(null);
+
+    const promise = readStdin();
+    onReadableHandler();
+
+    await expect(promise).resolves.toBe('a'.repeat(MAX_STDIN_SIZE));
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      `Warning: stdin input truncated to ${MAX_STDIN_SIZE} bytes.`,
+    );
+    expect(mockStdin.destroy).toHaveBeenCalled();
+  });
+
+  it('should handle stdin error', async () => {
+    const promise = readStdin();
+    const error = new Error('stdin error');
+    onErrorHandler(error);
+    await expect(promise).rejects.toThrow('stdin error');
   });
 });

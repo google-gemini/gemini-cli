@@ -8,10 +8,12 @@ import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { MCPServerStatus } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { MAX_MCP_RESOURCES_TO_SHOW } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type {
   HistoryItemMcpStatus,
   JsonMcpPrompt,
+  JsonMcpResource,
   JsonMcpTool,
 } from '../../types.js';
 
@@ -19,6 +21,7 @@ interface McpStatusProps {
   servers: Record<string, MCPServerConfig>;
   tools: JsonMcpTool[];
   prompts: JsonMcpPrompt[];
+  resources: JsonMcpResource[];
   blockedServers: Array<{ name: string; extensionName: string }>;
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
@@ -26,13 +29,13 @@ interface McpStatusProps {
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-  showTips: boolean;
 }
 
 export const McpStatus: React.FC<McpStatusProps> = ({
   servers,
   tools,
   prompts,
+  resources,
   blockedServers,
   serverStatus,
   authStatus,
@@ -40,7 +43,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   connectingServers,
   showDescriptions,
   showSchema,
-  showTips,
 }) => {
   const serverNames = Object.keys(servers);
 
@@ -85,9 +87,14 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         const serverPrompts = prompts.filter(
           (prompt) => prompt.serverName === serverName,
         );
+        const serverResources = resources.filter(
+          (resource) => resource.serverName === serverName,
+        );
         const originalStatus = serverStatus(serverName);
         const hasCachedItems =
-          serverTools.length > 0 || serverPrompts.length > 0;
+          serverTools.length > 0 ||
+          serverPrompts.length > 0 ||
+          serverResources.length > 0;
         const status =
           originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
             ? MCPServerStatus.CONNECTED
@@ -117,12 +124,13 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         }
 
         let serverDisplayName = serverName;
-        if (server.extensionName) {
-          serverDisplayName += ` (from ${server.extensionName})`;
+        if (server.extension?.name) {
+          serverDisplayName += ` (from ${server.extension?.name})`;
         }
 
         const toolCount = serverTools.length;
         const promptCount = serverPrompts.length;
+        const resourceCount = serverResources.length;
         const parts = [];
         if (toolCount > 0) {
           parts.push(`${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}`);
@@ -130,6 +138,11 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         if (promptCount > 0) {
           parts.push(
             `${promptCount} ${promptCount === 1 ? 'prompt' : 'prompts'}`,
+          );
+        }
+        if (resourceCount > 0) {
+          parts.push(
+            `${resourceCount} ${resourceCount === 1 ? 'resource' : 'resources'}`,
           );
         }
 
@@ -235,6 +248,46 @@ export const McpStatus: React.FC<McpStatusProps> = ({
                 ))}
               </Box>
             )}
+
+            {serverResources.length > 0 && (
+              <Box flexDirection="column" marginLeft={2}>
+                <Text color={theme.text.primary}>Resources:</Text>
+                {serverResources
+                  .slice(0, MAX_MCP_RESOURCES_TO_SHOW)
+                  .map((resource, index) => {
+                    const label = resource.name || resource.uri || 'resource';
+                    return (
+                      <Box
+                        key={`${resource.serverName}-resource-${index}`}
+                        flexDirection="column"
+                      >
+                        <Text>
+                          - <Text color={theme.text.primary}>{label}</Text>
+                          {resource.uri ? ` (${resource.uri})` : ''}
+                          {resource.mimeType ? ` [${resource.mimeType}]` : ''}
+                        </Text>
+                        {showDescriptions && resource.description && (
+                          <Box marginLeft={2}>
+                            <Text color={theme.text.secondary}>
+                              {resource.description.trim()}
+                            </Text>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                {serverResources.length > MAX_MCP_RESOURCES_TO_SHOW && (
+                  <Text color={theme.text.secondary}>
+                    {'  '}...{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW}{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW === 1
+                      ? 'resource'
+                      : 'resources'}{' '}
+                    hidden
+                  </Text>
+                )}
+              </Box>
+            )}
           </Box>
         );
       })}
@@ -249,33 +302,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
           <Text> - Blocked</Text>
         </Box>
       ))}
-
-      {showTips && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color={theme.text.accent}>💡 Tips:</Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp desc</Text> to show
-            server and tool descriptions
-          </Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp schema</Text> to
-            show tool parameter schemas
-          </Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp nodesc</Text> to
-            hide descriptions
-          </Text>
-          <Text>
-            {'  '}- Use{' '}
-            <Text color={theme.text.accent}>/mcp auth &lt;server-name&gt;</Text>{' '}
-            to authenticate with OAuth-enabled servers
-          </Text>
-          <Text>
-            {'  '}- Press <Text color={theme.text.accent}>Ctrl+T</Text> to
-            toggle tool descriptions on/off
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 };

@@ -8,16 +8,18 @@ import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
-import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
+import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
@@ -27,6 +29,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
@@ -47,23 +50,20 @@ export const DialogManager = ({
   const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
     uiState;
 
+  if (uiState.adminSettingsChanged) {
+    return <AdminSettingsChangedDialog />;
+  }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
-  }
-  if (uiState.showWorkspaceMigrationDialog) {
-    return (
-      <WorkspaceMigrationDialog
-        workspaceExtensions={uiState.workspaceExtensions}
-        onOpen={uiActions.onWorkspaceMigrationDialogOpen}
-        onClose={uiActions.onWorkspaceMigrationDialogClose}
-      />
-    );
   }
   if (uiState.proQuotaRequest) {
     return (
       <ProQuotaDialog
         failedModel={uiState.proQuotaRequest.failedModel}
         fallbackModel={uiState.proQuotaRequest.fallbackModel}
+        message={uiState.proQuotaRequest.message}
+        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
+        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
@@ -82,11 +82,6 @@ export const DialogManager = ({
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
       />
-    );
-  }
-  if (uiState.shellConfirmationRequest) {
-    return (
-      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
     );
   }
   if (uiState.loopDetectionConfirmationRequest) {
@@ -125,6 +120,7 @@ export const DialogManager = ({
         )}
         <ThemeDialog
           onSelect={uiActions.handleThemeSelect}
+          onCancel={uiActions.closeThemeDialog}
           onHighlight={uiActions.handleThemeHighlight}
           settings={settings}
           availableTerminalHeight={
@@ -141,8 +137,12 @@ export const DialogManager = ({
         <SettingsDialog
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={() => process.exit(0)}
+          onRestartRequest={async () => {
+            await runExitCleanup();
+            process.exit(RELAUNCH_EXIT_CODE);
+          }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
+          config={config}
         />
       </Box>
     );
@@ -159,6 +159,19 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.isAwaitingApiKeyInput) {
+    return (
+      <Box flexDirection="column">
+        <ApiAuthDialog
+          key={uiState.apiKeyDefaultValue}
+          onSubmit={uiActions.handleApiKeySubmit}
+          onCancel={uiActions.handleApiKeyCancel}
+          error={uiState.authError}
+          defaultValue={uiState.apiKeyDefaultValue}
+        />
+      </Box>
+    );
+  }
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">
@@ -168,6 +181,7 @@ export const DialogManager = ({
           setAuthState={uiActions.setAuthState}
           authError={uiState.authError}
           onAuthError={uiActions.onAuthError}
+          setAuthContext={uiActions.setAuthContext}
         />
       </Box>
     );
@@ -196,12 +210,23 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.isSessionBrowserOpen) {
+    return (
+      <SessionBrowser
+        config={config}
+        onResumeSession={uiActions.handleResumeSession}
+        onDeleteSession={uiActions.handleDeleteSession}
+        onExit={uiActions.closeSessionBrowser}
+      />
+    );
+  }
 
   if (uiState.isPermissionsDialogOpen) {
     return (
       <PermissionsModifyTrustDialog
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
+        targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
   }

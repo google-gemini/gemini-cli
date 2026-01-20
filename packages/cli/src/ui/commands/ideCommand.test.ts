@@ -110,7 +110,7 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connected,
       });
       const command = await ideCommand();
-      const result = await command!.subCommands!.find(
+      const result = await command.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connecting,
       });
       const command = await ideCommand();
-      const result = await command!.subCommands!.find(
+      const result = await command.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Disconnected,
       });
       const command = await ideCommand();
-      const result = await command!.subCommands!.find(
+      const result = await command.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('ideCommand', () => {
         details,
       });
       const command = await ideCommand();
-      const result = await command!.subCommands!.find(
+      const result = await command.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
       expect(vi.mocked(mockIdeClient.getConnectionStatus)).toHaveBeenCalled();
@@ -200,7 +200,7 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Connected,
       });
 
-      const actionPromise = command!.subCommands!.find(
+      const actionPromise = command.subCommands!.find(
         (c) => c.name === 'install',
       )!.action!(mockContext, '');
       await vi.runAllTimersAsync();
@@ -239,7 +239,7 @@ describe('ideCommand', () => {
       });
 
       const command = await ideCommand();
-      await command!.subCommands!.find((c) => c.name === 'install')!.action!(
+      await command.subCommands!.find((c) => c.name === 'install')!.action!(
         mockContext,
         '',
       );

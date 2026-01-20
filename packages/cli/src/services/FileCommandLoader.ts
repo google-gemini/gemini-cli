@@ -10,7 +10,7 @@ import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
 import type { Config } from '@google/gemini-cli-core';
-import { Storage } from '@google/gemini-cli-core';
+import { Storage, coreEvents } from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,
@@ -37,6 +37,7 @@ import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 interface CommandDirectory {
   path: string;
   extensionName?: string;
+  extensionId?: string;
 }
 
 /**
@@ -64,11 +65,11 @@ const TomlCommandDefSchema = z.object({
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
   private readonly folderTrustEnabled: boolean;
-  private readonly folderTrust: boolean;
+  private readonly isTrustedFolder: boolean;
 
   constructor(private readonly config: Config | null) {
-    this.folderTrustEnabled = !!config?.getFolderTrustFeature();
-    this.folderTrust = !!config?.getFolderTrust();
+    this.folderTrustEnabled = !!config?.getFolderTrust();
+    this.isTrustedFolder = !!config?.isTrustedFolder();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -84,6 +85,10 @@ export class FileCommandLoader implements ICommandLoader {
    * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
+    if (this.folderTrustEnabled && !this.isTrustedFolder) {
+      return [];
+    }
+
     const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
@@ -101,15 +106,12 @@ export class FileCommandLoader implements ICommandLoader {
           cwd: dirInfo.path,
         });
 
-        if (this.folderTrustEnabled && !this.folderTrust) {
-          return [];
-        }
-
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
             path.join(dirInfo.path, file),
             dirInfo.path,
             dirInfo.extensionName,
+            dirInfo.extensionId,
           ),
         );
 
@@ -120,8 +122,12 @@ export class FileCommandLoader implements ICommandLoader {
         // Add all commands without deduplication
         allCommands.push(...commands);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.error(
+        if (
+          !signal.aborted &&
+          (error as { code?: string })?.code !== 'ENOENT'
+        ) {
+          coreEvents.emitFeedback(
+            'error',
             `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
             error,
           );
@@ -158,6 +164,7 @@ export class FileCommandLoader implements ICommandLoader {
       const extensionCommandDirs = activeExtensions.map((ext) => ({
         path: path.join(ext.path, 'commands'),
         extensionName: ext.name,
+        extensionId: ext.id,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -177,12 +184,14 @@ export class FileCommandLoader implements ICommandLoader {
     filePath: string,
     baseDir: string,
     extensionName?: string,
+    extensionId?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
       fileContent = await fs.readFile(filePath, 'utf-8');
     } catch (error: unknown) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `[FileCommandLoader] Failed to read file ${filePath}:`,
         error instanceof Error ? error.message : String(error),
       );
@@ -193,7 +202,8 @@ export class FileCommandLoader implements ICommandLoader {
     try {
       parsed = toml.parse(fileContent);
     } catch (error: unknown) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `[FileCommandLoader] Failed to parse TOML file ${filePath}:`,
         error instanceof Error ? error.message : String(error),
       );
@@ -203,7 +213,8 @@ export class FileCommandLoader implements ICommandLoader {
     const validationResult = TomlCommandDefSchema.safeParse(parsed);
 
     if (!validationResult.success) {
-      console.error(
+      coreEvents.emitFeedback(
+        'error',
         `[FileCommandLoader] Skipping invalid command file: ${filePath}. Validation errors:`,
         validationResult.error.flatten(),
       );
@@ -265,12 +276,14 @@ export class FileCommandLoader implements ICommandLoader {
       description,
       kind: CommandKind.FILE,
       extensionName,
+      extensionId,
       action: async (
         context: CommandContext,
         _args: string,
       ): Promise<SlashCommandActionReturn> => {
         if (!context.invocation) {
-          console.error(
+          coreEvents.emitFeedback(
+            'error',
             `[FileCommandLoader] Critical error: Command '${baseCommandName}' was executed without invocation context.`,
           );
           return {

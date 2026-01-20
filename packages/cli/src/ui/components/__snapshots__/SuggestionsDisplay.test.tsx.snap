@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SuggestionsDisplay > handles scrolling 1`] = `
+" ▲
+ Cmd 5   Description 5
+ Cmd 6   Description 6
+ Cmd 7   Description 7
+ Cmd 8   Description 8
+ Cmd 9   Description 9
+ Cmd 10   Description 10
+ Cmd 11   Description 11
+ Cmd 12   Description 12
+ ▼
+ (11/20)"
+`;
+
+exports[`SuggestionsDisplay > highlights active item 1`] = `
+" command1   Description 1
+ command2   Description 2
+ command3   Description 3"
+`;
+
+exports[`SuggestionsDisplay > renders MCP tag for MCP prompts 1`] = `" mcp-tool [MCP]"`;
+
+exports[`SuggestionsDisplay > renders loading state 1`] = `" Loading suggestions..."`;
+
+exports[`SuggestionsDisplay > renders suggestions list 1`] = `
+" command1   Description 1
+ command2   Description 2
+ command3   Description 3"
+`;

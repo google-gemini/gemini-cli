@@ -23,7 +23,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, it, afterEach, beforeEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
@@ -166,9 +166,15 @@ rpc.send({
 `;
 
 describe('mcp server with cyclic tool schema is detected', () => {
-  const rig = new TestRig();
+  let rig: TestRig;
 
-  beforeAll(async () => {
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
+  it('mcp tool list should include tool with cyclic tool schema', async () => {
     // Setup test directory with MCP server configuration
     await rig.setup('cyclic-schema-mcp-server', {
       settings: {
@@ -190,16 +196,12 @@ describe('mcp server with cyclic tool schema is detected', () => {
       const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
-  });
 
-  it('mcp tool list should include tool with cyclic tool schema', async () => {
-    const tool_list_output = await rig.run('/mcp list');
-    expect(tool_list_output).toContain('tool_with_cyclic_schema');
-  });
+    const run = await rig.runInteractive();
 
-  it('gemini api call should be successful with cyclic mcp tool schema', async () => {
-    // Run any command and verify that we get a non-error response from
-    // the Gemini API.
-    await rig.run('hello');
+    await run.type('/mcp list');
+    await run.type('\r');
+
+    await run.expectText('tool_with_cyclic_schema');
   });
 });

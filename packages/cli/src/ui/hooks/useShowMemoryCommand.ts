@@ -6,7 +6,7 @@
 
 import type { Message } from '../types.js';
 import { MessageType } from '../types.js';
-import type { Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 
 export function createShowMemoryAction(
@@ -27,21 +27,21 @@ export function createShowMemoryAction(
     const debugMode = config.getDebugMode();
 
     if (debugMode) {
-      console.log('[DEBUG] Show Memory command invoked.');
+      debugLogger.log('[DEBUG] Show Memory command invoked.');
     }
 
     const currentMemory = config.getUserMemory();
     const fileCount = config.getGeminiMdFileCount();
-    const contextFileName = settings.merged.context?.fileName;
+    const contextFileName = settings.merged.context.fileName;
     const contextFileNames = Array.isArray(contextFileName)
       ? contextFileName
       : [contextFileName];
 
     if (debugMode) {
-      console.log(
+      debugLogger.log(
         `[DEBUG] Showing memory. Content from config.getUserMemory() (first 200 chars): ${currentMemory.substring(0, 200)}...`,
       );
-      console.log(`[DEBUG] Number of context files loaded: ${fileCount}`);
+      debugLogger.log(`[DEBUG] Number of context files loaded: ${fileCount}`);
     }
 
     if (fileCount > 0) {

@@ -14,13 +14,22 @@ import {
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import { getCliVersion } from '../../utils/version.js';
-import { IdeClient, sessionId } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  sessionId,
+  getVersion,
+  INITIAL_HISTORY_LENGTH,
+  debugLogger,
+} from '@google/gemini-cli-core';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+import { exportHistoryToFile } from '../utils/historyExportUtils.js';
+import path from 'node:path';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
-  description: 'submit a bug report',
+  description: 'Submit a bug report',
   kind: CommandKind.BUILT_IN,
+  autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
     const { config } = context.services;
@@ -35,9 +44,16 @@ export const bugCommand: SlashCommand = {
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';
-    const cliVersion = await getCliVersion();
+    const cliVersion = await getVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
+    const terminalName =
+      terminalCapabilityManager.getTerminalName() || 'Unknown';
+    const terminalBgColor =
+      terminalCapabilityManager.getTerminalBackgroundColor() || 'Unknown';
+    const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
+      ? 'Supported'
+      : 'Unsupported';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -47,13 +63,39 @@ export const bugCommand: SlashCommand = {
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
+* **Terminal Name:** ${terminalName}
+* **Terminal Background:** ${terminalBgColor}
+* **Kitty Keyboard Protocol:** ${kittyProtocol}
 `;
     if (ideClient) {
       info += `* **IDE Client:** ${ideClient}\n`;
     }
 
+    const chat = config?.getGeminiClient()?.getChat();
+    const history = chat?.getHistory() || [];
+    let historyFileMessage = '';
+    let problemValue = bugDescription;
+
+    if (history.length > INITIAL_HISTORY_LENGTH) {
+      const tempDir = config?.storage?.getProjectTempDir();
+      if (tempDir) {
+        const historyFileName = `bug-report-history-${Date.now()}.json`;
+        const historyFilePath = path.join(tempDir, historyFileName);
+        try {
+          await exportHistoryToFile({ history, filePath: historyFilePath });
+          historyFileMessage = `\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n${historyFilePath}\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.`;
+          problemValue += `\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.`;
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          debugLogger.error(
+            `Failed to export chat history for bug report: ${errorMessage}`,
+          );
+        }
+      }
+    }
+
     let bugReportUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
+      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
 
     const bugCommandSettings = config?.getBugCommand();
     if (bugCommandSettings?.urlTemplate) {
@@ -62,12 +104,13 @@ export const bugCommand: SlashCommand = {
 
     bugReportUrl = bugReportUrl
       .replace('{title}', encodeURIComponent(bugDescription))
-      .replace('{info}', encodeURIComponent(info));
+      .replace('{info}', encodeURIComponent(info))
+      .replace('{problem}', encodeURIComponent(problemValue));
 
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
+        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}${historyFileMessage}`,
       },
       Date.now(),
     );

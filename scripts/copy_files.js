@@ -26,7 +26,7 @@ import path from 'node:path';
 const sourceDir = path.join('src');
 const targetDir = path.join('dist', 'src');
 
-const extensionsToCopy = ['.md', '.json', '.sb'];
+const extensionsToCopy = ['.md', '.json', '.sb', '.toml'];
 
 function copyFilesRecursive(source, target) {
   if (!fs.existsSync(target)) {
@@ -71,6 +71,15 @@ if (packageName === 'cli') {
   );
   if (fs.existsSync(examplesSource)) {
     fs.cpSync(examplesSource, examplesTarget, { recursive: true });
+  }
+}
+
+// Copy built-in skills for the core package.
+if (packageName === 'core') {
+  const builtinSkillsSource = path.join(sourceDir, 'skills', 'builtin');
+  const builtinSkillsTarget = path.join(targetDir, 'skills', 'builtin');
+  if (fs.existsSync(builtinSkillsSource)) {
+    fs.cpSync(builtinSkillsSource, builtinSkillsTarget, { recursive: true });
   }
 }
 
