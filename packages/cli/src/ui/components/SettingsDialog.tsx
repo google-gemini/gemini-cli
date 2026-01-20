@@ -737,7 +737,7 @@ export function SettingsDialog({
             startEditing(currentItem.value, key.sequence);
           }
         } else if (
-          keyMatchers[Command.QUIT](key) ||
+          keyMatchers[Command.CLEAR_INPUT](key) ||
           keyMatchers[Command.CLEAR_SCREEN](key)
         ) {
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
