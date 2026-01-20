@@ -17,8 +17,10 @@ import {
   createDefaultPolicy,
   createSingleModelChain,
   getModelPolicyChain,
+  getFlashLitePolicyChain,
 } from './policyCatalog.js';
 import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -40,8 +42,11 @@ export function resolvePolicyChain(
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
 
   let chain;
+  const resolvedModel = resolveModel(modelFromConfig);
 
-  if (
+  if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+    chain = getFlashLitePolicyChain();
+  } else if (
     config.getModel() === PREVIEW_GEMINI_MODEL_AUTO ||
     config.getModel() === DEFAULT_GEMINI_MODEL_AUTO
   ) {
@@ -52,8 +57,7 @@ export function resolvePolicyChain(
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
-
-  const activeModel = resolveModel(modelFromConfig);
+  const activeModel = resolvedModel;
 
   const activeIndex = chain.findIndex((policy) => policy.model === activeModel);
   if (activeIndex !== -1) {

@@ -12,7 +12,10 @@ import {
 } from './policyHelpers.js';
 import { createDefaultPolicy } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '../config/models.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -60,6 +63,28 @@ describe('policyHelpers', () => {
       const chain = resolvePolicyChain(config, 'gemini-2.5-flash');
       expect(chain).toHaveLength(1);
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('returns flash-lite chain when preferred model is flash-lite', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, DEFAULT_GEMINI_FLASH_LITE_MODEL);
+      expect(chain).toHaveLength(3);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-pro');
+    });
+
+    it('returns flash-lite chain when configured model is flash-lite', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain).toHaveLength(3);
+      expect(chain[0]?.model).toBe('gemini-2.5-flash-lite');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+      expect(chain[2]?.model).toBe('gemini-2.5-pro');
     });
 
     it('wraps around the chain when wrapsAround is true', () => {
