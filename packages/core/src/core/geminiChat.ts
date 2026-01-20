@@ -386,8 +386,8 @@ export class GeminiChat {
               this.config.getRetryFetchErrors(),
             );
 
-            // For non-retryable connection errors, pop history and throw immediately
             if (isConnectionPhase && !isRetryable) {
+              // Remove failed user content to not break subsequent requests
               this.history.pop();
               throw error;
             }
