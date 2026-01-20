@@ -95,6 +95,8 @@ export async function loadConfig(
     extensionLoader,
     checkpointing,
     previewFeatures: settings.general?.previewFeatures,
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler ?? true,
     interactive: true,
     enableInteractiveShell: true,
   };
