@@ -32,7 +32,8 @@ import {
   readFileWithEncoding,
   fileExists,
   readWasmBinaryFromDisk,
-  saveTruncatedContent,
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -1024,212 +1025,107 @@ describe('fileUtils', () => {
     });
   });
 
-  describe('saveTruncatedContent', () => {
-    const THRESHOLD = 40_000;
-    const TRUNCATE_LINES = 1000;
+  describe('saveTruncatedToolOutput & formatTruncatedToolOutput', () => {
+    it('should save content to a file with safe name', async () => {
+      const content = 'some content';
+      const toolName = 'shell';
+      const id = '123';
 
-    it('should return content unchanged if below threshold', async () => {
-      const content = 'Short content';
-      const callId = 'test-call-id';
-
-      const result = await saveTruncatedContent(
+      const result = await saveTruncatedToolOutput(
         content,
-        callId,
+        toolName,
+        id,
         tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
       );
 
-      expect(result).toEqual({ content });
-      const outputFile = path.join(tempRootDir, `${callId}.output`);
-      expect(await fileExists(outputFile)).toBe(false);
-    });
-
-    it('should truncate content by lines when content has many lines', async () => {
-      // Create content that exceeds 100,000 character threshold with many lines
-      const lines = Array(2000).fill('x'.repeat(100));
-      const content = lines.join('\n');
-      const callId = 'test-call-id';
-
-      const result = await saveTruncatedContent(
-        content,
-        callId,
-        tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
-      );
-
-      const expectedOutputFile = path.join(tempRootDir, `${callId}.output`);
+      const expectedOutputFile = path.join(tempRootDir, 'shell_123.txt');
       expect(result.outputFile).toBe(expectedOutputFile);
+      expect(result.totalLines).toBe(1);
 
       const savedContent = await fsPromises.readFile(
         expectedOutputFile,
         'utf-8',
       );
       expect(savedContent).toBe(content);
-
-      // Should contain the first and last lines with 1/5 head and 4/5 tail
-      const head = Math.floor(TRUNCATE_LINES / 5);
-      const beginning = lines.slice(0, head);
-      const end = lines.slice(-(TRUNCATE_LINES - head));
-      const expectedTruncated =
-        beginning.join('\n') +
-        '\n... [CONTENT TRUNCATED] ...\n' +
-        end.join('\n');
-
-      expect(result.content).toContain(
-        'Tool output was too large and has been truncated',
-      );
-      expect(result.content).toContain('Truncated part of the output:');
-      expect(result.content).toContain(expectedTruncated);
     });
 
-    it('should wrap and truncate content when content has few but long lines', async () => {
-      const content = 'a'.repeat(200_000); // A single very long line
-      const callId = 'test-call-id';
-      const wrapWidth = 120;
+    it('should sanitize tool name in filename', async () => {
+      const content = 'content';
+      const toolName = '../../dangerous/tool';
+      const id = 1;
 
-      // Manually wrap the content to generate the expected file content
-      const wrappedLines: string[] = [];
-      for (let i = 0; i < content.length; i += wrapWidth) {
-        wrappedLines.push(content.substring(i, i + wrapWidth));
-      }
-      const expectedFileContent = wrappedLines.join('\n');
-
-      const result = await saveTruncatedContent(
+      const result = await saveTruncatedToolOutput(
         content,
-        callId,
+        toolName,
+        id,
         tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
       );
 
-      const expectedOutputFile = path.join(tempRootDir, `${callId}.output`);
+      // ../../dangerous/tool -> ______dangerous_tool
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        '______dangerous_tool_1.txt',
+      );
       expect(result.outputFile).toBe(expectedOutputFile);
-
-      const savedContent = await fsPromises.readFile(
-        expectedOutputFile,
-        'utf-8',
-      );
-      expect(savedContent).toBe(expectedFileContent);
-
-      // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
-      const head = Math.floor(TRUNCATE_LINES / 5);
-      const beginning = wrappedLines.slice(0, head);
-      const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
-      const expectedTruncated =
-        beginning.join('\n') +
-        '\n... [CONTENT TRUNCATED] ...\n' +
-        end.join('\n');
-      expect(result.content).toContain(
-        'Tool output was too large and has been truncated',
-      );
-      expect(result.content).toContain('Truncated part of the output:');
-      expect(result.content).toContain(expectedTruncated);
     });
 
-    it('should save to correct file path with call ID', async () => {
-      const content = 'a'.repeat(200_000);
-      const callId = 'unique-call-123';
-      const wrapWidth = 120;
+    it('should sanitize id in filename', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '../../etc/passwd';
 
-      // Manually wrap the content to generate the expected file content
-      const wrappedLines: string[] = [];
-      for (let i = 0; i < content.length; i += wrapWidth) {
-        wrappedLines.push(content.substring(i, i + wrapWidth));
-      }
-      const expectedFileContent = wrappedLines.join('\n');
-
-      const result = await saveTruncatedContent(
+      const result = await saveTruncatedToolOutput(
         content,
-        callId,
+        toolName,
+        id,
         tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
       );
 
-      const expectedPath = path.join(tempRootDir, `${callId}.output`);
-      expect(result.outputFile).toBe(expectedPath);
-
-      const savedContent = await fsPromises.readFile(expectedPath, 'utf-8');
-      expect(savedContent).toBe(expectedFileContent);
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'shell_______etc_passwd.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
     });
 
-    it('should include helpful instructions in truncated message', async () => {
-      const content = 'a'.repeat(200_000);
-      const callId = 'test-call-id';
+    it('should format multi-line output correctly', () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
+      const content = lines.join('\n');
+      const outputFile = '/tmp/out.txt';
 
-      const result = await saveTruncatedContent(
-        content,
-        callId,
-        tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
-      );
+      const formatted = formatTruncatedToolOutput(content, outputFile, 10);
 
-      expect(result.content).toContain(
-        'read_file tool with the absolute file path above',
+      expect(formatted).toContain(
+        'Output too large. Showing the last 10 of 50 lines.',
       );
-      expect(result.content).toContain(
-        'read_file tool with offset=0, limit=100',
-      );
-      expect(result.content).toContain(
-        'read_file tool with offset=N to skip N lines',
-      );
-      expect(result.content).toContain(
-        'read_file tool with limit=M to read only M lines',
-      );
+      expect(formatted).toContain('For full output see: /tmp/out.txt');
+      expect(formatted).toContain('line 49');
+      expect(formatted).not.toContain('line 0');
     });
 
-    it('should sanitize callId to prevent path traversal', async () => {
-      const content = 'a'.repeat(200_000);
-      const callId = '../../../../../etc/passwd';
-      const wrapWidth = 120;
+    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
+      const longLine = 'a'.repeat(2000);
+      const content = `line 1\n${longLine}\nline 3`;
+      const outputFile = '/tmp/out.txt';
 
-      // Manually wrap the content to generate the expected file content
-      const wrappedLines: string[] = [];
-      for (let i = 0; i < content.length; i += wrapWidth) {
-        wrappedLines.push(content.substring(i, i + wrapWidth));
-      }
-      const expectedFileContent = wrappedLines.join('\n');
+      const formatted = formatTruncatedToolOutput(content, outputFile, 3);
 
-      await saveTruncatedContent(
-        content,
-        callId,
-        tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
-      );
-
-      const expectedPath = path.join(tempRootDir, 'passwd.output');
-
-      const savedContent = await fsPromises.readFile(expectedPath, 'utf-8');
-      expect(savedContent).toBe(expectedFileContent);
+      expect(formatted).toContain('(some long lines truncated)');
+      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
+      expect(formatted.length).toBeLessThan(longLine.length);
     });
 
-    it('should handle file write errors gracefully', async () => {
-      const content = 'a'.repeat(50_000);
-      const callId = 'test-call-id-fail';
+    it('should handle massive single-line string with character-based truncation', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
 
-      const writeFileSpy = vi
-        .spyOn(fsPromises, 'writeFile')
-        .mockRejectedValue(new Error('File write failed'));
+      const formatted = formatTruncatedToolOutput(content, outputFile);
 
-      const result = await saveTruncatedContent(
-        content,
-        callId,
-        tempRootDir,
-        THRESHOLD,
-        TRUNCATE_LINES,
+      expect(formatted).toContain(
+        'Output too large. Showing the last 4,000 characters',
       );
-
-      expect(result.outputFile).toBeUndefined();
-      expect(result.content).toContain(
-        '[Note: Could not save full output to file]',
-      );
-      expect(writeFileSpy).toHaveBeenCalled();
-
-      writeFileSpy.mockRestore();
+      expect(formatted.endsWith(content.slice(-4000))).toBe(true);
     });
   });
 });

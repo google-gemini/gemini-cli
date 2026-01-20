@@ -274,6 +274,35 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    it('should not await MCP initialization', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should return immediately, before MCP finishes (50ms delay)
+      expect(mcpStarted).toBe(false);
+
+      // Wait for it to eventually finish to avoid open handles
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(mcpStarted).toBe(true);
+    });
+
     describe('getCompressionThreshold', () => {
       it('should return the local compression threshold if it is set', async () => {
         const config = new Config({
@@ -823,6 +852,22 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(params);
       expect(config.getUseWriteTodos()).toBe(true);
+    });
+  });
+
+  describe('Event Driven Scheduler Configuration', () => {
+    it('should default enableEventDrivenScheduler to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
+    });
+
+    it('should set enableEventDrivenScheduler to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableEventDrivenScheduler: false,
+      };
+      const config = new Config(params);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
     });
   });
 
@@ -1503,40 +1548,16 @@ describe('Config getHooks', () => {
   });
 
   it('should return the hooks configuration when provided', () => {
-    const mockHooks: { [K in HookEventName]?: HookDefinition[] } = {
-      [HookEventName.BeforeTool]: [
+    const mockHooks = {
+      BeforeTool: [
         {
-          matcher: 'write_file',
-          hooks: [
-            {
-              type: HookType.Command,
-              command: 'echo "test hook"',
-              timeout: 5000,
-            },
-          ],
-        },
-      ],
-      [HookEventName.AfterTool]: [
-        {
-          hooks: [
-            {
-              type: HookType.Command,
-              command: './hooks/after-tool.sh',
-              timeout: 10000,
-            },
-          ],
+          hooks: [{ type: HookType.Command, command: 'echo 1' }],
         },
       ],
     };
-
-    const config = new Config({
-      ...baseParams,
-      hooks: mockHooks,
-    });
-
+    const config = new Config({ ...baseParams, hooks: mockHooks });
     const retrievedHooks = config.getHooks();
     expect(retrievedHooks).toEqual(mockHooks);
-    expect(retrievedHooks).toBe(mockHooks); // Should return the same reference
   });
 
   it('should return hooks with all supported event types', () => {
@@ -1813,6 +1834,43 @@ describe('Availability Service Integration', () => {
   });
 });
 
+describe('Hooks configuration', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+    hooks: { disabled: ['initial-hook'] },
+  };
+
+  it('updateDisabledHooks should update the disabled list', () => {
+    const config = new Config(baseParams);
+    expect(config.getDisabledHooks()).toEqual(['initial-hook']);
+
+    const newDisabled = ['new-hook-1', 'new-hook-2'];
+    config.updateDisabledHooks(newDisabled);
+
+    expect(config.getDisabledHooks()).toEqual(['new-hook-1', 'new-hook-2']);
+  });
+
+  it('updateDisabledHooks should only update disabled list and not definitions', () => {
+    const initialHooks = {
+      BeforeAgent: [
+        {
+          hooks: [{ type: HookType.Command, command: 'initial' }],
+        },
+      ],
+    };
+    const config = new Config({ ...baseParams, hooks: initialHooks });
+
+    config.updateDisabledHooks(['some-hook']);
+
+    expect(config.getDisabledHooks()).toEqual(['some-hook']);
+    expect(config.getHooks()).toEqual(initialHooks);
+  });
+});
+
 describe('Config Quota & Preview Model Access', () => {
   let config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1924,6 +1982,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
     });
   });
+
+  describe('isPlanEnabled', () => {
+    it('should return false by default', () => {
+      const config = new Config(baseParams);
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+
+    it('should return true when plan is enabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: true,
+      });
+      expect(config.isPlanEnabled()).toBe(true);
+    });
+
+    it('should return false when plan is explicitly disabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: false,
+      });
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
@@ -2029,7 +2110,7 @@ describe('Config JIT Initialization', () => {
       expect(mockOnReload).toHaveBeenCalled();
       expect(skillManager.setDisabledSkills).toHaveBeenCalledWith(['skill2']);
       expect(toolRegistry.registerTool).toHaveBeenCalled();
-      expect(toolRegistry.unregisterTool).not.toHaveBeenCalledWith(
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
         ACTIVATE_SKILL_TOOL_NAME,
       );
     });
@@ -2090,6 +2171,31 @@ describe('Config JIT Initialization', () => {
       await config.reloadSkills();
 
       expect(skillManager.setDisabledSkills).toHaveBeenCalledWith([]);
+    });
+
+    it('should update admin settings from onReload', async () => {
+      const mockOnReload = vi.fn().mockResolvedValue({
+        adminSkillsEnabled: false,
+      });
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+        onReload: mockOnReload,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      vi.spyOn(skillManager, 'setAdminSettings');
+
+      await config.reloadSkills();
+
+      expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
     });
   });
 });

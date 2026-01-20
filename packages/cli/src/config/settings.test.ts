@@ -44,7 +44,7 @@ vi.mock('./settingsSchema.js', async (importOriginal) => {
 });
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as path from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -69,6 +69,10 @@ import {
   saveSettings,
   type SettingsFile,
   getDefaultsFromSchema,
+  loadEnvironment,
+  migrateDeprecatedSettings,
+  SettingScope,
+  LoadedSettings,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -80,7 +84,7 @@ import {
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
-const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
+const MOCK_WORKSPACE_SETTINGS_PATH = path.join(
   MOCK_WORKSPACE_DIR,
   GEMINI_DIR,
   'settings.json',
@@ -1599,6 +1603,363 @@ describe('Settings Loading and Merging', () => {
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
+    });
+  });
+
+  describe('with workspace trust', () => {
+    it('should merge workspace settings when workspace is trusted', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.tools?.sandbox).toBe(true);
+      expect(settings.merged.context?.fileName).toBe('WORKSPACE.md');
+      expect(settings.merged.ui?.theme).toBe('dark');
+    });
+
+    it('should NOT merge workspace settings when workspace is not trusted', () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+        context: { fileName: 'USER.md' },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
+      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+      expect(settings.merged.ui?.theme).toBe('dark'); // User setting
+    });
+  });
+
+  describe('loadEnvironment', () => {
+    function setup({
+      isFolderTrustEnabled = true,
+      isWorkspaceTrustedValue = true,
+    }) {
+      delete process.env['TESTTEST']; // reset
+      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: isWorkspaceTrustedValue,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
+        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
+      );
+      const userSettingsContent: Settings = {
+        ui: {
+          theme: 'dark',
+        },
+        security: {
+          folderTrust: {
+            enabled: isFolderTrustEnabled,
+          },
+        },
+        context: {
+          fileName: 'USER_CONTEXT.md',
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          return '{}';
+        },
+      );
+    }
+
+    it('sets environment variables from .env files', () => {
+      setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load env files from untrusted spaces', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+  });
+
+  describe('migrateDeprecatedSettings', () => {
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      mockFsExistsSync = vi.mocked(fs.existsSync);
+      mockFsExistsSync.mockReturnValue(true);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsReadFileSync.mockReturnValue('{}');
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should not do anything if there are no deprecated settings', () => {
+      const userSettingsContent = {
+        extensions: {
+          enabled: ['user-ext-1'],
+        },
+      };
+      const workspaceSettingsContent = {
+        someOtherSetting: 'value',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      setValueSpy.mockClear();
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).not.toHaveBeenCalled();
+    });
+
+    it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Should set new value to false (inverted from true)
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: false }),
+      );
+    });
+
+    it('should migrate all 4 inverted boolean settings', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: false,
+          disableUpdateNag: true,
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+          },
+        },
+        ui: {
+          accessibility: {
+            disableLoadingPhrases: true,
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Check that general settings were migrated with inverted values
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: true }),
+      );
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdateNotification: false }),
+      );
+
+      // Check context.fileFiltering was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        expect.objectContaining({
+          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+        }),
+      );
+
+      // Check ui.accessibility was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          accessibility: expect.objectContaining({
+            enableLoadingPhrases: false,
+          }),
+        }),
+      );
+    });
+
+    it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+          enableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableFuzzySearch: false, // Trust this (false) over disableFuzzySearch (false -> true)
+          },
+        },
+      };
+
+      const loadedSettings = new LoadedSettings(
+        {
+          path: getSystemSettingsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: getSystemDefaultsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: USER_SETTINGS_PATH,
+          settings: userSettingsContent as unknown as Settings,
+          originalSettings: userSettingsContent as unknown as Settings,
+        },
+        {
+          path: MOCK_WORKSPACE_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+        },
+        true,
+      );
+
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      // 1. removeDeprecated = false (default)
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should still have old settings
+      expect(
+        loadedSettings.forScope(SettingScope.User).settings.general,
+      ).toHaveProperty('disableAutoUpdate');
+      expect(
+        (
+          loadedSettings.forScope(SettingScope.User).settings.context as {
+            fileFiltering: { disableFuzzySearch: boolean };
+          }
+        ).fileFiltering,
+      ).toHaveProperty('disableFuzzySearch');
+
+      // 2. removeDeprecated = true
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Should remove disableAutoUpdate and trust enableAutoUpdate: true
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
+        enableAutoUpdate: true,
+      });
+
+      // Should remove disableFuzzySearch and trust enableFuzzySearch: false
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
+        fileFiltering: { enableFuzzySearch: false },
+      });
+    });
+
+    it('should trigger migration automatically during loadSettings', () => {
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in the merged settings
+      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+
+      // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
+      expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        expect.objectContaining({
+          general: expect.objectContaining({ enableAutoUpdate: false }),
+        }),
+      );
     });
   });
 
