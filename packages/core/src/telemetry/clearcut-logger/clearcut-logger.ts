@@ -42,6 +42,8 @@ import type {
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -100,6 +102,8 @@ export enum EventNames {
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
   LLM_LOOP_CHECK = 'llm_loop_check',
   HOOK_CALL = 'hook_call',
+  APPROVAL_MODE_SWITCH = 'approval_mode_switch',
+  APPROVAL_MODE_DURATION = 'approval_mode_duration',
 }
 
 export interface LogResponse {
@@ -1464,6 +1468,42 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.HOOK_CALL, data));
+    this.flushIfNeeded();
+  }
+
+  logApprovalModeSwitchEvent(event: ApprovalModeSwitchEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value: event.from_mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_TO,
+        value: event.to_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.APPROVAL_MODE_SWITCH, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logApprovalModeDurationEvent(event: ApprovalModeDurationEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value: event.mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.APPROVAL_MODE_DURATION, data),
+    );
     this.flushIfNeeded();
   }
 
