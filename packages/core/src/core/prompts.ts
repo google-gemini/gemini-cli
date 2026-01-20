@@ -379,15 +379,35 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       'finalReminder',
     );
 
-    // By default, all prompts are enabled. A prompt is disabled if its corresponding
-    // GEMINI_PROMPT_<NAME> environment variable is set to "0" or "false".
-    const enabledPrompts = orderedPrompts.filter((key) => {
-      const envVar = process.env[`GEMINI_PROMPT_${key.toUpperCase()}`];
-      const lowerEnvVar = envVar?.trim().toLowerCase();
-      return lowerEnvVar !== '0' && lowerEnvVar !== 'false';
-    });
+    // By default, all prompts are enabled. Each GEMINI_PROMPT_<NAME> env var can:
+    // - Be set to "0" or "false" to disable that section
+    // - Be set to a file path to replace that section with custom content
+    // - Be set to "1" or "true" or unset to use the default content
+    const promptContents: string[] = [];
+    for (const key of orderedPrompts) {
+      const envVarName = `GEMINI_PROMPT_${key.toUpperCase()}`;
+      const resolution = resolvePathFromEnv(process.env[envVarName]);
 
-    basePrompt = enabledPrompts.map((key) => promptConfig[key]).join('\n');
+      if (resolution.isDisabled) {
+        // Env var set to "0" or "false" - skip this section
+        continue;
+      }
+
+      if (resolution.value && !resolution.isSwitch) {
+        // Env var is a file path - read and use custom content
+        if (!fs.existsSync(resolution.value)) {
+          throw new Error(
+            `missing prompt override file '${resolution.value}' for ${envVarName}`,
+          );
+        }
+        promptContents.push(fs.readFileSync(resolution.value, 'utf8'));
+      } else {
+        // Unset, "1", or "true" - use default content
+        promptContents.push(promptConfig[key]);
+      }
+    }
+
+    basePrompt = promptContents.join('\n');
   }
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
@@ -420,8 +440,35 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
  * Provides the system prompt for the history compression process.
  * This prompt instructs the model to act as a specialized state manager,
  * think in a scratchpad, and produce a structured XML summary.
+ *
+ * The prompt can be customized via the GEMINI_COMPRESSION_PROMPT_MD env var:
+ * - Set to "0" or "false" to disable compression entirely
+ * - Set to a file path to use custom compression prompt
+ * - Set to "1" or "true" or unset to use the default
+ *
+ * @returns The compression prompt, or null if compression is disabled
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(): string | null {
+  const resolution = resolvePathFromEnv(
+    process.env['GEMINI_COMPRESSION_PROMPT_MD'],
+  );
+
+  if (resolution.isDisabled) {
+    // Compression is explicitly disabled
+    return null;
+  }
+
+  if (resolution.value && !resolution.isSwitch) {
+    // Custom compression prompt from file
+    if (!fs.existsSync(resolution.value)) {
+      throw new Error(
+        `missing compression prompt file '${resolution.value}' for GEMINI_COMPRESSION_PROMPT_MD`,
+      );
+    }
+    return fs.readFileSync(resolution.value, 'utf8');
+  }
+
+  // Default compression prompt
   return `
 You are the component that summarizes internal chat history into a given structure.
 

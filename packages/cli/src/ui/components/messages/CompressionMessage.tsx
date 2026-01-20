@@ -48,6 +48,8 @@ export function CompressionMessage({
         return 'Could not compress chat history due to a token counting error.';
       case CompressionStatus.NOOP:
         return 'Nothing to compress.';
+      case CompressionStatus.DISABLED_BY_ENV:
+        return 'Compression is disabled via GEMINI_COMPRESSION_PROMPT_MD environment variable.';
       default:
         return '';
     }

@@ -210,5 +210,20 @@ describe('<CompressionMessage />', () => {
         unmount();
       }
     });
+
+    it('shows disabled message when compression is disabled via env var', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        originalTokenCount: 100000,
+        newTokenCount: 100000,
+        compressionStatus: CompressionStatus.DISABLED_BY_ENV,
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).toContain('Compression is disabled via');
+      expect(output).toContain('GEMINI_COMPRESSION_PROMPT_MD');
+      unmount();
+    });
   });
 });

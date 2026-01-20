@@ -111,6 +111,18 @@ export class ChatCompressionService {
     config: Config,
     hasFailedCompressionAttempt: boolean,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
+    // Check if compression is disabled via env var
+    if (getCompressionPrompt() === null) {
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount: chat.getLastPromptTokenCount(),
+          newTokenCount: chat.getLastPromptTokenCount(),
+          compressionStatus: CompressionStatus.DISABLED_BY_ENV,
+        },
+      };
+    }
+
     const curatedHistory = chat.getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
@@ -190,7 +202,7 @@ export class ChatCompressionService {
           ],
         },
       ],
-      systemInstruction: { text: getCompressionPrompt() },
+      systemInstruction: { text: getCompressionPrompt()! },
       promptId,
       // TODO(joshualitt): wire up a sensible abort signal,
       abortSignal: new AbortController().signal,

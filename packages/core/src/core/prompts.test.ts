@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
+import {
+  getCoreSystemPrompt,
+  resolvePathFromEnv,
+  getCompressionPrompt,
+} from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -360,6 +364,123 @@ describe('Core System Prompt (prompts.ts)', () => {
           expect.any(String),
         );
       },
+    );
+  });
+});
+
+describe('GEMINI_PROMPT_* section overrides', () => {
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
+    vi.stubEnv('GEMINI_PROMPT_GIT', undefined);
+    vi.stubEnv('GEMINI_PROMPT_COREMANDATES', undefined);
+    mockConfig = {
+      getToolRegistry: vi.fn().mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([]),
+      }),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(false),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      },
+      isInteractive: vi.fn().mockReturnValue(true),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
+      getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getAgentRegistry: vi.fn().mockReturnValue({
+        getDirectoryContext: vi.fn().mockReturnValue(''),
+      }),
+      getSkillManager: vi.fn().mockReturnValue({
+        getSkills: vi.fn().mockReturnValue([]),
+      }),
+    } as unknown as Config;
+  });
+
+  it('should replace a section with file contents when GEMINI_PROMPT_* is a path', () => {
+    const customPath = '/custom/mandates.md';
+    const customContent = '# My Custom Mandates\nBe nice.';
+    vi.stubEnv('GEMINI_PROMPT_COREMANDATES', customPath);
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === path.resolve(customPath),
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === path.resolve(customPath)) return customContent;
+      throw new Error('unexpected read');
+    });
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain(customContent);
+    expect(prompt).not.toContain('# Core Mandates');
+  });
+
+  it('should throw error if GEMINI_PROMPT_* file does not exist', () => {
+    const customPath = '/non/existent/mandates.md';
+    vi.stubEnv('GEMINI_PROMPT_COREMANDATES', customPath);
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    expect(() => getCoreSystemPrompt(mockConfig)).toThrow(
+      `missing prompt override file '${path.resolve(customPath)}' for GEMINI_PROMPT_COREMANDATES`,
+    );
+  });
+});
+
+describe('getCompressionPrompt', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', undefined);
+  });
+
+  it('should return default compression prompt when env var is not set', () => {
+    const prompt = getCompressionPrompt();
+    expect(prompt).not.toBeNull();
+    expect(prompt).toContain('summarizes internal chat history');
+    expect(prompt).toContain('<state_snapshot>');
+  });
+
+  it.each(['0', 'false', 'FALSE'])(
+    'should return null when GEMINI_COMPRESSION_PROMPT_MD is "%s"',
+    (value) => {
+      vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', value);
+      const prompt = getCompressionPrompt();
+      expect(prompt).toBeNull();
+    },
+  );
+
+  it.each(['1', 'true', 'TRUE'])(
+    'should return default prompt when GEMINI_COMPRESSION_PROMPT_MD is "%s"',
+    (value) => {
+      vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', value);
+      const prompt = getCompressionPrompt();
+      expect(prompt).not.toBeNull();
+      expect(prompt).toContain('summarizes internal chat history');
+    },
+  );
+
+  it('should read from custom file when GEMINI_COMPRESSION_PROMPT_MD is a path', () => {
+    const customPath = '/custom/compression.md';
+    const customContent = 'My custom compression prompt';
+    vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', customPath);
+    vi.mocked(fs.existsSync).mockImplementation(
+      (p) => p === path.resolve(customPath),
+    );
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === path.resolve(customPath)) return customContent;
+      throw new Error('unexpected read');
+    });
+
+    const prompt = getCompressionPrompt();
+    expect(prompt).toBe(customContent);
+  });
+
+  it('should throw error if custom compression prompt file does not exist', () => {
+    const customPath = '/non/existent/compression.md';
+    vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', customPath);
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    expect(() => getCompressionPrompt()).toThrow(
+      `missing compression prompt file '${path.resolve(customPath)}' for GEMINI_COMPRESSION_PROMPT_MD`,
     );
   });
 });

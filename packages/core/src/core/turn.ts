@@ -172,6 +172,9 @@ export enum CompressionStatus {
 
   /** The compression was not necessary and no action was taken */
   NOOP,
+
+  /** The compression was disabled via GEMINI_COMPRESSION_PROMPT_MD env var */
+  DISABLED_BY_ENV,
 }
 
 export interface ChatCompressionInfo {

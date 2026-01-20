@@ -132,6 +132,7 @@ describe('ChatCompressionService', () => {
   const mockPromptId = 'test-prompt-id';
 
   beforeEach(() => {
+    vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', undefined);
     service = new ChatCompressionService();
     mockChat = {
       getHistory: vi.fn(),
@@ -309,5 +310,30 @@ describe('ChatCompressionService', () => {
       CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
     );
     expect(result.newHistory).toBeNull();
+  });
+
+  it('should return DISABLED_BY_ENV when compression is disabled via env var', async () => {
+    vi.stubEnv('GEMINI_COMPRESSION_PROMPT_MD', '0');
+    vi.mocked(mockChat.getHistory).mockReturnValue([
+      { role: 'user', parts: [{ text: 'msg1' }] },
+    ]);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(800);
+
+    const result = await service.compress(
+      mockChat,
+      mockPromptId,
+      true, // forced
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    expect(result.info.compressionStatus).toBe(
+      CompressionStatus.DISABLED_BY_ENV,
+    );
+    expect(result.newHistory).toBeNull();
+    expect(
+      mockConfig.getBaseLlmClient().generateContent,
+    ).not.toHaveBeenCalled();
   });
 });
