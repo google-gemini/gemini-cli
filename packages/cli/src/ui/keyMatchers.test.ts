@@ -96,7 +96,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.CLEAR_INPUT,
-      positive: [createKey('escape'), createKey('c', { ctrl: true })],
+      positive: [createKey('c', { ctrl: true })],
       negative: [createKey('c'), createKey('k', { ctrl: true })],
     },
     {
