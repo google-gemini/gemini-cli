@@ -134,7 +134,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-vi.mock('./extension-manager.js');
+vi.mock('./extension-manager.js', () => {
+  const ExtensionManager = vi.fn();
+  ExtensionManager.prototype.loadExtensions = vi.fn();
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  return { ExtensionManager };
+});
 
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
@@ -142,6 +147,11 @@ const originalGeminiModel = process.env['GEMINI_MODEL'];
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
+  // Restore ExtensionManager mocks by re-assigning them
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  ExtensionManager.prototype.loadExtensions = vi
+    .fn()
+    .mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -644,6 +654,12 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Restore ExtensionManager mocks that were reset
+    ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+    ExtensionManager.prototype.loadExtensions = vi
+      .fn()
+      .mockResolvedValue(undefined);
+
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     // Other common mocks would be reset here.
   });
