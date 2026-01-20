@@ -133,7 +133,17 @@ describe('<AppHeader />', () => {
   });
 
   it('should not render the default banner if shown count is 5 or more', () => {
-    persistentStateMock.get.mockReturnValue(5);
+    persistentStateMock.get.mockImplementation((key) => {
+      if (key === 'defaultBannerShownCount') {
+        const hash = crypto
+          .createHash('sha256')
+          .update('This is the default banner')
+          .digest('hex');
+        return { [hash]: 5 };
+      }
+      return undefined;
+    });
+
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],

@@ -12,6 +12,17 @@ import { Text } from 'ink';
 import { renderWithProviders } from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
 
+vi.mock('../../utils/persistentState.js', () => ({
+  persistentState: {
+    get: vi.fn().mockImplementation((key) => {
+      if (key === 'tipsShown') return false;
+      if (key === 'defaultBannerShownCount') return {};
+      return undefined;
+    }),
+    set: vi.fn(),
+  },
+}));
+
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
