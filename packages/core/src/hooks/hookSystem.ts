@@ -94,11 +94,12 @@ export class HookSystem {
    */
   async fireSessionStartEvent(
     source: SessionStartSource,
-  ): Promise<AggregatedHookResult | undefined> {
+  ): Promise<DefaultHookOutput | undefined> {
     if (!this.config.getEnableHooks()) {
       return undefined;
     }
-    return this.hookEventHandler.fireSessionStartEvent(source);
+    const result = await this.hookEventHandler.fireSessionStartEvent(source);
+    return result.finalOutput;
   }
 
   async fireSessionEndEvent(
