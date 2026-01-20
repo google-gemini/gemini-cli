@@ -56,6 +56,26 @@ describe('policyHelpers', () => {
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
     });
 
+    it('uses auto chain when preferred model is auto', () => {
+      const config = createMockConfig({
+        getModel: () => 'gemini-2.5-pro',
+      });
+      const chain = resolvePolicyChain(config, DEFAULT_GEMINI_MODEL_AUTO);
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('uses auto chain when configured model is auto even if preferred is concrete', () => {
+      const config = createMockConfig({
+        getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      const chain = resolvePolicyChain(config, 'gemini-2.5-pro');
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
     it('starts chain from preferredModel when model is "auto"', () => {
       const config = createMockConfig({
         getModel: () => DEFAULT_GEMINI_MODEL_AUTO,

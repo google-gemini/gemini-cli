@@ -22,8 +22,8 @@ import {
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
+  isAutoModel,
   resolveModel,
 } from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
@@ -40,26 +40,30 @@ export function resolvePolicyChain(
 ): ModelPolicyChain {
   const modelFromConfig =
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
+  const configuredModel = config.getModel();
 
   let chain;
   const resolvedModel = resolveModel(modelFromConfig);
+  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
+  const isAutoConfigured = isAutoModel(configuredModel);
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
-  } else if (
-    config.getModel() === PREVIEW_GEMINI_MODEL_AUTO ||
-    config.getModel() === DEFAULT_GEMINI_MODEL_AUTO
-  ) {
+  } else if (isAutoPreferred || isAutoConfigured) {
+    const previewEnabled =
+      preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+      configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
     chain = getModelPolicyChain({
-      previewEnabled: config.getModel() === PREVIEW_GEMINI_MODEL_AUTO,
+      previewEnabled,
       userTier: config.getUserTier(),
     });
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
-  const activeModel = resolvedModel;
 
-  const activeIndex = chain.findIndex((policy) => policy.model === activeModel);
+  const activeIndex = chain.findIndex(
+    (policy) => policy.model === resolvedModel,
+  );
   if (activeIndex !== -1) {
     return wrapsAround
       ? [...chain.slice(activeIndex), ...chain.slice(0, activeIndex)]
@@ -68,7 +72,7 @@ export function resolvePolicyChain(
 
   // If the user specified a model not in the default chain, we assume they want
   // *only* that model. We do not fallback to the default chain.
-  return [createDefaultPolicy(activeModel, { isLastResort: true })];
+  return [createDefaultPolicy(resolvedModel, { isLastResort: true })];
 }
 
 /**
