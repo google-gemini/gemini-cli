@@ -157,24 +157,39 @@ function findCodeRegions(content: string): Array<[number, number]> {
   const tokens = marked.lexer(content);
   let offset = 0;
 
+  function walkChildren(
+    children: Token[],
+    parentRaw: string,
+    baseOffset: number,
+  ) {
+    let childOffset = 0;
+    for (const child of children) {
+      const childIndexInParent = parentRaw.indexOf(child.raw, childOffset);
+      if (childIndexInParent === -1) {
+        // Child raw doesn't exist verbatim in parent (e.g., list items with
+        // normalized whitespace). Fall back to finding code regions directly
+        // in the parent's raw content.
+        findCodeSpansDirectly(parentRaw, baseOffset, regions);
+        return;
+      }
+      walk(child, baseOffset + childIndexInParent);
+      childOffset = childIndexInParent + child.raw.length;
+    }
+  }
+
   function walk(token: Token, baseOffset: number) {
     if (token.type === 'code' || token.type === 'codespan') {
       regions.push([baseOffset, baseOffset + token.raw.length]);
     }
 
+    // Walk into child tokens (paragraphs, text with inline formatting, etc.)
     if ('tokens' in token && token.tokens) {
-      let childOffset = 0;
-      for (const child of token.tokens) {
-        const childIndexInParent = token.raw.indexOf(child.raw, childOffset);
-        if (childIndexInParent === -1) {
-          logger.error(
-            `Could not find child token in parent raw content. Aborting parsing for this branch. Child raw: "${child.raw}"`,
-          );
-          break;
-        }
-        walk(child, baseOffset + childIndexInParent);
-        childOffset = childIndexInParent + child.raw.length;
-      }
+      walkChildren(token.tokens, token.raw, baseOffset);
+    }
+
+    // Walk into list items (lists have 'items' instead of 'tokens')
+    if ('items' in token && Array.isArray(token.items)) {
+      walkChildren(token.items as Token[], token.raw, baseOffset);
     }
   }
 
@@ -184,6 +199,40 @@ function findCodeRegions(content: string): Array<[number, number]> {
   }
 
   return regions;
+}
+
+// Fallback: find inline code spans directly using backtick matching
+function findCodeSpansDirectly(
+  content: string,
+  baseOffset: number,
+  regions: Array<[number, number]>,
+): void {
+  // Match fenced code blocks (```...```) and inline code (`...`)
+  // Process fenced blocks first to avoid matching their backticks as inline code
+  const fencedRegex = /```[\s\S]*?```/g;
+  let match;
+  const fencedRanges: Array<[number, number]> = [];
+
+  while ((match = fencedRegex.exec(content)) !== null) {
+    const start = baseOffset + match.index;
+    const end = start + match[0].length;
+    regions.push([start, end]);
+    fencedRanges.push([match.index, match.index + match[0].length]);
+  }
+
+  // Match inline code spans (single backticks), avoiding fenced regions
+  const inlineRegex = /`[^`]+`/g;
+  while ((match = inlineRegex.exec(content)) !== null) {
+    // Skip if this match is inside a fenced code block
+    const matchStart = match.index;
+    const matchEnd = matchStart + match[0].length;
+    const insideFenced = fencedRanges.some(
+      ([fStart, fEnd]) => matchStart >= fStart && matchEnd <= fEnd,
+    );
+    if (!insideFenced) {
+      regions.push([baseOffset + matchStart, baseOffset + matchEnd]);
+    }
+  }
 }
 
 /**

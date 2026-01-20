@@ -441,6 +441,22 @@ describe('memoryImportProcessor', () => {
       expect(result.importTree.imports).toBeUndefined();
     });
 
+    it('should not import when @ is inside inline code within a list item', async () => {
+      // This tests the bug where inline code inside list items wasn't being detected
+      // because findCodeRegions didn't walk into list items.
+      // The @ preceded by a space inside the code span would be detected as an import.
+      const content = `- _Example (Core package)_:
+  \`npm test -w @google/gemini-cli-core -- src/test.ts\`
+- _Common workspaces_: \`@google/gemini-cli\`, \`@google/gemini-cli-core\`.`;
+      const testRootDir = testPath('test', 'project');
+      mockedFs.access.mockClear();
+      const result = await processImports(content, testRootDir);
+      expect(result.content).toBe(content);
+      expect(result.importTree.imports).toBeUndefined();
+      // Verify no file access was attempted for the inline code paths
+      expect(mockedFs.access).not.toHaveBeenCalled();
+    });
+
     it('should allow imports from parent and subdirectories within project root', async () => {
       const content =
         'Parent import: @../parent.md Subdir import: @./components/sub.md';
