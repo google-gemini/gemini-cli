@@ -107,7 +107,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'debug' && (
         <InfoMessage
           text={itemForDisplay.text}
-          icon={'🐛 '}
+          icon={'⚙ '}
           color={theme.text.accent}
         />
       )}

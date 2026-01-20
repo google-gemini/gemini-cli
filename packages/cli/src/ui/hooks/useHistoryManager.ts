@@ -42,9 +42,8 @@ export function useHistory({
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messageIdCounterRef = useRef(0);
 
-  const getNextMessageId = useCallback((baseTimestamp: number) => {
-    // Generate a unique ID using timestamp and a counter to handle
-    // multiple messages in the same millisecond
+  // Generates a unique message ID based on a timestamp and a counter.
+  const getNextMessageId = useCallback((baseTimestamp: number): number => {
     messageIdCounterRef.current += 1;
     return baseTimestamp + messageIdCounterRef.current;
   }, []);
@@ -53,10 +52,7 @@ export function useHistory({
     setHistory(newHistory);
   }, []);
 
-  /**
-   * Adds an item to the history.
-   * Returns the ID of the added item.
-   */
+  // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
     (
       itemData: Omit<HistoryItem, 'id'>,
@@ -66,19 +62,19 @@ export function useHistory({
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
-      setHistory((prev) => {
-        if (prev.length > 0) {
-          const lastItem = prev[prev.length - 1];
+      setHistory((prevHistory) => {
+        if (prevHistory.length > 0) {
+          const lastItem = prevHistory[prevHistory.length - 1];
           // Prevent adding duplicate consecutive user messages
           if (
             lastItem.type === 'user' &&
             newItem.type === 'user' &&
             lastItem.text === newItem.text
           ) {
-            return prev; // Don't add the duplicate
+            return prevHistory; // Don't add the duplicate
           }
         }
-        return [...prev, newItem];
+        return [...prevHistory, newItem];
       });
 
       // Record UI-specific messages, but don't do it if we're actually loading
