@@ -508,7 +508,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } else {
           // Second ESC
           resetEscapeState();
-          if (keyMatchers[Command.CLEAR_INPUT](key) && buffer.text.length > 0) {
+          if (keyMatchers[Command.ESCAPE](key) && buffer.text.length > 0) {
             buffer.setText('');
             resetCompletionState();
           } else {

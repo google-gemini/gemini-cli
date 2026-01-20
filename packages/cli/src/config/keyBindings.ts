@@ -27,7 +27,6 @@ export enum Command {
   // Editing
   KILL_LINE_RIGHT = 'edit.deleteRightAll',
   KILL_LINE_LEFT = 'edit.deleteLeftAll',
-  CLEAR_INPUT = 'edit.clear',
   DELETE_WORD_BACKWARD = 'edit.deleteWordLeft',
   DELETE_WORD_FORWARD = 'edit.deleteWordRight',
   DELETE_CHAR_LEFT = 'edit.deleteLeft',
@@ -143,7 +142,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Editing
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
   [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
-  [Command.CLEAR_INPUT]: [{ key: 'escape' }],
   // Added command (meta/alt/option) for mac compatibility
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
@@ -273,7 +271,6 @@ export const commandCategories: readonly CommandCategory[] = [
     commands: [
       Command.KILL_LINE_RIGHT,
       Command.KILL_LINE_LEFT,
-      Command.CLEAR_INPUT,
       Command.DELETE_WORD_BACKWARD,
       Command.DELETE_WORD_FORWARD,
       Command.DELETE_CHAR_LEFT,
@@ -374,7 +371,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Editing
   [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',
   [Command.KILL_LINE_LEFT]: 'Delete from the cursor to the start of the line.',
-  [Command.CLEAR_INPUT]: 'Clear all text in the input field.',
   [Command.DELETE_WORD_BACKWARD]: 'Delete the previous word.',
   [Command.DELETE_WORD_FORWARD]: 'Delete the next word.',
   [Command.DELETE_CHAR_LEFT]: 'Delete the character to the left.',
