@@ -23,6 +23,8 @@ import { Storage } from '../config/storage.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import { PassThrough, Readable } from 'node:stream';
+import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 // Mock dependencies for canUseRipgrep
@@ -197,47 +199,43 @@ describe('ensureRgPath', () => {
 function createMockSpawn(
   options: {
     outputData?: string;
-    exitCode?: number;
+    exitCode?: number | null;
     signal?: string;
   } = {},
 ) {
   const { outputData, exitCode = 0, signal } = options;
 
   return () => {
-    const mockProcess = {
-      stdout: {
-        on: vi.fn(),
-        removeListener: vi.fn(),
+    // strict Readable implementation
+    let pushed = false;
+    const stdout = new Readable({
+      read() {
+        if (!pushed) {
+          if (outputData) {
+            this.push(outputData);
+          }
+          this.push(null); // EOF
+          pushed = true;
+        }
       },
-      stderr: {
-        on: vi.fn(),
-        removeListener: vi.fn(),
-      },
-      on: vi.fn(),
-      removeListener: vi.fn(),
-      kill: vi.fn(),
-    };
+    });
 
-    // Set up event listeners immediately
+    const stderr = new PassThrough();
+    const mockProcess = new EventEmitter() as ChildProcess;
+    mockProcess.stdout = stdout as unknown as Readable;
+    mockProcess.stderr = stderr;
+    mockProcess.kill = vi.fn();
+    // @ts-expect-error - mocking private/internal property
+    mockProcess.killed = false;
+    // @ts-expect-error - mocking private/internal property
+    mockProcess.exitCode = null;
+
+    // Emulating process exit
     setTimeout(() => {
-      const stdoutDataHandler = mockProcess.stdout.on.mock.calls.find(
-        (call) => call[0] === 'data',
-      )?.[1];
+      mockProcess.emit('close', exitCode, signal);
+    }, 10);
 
-      const closeHandler = mockProcess.on.mock.calls.find(
-        (call) => call[0] === 'close',
-      )?.[1];
-
-      if (stdoutDataHandler && outputData) {
-        stdoutDataHandler(Buffer.from(outputData));
-      }
-
-      if (closeHandler) {
-        closeHandler(exitCode, signal);
-      }
-    }, 0);
-
-    return mockProcess as unknown as ChildProcess;
+    return mockProcess;
   };
 }
 
@@ -471,51 +469,20 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'hello' in 'sub' with '*.js' filter
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Only return match from the .js file in sub directory
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'another.js' },
-                    line_number: 1,
-                    lines: { text: 'const greeting = "hello";\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'another.js' },
+                line_number: 1,
+                lines: { text: 'const greeting = "hello";\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'hello',
@@ -559,59 +526,114 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = { pattern: '[[' };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('ripgrep exited with code 2');
+      expect(result.llmContent).toContain('Process exited with code 2');
       expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code 2',
+        'Error: Process exited with code 2',
       );
     });
 
+    it('should ignore invalid regex error from ripgrep when it is not a user error', async () => {
+      mockSpawn.mockImplementation(
+        createMockSpawn({
+          outputData: '',
+          exitCode: 2,
+          signal: undefined,
+        }),
+      );
+
+      const invocation = grepTool.build({
+        pattern: 'foo',
+        dir_path: tempRootDir,
+      });
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Process exited with code 2');
+      expect(result.returnDisplay).toContain(
+        'Error: Process exited with code 2',
+      );
+    });
+
+    it('should handle massive output by terminating early without crashing (Regression)', async () => {
+      const massiveOutputLines = 30000;
+
+      // Custom mock for massive streaming
+      mockSpawn.mockImplementation(() => {
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        const mockProcess = new EventEmitter() as ChildProcess;
+        mockProcess.stdout = stdout;
+        mockProcess.stderr = stderr;
+        mockProcess.kill = vi.fn();
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.killed = false;
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.exitCode = null;
+
+        // Push data over time
+        let linesPushed = 0;
+        const pushInterval = setInterval(() => {
+          if (linesPushed >= massiveOutputLines) {
+            clearInterval(pushInterval);
+            stdout.end();
+            mockProcess.emit('close', 0);
+            return;
+          }
+
+          // Push a batch
+          try {
+            for (let i = 0; i < 2000 && linesPushed < massiveOutputLines; i++) {
+              const match = JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: `file_${linesPushed}.txt` },
+                  line_number: 1,
+                  lines: { text: `match ${linesPushed}\n` },
+                },
+              });
+              stdout.write(match + '\n');
+              linesPushed++;
+            }
+          } catch (_e) {
+            clearInterval(pushInterval);
+          }
+        }, 1);
+
+        mockProcess.kill = vi.fn().mockImplementation(() => {
+          clearInterval(pushInterval);
+          stdout.end();
+          // Emit close async to allow listeners to attach
+          setTimeout(() => mockProcess.emit('close', 0, 'SIGTERM'), 0);
+          return true;
+        });
+
+        return mockProcess;
+      });
+
+      const invocation = grepTool.build({
+        pattern: 'test',
+        dir_path: tempRootDir,
+      });
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.returnDisplay).toContain('(limited)');
+    }, 10000);
+
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Return match for the regex pattern
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileB.js' },
-                    line_number: 1,
-                    lines: { text: 'const foo = "bar";\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.js' },
+                line_number: 1,
+                lines: { text: 'const foo = "bar";\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'foo.*bar' }; // Matches 'const foo = "bar";'
       const invocation = grepTool.build(params);
@@ -625,61 +647,30 @@ describe('RipGrepTool', () => {
 
     it('should be case-insensitive by default (JS fallback)', async () => {
       // Setup specific mock for this test - case insensitive search for 'HELLO'
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Return case-insensitive matches for 'HELLO'
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileA.txt' },
-                    line_number: 1,
-                    lines: { text: 'hello world\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'fileB.js' },
-                      line_number: 2,
-                      lines: { text: 'function baz() { return "hello"; }\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.js' },
+                line_number: 2,
+                lines: { text: 'function baz() { return "hello"; }\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'HELLO' };
       const invocation = grepTool.build(params);
@@ -742,97 +733,39 @@ describe('RipGrepTool', () => {
 
       // Setup specific mock for this test - multi-directory search for 'world'
       // Mock will be called twice - once for each directory
-      let callCount = 0;
-      mockSpawn.mockImplementation(() => {
-        callCount++;
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
 
-        setTimeout(() => {
-          const stdoutDataHandler = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-
-          const closeHandler = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          let outputData = '';
-          if (callCount === 1) {
-            // First directory (tempRootDir)
-            outputData =
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'fileA.txt' },
-                  line_number: 1,
-                  lines: { text: 'hello world\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'fileA.txt' },
-                  line_number: 2,
-                  lines: { text: 'second line with world\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'sub/fileC.txt' },
-                  line_number: 1,
-                  lines: { text: 'another world in sub dir\n' },
-                },
-              }) +
-              '\n';
-          } else if (callCount === 2) {
-            // Second directory (secondDir)
-            outputData =
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'other.txt' },
-                  line_number: 2,
-                  lines: { text: 'world in second\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'another.js' },
-                  line_number: 1,
-                  lines: { text: 'function world() { return "test"; }\n' },
-                },
-              }) +
-              '\n';
-          }
-
-          if (stdoutDataHandler && outputData) {
-            stdoutDataHandler(Buffer.from(outputData));
-          }
-
-          if (closeHandler) {
-            closeHandler(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 2,
+                lines: { text: 'second line with world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'sub/fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const multiDirGrepTool = new RipGrepTool(
         multiDirConfig,
@@ -886,50 +819,19 @@ describe('RipGrepTool', () => {
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileC.txt' },
-                    line_number: 1,
-                    lines: { text: 'another world in sub dir\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const multiDirGrepTool = new RipGrepTool(
         multiDirConfig,
@@ -970,35 +872,12 @@ describe('RipGrepTool', () => {
 
     it('should abort streaming search when signal is triggered', async () => {
       // Setup specific mock for this test - simulate process being killed due to abort
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        // Simulate process being aborted - use setTimeout to ensure handlers are registered first
-        setTimeout(() => {
-          const closeHandler = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (closeHandler) {
-            // Simulate process killed by signal (code is null, signal is SIGTERM)
-            closeHandler(null, 'SIGTERM');
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          exitCode: null,
+          signal: 'SIGTERM',
+        }),
+      );
 
       const controller = new AbortController();
       const params: RipGrepToolParams = { pattern: 'test' };
@@ -1008,12 +887,7 @@ describe('RipGrepTool', () => {
       controller.abort();
 
       const result = await invocation.execute(controller.signal);
-      expect(result.llmContent).toContain(
-        'Error during grep search operation: ripgrep exited with code null',
-      );
-      expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code null',
-      );
+      expect(result.returnDisplay).toContain('No matches found');
     });
   });
 
@@ -1060,50 +934,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'world' should find the file with special characters
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: specialFileName },
-                    line_number: 1,
-                    lines: { text: 'hello world with special chars\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: specialFileName },
+                line_number: 1,
+                lines: { text: 'hello world with special chars\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
@@ -1122,50 +965,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'deep' should find the deeply nested file
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'a/b/c/d/e/deep.txt' },
-                    line_number: 1,
-                    lines: { text: 'content in deep directory\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'a/b/c/d/e/deep.txt' },
+                line_number: 1,
+                lines: { text: 'content in deep directory\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'deep' };
       const invocation = grepTool.build(params);
@@ -1184,50 +996,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - regex pattern should match function declarations
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'code.js' },
-                    line_number: 1,
-                    lines: { text: 'function getName() { return "test"; }\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'code.js' },
+                line_number: 1,
+                lines: { text: 'function getName() { return "test"; }\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'function\\s+\\w+\\s*\\(' };
       const invocation = grepTool.build(params);
@@ -1244,69 +1025,38 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - case insensitive search should match all variants
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'case.txt' },
-                    line_number: 1,
-                    lines: { text: 'Hello World\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'case.txt' },
-                      line_number: 2,
-                      lines: { text: 'hello world\n' },
-                    },
-                  }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'case.txt' },
-                      line_number: 3,
-                      lines: { text: 'HELLO WORLD\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 1,
+                lines: { text: 'Hello World\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 2,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 3,
+                lines: { text: 'HELLO WORLD\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'hello' };
       const invocation = grepTool.build(params);
@@ -1324,50 +1074,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - escaped regex pattern should match price format
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'special.txt' },
-                    line_number: 1,
-                    lines: { text: 'Price: $19.99\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'special.txt' },
+                line_number: 1,
+                lines: { text: 'Price: $19.99\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: '\\$\\d+\\.\\d+' };
       const invocation = grepTool.build(params);
@@ -1392,60 +1111,29 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'test.txt'), 'text content');
 
       // Setup specific mock for this test - include pattern should filter to only ts/tsx files
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'test.ts' },
-                    line_number: 1,
-                    lines: { text: 'typescript content\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'test.tsx' },
-                      line_number: 1,
-                      lines: { text: 'tsx content\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'test.ts' },
+                line_number: 1,
+                lines: { text: 'typescript content\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'test.tsx' },
+                line_number: 1,
+                lines: { text: 'tsx content\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'content',
@@ -1469,50 +1157,19 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'other.ts'), 'other code');
 
       // Setup specific mock for this test - include pattern should filter to only src/** files
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'src/main.ts' },
-                    line_number: 1,
-                    lines: { text: 'source code\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'src/main.ts' },
+                line_number: 1,
+                lines: { text: 'source code\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'code',
