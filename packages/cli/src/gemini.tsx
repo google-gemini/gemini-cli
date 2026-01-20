@@ -96,6 +96,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -409,6 +410,9 @@ export async function main() {
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
   }
+
+  // Run deferred command now that we have admin settings.
+  await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {

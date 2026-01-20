@@ -64,6 +64,8 @@ import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -105,6 +107,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+import {
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 
 export interface AccessibilitySettings {
@@ -544,6 +550,7 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
+  private lastModeSwitchTime: number = Date.now();
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1278,6 +1285,24 @@ export class Config {
     return this.userMemory;
   }
 
+  /**
+   * Refreshes the MCP context, including memory, tools, and system instructions.
+   */
+  async refreshMcpContext(): Promise<void> {
+    if (this.experimentalJitContext && this.contextManager) {
+      await this.contextManager.refresh();
+    } else {
+      const { refreshServerHierarchicalMemory } = await import(
+        '../utils/memoryDiscovery.js'
+      );
+      await refreshServerHierarchicalMemory(this);
+    }
+    if (this.geminiClient?.isInitialized()) {
+      await this.geminiClient.setTools();
+      await this.geminiClient.updateSystemInstruction();
+    }
+  }
+
   setUserMemory(newUserMemory: string): void {
     this.userMemory = newUserMemory;
   }
@@ -1330,7 +1355,30 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
+
+    const currentMode = this.getApprovalMode();
+    if (currentMode !== mode) {
+      this.logCurrentModeDuration(this.getApprovalMode());
+      logApprovalModeSwitch(
+        this,
+        new ApprovalModeSwitchEvent(currentMode, mode),
+      );
+      this.lastModeSwitchTime = Date.now();
+    }
+
     this.policyEngine.setApprovalMode(mode);
+  }
+
+  /**
+   * Logs the duration of the current approval mode.
+   */
+  logCurrentModeDuration(mode: ApprovalMode): void {
+    const now = Date.now();
+    const duration = now - this.lastModeSwitchTime;
+    logApprovalModeDuration(
+      this,
+      new ApprovalModeDurationEvent(mode, duration),
+    );
   }
 
   isYoloModeDisabled(): boolean {
@@ -2036,6 +2084,7 @@ export class Config {
    * Disposes of resources and removes event listeners.
    */
   async dispose(): Promise<void> {
+    this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
     this.agentRegistry?.dispose();
     this.geminiClient?.dispose();
