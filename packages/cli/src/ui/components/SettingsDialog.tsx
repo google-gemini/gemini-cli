@@ -75,19 +75,12 @@ interface SettingsDialogProps {
 const MAX_ITEMS_TO_SHOW = 8;
 
 const CATEGORY_ORDER = [
-  'Core & Intelligence',
-  'Appearance & UI',
-  'Editor & Input',
-  'File System & Context',
-  'System & Maintenance',
-  'General',
-  'UI',
-  'Tools',
-  'Model',
-  'Security',
-  'Privacy',
-  'Experimental',
-  'Advanced',
+  'APPLICATION',
+  'INTELLIGENCE & MODEL',
+  'INTERFACE & APPEARANCE',
+  'EDITOR & INPUT',
+  'FILE SYSTEM & CONTEXT',
+  'SYSTEM',
 ];
 
 type SettingsDialogItem =
@@ -1046,15 +1039,31 @@ export function SettingsDialog({
                 activeSettingIndex === idx + scrollOffset;
 
               if (item.type === 'header') {
+                const headerLabel = `── ${item.label.toUpperCase()} `;
+
+                // Calculate padding to fill width, accounting for margins
+
+                const targetWidth = Math.max(10, mainAreaWidth - 6);
+
+                const paddingLen = Math.max(
+                  0,
+
+                  targetWidth - headerLabel.length,
+                );
+
+                const padding = '─'.repeat(paddingLen);
+
                 return (
                   <Box
                     key={item.value}
                     marginTop={1}
-                    marginBottom={0}
+                    marginBottom={1}
                     marginX={1}
                   >
-                    <Text bold color={theme.text.primary} underline>
-                      {item.label}
+                    <Text color={theme.text.secondary}>
+                      {headerLabel}
+
+                      {padding}
                     </Text>
                   </Box>
                 );
