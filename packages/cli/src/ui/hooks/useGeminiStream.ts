@@ -30,6 +30,7 @@ import {
   ToolErrorType,
   coreEvents,
   CoreEvent,
+  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -62,9 +63,9 @@ import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
+import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import {
   useReactToolScheduler,
-  mapToDisplay as mapTrackedToolCallsToDisplay,
   type TrackedToolCall,
   type TrackedCompletedToolCall,
   type TrackedCancelledToolCall,
@@ -83,7 +84,7 @@ enum StreamProcessingStatus {
 }
 
 function showCitations(settings: LoadedSettings): boolean {
-  const enabled = settings?.merged?.ui?.showCitations;
+  const enabled = settings.merged.ui.showCitations;
   if (enabled !== undefined) {
     return enabled;
   }
@@ -459,7 +460,7 @@ export const useGeminiStream = (
                   isClientInitiated: true,
                   prompt_id,
                 };
-                scheduleToolCalls([toolCallRequest], abortSignal);
+                await scheduleToolCalls([toolCallRequest], abortSignal);
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {
@@ -782,7 +783,7 @@ export const useGeminiStream = (
 
   const handleChatModelEvent = useCallback(
     (eventValue: string, userMessageTimestamp: number) => {
-      if (!settings?.merged?.ui?.showModelInfoInChat) {
+      if (!settings.merged.ui.showModelInfoInChat) {
         return;
       }
       if (pendingHistoryItemRef.current) {
@@ -922,7 +923,11 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCalls(toolCallRequests, signal);
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+          setPendingHistoryItem(null);
+        }
+        await scheduleToolCalls(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
     },
@@ -939,6 +944,9 @@ export const useGeminiStream = (
       handleChatModelEvent,
       handleAgentExecutionStoppedEvent,
       handleAgentExecutionBlockedEvent,
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
     ],
   );
   const submitQuery = useCallback(
@@ -951,6 +959,26 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
+
+          const discoveryState = config
+            .getMcpClientManager()
+            ?.getDiscoveryState();
+          const mcpServerCount =
+            config.getMcpClientManager()?.getMcpServerCount() ?? 0;
+          if (
+            !options?.isContinuation &&
+            typeof query === 'string' &&
+            !isSlashCommand(query.trim()) &&
+            mcpServerCount > 0 &&
+            discoveryState !== MCPDiscoveryState.COMPLETED
+          ) {
+            coreEvents.emitFeedback(
+              'info',
+              'Waiting for MCP servers to initialize... Slash commands are still available.',
+            );
+            return;
+          }
+
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
           if (
