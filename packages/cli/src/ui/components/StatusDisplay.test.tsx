@@ -35,6 +35,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
+    buffer: { text: '' },
     ...overrides,
   }) as UIState;
 
@@ -147,7 +148,7 @@ describe('StatusDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Escape prompt', () => {
+  it('renders Escape prompt when buffer is NOT empty', () => {
     const uiState = createMockUIState({
       showEscapePrompt: true,
     });
