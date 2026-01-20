@@ -22,6 +22,17 @@ vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
   return {
     ...actual,
     expandHomeDir: (p: string) => p, // Simple pass-through for testing
+    batchAddDirectories: (
+      workspaceContext: WorkspaceContext,
+      paths: string[],
+    ) => {
+      const result = workspaceContext.addDirectories(paths);
+      const errors: string[] = [];
+      for (const failure of result.failed) {
+        errors.push(`Error adding '${failure.path}': ${failure.error.message}`);
+      }
+      return { added: result.added, errors };
+    },
     loadMemoryFromDirectories: vi.fn().mockResolvedValue({ fileCount: 1 }),
   };
 });
