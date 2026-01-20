@@ -1253,6 +1253,25 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should clear the buffer on Ctrl+C if it has text', async () => {
+    await act(async () => {
+      props.buffer.setText('some text to clear');
+    });
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\x03'); // Ctrl+C character
+    });
+    await waitFor(() => {
+      expect(props.buffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+    });
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
     props.buffer.text = '';
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
@@ -1855,6 +1874,25 @@ describe('InputPrompt', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    it('should clear buffer on Ctrl-C', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('text to clear');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x03');
+        vi.advanceTimersByTime(100);
+
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
     it('should submit /rewind on double ESC when buffer is empty', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
@@ -1874,7 +1912,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should clear the buffer on esc esc if it has text', async () => {
+    it('should clear the buff on esc esc if it has text', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('some text');

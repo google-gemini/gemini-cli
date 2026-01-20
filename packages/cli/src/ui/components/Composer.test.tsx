@@ -385,6 +385,16 @@ describe('Composer', () => {
 
       expect(lastFrame()).toContain('Press Ctrl+D again to exit');
     });
+
+    it('shows escape prompt when showEscapePrompt is true', () => {
+      const uiState = createMockUIState({
+        showEscapePrompt: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('Press Esc again to rewind');
+    });
   });
 
   describe('Input and Indicators', () => {

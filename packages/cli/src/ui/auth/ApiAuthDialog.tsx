@@ -87,7 +87,7 @@ export function ApiAuthDialog({
 
   useKeypress(
     async (key) => {
-      if (keyMatchers[Command.QUIT](key)) {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         await handleClear();
       }
     },

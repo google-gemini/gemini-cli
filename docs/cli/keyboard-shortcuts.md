@@ -34,6 +34,7 @@ available combinations.
 | ------------------------------------------------ | --------------------------------------------------------- |
 | Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
+| Clear all text in the input field.               | `Ctrl + C`                                                |
 | Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
 | Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |

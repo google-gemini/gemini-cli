@@ -795,6 +795,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.move('end');
         return;
       }
+      // Ctrl+C (Clear input)
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+        }
+        return;
+      }
+
       // Kill line commands
       if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
