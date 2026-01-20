@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type GeminiCodeAssistSetting,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -24,12 +24,24 @@ import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
+  type MergedSettings,
   type MemoryImportFormat,
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
 } from './settingsSchema.js';
+
+export {
+  type Settings,
+  type MergedSettings,
+  type MemoryImportFormat,
+  type MergeStrategy,
+  type SettingsSchema,
+  type SettingDefinition,
+  getSettingsSchema,
+};
+
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -58,8 +70,6 @@ function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
 
   return current?.mergeStrategy;
 }
-
-export type { Settings, MemoryImportFormat };
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
@@ -138,7 +148,7 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
 
@@ -201,10 +211,7 @@ export function getDefaultsFromSchema(
   for (const key in schema) {
     const definition = schema[key];
     if (definition.properties) {
-      const childDefaults = getDefaultsFromSchema(definition.properties);
-      if (Object.keys(childDefaults).length > 0) {
-        defaults[key] = childDefaults;
-      }
+      defaults[key] = getDefaultsFromSchema(definition.properties);
     } else if (definition.default !== undefined) {
       defaults[key] = definition.default;
     }
@@ -212,13 +219,13 @@ export function getDefaultsFromSchema(
   return defaults as Settings;
 }
 
-function mergeSettings(
+export function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
-): Settings {
+): MergedSettings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
   const schemaDefaults = getDefaultsFromSchema();
 
@@ -236,7 +243,24 @@ function mergeSettings(
     user,
     safeWorkspace,
     system,
-  ) as Settings;
+  ) as MergedSettings;
+}
+
+/**
+ * Creates a fully populated MergedSettings object for testing purposes.
+ * It merges the provided overrides with the default settings from the schema.
+ *
+ * @param overrides Partial settings to override the defaults.
+ * @returns A complete MergedSettings object.
+ */
+export function createTestMergedSettings(
+  overrides: Partial<Settings> = {},
+): MergedSettings {
+  return customDeepMerge(
+    getMergeStrategyForPath,
+    getDefaultsFromSchema(),
+    overrides,
+  ) as MergedSettings;
 }
 
 export class LoadedSettings {
@@ -264,14 +288,14 @@ export class LoadedSettings {
   readonly isTrusted: boolean;
   readonly errors: SettingsError[];
 
-  private _merged: Settings;
+  private _merged: MergedSettings;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
-  get merged(): Settings {
+  get merged(): MergedSettings {
     return this._merged;
   }
 
-  private computeMergedSettings(): Settings {
+  private computeMergedSettings(): MergedSettings {
     const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
@@ -293,7 +317,7 @@ export class LoadedSettings {
         (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
         adminDefaults,
         this._remoteAdminSettings?.admin ?? {},
-      ) as Settings['admin'];
+      ) as MergedSettings['admin'];
     }
     return merged;
   }
@@ -322,25 +346,21 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: GeminiCodeAssistSetting): void {
+  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
     const admin: Settings['admin'] = {};
+    const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
-    if (remoteSettings.secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = remoteSettings.secureModeEnabled;
+    if (secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = secureModeEnabled;
     }
 
-    if (remoteSettings.mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: remoteSettings.mcpSetting.mcpEnabled };
+    if (mcpSetting?.mcpEnabled !== undefined) {
+      admin.mcp = { enabled: mcpSetting.mcpEnabled };
     }
 
-    if (
-      remoteSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
-      undefined
-    ) {
-      admin.extensions = {
-        enabled:
-          remoteSettings.cliFeatureSetting.extensionsSetting.extensionsEnabled,
-      };
+    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
+    if (extensionsSetting?.extensionsEnabled !== undefined) {
+      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
     }
 
     this._remoteAdminSettings = { admin };
@@ -593,7 +613,7 @@ export function loadSettings(
     );
   }
 
-  return new LoadedSettings(
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -621,6 +641,171 @@ export function loadSettings(
     isTrusted,
     settingsErrors,
   );
+
+  // Automatically migrate deprecated settings when loading.
+  migrateDeprecatedSettings(loadedSettings);
+
+  return loadedSettings;
+}
+
+/**
+ * Migrates deprecated settings to their new counterparts.
+ *
+ * TODO: After a couple of weeks (around early Feb 2026), we should start removing
+ * the deprecated settings from the settings files by default.
+ *
+ * @returns true if any changes were made and need to be saved.
+ */
+export function migrateDeprecatedSettings(
+  loadedSettings: LoadedSettings,
+  removeDeprecated = false,
+): boolean {
+  let anyModified = false;
+  const processScope = (scope: LoadableSettingScope) => {
+    const settings = loadedSettings.forScope(scope).settings;
+
+    // Migrate inverted boolean settings (disableX -> enableX)
+    // These settings were renamed and their boolean logic inverted
+    const generalSettings = settings.general as
+      | Record<string, unknown>
+      | undefined;
+    const uiSettings = settings.ui as Record<string, unknown> | undefined;
+    const contextSettings = settings.context as
+      | Record<string, unknown>
+      | undefined;
+
+    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
+    if (generalSettings) {
+      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      let modified = false;
+
+      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableAutoUpdate'];
+          newGeneral['enableAutoUpdate'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+          }
+          modified = true;
+        }
+      }
+
+      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableUpdateNag'];
+          newGeneral['enableAutoUpdateNotification'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+          }
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        anyModified = true;
+      }
+    }
+
+    // Migrate ui settings
+    if (uiSettings) {
+      const newUi: Record<string, unknown> = { ...uiSettings };
+      let modified = false;
+
+      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+      const accessibilitySettings = newUi['accessibility'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        accessibilitySettings &&
+        typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
+      ) {
+        const newAccessibility: Record<string, unknown> = {
+          ...accessibilitySettings,
+        };
+        if (
+          typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
+        ) {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+            newUi['accessibility'] = newAccessibility;
+            modified = true;
+          }
+        } else {
+          const oldValue = accessibilitySettings['disableLoadingPhrases'];
+          newAccessibility['enableLoadingPhrases'] = !oldValue;
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+          }
+          newUi['accessibility'] = newAccessibility;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        anyModified = true;
+      }
+    }
+
+    // Migrate context settings
+    if (contextSettings) {
+      const newContext: Record<string, unknown> = { ...contextSettings };
+      let modified = false;
+
+      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+      const fileFilteringSettings = newContext['fileFiltering'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        fileFilteringSettings &&
+        typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
+      ) {
+        const newFileFiltering: Record<string, unknown> = {
+          ...fileFilteringSettings,
+        };
+        if (typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+            newContext['fileFiltering'] = newFileFiltering;
+            modified = true;
+          }
+        } else {
+          const oldValue = fileFilteringSettings['disableFuzzySearch'];
+          newFileFiltering['enableFuzzySearch'] = !oldValue;
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+          }
+          newContext['fileFiltering'] = newFileFiltering;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'context', newContext);
+        anyModified = true;
+      }
+    }
+  };
+
+  processScope(SettingScope.User);
+  processScope(SettingScope.Workspace);
+
+  return anyModified;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
