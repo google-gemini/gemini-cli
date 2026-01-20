@@ -52,6 +52,7 @@ import {
   type ResumedSessionData,
   debugLogger,
   coreEvents,
+  type AuthType,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -1023,6 +1024,210 @@ describe('gemini.tsx main function kitty protocol', () => {
       configurable: true,
     });
   });
+
+  it('should validate non-interactive auth when selectedType is missing in settings', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const { validateNonInteractiveAuth } = await import(
+      './validateNonInterActiveAuth.js'
+    );
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: {
+            auth: {
+              selectedType: undefined, // Explicitly undefined
+              useExternal: false,
+            },
+          },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as unknown as CliArgs);
+
+    const refreshAuthSpy = vi.fn();
+
+    vi.mocked(loadCliConfig).mockResolvedValue({
+      isInteractive: () => false,
+      getQuestion: () => 'test-question',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
+      getHookSystem: () => undefined,
+      initialize: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => false,
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getProjectRoot: () => '/',
+      getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
+      getToolRegistry: vi.fn(),
+      getExtensions: () => [],
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getUsageStatisticsEnabled: () => false,
+      refreshAuth: refreshAuthSpy,
+      setTerminalBackground: vi.fn(),
+      getRemoteAdminSettings: () => undefined,
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
+    } as unknown as Config);
+
+    vi.mock('./utils/readStdin.js', () => ({
+      readStdin: vi.fn().mockResolvedValue(''),
+    }));
+    vi.mock('./nonInteractiveCli.js', () => ({
+      runNonInteractive: vi.fn(),
+    }));
+
+    // We want to verify this is called
+    vi.mocked(validateNonInteractiveAuth).mockResolvedValue(
+      'gemini-api-key' as unknown as AuthType,
+    );
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(validateNonInteractiveAuth).toHaveBeenCalled();
+    expect(refreshAuthSpy).toHaveBeenCalledWith('gemini-api-key');
+    expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
+
+  it('should validate non-interactive auth when mcp command is detected, even if interactive is true', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const { validateNonInteractiveAuth } = await import(
+      './validateNonInterActiveAuth.js'
+    );
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: {
+            auth: {
+              selectedType: undefined,
+              useExternal: false,
+            },
+          },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+      _: ['mcp'],
+    } as unknown as CliArgs);
+
+    const refreshAuthSpy = vi.fn();
+
+    vi.mocked(loadCliConfig).mockResolvedValue({
+      isInteractive: () => true, // Interactive is true, but 'mcp' command should trigger validation
+      getQuestion: () => 'test-question',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
+      getHookSystem: () => undefined,
+      initialize: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => false,
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getProjectRoot: () => '/',
+      getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
+      getToolRegistry: vi.fn(),
+      getExtensions: () => [],
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getUsageStatisticsEnabled: () => false,
+      refreshAuth: refreshAuthSpy,
+      setTerminalBackground: vi.fn(),
+      getRemoteAdminSettings: () => undefined,
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
+    } as unknown as Config);
+
+    vi.mock('./utils/readStdin.js', () => ({
+      readStdin: vi.fn().mockResolvedValue(''),
+    }));
+    vi.mock('./nonInteractiveCli.js', () => ({
+      runNonInteractive: vi.fn(),
+    }));
+
+    vi.mocked(validateNonInteractiveAuth).mockResolvedValue(
+      'gemini-api-key' as unknown as AuthType,
+    );
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(validateNonInteractiveAuth).toHaveBeenCalled();
+    expect(refreshAuthSpy).toHaveBeenCalledWith('gemini-api-key');
+    expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
 });
 
 describe('gemini.tsx main function exit codes', () => {
@@ -1060,6 +1265,7 @@ describe('gemini.tsx main function exit codes', () => {
     );
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: true,
+      _: [],
     } as unknown as CliArgs);
     Object.defineProperty(process.stdin, 'isTTY', {
       value: false,
@@ -1093,7 +1299,9 @@ describe('gemini.tsx main function exit codes', () => {
         },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      _: [],
+    } as unknown as CliArgs);
     vi.mock('./config/auth.js', () => ({
       validateAuthMethod: vi.fn().mockReturnValue(null),
     }));
@@ -1157,6 +1365,7 @@ describe('gemini.tsx main function exit codes', () => {
     );
     vi.mocked(parseArguments).mockResolvedValue({
       resume: 'invalid-session',
+      _: [],
     } as unknown as CliArgs);
 
     vi.mock('./utils/sessionUtils.js', () => ({
@@ -1224,7 +1433,9 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      _: [],
+    } as unknown as CliArgs);
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true, // Simulate TTY so it doesn't try to read stdin
       configurable: true,
