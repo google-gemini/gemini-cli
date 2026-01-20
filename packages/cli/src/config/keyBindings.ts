@@ -71,7 +71,7 @@ export enum Command {
 
   TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
   TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
-  
+
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -434,7 +434,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
   [Command.SHOW_MORE_LINES]:
-      'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+    'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Move current shell command to background or toggle background shell view.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
