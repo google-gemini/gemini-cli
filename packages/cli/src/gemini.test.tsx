@@ -1265,7 +1265,6 @@ describe('gemini.tsx main function exit codes', () => {
     );
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: true,
-      _: [],
     } as unknown as CliArgs);
     Object.defineProperty(process.stdin, 'isTTY', {
       value: false,
@@ -1299,9 +1298,7 @@ describe('gemini.tsx main function exit codes', () => {
         },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({
-      _: [],
-    } as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
     vi.mock('./config/auth.js', () => ({
       validateAuthMethod: vi.fn().mockReturnValue(null),
     }));
@@ -1433,9 +1430,7 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({
-      _: [],
-    } as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true, // Simulate TTY so it doesn't try to read stdin
       configurable: true,
