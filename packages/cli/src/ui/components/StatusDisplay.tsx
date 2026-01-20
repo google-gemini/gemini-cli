@@ -45,7 +45,12 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   if (uiState.showEscapePrompt) {
-    return <Text color={theme.text.secondary}>Press Esc again to rewind.</Text>;
+    const isPromptEmpty = uiState.buffer.text.trim().length === 0;
+    return (
+      <Text color={theme.text.secondary}>
+        Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
+      </Text>
+    );
   }
 
   if (uiState.queueErrorMessage) {

@@ -495,7 +495,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for rewind
+        // Handle double ESC
         if (escPressCount.current === 0) {
           escPressCount.current = 1;
           setShowEscapePrompt(true);
@@ -506,9 +506,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-          // Second ESC triggers rewind
+          // Second ESC
           resetEscapeState();
-          onSubmit('/rewind');
+          if (keyMatchers[Command.CLEAR_INPUT](key) && buffer.text.length > 0) {
+            buffer.setText('');
+            resetCompletionState();
+          } else {
+            onSubmit('/rewind');
+          }
         }
         return;
       }
@@ -790,15 +795,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.move('end');
         return;
       }
-      // Ctrl+C (Clear input)
-      if (keyMatchers[Command.CLEAR_INPUT](key)) {
-        if (buffer.text.length > 0) {
-          buffer.setText('');
-          resetCompletionState();
-        }
-        return;
-      }
-
       // Kill line commands
       if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
