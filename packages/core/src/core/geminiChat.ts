@@ -379,17 +379,18 @@ export class GeminiChat {
               return; // Stop the generator
             }
 
-            if (isConnectionPhase) {
-              // Remove failed user content so it doesn't break subsequent requests
-              this.history.pop();
-              throw error;
-            }
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
             const isRetryable = isRetryableError(
               error,
               this.config.getRetryFetchErrors(),
             );
+
+            // For non-retryable connection errors, pop history and throw immediately
+            if (isConnectionPhase && !isRetryable) {
+              this.history.pop();
+              throw error;
+            }
 
             if (
               (isContentError && isGemini2Model(model)) ||
