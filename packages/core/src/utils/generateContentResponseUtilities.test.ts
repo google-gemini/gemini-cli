@@ -212,12 +212,16 @@ describe('generateContentResponseUtilities', () => {
         llmContent,
         DEFAULT_GEMINI_MODEL,
       );
+      // Binary content is dropped for non-multimodal models, with an accurate message
       expect(result).toEqual([
         {
           functionResponse: {
             name: toolName,
             id: callId,
-            response: { output: 'Binary content provided (1 item(s)).' },
+            response: {
+              output:
+                'Tool executed but binary output was omitted (model does not support multimodal function responses).',
+            },
           },
         },
       ]);

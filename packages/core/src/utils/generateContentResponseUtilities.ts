@@ -97,7 +97,6 @@ export function convertToFunctionResponse(
   };
 
   const isMultimodalFRSupported = supportsMultimodalFunctionResponse(model);
-  const siblingParts: Part[] = [];
 
   if (isMultimodalFRSupported) {
     const binaryParts = [...fileDataParts, ...inlineDataParts];
@@ -105,27 +104,28 @@ export function convertToFunctionResponse(
       // Nest all binary content if supported by the model
       (part.functionResponse as unknown as { parts: Part[] }).parts =
         binaryParts;
+      // Add descriptive text if the response object is empty but we have binary content
+      if (textParts.length === 0) {
+        part.functionResponse!.response = {
+          output: `Binary content provided (${binaryParts.length} item(s)).`,
+        };
+      }
     }
   } else {
-    // Otherwise treat as siblings (which will be dropped below)
-    siblingParts.push(...fileDataParts, ...inlineDataParts);
-  }
-
-  // Add descriptive text if the response object is empty but we have binary content
-  if (
-    textParts.length === 0 &&
-    (inlineDataParts.length > 0 || fileDataParts.length > 0)
-  ) {
-    const totalBinaryItems = inlineDataParts.length + fileDataParts.length;
-    part.functionResponse!.response = {
-      output: `Binary content provided (${totalBinaryItems} item(s)).`,
-    };
-  }
-
-  if (siblingParts.length > 0) {
-    debugLogger.warn(
-      `Model ${model} does not support multimodal function responses. Sibling parts will be omitted to prevent API errors in parallel function calling.`,
-    );
+    // Binary content will be dropped for non-multimodal models
+    const droppedCount = fileDataParts.length + inlineDataParts.length;
+    if (droppedCount > 0) {
+      debugLogger.warn(
+        `Model ${model} does not support multimodal function responses. ${droppedCount} binary part(s) will be omitted to prevent API errors in parallel function calling.`,
+      );
+      // Don't mislead the model - only set response message if there's no text
+      // and binary was dropped (so the model knows the tool ran but output was lost)
+      if (textParts.length === 0) {
+        part.functionResponse!.response = {
+          output: `Tool executed but binary output was omitted (model does not support multimodal function responses).`,
+        };
+      }
+    }
   }
 
   return [part];
