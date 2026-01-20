@@ -361,9 +361,11 @@ describe('migrate command', () => {
     await handleMigrateFromClaude();
 
     expect(mockSetValue).toHaveBeenCalledWith(
-      expect.any(String),
+      SettingScope.Workspace,
       'hooks',
-      expect.any(Object),
+      expect.objectContaining({
+        BeforeTool: expect.any(Array),
+      }),
     );
   });
 
