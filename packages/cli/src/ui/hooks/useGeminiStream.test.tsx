@@ -2205,6 +2205,98 @@ describe('useGeminiStream', () => {
     );
   });
 
+  it('should flush pending text rationale before scheduling tool calls to ensure correct history order', async () => {
+    const addItemOrder: string[] = [];
+    let capturedOnComplete: any;
+
+    const mockScheduleToolCalls = vi.fn(async (requests) => {
+      addItemOrder.push('scheduleToolCalls_START');
+      // Simulate tools completing and triggering onComplete immediately.
+      // This mimics the behavior that caused the regression where tool results
+      // were added to history during the await scheduleToolCalls(...) block.
+      const tools = requests.map((r: any) => ({
+        request: r,
+        status: 'success',
+        tool: { displayName: r.name, name: r.name },
+        invocation: { getDescription: () => 'desc' },
+        response: { responseParts: [], resultDisplay: 'done' },
+        startTime: Date.now(),
+        endTime: Date.now(),
+      }));
+      await capturedOnComplete(tools);
+      addItemOrder.push('scheduleToolCalls_END');
+    });
+
+    mockAddItem.mockImplementation((item: any) => {
+      addItemOrder.push(`addItem:${item.type}`);
+    });
+
+    // We need to capture the onComplete callback from useReactToolScheduler
+    const mockUseReactToolScheduler = useReactToolScheduler as Mock;
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [], // toolCalls
+        mockScheduleToolCalls,
+        vi.fn(), // markToolsAsSubmitted
+        vi.fn(), // setToolCallsForDisplay
+        vi.fn(), // cancelAllToolCalls
+        0, // lastToolOutputTime
+      ];
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        vi.fn(),
+        vi.fn(),
+        false,
+        () => 'vscode' as EditorType,
+        vi.fn(),
+        vi.fn(),
+        false,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        80,
+        24,
+      ),
+    );
+
+    const mockStream = (async function* () {
+      yield {
+        type: ServerGeminiEventType.Content,
+        value: 'Rationale rationale.',
+      };
+      yield {
+        type: ServerGeminiEventType.ToolCallRequest,
+        value: { callId: '1', name: 'test_tool', args: {} },
+      };
+    })();
+    mockSendMessageStream.mockReturnValue(mockStream);
+
+    await act(async () => {
+      await result.current.submitQuery('test input');
+    });
+
+    // Expectation: addItem:gemini (rationale) MUST happen before scheduleToolCalls_START
+    const rationaleIndex = addItemOrder.indexOf('addItem:gemini');
+    const scheduleIndex = addItemOrder.indexOf('scheduleToolCalls_START');
+    const toolGroupIndex = addItemOrder.indexOf('addItem:tool_group');
+
+    expect(rationaleIndex).toBeGreaterThan(-1);
+    expect(scheduleIndex).toBeGreaterThan(-1);
+    expect(toolGroupIndex).toBeGreaterThan(-1);
+
+    // This is the core fix validation: Rationale comes before tools are even scheduled (awaited)
+    expect(rationaleIndex).toBeLessThan(scheduleIndex);
+    expect(rationaleIndex).toBeLessThan(toolGroupIndex);
+  });
+
   it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
     const rawQuery = '@include file.txt Summarize this.';
     const processedQueryParts = [
