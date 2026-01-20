@@ -65,6 +65,8 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     fallbackHandler: undefined,
     getFallbackModelHandler: vi.fn(),
     setActiveModel: vi.fn(),
+    setModel: vi.fn(),
+    activateFallbackMode: vi.fn(),
     getModelAvailabilityService: vi.fn(() =>
       createAvailabilityServiceMock({
         selectedModel: FALLBACK_MODEL,
@@ -198,7 +200,7 @@ describe('handleFallback', () => {
 
         expect(result).toBe(true);
         expect(policyConfig.getFallbackModelHandler).not.toHaveBeenCalled();
-        expect(policyConfig.setActiveModel).toHaveBeenCalledWith(
+        expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
         );
       } finally {
@@ -273,7 +275,7 @@ describe('handleFallback', () => {
       expect(openBrowserSecurely).toHaveBeenCalledWith(
         'https://goo.gle/set-up-gemini-code-assist',
       );
-      expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
     });
 
     it('should catch errors from the handler, log an error, and return null', async () => {
@@ -378,7 +380,7 @@ describe('handleFallback', () => {
       );
     });
 
-    it('calls setActiveModel and logs telemetry when handler returns "retry_always"', async () => {
+    it('calls activateFallbackMode when handler returns "retry_always"', async () => {
       policyHandler.mockResolvedValue('retry_always');
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
@@ -391,11 +393,13 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBe(true);
-      expect(policyConfig.setActiveModel).toHaveBeenCalledWith(FALLBACK_MODEL);
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        FALLBACK_MODEL,
+      );
       // TODO: add logging expect statement
     });
 
-    it('does NOT call setActiveModel when handler returns "stop"', async () => {
+    it('does NOT call activateFallbackMode when handler returns "stop"', async () => {
       policyHandler.mockResolvedValue('stop');
 
       const result = await handleFallback(
@@ -405,11 +409,11 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBe(false);
-      expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
       // TODO: add logging expect statement
     });
 
-    it('does NOT call setActiveModel when handler returns "retry_once"', async () => {
+    it('does NOT call activateFallbackMode when handler returns "retry_once"', async () => {
       policyHandler.mockResolvedValue('retry_once');
 
       const result = await handleFallback(
@@ -419,7 +423,7 @@ describe('handleFallback', () => {
       );
 
       expect(result).toBe(true);
-      expect(policyConfig.setActiveModel).not.toHaveBeenCalled();
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
     });
   });
 });

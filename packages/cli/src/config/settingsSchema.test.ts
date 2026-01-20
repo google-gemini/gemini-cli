@@ -79,7 +79,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().ui?.properties?.accessibility.properties
-          ?.disableLoadingPhrases.type,
+          ?.enableLoadingPhrases.type,
       ).toBe('boolean');
     });
 
@@ -170,7 +170,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.disableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
@@ -357,6 +357,17 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have skills setting enabled by default', () => {
+      const setting = getSettingsSchema().skills.properties.enabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Agent Skills.');
+    });
+
     it('should have plan setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.plan;
       expect(setting).toBeDefined();
@@ -367,6 +378,20 @@ describe('SettingsSchema', () => {
       expect(setting.showInDialog).toBe(true);
       expect(setting.description).toBe(
         'Enable planning features (Plan Mode and tools).',
+      );
+    });
+
+    it('should have enableEventDrivenScheduler setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enables event-driven scheduler within the CLI session.',
       );
     });
 
