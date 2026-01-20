@@ -172,6 +172,9 @@ export enum CompressionStatus {
   /** The compression failed due to an error counting tokens */
   COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
 
+  /** The compression failed because the summary was empty */
+  COMPRESSION_FAILED_EMPTY_SUMMARY,
+
   /** The compression was not necessary and no action was taken */
   NOOP,
 }
