@@ -40,11 +40,15 @@ powerful tool for developers.
 
 ## Testing and Quality
 
-- **Run All Tests (Unit):** `npm run test`
-- **Run Integration Tests (E2E):** `npm run test:e2e`
-- **Lint Codebase:** `npm run lint`
-- **Format Codebase:** `npm run format`
-- **Type Check:** `npm run typecheck`
+- **Test Commands:**
+  - **Unit (All):** `npm run test`
+  - **Integration (E2E):** `npm run test:e2e`
+  - **Workspace-Specific:** `npm test -w <pkg> -- <path>` (Note: `<path>` must
+    be relative to the workspace root, e.g.,
+    `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
+- **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
+  build, lint, type check, and tests. Recommended before submitting PRs.)
+- **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
 
