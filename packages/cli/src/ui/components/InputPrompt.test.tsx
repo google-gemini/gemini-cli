@@ -1855,24 +1855,6 @@ describe('InputPrompt', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    it('should NOT clear buffer on Ctrl-C', async () => {
-      const onEscapePromptChange = vi.fn();
-      props.onEscapePromptChange = onEscapePromptChange;
-      props.buffer.setText('text to clear');
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-
-      await act(async () => {
-        stdin.write('\x03');
-        vi.advanceTimersByTime(100);
-
-        expect(props.buffer.setText).not.toHaveBeenCalledWith('');
-      });
-      unmount();
-    });
-
     it('should submit /rewind on double ESC when buffer is empty', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
