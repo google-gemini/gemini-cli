@@ -240,6 +240,7 @@ export class ChatCompressionService {
     model: string,
     config: Config,
     hasFailedCompressionAttempt: boolean,
+    abortSignal?: AbortSignal,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
     const curatedHistory = chat.getHistory(true);
 
@@ -319,6 +320,14 @@ export class ChatCompressionService {
         ? originalHistoryToCompress
         : historyToCompressTruncated;
 
+    const hasPreviousSnapshot = historyForSummarizer.some((c) =>
+      c.parts?.some((p) => p.text?.includes('<state_snapshot>')),
+    );
+
+    const anchorInstruction = hasPreviousSnapshot
+      ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
+      : 'Generate a new <state_snapshot> based on the provided history.';
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
@@ -327,7 +336,7 @@ export class ChatCompressionService {
           role: 'user',
           parts: [
             {
-              text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
             },
           ],
         },
@@ -335,14 +344,62 @@ export class ChatCompressionService {
       systemInstruction: { text: getCompressionPrompt() },
       promptId,
       // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: new AbortController().signal,
+      abortSignal: abortSignal ?? new AbortController().signal,
     });
     const summary = getResponseText(summaryResponse) ?? '';
+
+    // Phase 3: The "Probe" Verification (Self-Correction)
+    // We perform a second lightweight turn to ensure no critical information was lost.
+    const verificationResponse = await config
+      .getBaseLlmClient()
+      .generateContent({
+        modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+        contents: [
+          ...historyForSummarizer,
+          {
+            role: 'model',
+            parts: [{ text: summary }],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                text: 'Critically evaluate the <state_snapshot> you just generated. Did you omit any specific technical details, file paths, tool results, or user constraints mentioned in the history? If anything is missing or could be more precise, generate a FINAL, improved <state_snapshot>. Otherwise, repeat the exact same <state_snapshot> again.',
+              },
+            ],
+          },
+        ],
+        systemInstruction: { text: getCompressionPrompt() },
+        promptId: `${promptId}-verify`,
+        abortSignal: abortSignal ?? new AbortController().signal,
+      });
+
+    const finalSummary = (
+      getResponseText(verificationResponse)?.trim() || summary
+    ).trim();
+
+    if (!finalSummary) {
+      logChatCompression(
+        config,
+        makeChatCompressionEvent({
+          tokens_before: originalTokenCount,
+          tokens_after: originalTokenCount, // No change since it failed
+        }),
+      );
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY,
+        },
+      };
+    }
 
     const extraHistory: Content[] = [
       {
         role: 'user',
-        parts: [{ text: summary }],
+        parts: [{ text: finalSummary }],
       },
       {
         role: 'model',
