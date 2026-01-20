@@ -196,6 +196,7 @@ foreach ($commandAst in $commandAsts) {
 ).toString('base64');
 
 const REDIRECTION_NAMES = new Set([
+  'redirection (<)',
   'redirection (>)',
   'heredoc (<<)',
   'herestring (<<<)',
@@ -286,9 +287,16 @@ function extractNameFromNode(node: Node): string | null {
       return normalizeCommandName(firstChild.text);
     }
     case 'file_redirect': {
-      const op = node.child(0)?.text;
-      if (op === '<') {
-        return 'redirection (<)';
+      // The first child might be a file descriptor (e.g., '2>').
+      // We iterate to find the actual operator token.
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (child && child.text.includes('<')) {
+          return 'redirection (<)';
+        }
+        if (child && child.text.includes('>')) {
+          return 'redirection (>)';
+        }
       }
       return 'redirection (>)';
     }

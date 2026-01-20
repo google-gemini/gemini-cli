@@ -18,6 +18,7 @@ import {
   getCommandRoots,
   getShellConfiguration,
   initializeShellParsers,
+  parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
@@ -168,6 +169,20 @@ describe('getCommandRoots', () => {
     expect(result).toEqual(['echo', 'cat']);
   });
 
+  it('should correctly identify input redirection with explicit file descriptor', () => {
+    const result = parseCommandDetails('ls 2< input.txt');
+    const redirection = result?.details.find((d) =>
+      d.name.startsWith('redirection'),
+    );
+    expect(redirection?.name).toBe('redirection (<)');
+  });
+
+  it('should filter out all redirections from getCommandRoots', () => {
+    expect(getCommandRoots('cat < input.txt')).toEqual(['cat']);
+    expect(getCommandRoots('ls 2> error.log')).toEqual(['ls']);
+    expect(getCommandRoots('exec 3<&0')).toEqual(['exec']);
+  });
+
   it('should handle parser initialization failures gracefully', async () => {
     // Reset modules to clear singleton state
     vi.resetModules();
@@ -218,6 +233,11 @@ describe('hasRedirection', () => {
 
   it('should detect input redirection', () => {
     expect(hasRedirection('cat < input')).toBe(true);
+  });
+
+  it('should detect redirection with explicit file descriptor', () => {
+    expect(hasRedirection('ls 2> error.log')).toBe(true);
+    expect(hasRedirection('exec 3<&0')).toBe(true);
   });
 
   it('should detect append redirection', () => {
