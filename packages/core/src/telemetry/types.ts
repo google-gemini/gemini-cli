@@ -1865,6 +1865,10 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
       to_mode: this.to_mode,
     };
   }
+
+  toLogBody(): string {
+    return `Approval mode switched from ${this.from_mode} to ${this.to_mode}.`;
+  }
 }
 
 export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
@@ -1886,6 +1890,10 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
       mode: this.mode,
       duration_ms: this.duration_ms,
     };
+  }
+
+  toLogBody(): string {
+    return `Approval mode ${this.mode} was active for ${this.duration_ms}ms.`;
   }
 }
 

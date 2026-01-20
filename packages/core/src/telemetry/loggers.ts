@@ -680,7 +680,7 @@ export function logApprovalModeSwitch(
   ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
   bufferTelemetryEvent(() => {
     logs.getLogger(SERVICE_NAME).emit({
-      body: 'Approval Mode Switched',
+      body: event.toLogBody(),
       attributes: event.toOpenTelemetryAttributes(config),
     });
   });
@@ -693,7 +693,7 @@ export function logApprovalModeDuration(
   ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
   bufferTelemetryEvent(() => {
     logs.getLogger(SERVICE_NAME).emit({
-      body: 'Approval Mode Duration',
+      body: event.toLogBody(),
       attributes: event.toOpenTelemetryAttributes(config),
     });
   });
