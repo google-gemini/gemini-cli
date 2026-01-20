@@ -452,6 +452,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
 
@@ -660,6 +661,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
+    clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
@@ -729,6 +731,8 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler,
     skillsSupport:
       settings.experimental?.skills || (settings.skills?.enabled ?? true),
     disabledSkills: settings.skills?.disabled,

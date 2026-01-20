@@ -1400,6 +1400,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enableEventDrivenScheduler": {
+          "title": "Event Driven Scheduler",
+          "description": "Enables event-driven scheduler within the CLI session.",
+          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1939,10 +1946,6 @@
         "enabled": {
           "type": "boolean",
           "description": "Whether to enable the agent."
-        },
-        "disabled": {
-          "type": "boolean",
-          "description": "Whether to disable the agent."
         }
       }
     },

@@ -11,6 +11,7 @@ import { removeCommand } from './mcp/remove.js';
 import { listCommand } from './mcp/list.js';
 import { enableCommand, disableCommand } from './mcp/enableDisable.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
+import { defer } from '../deferred.js';
 
 export const mcpCommand: CommandModule = {
   command: 'mcp',
@@ -18,11 +19,11 @@ export const mcpCommand: CommandModule = {
   builder: (yargs: Argv) =>
     yargs
       .middleware(() => initializeOutputListenersAndFlush())
-      .command(addCommand)
-      .command(removeCommand)
-      .command(listCommand)
-      .command(enableCommand)
-      .command(disableCommand)
+      .command(defer(addCommand, 'mcp'))
+      .command(defer(removeCommand, 'mcp'))
+      .command(defer(listCommand, 'mcp'))
+      .command(defer(enableCommand, 'mcp'))
+      .command(defer(disableCommand, 'mcp'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {

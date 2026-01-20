@@ -64,6 +64,8 @@ import { logRipgrepFallback, logFlashFallback } from '../telemetry/loggers.js';
 import {
   RipgrepFallbackEvent,
   FlashFallbackEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
@@ -105,6 +107,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
+import {
+  logApprovalModeSwitch,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 
 export interface AccessibilitySettings {
@@ -171,7 +177,6 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
-  disabled?: boolean;
   enabled?: boolean;
 }
 
@@ -297,6 +302,7 @@ export interface McpEnablementCallbacks {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -392,6 +398,7 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableAgents?: boolean;
+  enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
@@ -422,6 +429,7 @@ export class Config {
   private agentRegistry!: AgentRegistry;
   private skillManager!: SkillManager;
   private sessionId: string;
+  private clientVersion: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -504,6 +512,7 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
+  private compressionTruncationCounter = 0;
   private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
@@ -544,6 +553,7 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
+  private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
@@ -555,9 +565,11 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
+  private lastModeSwitchTime: number = Date.now();
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.clientVersion = params.clientVersion ?? 'unknown';
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -632,6 +644,8 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.planEnabled = params.plan ?? false;
+    this.enableEventDrivenScheduler =
+      params.enableEventDrivenScheduler ?? false;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -814,6 +828,7 @@ export class Config {
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
+      this.clientVersion,
       this.toolRegistry,
       this,
       this.eventEmitter,
@@ -1292,6 +1307,24 @@ export class Config {
     return this.userMemory;
   }
 
+  /**
+   * Refreshes the MCP context, including memory, tools, and system instructions.
+   */
+  async refreshMcpContext(): Promise<void> {
+    if (this.experimentalJitContext && this.contextManager) {
+      await this.contextManager.refresh();
+    } else {
+      const { refreshServerHierarchicalMemory } = await import(
+        '../utils/memoryDiscovery.js'
+      );
+      await refreshServerHierarchicalMemory(this);
+    }
+    if (this.geminiClient?.isInitialized()) {
+      await this.geminiClient.setTools();
+      await this.geminiClient.updateSystemInstruction();
+    }
+  }
+
   setUserMemory(newUserMemory: string): void {
     this.userMemory = newUserMemory;
   }
@@ -1344,7 +1377,30 @@ export class Config {
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
     }
+
+    const currentMode = this.getApprovalMode();
+    if (currentMode !== mode) {
+      this.logCurrentModeDuration(this.getApprovalMode());
+      logApprovalModeSwitch(
+        this,
+        new ApprovalModeSwitchEvent(currentMode, mode),
+      );
+      this.lastModeSwitchTime = Date.now();
+    }
+
     this.policyEngine.setApprovalMode(mode);
+  }
+
+  /**
+   * Logs the duration of the current approval mode.
+   */
+  logCurrentModeDuration(mode: ApprovalMode): void {
+    const now = Date.now();
+    const duration = now - this.lastModeSwitchTime;
+    logApprovalModeDuration(
+      this,
+      new ApprovalModeDurationEvent(mode, duration),
+    );
   }
 
   isYoloModeDisabled(): boolean {
@@ -1538,6 +1594,10 @@ export class Config {
     return this.enableAgents;
   }
 
+  isEventDrivenSchedulerEnabled(): boolean {
+    return this.enableEventDrivenScheduler;
+  }
+
   getNoBrowser(): boolean {
     return this.noBrowser;
   }
@@ -1603,6 +1663,8 @@ export class Config {
     if (this.compressionThreshold) {
       return this.compressionThreshold;
     }
+
+    await this.ensureExperimentsLoaded();
 
     const remoteThreshold =
       this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
@@ -1783,6 +1845,10 @@ export class Config {
 
   getTruncateToolOutputLines(): number {
     return this.truncateToolOutputLines;
+  }
+
+  getNextCompressionTruncationId(): number {
+    return ++this.compressionTruncationCounter;
   }
 
   getUseWriteTodos(): boolean {
@@ -2040,10 +2106,10 @@ export class Config {
    * Disposes of resources and removes event listeners.
    */
   async dispose(): Promise<void> {
+    this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-    if (this.agentRegistry) {
-      this.agentRegistry.dispose();
-    }
+    this.agentRegistry?.dispose();
+    this.geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }
