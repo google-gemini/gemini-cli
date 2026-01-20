@@ -172,8 +172,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       args: { data: 'any data' },
     } as any;
 
-    act(() => {
-      schedule(request, new AbortController().signal);
+    await act(async () => {
+      await schedule(request, new AbortController().signal);
     });
 
     await act(async () => {
@@ -229,11 +229,11 @@ describe('useReactToolScheduler', () => {
     schedule: (
       req: ToolCallRequestInfo | ToolCallRequestInfo[],
       signal: AbortSignal,
-    ) => void,
+    ) => Promise<void>,
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
   ) => {
-    act(() => {
-      schedule(request, new AbortController().signal);
+    await act(async () => {
+      await schedule(request, new AbortController().signal);
     });
 
     await advanceAndSettle();
@@ -346,8 +346,9 @@ describe('useReactToolScheduler', () => {
       name: 'mockTool',
       args: {},
     } as any;
+    // Don't await - we want to check the state immediately after scheduling starts
     act(() => {
-      schedule(newRequest, new AbortController().signal);
+      void schedule(newRequest, new AbortController().signal);
     });
 
     // After scheduling, the old call should be gone,
@@ -388,8 +389,9 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
+    // Don't await - we need to observe 'executing' state during the long-running promise
     act(() => {
-      schedule(request, new AbortController().signal);
+      void schedule(request, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -520,8 +522,9 @@ describe('useReactToolScheduler', () => {
       args: { data: 'sensitive' },
     } as any;
 
+    // Don't await - we need to observe 'awaiting_approval' state
     act(() => {
-      schedule(request, new AbortController().signal);
+      void schedule(request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -567,8 +570,9 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
+    // Don't await - we need to observe 'awaiting_approval' state
     act(() => {
-      schedule(request, new AbortController().signal);
+      void schedule(request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -628,8 +632,9 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
+    // Don't await - we need to observe intermediate execution state
     act(() => {
-      result.current[1](request, new AbortController().signal);
+      void result.current[1](request, new AbortController().signal);
     });
     await advanceAndSettle();
 
@@ -699,8 +704,8 @@ describe('useReactToolScheduler', () => {
       { callId: 'multi2', name: 'tool2', args: { p: 2 } } as any,
     ];
 
-    act(() => {
-      schedule(requests, new AbortController().signal);
+    await act(async () => {
+      await schedule(requests, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -791,15 +796,16 @@ describe('useReactToolScheduler', () => {
       args: {},
     } as any;
 
+    // Don't await - we need to observe queuing behavior during execution
     act(() => {
-      schedule(request1, new AbortController().signal);
+      void schedule(request1, new AbortController().signal);
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
     act(() => {
-      schedule(request2, new AbortController().signal);
+      void schedule(request2, new AbortController().signal);
     });
 
     await act(async () => {
