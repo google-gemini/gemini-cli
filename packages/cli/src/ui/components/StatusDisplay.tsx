@@ -45,9 +45,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   if (uiState.showEscapePrompt) {
-    return (
-      <Text color={theme.text.secondary}>Clearing input is now Ctrl + C</Text>
-    );
+    return <Text color={theme.text.secondary}>Clearing input is Ctrl + C</Text>;
   }
 
   if (uiState.queueErrorMessage) {

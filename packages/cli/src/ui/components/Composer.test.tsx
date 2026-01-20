@@ -385,7 +385,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Clearing input is now Ctrl + C');
+      expect(lastFrame()).toContain('Clearing input is Ctrl + C');
     });
   });
 
