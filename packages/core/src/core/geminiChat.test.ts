@@ -1279,13 +1279,10 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should still contain the user message.
+      // History should NOT contain the failed user message,
+      // to prevent invalid content from breaking subsequent requests.
       const history = chat.getHistory();
-      expect(history.length).toBe(1);
-      expect(history[0]).toEqual({
-        role: 'user',
-        parts: [{ text: 'test' }],
-      });
+      expect(history.length).toBe(0);
     });
 
     describe('API error retry behavior', () => {

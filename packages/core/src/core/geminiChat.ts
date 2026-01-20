@@ -380,6 +380,8 @@ export class GeminiChat {
             }
 
             if (isConnectionPhase) {
+              // Remove failed user content so it doesn't break subsequent requests
+              this.history.pop();
               throw error;
             }
             lastError = error;
@@ -429,6 +431,8 @@ export class GeminiChat {
               new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
             );
           }
+          // Remove failed user content so it doesn't break subsequent requests
+          this.history.pop();
           throw lastError;
         }
       } finally {
