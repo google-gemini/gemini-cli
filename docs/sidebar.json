@@ -81,10 +81,6 @@
         "slug": "docs/cli/model"
       },
       {
-        "label": "Rewind",
-        "slug": "docs/cli/rewind"
-      },
-      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
