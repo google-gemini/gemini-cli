@@ -14,6 +14,7 @@ import {
 import { ExitCodes } from '@google/gemini-cli-core';
 import type { ArgumentsCamelCase, CommandModule } from 'yargs';
 import type { MergedSettings } from './config/settings.js';
+import type { MockInstance } from 'vitest';
 
 const { mockRunExitCleanup, mockDebugLogger } = vi.hoisted(() => ({
   mockRunExitCleanup: vi.fn(),
@@ -34,10 +35,6 @@ vi.mock('@google/gemini-cli-core', async () => {
 vi.mock('./utils/cleanup.js', () => ({
   runExitCleanup: mockRunExitCleanup,
 }));
-
-import type { MockInstance } from 'vitest';
-
-// ... imports
 
 let mockExit: MockInstance;
 
@@ -180,14 +177,6 @@ describe('deferred', () => {
       const deferredModule = defer(commandModule, 'parent');
       await deferredModule.handler({} as ArgumentsCamelCase);
 
-      // Verify the command name stored is 'parent'
-      // We can check this by spying on exit or logs, or just trusting the run logic if we could peek the state.
-      // Easiest is to enable verification via disabled settings
-
-      // Temporarily overwrite runDeferredCommand logic check to simulate arbitrary parent check?
-      // No, deferred.ts hardcodes 'mcp', 'extensions', 'skills'.
-      // So let's test with 'mcp' as parent.
-
       const deferredMcp = defer(commandModule, 'mcp');
       await deferredMcp.handler({} as ArgumentsCamelCase);
 
@@ -199,18 +188,30 @@ describe('deferred', () => {
       );
     });
 
-    it('should fallback to command name array first element', async () => {
+    it('should fallback to unknown if no parentCommandName is provided', async () => {
+      const mockHandler = vi.fn();
       const commandModule: CommandModule = {
         command: ['foo', 'infoo'],
         describe: 'foo command',
-        handler: vi.fn(),
+        handler: mockHandler,
       };
 
       const deferredModule = defer(commandModule);
       await deferredModule.handler({} as ArgumentsCamelCase);
 
-      // Just run it and check log
-      await runDeferredCommand(createMockSettings());
+      // Verify it runs even if all known commands are disabled,
+      // confirming it didn't capture 'mcp', 'extensions', or 'skills'
+      // and defaulted to 'unknown' (or something else safe).
+      const settings = createMockSettings({
+        mcp: { enabled: false },
+        extensions: { enabled: false },
+        skills: { enabled: false },
+      });
+
+      await runDeferredCommand(settings);
+
+      expect(mockHandler).toHaveBeenCalled();
+      expect(mockExit).toHaveBeenCalledWith(ExitCodes.SUCCESS);
     });
   });
 });

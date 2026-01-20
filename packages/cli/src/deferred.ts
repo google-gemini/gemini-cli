@@ -71,11 +71,7 @@ export function defer<T = object, U = object>(
           argv: ArgumentsCamelCase,
         ) => void | Promise<void>,
         argv: argv as unknown as ArgumentsCamelCase,
-        commandName:
-          parentCommandName ||
-          (Array.isArray(commandModule.command)
-            ? commandModule.command[0] // If array, first element is usually the command name
-            : commandModule.command || 'unknown'),
+        commandName: parentCommandName || 'unknown',
       });
     },
   };
