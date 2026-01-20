@@ -595,7 +595,6 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
-
         const serverName =
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName

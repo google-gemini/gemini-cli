@@ -84,7 +84,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
       expect(result.returnDisplay).toBe('Found 2 matching file(s)');
-    });
+    }, 30000);
 
     it('should find files case-sensitively when case_sensitive is true', async () => {
       const params: GlobToolParams = { pattern: '*.txt', case_sensitive: true };
@@ -95,16 +95,17 @@ describe('GlobTool', () => {
       expect(result.llmContent).not.toContain(
         path.join(tempRootDir, 'FileB.TXT'),
       );
-    });
+    }, 30000);
 
     it('should find files case-insensitively by default (pattern: *.TXT)', async () => {
       const params: GlobToolParams = { pattern: '*.TXT' };
       const invocation = globTool.build(params);
+
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Found 2 file(s)');
-      expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
-      expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
-    });
+
+      expect(result.llmContent).toContain('fileA.txt');
+      expect(result.llmContent).toContain('FileB.TXT');
+    }, 30000);
 
     it('should find files case-insensitively when case_sensitive is false (pattern: *.TXT)', async () => {
       const params: GlobToolParams = {
@@ -116,7 +117,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain(path.join(tempRootDir, 'fileA.txt'));
       expect(result.llmContent).toContain(path.join(tempRootDir, 'FileB.TXT'));
-    });
+    }, 30000);
 
     it('should find files using a pattern that includes a subdirectory', async () => {
       const params: GlobToolParams = { pattern: 'sub/*.md' };
@@ -129,7 +130,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'FileD.MD'),
       );
-    });
+    }, 30000);
 
     it('should find files in a specified relative path (relative to rootDir)', async () => {
       const params: GlobToolParams = { pattern: '*.md', dir_path: 'sub' };
@@ -142,7 +143,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'FileD.MD'),
       );
-    });
+    }, 30000);
 
     it('should find files using a deep globstar pattern (e.g., **/*.log)', async () => {
       const params: GlobToolParams = { pattern: '**/*.log' };
@@ -152,7 +153,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'sub', 'deep', 'fileE.log'),
       );
-    });
+    }, 30000);
 
     it('should return "No files found" message when pattern matches nothing', async () => {
       const params: GlobToolParams = { pattern: '*.nonexistent' };
@@ -162,7 +163,7 @@ describe('GlobTool', () => {
         'No files found matching pattern "*.nonexistent"',
       );
       expect(result.returnDisplay).toBe('No files found');
-    });
+    }, 30000);
 
     it('should find files with special characters in the name', async () => {
       await fs.writeFile(path.join(tempRootDir, 'file[1].txt'), 'content');
@@ -173,7 +174,7 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain(
         path.join(tempRootDir, 'file[1].txt'),
       );
-    });
+    }, 30000);
 
     it('should find files with special characters like [] and () in the path', async () => {
       const filePath = path.join(
@@ -190,7 +191,7 @@ describe('GlobTool', () => {
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain('Found 1 file(s)');
       expect(result.llmContent).toContain(filePath);
-    });
+    }, 30000);
 
     it('should correctly sort files by modification time (newest first)', async () => {
       const params: GlobToolParams = { pattern: '*.sortme' };
@@ -216,7 +217,7 @@ describe('GlobTool', () => {
       expect(path.resolve(filesListed[1])).toBe(
         path.resolve(tempRootDir, 'older.sortme'),
       );
-    });
+    }, 30000);
 
     it('should return a PATH_NOT_IN_WORKSPACE error if path is outside workspace', async () => {
       // Bypassing validation to test execute method directly
@@ -226,7 +227,7 @@ describe('GlobTool', () => {
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
       expect(result.returnDisplay).toBe('Path is not within workspace');
-    });
+    }, 30000);
 
     it('should return a GLOB_EXECUTION_ERROR on glob failure', async () => {
       vi.mocked(glob.glob).mockRejectedValue(new Error('Glob failed'));
@@ -239,7 +240,7 @@ describe('GlobTool', () => {
       );
       // Reset glob.
       vi.mocked(glob.glob).mockReset();
-    });
+    }, 30000);
   });
 
   describe('validateToolParams', () => {

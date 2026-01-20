@@ -1279,6 +1279,123 @@ describe('PolicyEngine', () => {
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
+
+    it('should require confirmation for a compound command with redirection even if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"mkdir\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // The full command has redirection, even if the individual split commands do not.
+      // splitCommands will return ['mkdir -p "bar"', 'echo "hello"']
+      // The redirection '> bar/test.md' is stripped by splitCommands.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'mkdir -p "bar" && echo "hello" > bar/test.md' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should report redirection when a sub-command specifically has redirection', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"mkdir\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // In this case, we mock splitCommands to keep the redirection in the sub-command
+      vi.mocked(initializeShellParsers).mockResolvedValue(undefined);
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      vi.mocked(splitCommands).mockReturnValueOnce([
+        'mkdir bar',
+        'echo hello > bar/test.md',
+      ]);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'mkdir bar && echo hello > bar/test.md' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should allow redirected shell commands in AUTO_EDIT mode if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" > test.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should allow compound commands with safe operators (&&, ||) if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "echo hello && echo world" should be allowed since both parts are ALLOW and no redirection is present.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && echo world' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('safety checker integration', () => {

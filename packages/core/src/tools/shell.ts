@@ -38,6 +38,8 @@ import {
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
+  parseCommandDetails,
+  hasRedirection,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -101,16 +103,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    let rootCommands = [...new Set(getCommandRoots(command))];
 
-    // Fallback for UI display if parser fails or returns no commands (e.g.
-    // variable assignments only)
-    if (rootCommands.length === 0 && command.trim()) {
+    const parsed = parseCommandDetails(command);
+    let rootCommandDisplay = '';
+
+    if (!parsed || parsed.hasError || parsed.details.length === 0) {
+      // Fallback if parser fails
       const fallback = command.trim().split(/\s+/)[0];
-      if (fallback) {
-        rootCommands = [fallback];
+      rootCommandDisplay = fallback || 'shell command';
+      if (hasRedirection(command)) {
+        rootCommandDisplay += ', redirection';
       }
+    } else {
+      rootCommandDisplay = parsed.details
+        .map((detail) => detail.name)
+        .join(', ');
     }
+
+    const rootCommands = [...new Set(getCommandRoots(command))];
 
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
@@ -119,7 +129,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
-      rootCommand: rootCommands.join(', '),
+      rootCommand: rootCommandDisplay,
       rootCommands,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         await this.publishPolicyUpdate(outcome);
@@ -306,7 +316,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           `Command: ${this.params.command}`,
           `Directory: ${this.params.dir_path || '(root)'}`,
           `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`, // Use the cleaned error string.
+          `Error: ${finalError}`,
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
           `Background PIDs: ${
