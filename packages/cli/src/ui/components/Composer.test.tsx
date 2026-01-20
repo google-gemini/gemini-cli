@@ -395,16 +395,6 @@ describe('Composer', () => {
 
       expect(lastFrame()).toContain('Press Esc again to rewind');
     });
-
-    it('shows clearing input educational message when showClearTextToast is true', () => {
-      const uiState = createMockUIState({
-        showClearTextToast: true,
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('Ctrl + C clears all text in the prompt');
-    });
   });
 
   describe('Input and Indicators', () => {

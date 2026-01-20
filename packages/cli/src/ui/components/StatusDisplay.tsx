@@ -48,14 +48,6 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.text.secondary}>Press Esc again to rewind.</Text>;
   }
 
-  if (uiState.showClearTextToast) {
-    return (
-      <Text color={theme.text.secondary}>
-        Ctrl + C clears all text in the prompt.
-      </Text>
-    );
-  }
-
   if (uiState.queueErrorMessage) {
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
   }

@@ -159,17 +159,6 @@ describe('StatusDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Clear Text Toast', () => {
-    const uiState = createMockUIState({
-      showClearTextToast: true,
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
   it('renders Queue Error Message', () => {
     const uiState = createMockUIState({
       queueErrorMessage: 'Queue Error',

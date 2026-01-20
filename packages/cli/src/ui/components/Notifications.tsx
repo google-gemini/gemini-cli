@@ -31,7 +31,8 @@ const screenReaderNudgeFilePath = path.join(
 
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();
-  const { initError, streamingState, updateInfo } = useUIState();
+  const { initError, streamingState, updateInfo, showClearTextToast } =
+    useUIState();
 
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const showStartupWarnings = startupWarnings.length > 0;
@@ -82,13 +83,19 @@ export const Notifications = () => {
     !showStartupWarnings &&
     !showInitError &&
     !updateInfo &&
-    !showScreenReaderNudge
+    !showScreenReaderNudge &&
+    !showClearTextToast
   ) {
     return null;
   }
 
   return (
     <>
+      {showClearTextToast && (
+        <Text color={theme.text.secondary}>
+          Ctrl + C clears all text in the prompt.
+        </Text>
+      )}
       {showScreenReaderNudge && (
         <Text>
           You are currently in screen reader-friendly view. To switch out, open{' '}

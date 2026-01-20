@@ -181,4 +181,15 @@ describe('Notifications', () => {
     expect(lastFrame()).toBe('');
     expect(mockFsWriteFile).not.toHaveBeenCalled();
   });
+
+  it('renders clear text toast', () => {
+    mockUseUIState.mockReturnValue({
+      initError: null,
+      streamingState: 'idle',
+      updateInfo: null,
+      showClearTextToast: true,
+    } as unknown as UIState);
+    const { lastFrame } = render(<Notifications />);
+    expect(lastFrame()).toContain('Ctrl + C clears all text in the prompt');
+  });
 });
