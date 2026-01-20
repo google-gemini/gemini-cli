@@ -12,6 +12,7 @@ import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
+import type { AnySchema } from 'ajv';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -137,24 +138,8 @@ export interface ToolConfig {
  * Configures the expected inputs (parameters) for the agent.
  */
 export interface InputConfig {
-  /**
-   * Defines the parameters the agent accepts.
-   * This is vital for generating the tool wrapper schema.
-   */
-  inputs: Record<
-    string,
-    {
-      description: string;
-      type:
-        | 'string'
-        | 'number'
-        | 'boolean'
-        | 'integer'
-        | 'string[]'
-        | 'number[]';
-      required: boolean;
-    }
-  >;
+  /** Standard JSON Schema for validation and tool generation */
+  inputSchema: AnySchema;
 }
 
 /**

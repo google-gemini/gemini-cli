@@ -89,7 +89,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    const query = params['query'];
+    const query = params['query'] ?? 'Get Started!';
     if (typeof query !== 'string') {
       throw new Error(
         `Remote agent '${definition.name}' requires a string 'query' input.`,
