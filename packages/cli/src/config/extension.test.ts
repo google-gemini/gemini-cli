@@ -815,6 +815,7 @@ describe('extension tests', () => {
         fs.mkdirSync(hooksDir);
 
         const hooksConfig = {
+          enabled: false,
           hooks: {
             BeforeTool: [
               {
@@ -836,7 +837,7 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        settings.hooks.enabled = true;
+        settings.hooksConfig.enabled = true;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -867,11 +868,10 @@ describe('extension tests', () => {
         fs.mkdirSync(hooksDir);
         fs.writeFileSync(
           path.join(hooksDir, 'hooks.json'),
-          JSON.stringify({ hooks: { BeforeTool: [] } }),
+          JSON.stringify({ hooks: { BeforeTool: [] }, enabled: false }),
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        settings.hooks.enabled = false;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,

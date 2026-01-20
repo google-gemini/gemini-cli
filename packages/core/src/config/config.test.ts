@@ -1841,7 +1841,7 @@ describe('Hooks configuration', () => {
     debugMode: false,
     model: 'test-model',
     cwd: '.',
-    hooks: { disabled: ['initial-hook'] },
+    disabledHooks: ['initial-hook'],
   };
 
   it('updateDisabledHooks should update the disabled list', () => {
