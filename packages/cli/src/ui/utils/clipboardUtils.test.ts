@@ -16,17 +16,25 @@ import {
 describe('clipboardUtils', () => {
   describe('clipboardHasImage', () => {
     it('should return false on unsupported platforms', async () => {
-      if (process.platform !== 'darwin' && process.platform !== 'win32') {
+      if (
+        process.platform !== 'darwin' &&
+        process.platform !== 'win32' &&
+        process.platform !== 'linux'
+      ) {
         const result = await clipboardHasImage();
         expect(result).toBe(false);
       } else {
-        // Skip on macOS/Windows as it would require actual clipboard state
+        // Skip on macOS/Windows/Linux as it would require actual clipboard state
         expect(true).toBe(true);
       }
     });
 
-    it('should return boolean on macOS or Windows', async () => {
-      if (process.platform === 'darwin' || process.platform === 'win32') {
+    it('should return boolean on macOS, Windows, or Linux', async () => {
+      if (
+        process.platform === 'darwin' ||
+        process.platform === 'win32' ||
+        process.platform === 'linux'
+      ) {
         const result = await clipboardHasImage();
         expect(typeof result).toBe('boolean');
       } else {
@@ -38,11 +46,15 @@ describe('clipboardUtils', () => {
 
   describe('saveClipboardImage', () => {
     it('should return null on unsupported platforms', async () => {
-      if (process.platform !== 'darwin' && process.platform !== 'win32') {
+      if (
+        process.platform !== 'darwin' &&
+        process.platform !== 'win32' &&
+        process.platform !== 'linux'
+      ) {
         const result = await saveClipboardImage();
         expect(result).toBe(null);
       } else {
-        // Skip on macOS/Windows
+        // Skip on macOS/Windows/Linux
         expect(true).toBe(true);
       }
     });
@@ -53,8 +65,12 @@ describe('clipboardUtils', () => {
         '/invalid/path/that/does/not/exist',
       );
 
-      if (process.platform === 'darwin' || process.platform === 'win32') {
-        // On macOS/Windows, might return null due to various errors
+      if (
+        process.platform === 'darwin' ||
+        process.platform === 'win32' ||
+        process.platform === 'linux'
+      ) {
+        // On macOS/Windows/Linux, might return null due to various errors
         expect(result === null || typeof result === 'string').toBe(true);
       } else {
         // On other platforms, should always return null

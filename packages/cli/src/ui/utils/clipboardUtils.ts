@@ -5,6 +5,8 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
   debugLogger,
@@ -30,10 +32,109 @@ export const IMAGE_EXTENSIONS = [
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
 /**
- * Checks if the system clipboard contains an image (macOS and Windows)
+ * Helper to save command stdout to a file while preventing shell injections and race conditions
+ */
+async function saveFromCommand(
+  command: string,
+  args: string[],
+  destination: string,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args);
+    const fileStream = createWriteStream(destination);
+    let resolved = false;
+
+    const safeResolve = (value: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    };
+
+    child.stdout.pipe(fileStream);
+
+    child.on('error', (err) => {
+      debugLogger.debug(`Failed to spawn ${command}:`, err);
+      safeResolve(false);
+    });
+
+    fileStream.on('error', (err) => {
+      debugLogger.debug(`File stream error for ${destination}:`, err);
+      safeResolve(false);
+    });
+
+    child.on('close', async (code) => {
+      if (resolved) return;
+
+      if (code !== 0) {
+        debugLogger.debug(
+          `${command} exited with code ${code}. Args: ${args.join(' ')}`,
+        );
+        safeResolve(false);
+        return;
+      }
+
+      // Helper to check file size
+      const checkFile = async () => {
+        try {
+          const stats = await fs.stat(destination);
+          safeResolve(stats.size > 0);
+        } catch (e) {
+          debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+          safeResolve(false);
+        }
+      };
+
+      if (fileStream.writableFinished) {
+        await checkFile();
+      } else {
+        fileStream.on('finish', checkFile);
+        // In case finish never fires due to error (though error handler should catch it)
+        fileStream.on('close', async () => {
+          if (!resolved) await checkFile();
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Checks if the system clipboard contains an image (macOS, Windows, and Linux)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'linux') {
+    // Try Wayland first (wl-clipboard)
+    try {
+      const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+      if (stdout.includes('image/')) {
+        return true;
+      }
+    } catch (e) {
+      debugLogger.debug('wl-paste check failed:', e);
+      // Ignore error, try X11
+    }
+
+    // Try X11 (xclip)
+    try {
+      const { stdout } = await spawnAsync('xclip', [
+        '-selection',
+        'clipboard',
+        '-t',
+        'TARGETS',
+        '-o',
+      ]);
+      if (stdout.includes('image/')) {
+        return true;
+      }
+    } catch (e) {
+      debugLogger.debug('xclip check failed:', e);
+      // Ignore error
+    }
+
+    return false;
+  }
+
   if (process.platform === 'win32') {
     try {
       const { stdout } = await spawnAsync('powershell', [
@@ -65,17 +166,13 @@ export async function clipboardHasImage(): Promise<boolean> {
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS and Windows)
+ * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') {
-    return null;
-  }
-
   try {
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
@@ -85,6 +182,47 @@ export async function saveClipboardImage(
 
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
+
+    if (process.platform === 'linux') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+
+      // Try Wayland (wl-clipboard)
+      const wlSuccess = await saveFromCommand(
+        'wl-paste',
+        ['--no-newline', '--type', 'image/png'],
+        tempFilePath,
+      );
+
+      if (wlSuccess) {
+        return tempFilePath;
+      }
+
+      // Cleanup Wayland attempt on failure
+      try {
+        await fs.unlink(tempFilePath);
+      } catch {
+        /* ignore */
+      }
+
+      // Try X11 (xclip)
+      const x11Success = await saveFromCommand(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+        tempFilePath,
+      );
+
+      if (x11Success) {
+        return tempFilePath;
+      }
+
+      // Cleanup X11 attempt on failure
+      try {
+        await fs.unlink(tempFilePath);
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
 
     if (process.platform === 'win32') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
