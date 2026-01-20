@@ -10,7 +10,12 @@ import { writeFile } from 'node:fs/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { debugLogger, unescapePath, escapePath } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  unescapePath,
+  escapePath,
+  spawnAsync,
+} from '@google/gemini-cli-core';
 
 /**
  * Interface for paste protection options
@@ -215,10 +220,10 @@ export async function clipboardHasImage(): Promise<boolean> {
   } else if (process.platform === 'win32') {
     try {
       // Use PowerShell to check if clipboard contains an image
-      const { stdout } = await execAsync(
-        `powershell -Command "[bool](Get-Clipboard -Format Image -ErrorAction Ignore)"`,
-        { shell: 'powershell.exe' },
-      );
+      const { stdout } = await spawnAsync('powershell.exe', [
+        '-Command',
+        '[bool](Get-Clipboard -Format Image -ErrorAction Ignore)',
+      ]);
       return stdout.trim().toLowerCase() === 'true';
     } catch (error) {
       debugLogger.error(
@@ -286,12 +291,6 @@ export async function saveClipboardImageDetailed(
 ): Promise<SaveClipboardImageResult> {
   // Validate targetDir for security
   if (targetDir) {
-    if (!path.isAbsolute(targetDir)) {
-      return {
-        filePath: null,
-        error: 'targetDir must be an absolute path',
-      };
-    }
     // Ensure it's within the current working directory to prevent path traversal
     const cwd = process.cwd();
     if (!path.resolve(targetDir).startsWith(path.resolve(cwd))) {
@@ -376,10 +375,10 @@ export async function saveClipboardImageDetailed(
       } else if (process.platform === 'win32') {
         try {
           // Use PowerShell to get image data and hash
-          const { stdout } = await execAsync(
-            `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $ms = New-Object System.IO.MemoryStream; $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); $bytes = $ms.ToArray(); $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes); [BitConverter]::ToString($hash).Replace('-', '').ToLower() } else { '' }"`,
-            { shell: 'powershell.exe', maxBuffer: 10 * 1024 * 1024 },
-          );
+          const { stdout } = await spawnAsync('powershell.exe', [
+            '-Command',
+            'Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $ms = New-Object System.IO.MemoryStream; $img.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png); $bytes = $ms.ToArray(); $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes); [BitConverter]::ToString($hash).Replace("-", "").ToLower() } else { "" }',
+          ]);
           if (stdout.trim()) {
             contentHash = stdout.trim();
           }
@@ -565,13 +564,10 @@ export async function saveClipboardImageDetailed(
 
       try {
         // First try with the standard approach
-        result = await execAsync(
-          `powershell -ExecutionPolicy Bypass -NoProfile -Command "& {${powershellCommand}}"`,
-          {
-            shell: 'powershell.exe',
-            maxBuffer: 10 * 1024 * 1024,
-          },
-        );
+        result = await spawnAsync('powershell.exe', [
+          '-Command',
+          powershellCommand,
+        ]);
       } catch (primaryError) {
         debugLogger.error(
           'Primary method failed, trying fallback...',

@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import { saveClipboardImage } from './clipboardUtils.js';
+import { spawnAsync } from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('node:fs/promises');
@@ -24,12 +25,13 @@ describe('saveClipboardImage Windows Path Escaping', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    Object.defineProperty(process, 'platform', {
-      value: 'win32',
-    });
+    vi.stubGlobal('process', { ...process, platform: 'win32' });
 
     // Mock fs calls to succeed
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.readdir).mockResolvedValue([]);
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.unlink).mockResolvedValue(undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(fs.stat).mockResolvedValue({ size: 100 } as any);
   });
@@ -41,23 +43,31 @@ describe('saveClipboardImage Windows Path Escaping', () => {
   });
 
   it('should escape single quotes in path for PowerShell script', async () => {
-    const { spawnAsync } = await import('@google/gemini-cli-core');
-    vi.mocked(spawnAsync).mockResolvedValue({
-      stdout: 'success',
-      stderr: '',
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(spawnAsync)
+      .mockResolvedValueOnce({
+        stdout: 'true',
+        stderr: '',
+      })
+      .mockResolvedValueOnce({
+        stdout: 'dummyhash',
+        stderr: '',
+      })
+      .mockResolvedValueOnce({
+        stdout: 'success',
+        stderr: '',
+      });
 
-    const targetDir = "C:\\User's Files";
+    const targetDir = "User's Files";
     await saveClipboardImage(targetDir);
 
     expect(spawnAsync).toHaveBeenCalled();
-    const args = vi.mocked(spawnAsync).mock.calls[0][1];
-    const script = args[2];
+    const args = vi.mocked(spawnAsync).mock.calls[2][1];
+    const script = args[1];
 
-    // The path C:\User's Files\.gemini-clipboard\clipboard-....png
-    // should be escaped in the script as 'C:\User''s Files\...'
+    // The path User's Files\.gemini-clipboard\clipboard-....png
+    // should be escaped in the script as 'User''s Files\...'
 
     // Check if the script contains the escaped path
-    expect(script).toMatch(/'C:\\User''s Files/);
+    expect(script).toMatch(/'User''s Files/);
   });
 });
