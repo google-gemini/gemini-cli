@@ -49,18 +49,18 @@
           "default": false,
           "type": "boolean"
         },
-        "disableAutoUpdate": {
-          "title": "Disable Auto Update",
-          "description": "Disable automatic updates",
-          "markdownDescription": "Disable automatic updates\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "enableAutoUpdate": {
+          "title": "Enable Auto Update",
+          "description": "Enable automatic updates.",
+          "markdownDescription": "Enable automatic updates.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "disableUpdateNag": {
-          "title": "Disable Update Nag",
-          "description": "Disable update notification prompts.",
-          "markdownDescription": "Disable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "enableAutoUpdateNotification": {
+          "title": "Enable Auto Update Notification",
+          "description": "Enable update notification prompts.",
+          "markdownDescription": "Enable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "checkpointing": {
@@ -340,11 +340,11 @@
           "default": {},
           "type": "object",
           "properties": {
-            "disableLoadingPhrases": {
-              "title": "Disable Loading Phrases",
-              "description": "Disable loading phrases for accessibility",
-              "markdownDescription": "Disable loading phrases for accessibility\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+            "enableLoadingPhrases": {
+              "title": "Enable Loading Phrases",
+              "description": "Enable loading phrases during operations.",
+              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "screenReader": {
@@ -1017,11 +1017,11 @@
               "default": true,
               "type": "boolean"
             },
-            "disableFuzzySearch": {
-              "title": "Disable Fuzzy Search",
-              "description": "Disable fuzzy search when searching for files.",
-              "markdownDescription": "Disable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+            "enableFuzzySearch": {
+              "title": "Enable Fuzzy Search",
+              "description": "Enable fuzzy search when searching for files.",
+              "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
@@ -1400,6 +1400,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enableEventDrivenScheduler": {
+          "title": "Event Driven Scheduler",
+          "description": "Enables event-driven scheduler within the CLI session.",
+          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1537,6 +1544,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Agent Skills",
+          "description": "Enable Agent Skills.",
+          "markdownDescription": "Enable Agent Skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Skills",
           "description": "List of disabled skills.",
@@ -1928,6 +1942,10 @@
               "description": "The maximum number of conversational turns."
             }
           }
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to enable the agent."
         },
         "disabled": {
           "type": "boolean",
