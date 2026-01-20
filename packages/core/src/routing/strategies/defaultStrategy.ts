@@ -11,22 +11,26 @@ import type {
   RoutingDecision,
   TerminalStrategy,
 } from '../routingStrategy.js';
-import { DEFAULT_GEMINI_MODEL } from '../../config/models.js';
+import { resolveModel } from '../../config/models.js';
 
 export class DefaultStrategy implements TerminalStrategy {
   readonly name = 'default';
 
   async route(
     _context: RoutingContext,
-    _config: Config,
+    config: Config,
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision> {
+    const defaultModel = resolveModel(
+      config.getModel(),
+      config.getPreviewFeatures(),
+    );
     return {
-      model: DEFAULT_GEMINI_MODEL,
+      model: defaultModel,
       metadata: {
         source: this.name,
         latencyMs: 0,
-        reasoning: `Routing to default model: ${DEFAULT_GEMINI_MODEL}`,
+        reasoning: `Routing to default model: ${defaultModel}`,
       },
     };
   }
