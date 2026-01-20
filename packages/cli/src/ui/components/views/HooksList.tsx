@@ -7,7 +7,6 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { theme } from '../../semantic-colors.js';
 
 interface HooksListProps {
   hooks: ReadonlyArray<{
@@ -64,28 +63,30 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
       width="100%"
     >
       <Box marginBottom={1}>
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.status.warning} bold underline>
-          ⚠️ Security Warning:
-        </Text>
-        <Text color={theme.status.warning}>
-          Hooks can execute arbitrary commands on your system. Only use hooks
-          from sources you trust. Review hook scripts carefully.
-        </Text>
-      </Box>
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.status.warning} bold underline>
+            ⚠️ Security Warning:
+          </Text>
+          <Text color={theme.status.warning}>
+            Hooks can execute arbitrary commands on your system. Only use hooks
+            from sources you trust. Review hook scripts carefully.
+          </Text>
+        </Box>
 
-      <Box marginTop={1}>
-        <Text>
-          Learn more:{' '}
-          <Text color={theme.text.link}>https://geminicli.com/docs/hooks</Text>
-        </Text>
-      </Box>
+        <Box marginTop={1}>
+          <Text>
+            Learn more:{' '}
+            <Text color={theme.text.link}>
+              https://geminicli.com/docs/hooks
+            </Text>
+          </Text>
+        </Box>
 
-      <Box marginTop={1}>
+        <Box marginTop={1}>
           <Text bold color={theme.text.accent}>
-          Configured Hooks
-        </Text>
-      </Box>
+            Configured Hooks
+          </Text>
+        </Box>
       </Box>
       <Box flexDirection="column" marginTop={1}>
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
@@ -102,11 +103,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
                 const statusColor = hook.enabled
                   ? theme.status.success
                   : theme.text.secondary;
-                const statusColor = hook.enabled
-                  ? theme.status.success
-                  : theme.text.secondary;
                 const statusText = hook.enabled ? 'enabled' : 'disabled';
-
                 return (
                   <Box
                     key={`${hook.source}:${hook.config.name ?? ''}:${hook.config.command ?? ''}`}
