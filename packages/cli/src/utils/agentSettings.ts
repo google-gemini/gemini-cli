@@ -29,8 +29,8 @@ export interface AgentActionResult {
 }
 
 /**
- * Enables an agent by ensuring it is not disabled in any writable scope (User and Workspace).
- * It sets `agents.overrides.<agentName>.disabled` to `false` if it was found to be `true`.
+ * Enables an agent by ensuring it is enabled in any writable scope (User and Workspace).
+ * It sets `agents.overrides.<agentName>.enabled` to `true`.
  */
 export function enableAgent(
   settings: LoadedSettings,
@@ -45,9 +45,9 @@ export function enableAgent(
       const scopePath = settings.forScope(scope).path;
       const agentOverrides =
         settings.forScope(scope).settings.agents?.overrides;
-      const isDisabled = agentOverrides?.[agentName]?.disabled === true;
+      const isEnabled = agentOverrides?.[agentName]?.enabled === true;
 
-      if (isDisabled) {
+      if (!isEnabled) {
         foundInDisabledScopes.push({ scope, path: scopePath });
       } else {
         alreadyEnabledScopes.push({ scope, path: scopePath });
@@ -68,9 +68,8 @@ export function enableAgent(
   const modifiedScopes: ModifiedScope[] = [];
   for (const { scope, path } of foundInDisabledScopes) {
     if (isLoadableSettingScope(scope)) {
-      // Explicitly enable it to override any lower-precedence disables, or just clear the disable.
-      // Setting to false ensures it is enabled.
-      settings.setValue(scope, `agents.overrides.${agentName}.disabled`, false);
+      // Explicitly enable it.
+      settings.setValue(scope, `agents.overrides.${agentName}.enabled`, true);
       modifiedScopes.push({ scope, path });
     }
   }
@@ -85,7 +84,7 @@ export function enableAgent(
 }
 
 /**
- * Disables an agent by setting `agents.overrides.<agentName>.disabled` to `true` in the specified scope.
+ * Disables an agent by setting `agents.overrides.<agentName>.enabled` to `false` in the specified scope.
  */
 export function disableAgent(
   settings: LoadedSettings,
@@ -105,9 +104,9 @@ export function disableAgent(
 
   const scopePath = settings.forScope(scope).path;
   const agentOverrides = settings.forScope(scope).settings.agents?.overrides;
-  const isDisabled = agentOverrides?.[agentName]?.disabled === true;
+  const isEnabled = agentOverrides?.[agentName]?.enabled !== false;
 
-  if (isDisabled) {
+  if (!isEnabled) {
     return {
       status: 'no-op',
       agentName,
@@ -127,7 +126,7 @@ export function disableAgent(
   if (isLoadableSettingScope(otherScope)) {
     const otherOverrides =
       settings.forScope(otherScope).settings.agents?.overrides;
-    if (otherOverrides?.[agentName]?.disabled === true) {
+    if (otherOverrides?.[agentName]?.enabled === false) {
       alreadyDisabledInOther.push({
         scope: otherScope,
         path: settings.forScope(otherScope).path,
@@ -135,7 +134,7 @@ export function disableAgent(
     }
   }
 
-  settings.setValue(scope, `agents.overrides.${agentName}.disabled`, true);
+  settings.setValue(scope, `agents.overrides.${agentName}.enabled`, false);
 
   return {
     status: 'success',

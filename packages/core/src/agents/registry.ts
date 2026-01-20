@@ -152,7 +152,7 @@ export class AgentRegistry {
     // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
     if (
       investigatorSettings?.enabled &&
-      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
+      agentsOverrides[CodebaseInvestigatorAgent.name]?.enabled !== false
     ) {
       let model;
       const settingsModel = investigatorSettings.model;
@@ -200,7 +200,7 @@ export class AgentRegistry {
     // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
     if (
       cliHelpSettings.enabled &&
-      !agentsOverrides[CliHelpAgent.name]?.disabled
+      agentsOverrides[CliHelpAgent.name]?.enabled !== false
     ) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
@@ -280,12 +280,8 @@ export class AgentRegistry {
     const isExperimental = definition.experimental === true;
     let isEnabled = !isExperimental;
 
-    if (overrides) {
-      if (overrides.disabled !== undefined) {
-        isEnabled = !overrides.disabled;
-      } else if (overrides.enabled !== undefined) {
-        isEnabled = overrides.enabled;
-      }
+    if (overrides && overrides.enabled !== undefined) {
+      isEnabled = overrides.enabled;
     }
 
     return isEnabled;
