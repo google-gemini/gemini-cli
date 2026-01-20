@@ -300,18 +300,18 @@ export const AppContainer = (props: AppContainerProps) => {
         .getHookSystem()
         ?.fireSessionStartEvent(sessionStartSource);
 
-      if (result?.finalOutput) {
-        if (result.finalOutput?.systemMessage) {
+      if (result) {
+        if (result.systemMessage) {
           historyManager.addItem(
             {
               type: MessageType.INFO,
-              text: result.finalOutput.systemMessage,
+              text: result.systemMessage,
             },
             Date.now(),
           );
         }
 
-        const additionalContext = result.finalOutput.getAdditionalContext();
+        const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
