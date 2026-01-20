@@ -524,9 +524,9 @@ function* emitKeys(
       // carriage return
       name = 'return';
       meta = escaped;
-    } else if (ch === '\n') {
-      // Enter, should have been called linefeed
-      name = 'enter';
+    } else if (escaped && ch === '\n') {
+      // Alt+Enter (linefeed), should be consistent with carriage return
+      name = 'return';
       meta = escaped;
     } else if (ch === '\t') {
       // tab
