@@ -20,6 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
+import { createTestMergedSettings } from '../settings.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,7 +155,11 @@ describe('extensionUpdates', () => {
       );
       await userKeychain.setSecret('VAR2', 'val2');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
 
@@ -166,7 +171,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s1');
     });
@@ -181,7 +190,11 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toHaveLength(1);
       expect(missing[0].name).toBe('s2');
     });
@@ -201,7 +214,11 @@ describe('extensionUpdates', () => {
       );
       fs.writeFileSync(workspaceEnvPath, 'VAR1=val1');
 
-      const missing = await getMissingSettings(config, extensionId);
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
       expect(missing).toEqual([]);
     });
   });
@@ -229,8 +246,11 @@ describe('extensionUpdates', () => {
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        settings: { telemetry: {} } as any,
+
+        settings: createTestMergedSettings({
+          telemetry: { enabled: false },
+          experimental: { extensionConfig: true },
+        }),
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });

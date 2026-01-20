@@ -48,9 +48,11 @@ import type {
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
-  LlmLoopCheckEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
   HookCallEvent,
   StartupStatsEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,7 +81,7 @@ export function logCliConfiguration(
   config: Config,
   event: StartSessionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
+  void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -668,6 +670,32 @@ export function logLlmLoopCheck(
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
+  });
+}
+
+export function logApprovalModeSwitch(
+  config: Config,
+  event: ApprovalModeSwitchEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logApprovalModeDuration(
+  config: Config,
+  event: ApprovalModeDurationEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
   });
 }
 

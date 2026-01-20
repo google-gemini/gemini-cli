@@ -11,7 +11,7 @@ import {
   MultiFolderTrustChoice,
   type MultiFolderTrustDialogProps,
 } from './MultiFolderTrustDialog.js';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   TrustLevel,
   type LoadedTrustedFolders,
@@ -94,7 +94,6 @@ describe('MultiFolderTrustDialog', () => {
         ctrl: false,
         meta: false,
         shift: false,
-        paste: false,
         sequence: '',
         insertable: false,
       });
@@ -213,13 +212,10 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      expect.any(Number),
-    );
+    expect(mockAddItem).toHaveBeenCalledWith({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     expect(mockOnComplete).toHaveBeenCalled();
     expect(mockFinishAddingDirectories).not.toHaveBeenCalled();
   });
