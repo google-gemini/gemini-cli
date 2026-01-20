@@ -381,6 +381,20 @@ describe('SettingsSchema', () => {
       );
     });
 
+    it('should have enableEventDrivenScheduler setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enables event-driven scheduler within the CLI session.',
+      );
+    });
+
     it('should have hooks.notifications setting in schema', () => {
       const setting = getSettingsSchema().hooks.properties.notifications;
       expect(setting).toBeDefined();
