@@ -1039,7 +1039,23 @@ export function SettingsDialog({
                 activeSettingIndex === idx + scrollOffset;
 
               if (item.type === 'header') {
-                const headerLabel = `── ${item.label.toUpperCase()} `;
+                // Convert to Title Case
+
+                const label = item.label
+
+                  .split(' ')
+
+                  .map((word) => {
+                    if (word === '&') return word;
+
+                    return (
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    );
+                  })
+
+                  .join(' ');
+
+                const headerLabel = `${label} `;
 
                 // Calculate padding to fill width, accounting for margins
 
@@ -1060,11 +1076,11 @@ export function SettingsDialog({
                     marginBottom={1}
                     marginX={1}
                   >
-                    <Text color={theme.text.secondary}>
-                      {headerLabel}
-
-                      {padding}
+                    <Text bold color={theme.text.primary}>
+                      {label}
                     </Text>
+
+                    <Text color={theme.text.secondary}> {padding}</Text>
                   </Box>
                 );
               }
