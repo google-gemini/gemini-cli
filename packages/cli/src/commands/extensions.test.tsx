@@ -54,15 +54,33 @@ describe('extensionsCommand', () => {
     extensionsCommand.builder(mockYargs);
 
     expect(mockYargs.middleware).toHaveBeenCalled();
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'install' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'uninstall' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'list' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'update' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'disable' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'enable' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'link' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'new' });
-    expect(mockYargs.command).toHaveBeenCalledWith({ command: 'validate' });
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'install' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'uninstall' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'list' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'update' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'disable' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'enable' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'link' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'new' }),
+    );
+    expect(mockYargs.command).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'validate' }),
+    );
     expect(mockYargs.demandCommand).toHaveBeenCalledWith(1, expect.any(String));
     expect(mockYargs.version).toHaveBeenCalledWith(false);
   });
