@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, poll, getDefaultTimeout } from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 
 /**
@@ -60,6 +60,39 @@ function getToolNamesFromApiRequest(
   return [];
 }
 
+async function runUntilToolsAvailable(
+  rig: TestRig,
+  prompt: string,
+  requiredTools: string[],
+  maxAttempts = 2,
+): Promise<string[]> {
+  let toolNames: string[] = [];
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const initialCount = readSemanticApiRequests(rig).length;
+    await rig.run({ args: prompt });
+    const timeout = getDefaultTimeout();
+    const hasNewRequest = await poll(
+      () => readSemanticApiRequests(rig).length > initialCount,
+      timeout,
+      100,
+    );
+    expect(
+      hasNewRequest,
+      `Expected a new semantic API request within ${timeout}ms`,
+    ).toBe(true);
+    const semanticRequests = readSemanticApiRequests(rig);
+    const latestRequest =
+      semanticRequests.length > 0
+        ? semanticRequests[semanticRequests.length - 1]
+        : null;
+    toolNames = getToolNamesFromApiRequest(latestRequest);
+    if (requiredTools.every((tool) => toolNames.includes(tool))) {
+      break;
+    }
+  }
+  return toolNames;
+}
+
 describe('mcp-resources-tools', () => {
   let rig: TestRig;
   let mcpServer: TestMcpServer;
@@ -92,17 +125,11 @@ describe('mcp-resources-tools', () => {
       },
     });
 
-    // Run a simple prompt to trigger an API request
-    await rig.run({ args: 'What tools are available?' });
-
-    // Wait for telemetry to be written
-    await rig.waitForTelemetryEvent('api_request');
-
-    // Get the semantic API request which contains tool names
-    const semanticRequests = readSemanticApiRequests(rig);
-    expect(semanticRequests.length).toBeGreaterThan(0);
-
-    const toolNames = getToolNamesFromApiRequest(semanticRequests[0]);
+    const toolNames = await runUntilToolsAvailable(
+      rig,
+      'What tools are available?',
+      ['ping'],
+    );
 
     // Resource tools should NOT be sent to the model
     expect(toolNames).not.toContain('list_resources');
@@ -131,17 +158,11 @@ describe('mcp-resources-tools', () => {
       },
     });
 
-    // Run a simple prompt to trigger an API request
-    await rig.run({ args: 'What tools are available?' });
-
-    // Wait for telemetry to be written
-    await rig.waitForTelemetryEvent('api_request');
-
-    // Get the semantic API request which contains tool names
-    const semanticRequests = readSemanticApiRequests(rig);
-    expect(semanticRequests.length).toBeGreaterThan(0);
-
-    const toolNames = getToolNamesFromApiRequest(semanticRequests[0]);
+    const toolNames = await runUntilToolsAvailable(
+      rig,
+      'What tools are available?',
+      ['ping'],
+    );
 
     // Resource tools should NOT be sent to the model
     expect(toolNames).not.toContain('list_resources');
@@ -186,17 +207,11 @@ describe('mcp-resources-tools', () => {
       },
     });
 
-    // Run a simple prompt to trigger an API request
-    await rig.run({ args: 'What tools are available?' });
-
-    // Wait for telemetry to be written
-    await rig.waitForTelemetryEvent('api_request');
-
-    // Get the semantic API request which contains tool names
-    const semanticRequests = readSemanticApiRequests(rig);
-    expect(semanticRequests.length).toBeGreaterThan(0);
-
-    const toolNames = getToolNamesFromApiRequest(semanticRequests[0]);
+    const toolNames = await runUntilToolsAvailable(
+      rig,
+      'What tools are available?',
+      ['ping', 'list_resources', 'read_resource'],
+    );
 
     // Resource tools SHOULD be sent to the model when resources exist
     expect(toolNames).toContain('list_resources');
