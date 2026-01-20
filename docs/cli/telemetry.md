@@ -18,6 +18,7 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Logs and metrics](#logs-and-metrics)
     - [Logs](#logs)
       - [Sessions](#sessions)
+      - [Approval Mode](#approval-mode)
       - [Tools](#tools)
       - [Files](#files)
       - [API](#api)
@@ -314,6 +315,20 @@ Captures startup configuration and user prompt submissions.
     - `prompt_id` (string)
     - `prompt` (string; excluded if `telemetry.logPrompts` is `false`)
     - `auth_type` (string)
+
+#### Approval Mode
+
+Tracks changes and duration of approval modes.
+
+- `approval_mode_switch`: Approval mode was changed.
+  - **Attributes**:
+    - `from_mode` (string)
+    - `to_mode` (string)
+
+- `approval_mode_duration`: Duration spent in an approval mode.
+  - **Attributes**:
+    - `mode` (string)
+    - `duration_ms` (int)
 
 #### Tools
 

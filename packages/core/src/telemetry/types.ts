@@ -1845,6 +1845,58 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 }
 
 export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
+export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
+  eventName = 'approval_mode_switch';
+  from_mode: ApprovalMode;
+  to_mode: ApprovalMode;
+
+  constructor(fromMode: ApprovalMode, toMode: ApprovalMode) {
+    this.from_mode = fromMode;
+    this.to_mode = toMode;
+  }
+  'event.name': string;
+  'event.timestamp': string;
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      event_name: this.eventName,
+      from_mode: this.from_mode,
+      to_mode: this.to_mode,
+    };
+  }
+
+  toLogBody(): string {
+    return `Approval mode switched from ${this.from_mode} to ${this.to_mode}.`;
+  }
+}
+
+export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
+  eventName = 'approval_mode_duration';
+  mode: ApprovalMode;
+  duration_ms: number;
+
+  constructor(mode: ApprovalMode, durationMs: number) {
+    this.mode = mode;
+    this.duration_ms = durationMs;
+  }
+  'event.name': string;
+  'event.timestamp': string;
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      event_name: this.eventName,
+      mode: this.mode,
+      duration_ms: this.duration_ms,
+    };
+  }
+
+  toLogBody(): string {
+    return `Approval mode ${this.mode} was active for ${this.duration_ms}ms.`;
+  }
+}
+
 export class HookCallEvent implements BaseTelemetryEvent {
   'event.name': string;
   'event.timestamp': string;
