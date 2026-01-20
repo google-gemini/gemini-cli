@@ -62,6 +62,10 @@ describe('McpClientManager', () => {
     vi.restoreAllMocks();
   });
 
+  it('should discover tools from all configured', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
@@ -243,7 +247,11 @@ describe('McpClientManager', () => {
           }) as unknown as McpClient,
       );
 
-      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      const manager = new McpClientManager(
+        '0.0.1',
+        {} as ToolRegistry,
+        mockConfig,
+      );
 
       mockConfig.getMcpServers.mockReturnValue({
         'server-with-instructions': {},
