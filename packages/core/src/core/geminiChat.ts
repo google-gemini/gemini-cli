@@ -49,11 +49,6 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import {
-  fireAfterModelHook,
-  fireBeforeModelHook,
-  fireBeforeToolSelectionHook,
-} from './geminiChatHookTriggers.js';
 import { coreEvents } from '../utils/events.js';
 
 export enum StreamEventType {
@@ -507,39 +502,26 @@ export class GeminiChat {
         ? contentsForPreviewModel
         : requestContents;
 
-      // Fire BeforeModel and BeforeToolSelection hooks if enabled
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus) {
-        // Fire BeforeModel hook
-        const beforeModelResult = await fireBeforeModelHook(messageBus, {
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem) {
+        const beforeModelResult = await hookSystem.fireBeforeModelEvent({
           model: modelToUse,
           config,
           contents: contentsToUse,
         });
 
-        // Check if hook requested to stop execution
         if (beforeModelResult.stopped) {
           throw new AgentExecutionStoppedError(
             beforeModelResult.reason || 'Agent execution stopped by hook',
           );
         }
 
-        // Check if hook blocked the model call
         if (beforeModelResult.blocked) {
-          // Return a synthetic response generator
           const syntheticResponse = beforeModelResult.syntheticResponse;
-          if (syntheticResponse) {
-            // Ensure synthetic response has a finish reason to prevent InvalidStreamError
-            if (
-              syntheticResponse.candidates &&
-              syntheticResponse.candidates.length > 0
-            ) {
-              for (const candidate of syntheticResponse.candidates) {
-                if (!candidate.finishReason) {
-                  candidate.finishReason = FinishReason.STOP;
-                }
-              }
+
+          for (const candidate of syntheticResponse?.candidates ?? []) {
+            if (!candidate.finishReason) {
+              candidate.finishReason = FinishReason.STOP;
             }
           }
 
@@ -549,7 +531,6 @@ export class GeminiChat {
           );
         }
 
-        // Apply modifications from BeforeModel hook
         if (beforeModelResult.modifiedConfig) {
           Object.assign(config, beforeModelResult.modifiedConfig);
         }
@@ -560,17 +541,13 @@ export class GeminiChat {
           contentsToUse = beforeModelResult.modifiedContents as Content[];
         }
 
-        // Fire BeforeToolSelection hook
-        const toolSelectionResult = await fireBeforeToolSelectionHook(
-          messageBus,
-          {
+        const toolSelectionResult =
+          await hookSystem.fireBeforeToolSelectionEvent({
             model: modelToUse,
             config,
             contents: contentsToUse,
-          },
-        );
+          });
 
-        // Apply tool configuration modifications
         if (toolSelectionResult.toolConfig) {
           config.toolConfig = toolSelectionResult.toolConfig;
         }
@@ -825,12 +802,9 @@ export class GeminiChat {
         }
       }
 
-      // Fire AfterModel hook through MessageBus (only if hooks are enabled)
-      const hooksEnabled = this.config.getEnableHooks();
-      const messageBus = this.config.getMessageBus();
-      if (hooksEnabled && messageBus && originalRequest && chunk) {
-        const hookResult = await fireAfterModelHook(
-          messageBus,
+      const hookSystem = this.config.getHookSystem();
+      if (originalRequest && chunk && hookSystem) {
+        const hookResult = await hookSystem.fireAfterModelEvent(
           originalRequest,
           chunk,
         );
@@ -850,7 +824,7 @@ export class GeminiChat {
 
         yield hookResult.response;
       } else {
-        yield chunk; // Yield every chunk to the UI immediately.
+        yield chunk;
       }
     }
 
