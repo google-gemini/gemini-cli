@@ -1624,7 +1624,6 @@ ${JSON.stringify(
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
-        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
@@ -1712,13 +1711,13 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 4 events (model_info + original + model_info + 1 retry)
-      expect(events.length).toBe(4);
+      // We expect 3 events (model_info + original + 1 retry)
+      expect(events.length).toBe(3);
       expect(
         events
-          .filter((e) => e.type !== GeminiEventType.ModelInfo)
-          .every((e) => e.type === GeminiEventType.InvalidStream),
-      ).toBe(true);
+          .filter((e) => e.type === GeminiEventType.ModelInfo)
+          .map((e) => e.value),
+      ).toEqual(['default-routed-model']);
 
       // Verify that turn.run was called twice
       expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
