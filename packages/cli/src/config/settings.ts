@@ -363,6 +363,10 @@ export class LoadedSettings {
       admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
     }
 
+    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
+      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
+    }
+
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
   }
