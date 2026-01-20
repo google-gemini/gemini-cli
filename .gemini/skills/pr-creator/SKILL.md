@@ -35,7 +35,14 @@ Follow these steps to create a Pull Request:
     - **Related Issues**: Link any issues fixed or related to this PR (e.g.,
       "Fixes #123").
 
-4.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
+4.  **Preflight Check**: Before creating the PR, run the workspace preflight
+    script to ensure all build, lint, and test checks pass.
+    ```bash
+    npm run preflight
+    ```
+    If any checks fail, address the issues before proceeding to create the PR.
+
+5.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
     issues with multi-line Markdown, write the description to a temporary file
     first.
     ```bash
