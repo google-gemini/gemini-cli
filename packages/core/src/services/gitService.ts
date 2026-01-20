@@ -27,7 +27,7 @@ export class GitService {
   }
 
   async initialize(): Promise<void> {
-    const gitAvailable = await this.verifyGitAvailability();
+    const gitAvailable = await GitService.verifyGitAvailability();
     if (!gitAvailable) {
       throw new Error(
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
@@ -42,7 +42,7 @@ export class GitService {
     }
   }
 
-  async verifyGitAvailability(): Promise<boolean> {
+  static async verifyGitAvailability(): Promise<boolean> {
     try {
       await spawnAsync('git', ['--version']);
       return true;
