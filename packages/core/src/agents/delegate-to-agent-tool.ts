@@ -22,7 +22,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 
-type DelegateParams = { agent_name: string } & Record<string, unknown>;
+export type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
 export class DelegateToAgentTool extends BaseDeclarativeTool<
   DelegateParams,
@@ -126,6 +126,14 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
     );
   }
 
+  override validateToolParams(_params: DelegateParams): string | null {
+    // We override the default schema validation because the generic JSON schema validation
+    // produces poor error messages for discriminated unions (anyOf).
+    // Instead, we perform detailed, agent-specific validation in the `execute` method
+    // to provide rich error messages that help the LLM self-heal.
+    return null;
+  }
+
   protected createInvocation(
     params: DelegateParams,
     messageBus: MessageBus,
@@ -190,12 +198,79 @@ class DelegateInvocation extends BaseToolInvocation<
   ): Promise<ToolResult> {
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition) {
+      const availableAgents = this.registry
+        .getAllDefinitions()
+        .map((def) => `'${def.name}' (${def.description})`)
+        .join(', ');
+
       throw new Error(
-        `Agent '${this.params.agent_name}' not found in registry.`,
+        `Agent '${this.params.agent_name}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`,
       );
     }
 
     const { agent_name: _agent_name, ...agentArgs } = this.params;
+
+    // Validate specific agent arguments here using Zod to generate helpful error messages.
+    const inputShape: Record<string, z.ZodTypeAny> = {};
+    for (const [key, inputDef] of Object.entries(
+      definition.inputConfig.inputs,
+    )) {
+      let validator: z.ZodTypeAny;
+
+      switch (inputDef.type) {
+        case 'string':
+          validator = z.string();
+          break;
+        case 'number':
+          validator = z.number();
+          break;
+        case 'boolean':
+          validator = z.boolean();
+          break;
+        case 'integer':
+          validator = z.number().int();
+          break;
+        case 'string[]':
+          validator = z.array(z.string());
+          break;
+        case 'number[]':
+          validator = z.array(z.number());
+          break;
+        default:
+          validator = z.unknown();
+      }
+
+      if (!inputDef.required) {
+        validator = validator.optional();
+      }
+
+      inputShape[key] = validator.describe(inputDef.description);
+    }
+
+    const agentSchema = z.object(inputShape);
+
+    try {
+      agentSchema.parse(agentArgs);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        const errorMessages = e.errors.map(
+          (err) => `${err.path.join('.')}: ${err.message}`,
+        );
+
+        const expectedInputs = Object.entries(definition.inputConfig.inputs)
+          .map(
+            ([key, input]) =>
+              `'${key}' (${input.required ? 'required' : 'optional'} ${input.type})`,
+          )
+          .join(', ');
+
+        throw new Error(
+          `${errorMessages.join(', ')}. Expected inputs: ${expectedInputs}.`,
+        );
+      }
+      throw e;
+    }
+
     const invocation = this.buildSubInvocation(
       definition,
       agentArgs as AgentInputs,
