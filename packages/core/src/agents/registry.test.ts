@@ -309,7 +309,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            generalist: { enabled: true, disabled: true },
+            generalist: { enabled: false },
           },
         },
       });
@@ -704,7 +704,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            MockAgent: { disabled: true },
+            MockAgent: { enabled: false },
           },
         },
       });
@@ -719,7 +719,7 @@ describe('AgentRegistry', () => {
       const config = makeMockedConfig({
         agents: {
           overrides: {
-            RemoteAgent: { disabled: true },
+            RemoteAgent: { enabled: false },
           },
         },
       });
