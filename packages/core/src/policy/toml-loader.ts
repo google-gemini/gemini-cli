@@ -346,6 +346,7 @@ export async function loadPoliciesFromToml(
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
                   allowRedirection: rule.allow_redirection,
+                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 
                 // Compile regex pattern

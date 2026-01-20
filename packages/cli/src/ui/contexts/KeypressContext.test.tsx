@@ -179,7 +179,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: '',
+          name: 'return',
           sequence: '\r',
           insertable: true,
         }),
@@ -384,7 +384,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          paste: true,
+          name: 'paste',
           sequence: pastedText,
         }),
       );
@@ -405,7 +405,6 @@ describe('KeypressContext', () => {
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'paste',
-            paste: true,
             sequence: 'Hello OSC 52',
           }),
         );
@@ -432,7 +431,6 @@ describe('KeypressContext', () => {
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'paste',
-            paste: true,
             sequence: 'Split Paste',
           }),
         );
@@ -454,7 +452,6 @@ describe('KeypressContext', () => {
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'paste',
-            paste: true,
             sequence: 'Terminated by ST',
           }),
         );
@@ -727,7 +724,6 @@ describe('KeypressContext', () => {
                 ctrl: false,
                 meta: true,
                 shift: false,
-                paste: false,
               },
             };
           } else if (terminal === 'MacTerminal') {
@@ -743,7 +739,6 @@ describe('KeypressContext', () => {
                 ctrl: false,
                 meta: true,
                 shift: false,
-                paste: false,
               },
             };
           } else {
@@ -759,7 +754,6 @@ describe('KeypressContext', () => {
                 ctrl: false,
                 meta: true, // Always expect meta:true after conversion
                 shift: false,
-                paste: false,
                 sequence: accentedChar,
               },
             };
@@ -834,7 +828,6 @@ describe('KeypressContext', () => {
       expect.objectContaining({
         name: 'undefined',
         sequence: INCOMPLETE_KITTY_SEQUENCE,
-        paste: false,
       }),
     );
   });
@@ -853,7 +846,6 @@ describe('KeypressContext', () => {
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         sequence: '\x1b[m',
-        paste: false,
       }),
     );
   });
