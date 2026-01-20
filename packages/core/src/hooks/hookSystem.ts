@@ -104,9 +104,6 @@ export class HookSystem {
   async fireSessionStartEvent(
     source: SessionStartSource,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireSessionStartEvent(source);
     return result.finalOutput;
   }
