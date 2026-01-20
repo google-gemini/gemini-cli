@@ -1947,7 +1947,7 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
     expect(argv.promptInteractive).toBe('hello world how are you');
     expect(argv.extensions).toEqual(['none']);
@@ -2586,7 +2586,7 @@ describe('PolicyEngine nonInteractive wiring', () => {
 
   it('should set nonInteractive to true when -p flag is used', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', 'echo hello']; // Positional query makes it one-shot
+    process.argv = ['node', 'script.js', '-p', 'echo hello'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings(),
