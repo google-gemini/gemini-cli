@@ -473,7 +473,6 @@ export function useTerminalSetupPrompt({
       const shouldPrompt = await shouldPromptForTerminalSetup();
       if (!shouldPrompt || cancelled) return;
 
-      // Set this BEFORE showing the prompt to prevent re-prompting on re-render
       persistentState.set('terminalSetupPromptShown', true);
 
       const confirmed = await requestConsentInteractive(
