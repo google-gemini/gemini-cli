@@ -44,7 +44,7 @@ interface CommandDirectory {
  * Defines the Zod schema for a command definition file. This serves as the
  * single source of truth for both validation and type inference.
  */
-const TomlCommandDefSchema = z.object({
+export const TomlCommandDefSchema = z.object({
   prompt: z.string({
     required_error: "The 'prompt' field is required.",
     invalid_type_error: "The 'prompt' field must be a string.",

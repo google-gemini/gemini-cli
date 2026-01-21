@@ -15,6 +15,7 @@ export interface Suggestion {
   description?: string;
   matchedIndex?: number;
   commandKind?: CommandKind;
+  extensionName?: string;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -65,8 +66,13 @@ export function SuggestionsDisplay({
     [CommandKind.AGENT]: ' [Agent]',
   };
 
-  const getFullLabel = (s: Suggestion) =>
-    s.label + (s.commandKind ? (COMMAND_KIND_SUFFIX[s.commandKind] ?? '') : '');
+  const getFullLabel = (s: Suggestion) => {
+    let label = s.label;
+    if (s.commandKind && COMMAND_KIND_SUFFIX[s.commandKind]) {
+      label += COMMAND_KIND_SUFFIX[s.commandKind];
+    }
+    return label;
+  };
 
   const maxLabelLength = Math.max(
     ...suggestions.map((s) => getFullLabel(s).length),

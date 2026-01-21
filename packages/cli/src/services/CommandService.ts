@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 
@@ -20,6 +20,16 @@ import type { ICommandLoader } from './types.js';
  * system to be extended with new sources without modifying the service itself.
  */
 export class CommandService {
+  private static emittedFeedbacks = new Set<string>();
+
+  /**
+   * Clears the set of emitted feedback messages.
+   * This should ONLY be used in tests to ensure isolation between test cases.
+   */
+  static clearEmittedFeedbacksForTest(): void {
+    CommandService.emittedFeedbacks.clear();
+  }
+
   /**
    * Private constructor to enforce the use of the async factory.
    * @param commands A readonly array of the fully loaded and de-duplicated commands.
@@ -75,6 +85,12 @@ export class CommandService {
         while (commandMap.has(renamedName)) {
           renamedName = `${cmd.extensionName}.${cmd.name}${suffix}`;
           suffix++;
+        }
+
+        const feedbackMsg = `Extension command '/${cmd.name}' from '${cmd.extensionName}' was renamed to '/${renamedName}' due to a conflict with an existing command.`;
+        if (!CommandService.emittedFeedbacks.has(feedbackMsg)) {
+          coreEvents.emitFeedback('info', feedbackMsg);
+          CommandService.emittedFeedbacks.add(feedbackMsg);
         }
 
         finalName = renamedName;

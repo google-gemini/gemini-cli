@@ -68,6 +68,10 @@ import {
   ExtensionSettingScope,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { glob } from 'glob';
+import { BuiltinCommandLoader } from '../services/BuiltinCommandLoader.js';
+import { McpPromptLoader } from '../services/McpPromptLoader.js';
+import { FileCommandLoader } from '../services/FileCommandLoader.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -236,6 +240,9 @@ Would you like to attempt to install via "git clone" instead?`,
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         const newExtensionName = newExtensionConfig.name;
+
+        await this.checkCommandConflicts(localSourcePath, newExtensionName);
+
         const previous = this.getExtensions().find(
           (installed) => installed.name === newExtensionName,
         );
@@ -898,6 +905,84 @@ Would you like to attempt to install via "git clone" instead?`,
       extension.isActive = true;
     }
     await this.maybeStartExtension(extension);
+  }
+
+  private async checkCommandConflicts(
+    localSourcePath: string,
+    extensionName: string,
+  ): Promise<void> {
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
+    // 1. Get current commands
+    const currentLoaders = [
+      new McpPromptLoader(this.config ?? null),
+      new BuiltinCommandLoader(this.config ?? null),
+      new FileCommandLoader(this.config ?? null),
+    ];
+
+    const currentCommandsResults = await Promise.allSettled(
+      currentLoaders.map((l) => l.loadCommands(signal)),
+    );
+    const currentCommandNames = new Set<string>();
+    for (const result of currentCommandsResults) {
+      if (result.status === 'fulfilled') {
+        result.value.forEach((cmd) => {
+          // If it's an update, don't count existing commands from the SAME extension as conflicts
+          if (cmd.extensionName !== extensionName) {
+            currentCommandNames.add(cmd.name);
+          }
+        });
+      }
+    }
+
+    // 2. Get commands from the new/updated extension
+    const extensionCommandsDir = path.join(localSourcePath, 'commands');
+    if (!fs.existsSync(extensionCommandsDir)) {
+      return;
+    }
+
+    const files = await glob('**/*.toml', {
+      cwd: extensionCommandsDir,
+      nodir: true,
+      dot: true,
+      follow: true,
+    });
+
+    const conflicts: Array<{
+      commandName: string;
+      renamedName: string;
+    }> = [];
+
+    for (const file of files) {
+      const relativePath = file.substring(0, file.length - 5); // length of '.toml'
+      const baseCommandName = relativePath
+        .split(path.sep)
+        .map((segment) => segment.replaceAll(':', '_'))
+        .join(':');
+
+      if (currentCommandNames.has(baseCommandName)) {
+        conflicts.push({
+          commandName: baseCommandName,
+          renamedName: `${extensionName}.${baseCommandName}`,
+        });
+      }
+    }
+
+    if (conflicts.length > 0) {
+      const conflictList = conflicts
+        .map(
+          (c) =>
+            ` - '/${c.commandName}' (will be renamed to '/${c.renamedName}')`,
+        )
+        .join('\n');
+
+      const warning = `WARNING: Installing extension '${extensionName}' will cause the following command conflicts:\n${conflictList}\n\nDo you want to continue installation?`;
+
+      if (!(await this.requestConsent(warning))) {
+        throw new Error('Installation cancelled due to command conflicts.');
+      }
+    }
   }
 }
 

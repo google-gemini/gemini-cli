@@ -8,7 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CommandService } from './CommandService.js';
 import { type ICommandLoader } from './types.js';
 import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 
 const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
   name,
@@ -37,6 +37,7 @@ class MockCommandLoader implements ICommandLoader {
 describe('CommandService', () => {
   beforeEach(() => {
     vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
+    CommandService.clearEmittedFeedbacksForTest();
   });
 
   afterEach(() => {
@@ -235,6 +236,32 @@ describe('CommandService', () => {
     );
     expect(syncExtension).toBeDefined();
     expect(syncExtension?.extensionName).toBe('git-helper');
+  });
+
+  it('should emit feedback when an extension command is renamed', async () => {
+    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
+    const extensionCommand = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'firebase',
+      description: '[firebase] Deploy to Firebase',
+    };
+
+    const mockLoader1 = new MockCommandLoader([builtinCommand]);
+    const mockLoader2 = new MockCommandLoader([extensionCommand]);
+
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await CommandService.create(
+      [mockLoader1, mockLoader2],
+      new AbortController().signal,
+    );
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'info',
+      expect.stringContaining(
+        "Extension command '/deploy' from 'firebase' was renamed to '/firebase.deploy'",
+      ),
+    );
   });
 
   it('should handle user/project command override correctly', async () => {
