@@ -1893,10 +1893,35 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should submit /rewind on double ESC', async () => {
+    it('should submit /rewind on double ESC when buffer is empty', async () => {
+      const onEscapePromptChange = vi.fn();
+      props.onEscapePromptChange = onEscapePromptChange;
+      props.buffer.setText('');
+      vi.mocked(props.buffer.setText).mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            history: [{ id: 1, type: 'user', text: 'test' }],
+          },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1B\x1B');
+        vi.advanceTimersByTime(100);
+
+        expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
+      });
+      unmount();
+    });
+
+    it('should clear the buffer on esc esc if it has text', async () => {
       const onEscapePromptChange = vi.fn();
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('some text');
+      vi.mocked(props.buffer.setText).mockClear();
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1906,7 +1931,8 @@ describe('InputPrompt', () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
 
-        expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        expect(props.onSubmit).not.toHaveBeenCalledWith('/rewind');
       });
       unmount();
     });
