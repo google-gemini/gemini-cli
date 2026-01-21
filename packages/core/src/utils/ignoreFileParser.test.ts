@@ -132,4 +132,43 @@ describe('GeminiIgnoreParser', () => {
       expect(parser.hasPatterns()).toBe(false);
     });
   });
+
+  describe('when multiple ignore files are provided', () => {
+    const primaryFile = 'primary.ignore';
+    const secondaryFile = 'secondary.ignore';
+
+    beforeEach(async () => {
+      await createTestFile(primaryFile, '# Primary\n!important.txt\n');
+      await createTestFile(secondaryFile, '# Secondary\n*.txt\n');
+      await createTestFile('important.txt', 'important');
+      await createTestFile('other.txt', 'other');
+    });
+
+    it('should combine patterns from all files', () => {
+      const parser = new IgnoreFileParser(projectRoot, [
+        primaryFile,
+        secondaryFile,
+      ]);
+      expect(parser.isIgnored('other.txt')).toBe(true);
+    });
+
+    it('should respect priority (first file overrides second)', () => {
+      const parser = new IgnoreFileParser(projectRoot, [
+        primaryFile,
+        secondaryFile,
+      ]);
+      expect(parser.isIgnored('important.txt')).toBe(false);
+    });
+
+    it('should return the first existing file path', () => {
+      const parser = new IgnoreFileParser(projectRoot, [
+        'nonexistent.ignore',
+        primaryFile,
+        secondaryFile,
+      ]);
+      expect(parser.getIgnoreFilePath()).toBe(
+        path.join(projectRoot, primaryFile),
+      );
+    });
+  });
 });

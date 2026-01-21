@@ -17,23 +17,37 @@ export interface IgnoreFileFilter {
 }
 
 /**
- * An ignore file parser that reads the ignore file from the project root.
+ * An ignore file parser that reads the ignore files from the project root.
  */
 export class IgnoreFileParser implements IgnoreFileFilter {
   private projectRoot: string;
   private patterns: string[] = [];
   private ig = ignore();
+  private readonly fileNames: string[];
 
   constructor(
     projectRoot: string,
-    readonly fileName: string,
+    // The order matters: files listed earlier have higher priority.
+    // It can be a single file name or an array of file names.
+    fileNames: string | string[],
   ) {
     this.projectRoot = path.resolve(projectRoot);
+    this.fileNames = Array.isArray(fileNames) ? fileNames : [fileNames];
     this.loadPatterns();
   }
 
   private loadPatterns(): void {
-    const patternsFilePath = path.join(this.projectRoot, this.fileName);
+    // Iterate in reverse order so that the first file in the list is processed last.
+    // This gives the first file the highest priority, as patterns added later override earlier ones.
+    for (const fileName of [...this.fileNames].reverse()) {
+      const patterns = this.parseIgnoreFile(fileName);
+      this.patterns.push(...patterns);
+      this.ig.add(patterns);
+    }
+  }
+
+  private parseIgnoreFile(fileName: string): string[] {
+    const patternsFilePath = path.join(this.projectRoot, fileName);
     let content: string;
     try {
       content = fs.readFileSync(patternsFilePath, 'utf-8');
@@ -41,17 +55,15 @@ export class IgnoreFileParser implements IgnoreFileFilter {
       debugLogger.debug(
         `Ignore file not found: ${patternsFilePath}, continue without it.`,
       );
-      return;
+      return [];
     }
 
     debugLogger.debug(`Loading ignore patterns from: ${patternsFilePath}`);
 
-    this.patterns = (content ?? '')
+    return (content ?? '')
       .split('\n')
       .map((p) => p.trim())
       .filter((p) => p !== '' && !p.startsWith('#'));
-
-    this.ig.add(this.patterns);
   }
 
   isIgnored(filePath: string): boolean {
@@ -100,17 +112,24 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     if (!this.hasPatterns()) {
       return null;
     }
-    return path.join(this.projectRoot, this.fileName);
+    for (const fileName of this.fileNames) {
+      const ignoreFilePath = path.join(this.projectRoot, fileName);
+      if (fs.existsSync(ignoreFilePath)) {
+        return ignoreFilePath;
+      }
+    }
+    return null;
   }
 
   /**
-   * Returns true if .geminiignore exists and has patterns.
+   * Returns true if at least one ignore file exists and has patterns.
    */
   hasPatterns(): boolean {
     if (this.patterns.length === 0) {
       return false;
     }
-    const ignoreFilePath = path.join(this.projectRoot, this.fileName);
-    return fs.existsSync(ignoreFilePath);
+    return this.fileNames.some((fileName) =>
+      fs.existsSync(path.join(this.projectRoot, fileName)),
+    );
   }
 }
