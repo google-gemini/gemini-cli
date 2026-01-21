@@ -53,6 +53,14 @@
         "slug": "docs/cli"
       },
       {
+        "label": "Ignoring files",
+        "slug": "docs/cli/gemini-ignore"
+      },
+      {
+        "label": "Instructional context",
+        "slug": "docs/cli/gemini-md"
+      },
+      {
         "label": "Commands",
         "slug": "docs/cli/commands"
       },
@@ -79,6 +87,14 @@
       {
         "label": "Model selection",
         "slug": "docs/cli/model"
+      },
+      {
+        "label": "Model routing",
+        "slug": "docs/cli/model-routing"
+      },
+      {
+        "label": "Advanced model configuration",
+        "slug": "docs/cli/generation-settings"
       },
       {
         "label": "Sandbox",
