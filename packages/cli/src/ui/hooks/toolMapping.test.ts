@@ -195,6 +195,33 @@ describe('toolMapping', () => {
       expect(displayTool.confirmationDetails).toEqual(confirmationDetails);
     });
 
+    it('maps correlationId and serializable confirmation details', () => {
+      const serializableDetails = {
+        type: 'edit' as const,
+        title: 'Confirm Edit',
+        fileName: 'file.txt',
+        filePath: '/path/file.txt',
+        fileDiff: 'diff',
+        originalContent: 'old',
+        newContent: 'new',
+      };
+
+      const toolCall: WaitingToolCall = {
+        status: 'awaiting_approval',
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+        confirmationDetails: serializableDetails,
+        correlationId: 'corr-123',
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.correlationId).toBe('corr-123');
+      expect(displayTool.confirmationDetails).toEqual(serializableDetails);
+    });
+
     it('maps error tool call missing tool definition', () => {
       // e.g. "TOOL_NOT_REGISTERED" errors
       const toolCall: ToolCall = {
