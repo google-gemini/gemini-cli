@@ -356,18 +356,18 @@ describe('ScrollableList Demo Behavior', () => {
         expect(listRef?.getScrollState()?.scrollTop).toBeLessThan(2);
       });
 
-      // End -> \x1b[F
+      // End -> \x1b[1;5F (Ctrl+End)
       await act(async () => {
-        stdin.write('\x1b[F');
+        stdin.write('\x1b[1;5F');
       });
       await waitFor(() => {
         // Total 50 items, height 10. Max scroll ~40.
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(30);
       });
 
-      // Home -> \x1b[H
+      // Home -> \x1b[1;5H (Ctrl+Home)
       await act(async () => {
-        stdin.write('\x1b[H');
+        stdin.write('\x1b[1;5H');
       });
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
