@@ -1188,7 +1188,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: [] as string[],
         description:
-          'List of Regex patterns for allowed extensions. If nonempty, only extensions in this list are allowed.',
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
         showInDialog: true,
       },
       folderTrust: {
