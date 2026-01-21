@@ -45,9 +45,6 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   if (uiState.showEscapePrompt) {
-<<<<<<< HEAD
-    return <Text color={theme.text.secondary}>Press Esc again to clear.</Text>;
-=======
     const isPromptEmpty = uiState.buffer.text.length === 0;
     const hasHistory = uiState.history.length > 0;
 
@@ -60,7 +57,6 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
         Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
       </Text>
     );
->>>>>>> e1fd5be42 (Add Esc-Esc to clear prompt when it's not empty (#17131))
   }
 
   if (uiState.queueErrorMessage) {

@@ -495,15 +495,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-<<<<<<< HEAD
-        // Handle double ESC for clearing input
-=======
         // Handle double ESC
->>>>>>> e1fd5be42 (Add Esc-Esc to clear prompt when it's not empty (#17131))
         if (escPressCount.current === 0) {
-          if (buffer.text === '') {
-            return;
-          }
           escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
@@ -513,12 +506,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-<<<<<<< HEAD
-          // clear input and immediately reset state
-          buffer.setText('');
-          resetCompletionState();
-          resetEscapeState();
-=======
           // Second ESC
           resetEscapeState();
           if (buffer.text.length > 0) {
@@ -529,7 +516,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               onSubmit('/rewind');
             }
           }
->>>>>>> e1fd5be42 (Add Esc-Esc to clear prompt when it's not empty (#17131))
         }
         return;
       }
@@ -901,6 +887,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       activePtyId,
       setEmbeddedShellFocused,
       history,
+      onSubmit,
     ],
   );
 
