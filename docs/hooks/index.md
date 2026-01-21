@@ -1,10 +1,10 @@
-# Gemini CLI hooks
+# Gemini CLI hooks (experimental)
 
 Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
 
-> **Note: Hooks are currently an experimental feature.**
+> [!NOTE] **Hooks are currently an experimental feature.**
 >
 > To use hooks, you must explicitly enable them in your `settings.json`:
 >
