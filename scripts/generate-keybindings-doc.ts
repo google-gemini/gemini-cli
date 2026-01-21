@@ -168,13 +168,13 @@ function formatBinding(binding: KeyBinding): string {
   let combo = segments.join(' + ');
 
   const restrictions: string[] = [];
-  if (binding.shift === false) restrictions.push('no Shift');
-  if (binding.alt === false) restrictions.push('no Alt');
-  if (binding.ctrl === false) restrictions.push('no Ctrl');
-  if (binding.cmd === false) restrictions.push('no Cmd');
+  if (binding.shift === false) restrictions.push('Shift');
+  if (binding.alt === false) restrictions.push('Alt');
+  if (binding.ctrl === false) restrictions.push('Ctrl');
+  if (binding.cmd === false) restrictions.push('Cmd');
 
   if (restrictions.length > 0) {
-    combo = `${combo} (${restrictions.join(', ')})`;
+    combo = `${combo} (no ${restrictions.join(', ')})`;
   }
 
   return combo ? `\`${combo}\`` : '';

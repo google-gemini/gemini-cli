@@ -203,7 +203,13 @@ describe('KeypressContext', () => {
 
       act(() => stdin.write('a'));
       expect(keyHandler).toHaveBeenLastCalledWith(
-        expect.objectContaining({ name: 'a' }),
+        expect.objectContaining({
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
 
       act(() => stdin.write('\r'));
@@ -213,6 +219,10 @@ describe('KeypressContext', () => {
           name: 'return',
           sequence: '\r',
           insertable: true,
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -229,6 +239,10 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
           name: 'return',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -246,6 +260,10 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -748,11 +766,23 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ name: 'delete' }),
+        expect.objectContaining({
+          name: 'delete',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
       expect(keyHandler).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ name: 'delete' }),
+        expect.objectContaining({
+          name: 'delete',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
     });
 
@@ -833,8 +863,8 @@ describe('KeypressContext', () => {
             };
           } else {
             // iTerm2 and VSCode send accented characters (å, ø, µ)
-            // Note: µ (mu) is sent with cmd:false on iTerm2/VSCode but
-            // gets converted to m with cmd:true
+            // Note: µ (mu) is sent with alt:false on iTerm2/VSCode but
+            // gets converted to m with alt:true
             return {
               terminal,
               key,
@@ -886,6 +916,9 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           sequence: '\\',
+          shift: false,
+          alt: false,
+          ctrl: false,
           cmd: false,
         }),
       );
@@ -919,6 +952,10 @@ describe('KeypressContext', () => {
       expect.objectContaining({
         name: 'undefined',
         sequence: INCOMPLETE_KITTY_SEQUENCE,
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
       }),
     );
   });
@@ -937,6 +974,10 @@ describe('KeypressContext', () => {
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         sequence: '\x1b[m',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
       }),
     );
   });
@@ -1109,6 +1150,10 @@ describe('KeypressContext', () => {
         expect.objectContaining({
           name: 'a',
           sequence: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -1223,7 +1268,14 @@ describe('KeypressContext', () => {
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'f12', sequence: '\u001b[24~' }),
+        expect.objectContaining({
+          name: 'f12',
+          sequence: '\u001b[24~',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
     });
   });
