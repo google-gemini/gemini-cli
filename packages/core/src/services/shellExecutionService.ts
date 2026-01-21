@@ -165,17 +165,14 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
+
   /**
-   * Executes a shell command using `node-pty`, capturing all output and lifecycle events.
+   * Creates a standardized environment for shell execution with Gemini CLI markers.
+   * This ensures consistent environment setup across both PTY and child_process execution methods.
    *
-   * @param commandToExecute The exact command string to run.
-   * @param cwd The working directory to execute the command in.
-   * @param onOutputEvent A callback for streaming structured events about the execution, including data chunks and status updates.
-   * @param abortSignal An AbortSignal to terminate the process and its children.
-   * @returns An object containing the process ID (pid) and a promise that
-   *          resolves with the complete execution result.
-   * @param sanitizationConfig Configuration for environment variable sanitization.
+   * @param sanitizationConfig Configuration for environment variable sanitization
    * @param pager The pager command to use (defaults to 'cat')
+   * @returns A complete environment object with GEMINI_CLI markers and terminal settings
    */
 
   private static createShellEnvironment(
@@ -190,6 +187,24 @@ export class ShellExecutionService {
       GIT_PAGER: pager,
     };
   }
+  /**
+   * Executes a shell command with automatic fallback between PTY and child_process modes.
+   *
+   * Attempts to use node-pty for enhanced terminal emulation if available and requested,
+   * falling back to child_process if PTY execution fails or is not requested.
+   * All child processes receive the GEMINI_CLI=1 environment variable for agent detection.
+   *
+   * @param commandToExecute The exact command string to run.
+   * @param cwd The working directory to execute the command in.
+   * @param onOutputEvent A callback for streaming structured events about the execution,
+   *                      including data chunks, binary detection, and progress updates.
+   * @param abortSignal An AbortSignal to terminate the process and its children.
+   * @param shouldUseNodePty Whether to attempt PTY execution (falls back to child_process if unavailable).
+   * @param shellExecutionConfig Configuration object containing terminal dimensions,
+   *                             environment sanitization settings, pager preferences, and display options.
+   * @returns An object containing the process ID (pid) and a promise that
+   *          resolves with the complete execution result, including output, exit code, and execution method.
+   */
 
   static async execute(
     commandToExecute: string,
