@@ -36,6 +36,9 @@ export class LocalGeminiClient {
       apiKey: 'no-api-key-needed',
       httpOptions: {
         baseUrl: this.host,
+        // If the LiteRT-LM server is started but the wrong port is set, there will be a lengthy TCP timeout (here fixed to be 10 seconds).
+        // If the LiteRT-LM server is not started, there will be an immediate connection refusal.
+        timeout: 10000,
       },
     });
   }
