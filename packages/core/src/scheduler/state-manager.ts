@@ -161,19 +161,19 @@ export class SchedulerStateManager {
   }
 
   cancelAllQueued(reason: string): void {
-    let changed = false;
+    if (this.queue.length === 0) {
+      return;
+    }
+
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
-      changed = true;
       if (queuedCall.status === 'error') {
         this._completedBatch.push(queuedCall);
         continue;
       }
       this._completedBatch.push(this.toCancelled(queuedCall, reason));
     }
-    if (changed) {
-      this.emitUpdate();
-    }
+    this.emitUpdate();
   }
 
   getSnapshot(): ToolCall[] {
