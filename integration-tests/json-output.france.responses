@@ -1,0 +1,1 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"The capital of France is Paris."}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":7,"totalTokenCount":14,"promptTokensDetails":[{"modality":"TEXT","tokenCount":7}]}}]}

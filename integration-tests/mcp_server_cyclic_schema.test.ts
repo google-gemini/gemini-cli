@@ -5,14 +5,26 @@
  */
 
 /**
- * This test verifies we can match maximum schema depth errors from Gemini
- * and then detect and warn about the potential tools that caused the error.
+ * This test verifies we can provide MCP tools with recursive input schemas
+ * (in JSON, using the $ref keyword) and both the GenAI SDK and the Gemini
+ * API calls succeed. Note that prior to
+ * https://github.com/googleapis/js-genai/commit/36f6350705ecafc47eaea3f3eecbcc69512edab7#diff-fdde9372aec859322b7c5a5efe467e0ad25a57210c7229724586ee90ea4f5a30
+ * the Gemini API call would fail for such tools because the schema was
+ * passed not as a JSON string but using the Gemini API's tool parameter
+ * schema object which has stricter typing and recursion restrictions.
+ * If this test fails, it's likely because either the GenAI SDK or Gemini API
+ * has become more restrictive about the type of tool parameter schemas that
+ * are accepted. If this occurs: Gemini CLI previously attempted to detect
+ * such tools and proactively remove them from the set of tools provided in
+ * the Gemini API call (as FunctionDeclaration objects). It may be appropriate
+ * to resurrect that behavior but note that it's difficult to keep the
+ * GCLI filters in sync with the Gemini API restrictions and behavior.
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
-import { TestRig } from './test-helper.js';
-import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, it, afterEach, beforeEach } from 'vitest';
+import { TestRig } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -154,9 +166,15 @@ rpc.send({
 `;
 
 describe('mcp server with cyclic tool schema is detected', () => {
-  const rig = new TestRig();
+  let rig: TestRig;
 
-  beforeAll(async () => {
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
+  it('mcp tool list should include tool with cyclic tool schema', async () => {
     // Setup test directory with MCP server configuration
     await rig.setup('cyclic-schema-mcp-server', {
       settings: {
@@ -178,17 +196,12 @@ describe('mcp server with cyclic tool schema is detected', () => {
       const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
-  });
 
-  it('should error and suggest disabling the cyclic tool', async () => {
-    // Just run any command to trigger the schema depth error.
-    // If this test starts failing, check `isSchemaDepthError` from
-    // geminiChat.ts to see if it needs to be updated.
-    // Or, possibly it could mean that gemini has fixed the issue.
-    const output = await rig.run('hello');
+    const run = await rig.runInteractive();
 
-    expect(output).toMatch(
-      /Skipping tool 'tool_with_cyclic_schema' from MCP server 'cyclic-schema-server' because it has missing types in its parameter schema/,
-    );
+    await run.type('/mcp list');
+    await run.type('\r');
+
+    await run.expectText('tool_with_cyclic_schema');
   });
 });

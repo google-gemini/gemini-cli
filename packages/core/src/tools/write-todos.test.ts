@@ -6,9 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { WriteTodosTool, type WriteTodosToolParams } from './write-todos.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('WriteTodosTool', () => {
-  const tool = new WriteTodosTool();
+  const tool = new WriteTodosTool(createMockMessageBus());
   const signal = new AbortController().signal;
 
   describe('validation', () => {
@@ -86,7 +87,7 @@ describe('WriteTodosTool', () => {
       };
       const result = await tool.buildAndExecute(params, signal);
       expect(result.llmContent).toBe('Successfully cleared the todo list.');
-      expect(result.returnDisplay).toBe('Successfully cleared the todo list.');
+      expect(result.returnDisplay).toEqual({ todos: [] });
     });
 
     it('should return a formatted todo list on success', async () => {
@@ -103,7 +104,7 @@ describe('WriteTodosTool', () => {
 2. [in_progress] Second task
 3. [pending] Third task`;
       expect(result.llmContent).toBe(expectedOutput);
-      expect(result.returnDisplay).toBe(expectedOutput);
+      expect(result.returnDisplay).toEqual(params);
     });
   });
 });

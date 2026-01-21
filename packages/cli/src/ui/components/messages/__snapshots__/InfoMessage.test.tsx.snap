@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`InfoMessage > renders multiline info messages 1`] = `
+"
+ℹ Info line 1
+  Info line 2"
+`;
+
+exports[`InfoMessage > renders with a custom icon 1`] = `
+"
+★Custom icon test"
+`;
+
+exports[`InfoMessage > renders with the correct default prefix and text 1`] = `
+"
+ℹ Just so you know"
+`;

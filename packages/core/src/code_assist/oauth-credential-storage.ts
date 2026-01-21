@@ -9,10 +9,10 @@ import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js
 import { OAUTH_FILE } from '../config/storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { coreEvents } from '../utils/events.js';
 
-const GEMINI_DIR = '.gemini';
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
 const MAIN_ACCOUNT_KEY = 'main-account';
 
@@ -49,8 +49,12 @@ export class OAuthCredentialStorage {
       // Fallback: Try to migrate from old file-based storage
       return await this.migrateFromFileStorage();
     } catch (error: unknown) {
-      console.error(error);
-      throw new Error('Failed to load OAuth credentials');
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to load OAuth credentials',
+        error,
+      );
+      throw new Error('Failed to load OAuth credentials', { cause: error });
     }
   }
 
@@ -86,11 +90,15 @@ export class OAuthCredentialStorage {
       await this.storage.deleteCredentials(MAIN_ACCOUNT_KEY);
 
       // Also try to remove the old file if it exists
-      const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
+      const oldFilePath = path.join(homedir(), GEMINI_DIR, OAUTH_FILE);
       await fs.rm(oldFilePath, { force: true }).catch(() => {});
     } catch (error: unknown) {
-      console.error(error);
-      throw new Error('Failed to clear OAuth credentials');
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to clear OAuth credentials',
+        error,
+      );
+      throw new Error('Failed to clear OAuth credentials', { cause: error });
     }
   }
 
@@ -98,7 +106,7 @@ export class OAuthCredentialStorage {
    * Migrate credentials from old file-based storage to keychain
    */
   private static async migrateFromFileStorage(): Promise<Credentials | null> {
-    const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
+    const oldFilePath = path.join(homedir(), GEMINI_DIR, OAUTH_FILE);
 
     let credsJson: string;
     try {

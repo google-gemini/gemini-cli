@@ -1,0 +1,11 @@
+{
+  "name": "mcp-server-example",
+  "version": "1.0.0",
+  "description": "Example MCP Server for Gemini CLI Extension",
+  "type": "module",
+  "main": "example.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "zod": "^3.22.4"
+  }
+}

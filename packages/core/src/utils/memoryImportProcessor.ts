@@ -7,18 +7,19 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
-import { marked } from 'marked';
+import { debugLogger } from './debugLogger.js';
 
 // Simple console logger for import processing
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (...args: any[]) =>
-    console.debug('[DEBUG] [ImportProcessor]', ...args),
+    debugLogger.debug('[DEBUG] [ImportProcessor]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN] [ImportProcessor]', ...args),
+  warn: (...args: any[]) =>
+    debugLogger.warn('[WARN] [ImportProcessor]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
-    console.error('[ERROR] [ImportProcessor]', ...args),
+    debugLogger.error('[ERROR] [ImportProcessor]', ...args),
 };
 
 /**
@@ -81,7 +82,7 @@ function hasMessage(err: unknown): err is { message: string } {
   );
 }
 
-// Helper to find all code block and inline code regions using marked
+// Helper to find all code block and inline code regions using regex
 /**
  * Finds all import statements in content without using regex
  * @returns Array of {start, _end, path} objects for each import found
@@ -152,42 +153,13 @@ function isLetter(char: string): boolean {
 
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
-  const tokens = marked.lexer(content);
-
-  // Map from raw content to a queue of its start indices in the original content.
-  const rawContentIndices = new Map<string, number[]>();
-
-  function walk(token: { type: string; raw: string; tokens?: unknown[] }) {
-    if (token.type === 'code' || token.type === 'codespan') {
-      if (!rawContentIndices.has(token.raw)) {
-        const indices: number[] = [];
-        let lastIndex = -1;
-        while ((lastIndex = content.indexOf(token.raw, lastIndex + 1)) !== -1) {
-          indices.push(lastIndex);
-        }
-        rawContentIndices.set(token.raw, indices);
-      }
-
-      const indices = rawContentIndices.get(token.raw);
-      if (indices && indices.length > 0) {
-        // Assume tokens are processed in order of appearance.
-        // Dequeue the next available index for this raw content.
-        const idx = indices.shift()!;
-        regions.push([idx, idx + token.raw.length]);
-      }
-    }
-
-    if ('tokens' in token && token.tokens) {
-      for (const child of token.tokens) {
-        walk(child as { type: string; raw: string; tokens?: unknown[] });
-      }
-    }
+  // Regex to match code blocks (inline and multiline)
+  // Matches one or more backticks, content (lazy), and same number of backticks
+  const regex = /(`+)([\s\S]*?)\1/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    regions.push([match.index, match.index + match[0].length]);
   }
-
-  for (const token of tokens) {
-    walk(token);
-  }
-
   return regions;
 }
 

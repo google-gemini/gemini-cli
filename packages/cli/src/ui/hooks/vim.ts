@@ -8,6 +8,7 @@ import { useCallback, useReducer, useEffect } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -279,8 +280,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
         normalizedKey.name === 'return' &&
+        !normalizedKey.alt &&
         !normalizedKey.ctrl &&
-        !normalizedKey.meta
+        !normalizedKey.cmd
       ) {
         if (buffer.text.trim() && onSubmit) {
           // Handle command submission directly
@@ -308,10 +310,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     (key: Key): Key => ({
       name: key.name || '',
       sequence: key.sequence || '',
-      ctrl: key.ctrl || false,
-      meta: key.meta || false,
       shift: key.shift || false,
-      paste: key.paste || false,
+      alt: key.alt || false,
+      ctrl: key.ctrl || false,
+      cmd: key.cmd || false,
+      insertable: key.insertable || false,
     }),
     [],
   );
@@ -394,7 +397,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         normalizedKey = normalizeKey(key);
       } catch (error) {
         // Handle malformed key inputs gracefully
-        console.warn('Malformed key input in vim mode:', key, error);
+        debugLogger.warn('Malformed key input in vim mode:', key, error);
         return false;
       }
 

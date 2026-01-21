@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { FileTokenStorage } from './file-token-storage.js';
 import type { OAuthCredentials } from './types.js';
+import { GEMINI_DIR } from '../../utils/paths.js';
 
 vi.mock('node:fs', () => ({
   promises: {
@@ -57,12 +58,11 @@ describe('FileTokenStorage', () => {
   });
 
   describe('getCredentials', () => {
-    it('should throw error when file does not exist', async () => {
+    it('should return null when file does not exist', async () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
-      await expect(storage.getCredentials('test-server')).rejects.toThrow(
-        'Token file does not exist',
-      );
+      const result = await storage.getCredentials('test-server');
+      expect(result).toBeNull();
     });
 
     it('should return null for expired tokens', async () => {
@@ -135,7 +135,7 @@ describe('FileTokenStorage', () => {
       await storage.setCredentials(credentials);
 
       expect(mockFs.mkdir).toHaveBeenCalledWith(
-        path.join('/home/test', '.gemini'),
+        path.join('/home/test', GEMINI_DIR),
         { recursive: true, mode: 0o700 },
       );
       expect(mockFs.writeFile).toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe('FileTokenStorage', () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
       await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
-        'Token file does not exist',
+        'No credentials found for test-server',
       );
     });
 
@@ -201,7 +201,7 @@ describe('FileTokenStorage', () => {
       await storage.deleteCredentials('test-server');
 
       expect(mockFs.unlink).toHaveBeenCalledWith(
-        path.join('/home/test', '.gemini', 'mcp-oauth-tokens-v2.json'),
+        path.join('/home/test', GEMINI_DIR, 'mcp-oauth-tokens-v2.json'),
       );
     });
 
@@ -245,12 +245,11 @@ describe('FileTokenStorage', () => {
   });
 
   describe('listServers', () => {
-    it('should throw error when file does not exist', async () => {
+    it('should return empty list when file does not exist', async () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
-      await expect(storage.listServers()).rejects.toThrow(
-        'Token file does not exist',
-      );
+      const result = await storage.listServers();
+      expect(result).toEqual([]);
     });
 
     it('should return list of server names', async () => {
@@ -282,7 +281,7 @@ describe('FileTokenStorage', () => {
       await storage.clearAll();
 
       expect(mockFs.unlink).toHaveBeenCalledWith(
-        path.join('/home/test', '.gemini', 'mcp-oauth-tokens-v2.json'),
+        path.join('/home/test', GEMINI_DIR, 'mcp-oauth-tokens-v2.json'),
       );
     });
 

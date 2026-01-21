@@ -68,8 +68,8 @@ export const CloudFreePrivacyNotice = ({
   }
 
   const items = [
-    { label: 'Yes', value: true },
-    { label: 'No', value: false },
+    { label: 'Yes', value: true, key: 'true' },
+    { label: 'No', value: false, key: 'false' },
   ];
 
   return (
@@ -112,6 +112,7 @@ export const CloudFreePrivacyNotice = ({
           items={items}
           initialIndex={privacyState.dataCollectionOptIn ? 0 : 1}
           onSelect={(value) => {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
             updateDataCollectionOptIn(value);
             // Only exit if there was no error.
             if (!privacyState.error) {

@@ -7,9 +7,14 @@
 import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as process from 'node:process';
+import { debugLogger } from './debugLogger.js';
 
 export type Unsubscribe = () => void;
+
+export interface AddDirectoriesResult {
+  added: string[];
+  failed: Array<{ path: string; error: Error }>;
+}
 
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
@@ -23,14 +28,15 @@ export class WorkspaceContext {
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
-   * @param directory The initial working directory (usually cwd)
+   * @param targetDir The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  constructor(directory: string, additionalDirectories: string[] = []) {
-    this.addDirectory(directory);
-    for (const additionalDirectory of additionalDirectories) {
-      this.addDirectory(additionalDirectory);
-    }
+  constructor(
+    readonly targetDir: string,
+    additionalDirectories: string[] = [],
+  ) {
+    this.addDirectory(targetDir);
+    this.addDirectories(additionalDirectories);
     this.initialDirectories = new Set(this.directories);
   }
 
@@ -53,7 +59,9 @@ export class WorkspaceContext {
         listener();
       } catch (e) {
         // Don't let one listener break others.
-        console.error('Error in WorkspaceContext listener:', e);
+        debugLogger.warn(
+          `Error in WorkspaceContext listener: (${e instanceof Error ? e.message : String(e)})`,
+        );
       }
     }
   }
@@ -62,29 +70,51 @@ export class WorkspaceContext {
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
+   * @throws Error if the directory cannot be added
    */
-  addDirectory(directory: string, basePath: string = process.cwd()): void {
-    try {
-      const resolved = this.resolveAndValidateDir(directory, basePath);
-      if (this.directories.has(resolved)) {
-        return;
-      }
-      this.directories.add(resolved);
-      this.notifyDirectoriesChanged();
-    } catch (err) {
-      console.warn(
-        `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
-      );
+  addDirectory(directory: string): void {
+    const result = this.addDirectories([directory]);
+    if (result.failed.length > 0) {
+      throw result.failed[0].error;
     }
   }
 
-  private resolveAndValidateDir(
-    directory: string,
-    basePath: string = process.cwd(),
-  ): string {
-    const absolutePath = path.isAbsolute(directory)
-      ? directory
-      : path.resolve(basePath, directory);
+  /**
+   * Adds multiple directories to the workspace.
+   * Emits a single change event if any directories are added.
+   * @param directories The directory paths to add
+   * @returns Object containing successfully added directories and failures
+   */
+  addDirectories(directories: string[]): AddDirectoriesResult {
+    const result: AddDirectoriesResult = { added: [], failed: [] };
+    let changed = false;
+
+    for (const directory of directories) {
+      try {
+        const resolved = this.resolveAndValidateDir(directory);
+        if (!this.directories.has(resolved)) {
+          this.directories.add(resolved);
+          changed = true;
+        }
+        result.added.push(directory);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        debugLogger.warn(
+          `[WARN] Skipping unreadable directory: ${directory} (${error.message})`,
+        );
+        result.failed.push({ path: directory, error });
+      }
+    }
+
+    if (changed) {
+      this.notifyDirectoriesChanged();
+    }
+
+    return result;
+  }
+
+  private resolveAndValidateDir(directory: string): string {
+    const absolutePath = path.resolve(this.targetDir, directory);
 
     if (!fs.existsSync(absolutePath)) {
       throw new Error(`Directory does not exist: ${absolutePath}`);
@@ -151,7 +181,7 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(pathToCheck);
+      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
     } catch (e: unknown) {
       if (
         isNodeError(e) &&

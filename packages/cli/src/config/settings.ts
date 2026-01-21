@@ -6,14 +6,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir, platform } from 'node:os';
+import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
   FatalConfigError,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
+  GEMINI_DIR,
   getErrorMessage,
   Storage,
+  coreEvents,
+  homedir,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -21,25 +24,46 @@ import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
+  type MergedSettings,
   type MemoryImportFormat,
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
 } from './settingsSchema.js';
+
+export {
+  type Settings,
+  type MergedSettings,
+  type MemoryImportFormat,
+  type MergeStrategy,
+  type SettingsSchema,
+  type SettingDefinition,
+  getSettingsSchema,
+};
+
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
+import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
-import { disableExtension } from './extension.js';
+import {
+  validateSettings,
+  formatValidationError,
+} from './settings-validation.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
+  let parent: SettingDefinition | undefined = undefined;
 
   for (const key of path) {
     if (!currentSchema || !currentSchema[key]) {
+      // Key not found in schema - check if parent has additionalProperties
+      if (parent?.additionalProperties?.mergeStrategy) {
+        return parent.additionalProperties.mergeStrategy;
+      }
       return undefined;
     }
+    parent = current;
     current = currentSchema[key];
     currentSchema = current.properties;
   }
@@ -47,82 +71,9 @@ function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   return current?.mergeStrategy;
 }
 
-export type { Settings, MemoryImportFormat };
-
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
-
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
-
-const MIGRATE_V2_OVERWRITE = true;
-
-const MIGRATION_MAP: Record<string, string> = {
-  accessibility: 'ui.accessibility',
-  allowedTools: 'tools.allowed',
-  allowMCPServers: 'mcp.allowed',
-  autoAccept: 'tools.autoAccept',
-  autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
-  bugCommand: 'advanced.bugCommand',
-  chatCompression: 'model.chatCompression',
-  checkpointing: 'general.checkpointing',
-  coreTools: 'tools.core',
-  contextFileName: 'context.fileName',
-  customThemes: 'ui.customThemes',
-  customWittyPhrases: 'ui.customWittyPhrases',
-  debugKeystrokeLogging: 'general.debugKeystrokeLogging',
-  disableAutoUpdate: 'general.disableAutoUpdate',
-  disableUpdateNag: 'general.disableUpdateNag',
-  dnsResolutionOrder: 'advanced.dnsResolutionOrder',
-  enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
-  enablePromptCompletion: 'general.enablePromptCompletion',
-  enforcedAuthType: 'security.auth.enforcedType',
-  excludeTools: 'tools.exclude',
-  excludeMCPServers: 'mcp.excluded',
-  excludedProjectEnvVars: 'advanced.excludedEnvVars',
-  extensionManagement: 'experimental.extensionManagement',
-  extensions: 'extensions',
-  fileFiltering: 'context.fileFiltering',
-  folderTrustFeature: 'security.folderTrust.featureEnabled',
-  folderTrust: 'security.folderTrust.enabled',
-  hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
-  hideWindowTitle: 'ui.hideWindowTitle',
-  hideTips: 'ui.hideTips',
-  hideBanner: 'ui.hideBanner',
-  hideFooter: 'ui.hideFooter',
-  hideCWD: 'ui.footer.hideCWD',
-  hideSandboxStatus: 'ui.footer.hideSandboxStatus',
-  hideModelInfo: 'ui.footer.hideModelInfo',
-  hideContextSummary: 'ui.hideContextSummary',
-  showMemoryUsage: 'ui.showMemoryUsage',
-  showLineNumbers: 'ui.showLineNumbers',
-  showCitations: 'ui.showCitations',
-  ideMode: 'ide.enabled',
-  includeDirectories: 'context.includeDirectories',
-  loadMemoryFromIncludeDirectories: 'context.loadFromIncludeDirectories',
-  maxSessionTurns: 'model.maxSessionTurns',
-  mcpServers: 'mcpServers',
-  mcpServerCommand: 'mcp.serverCommand',
-  memoryImportFormat: 'context.importFormat',
-  memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
-  model: 'model.name',
-  preferredEditor: 'general.preferredEditor',
-  sandbox: 'tools.sandbox',
-  selectedAuthType: 'security.auth.selectedType',
-  shouldUseNodePtyShell: 'tools.shell.enableInteractiveShell',
-  shellPager: 'tools.shell.pager',
-  shellShowColor: 'tools.shell.showColor',
-  skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
-  summarizeToolOutput: 'model.summarizeToolOutput',
-  telemetry: 'telemetry',
-  theme: 'ui.theme',
-  toolDiscoveryCommand: 'tools.discoveryCommand',
-  toolCallCommand: 'tools.callCommand',
-  usageStatisticsEnabled: 'privacy.usageStatisticsEnabled',
-  useExternalAuth: 'security.auth.useExternal',
-  useRipgrep: 'tools.useRipgrep',
-  vimMode: 'general.vimMode',
-};
 
 export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
@@ -154,6 +105,38 @@ export enum SettingScope {
   Workspace = 'Workspace',
   System = 'System',
   SystemDefaults = 'SystemDefaults',
+  // Note that this scope is not supported in the settings dialog at this time,
+  // it is only supported for extensions.
+  Session = 'Session',
+}
+
+/**
+ * A type representing the settings scopes that are supported for LoadedSettings.
+ */
+export type LoadableSettingScope =
+  | SettingScope.User
+  | SettingScope.Workspace
+  | SettingScope.System
+  | SettingScope.SystemDefaults;
+
+/**
+ * The actual values of the loadable settings scopes.
+ */
+const _loadableSettingScopes = [
+  SettingScope.User,
+  SettingScope.Workspace,
+  SettingScope.System,
+  SettingScope.SystemDefaults,
+];
+
+/**
+ * A type guard function that checks if `scope` is a loadable settings scope,
+ * and allows promotion to the `LoadableSettingsScope` type based on the result.
+ */
+export function isLoadableSettingScope(
+  scope: SettingScope,
+): scope is LoadableSettingScope {
+  return _loadableSettingScopes.includes(scope);
 }
 
 export interface CheckpointingSettings {
@@ -165,13 +148,28 @@ export interface SummarizeToolOutputSettings {
 }
 
 export interface AccessibilitySettings {
-  disableLoadingPhrases?: boolean;
+  enableLoadingPhrases?: boolean;
   screenReader?: boolean;
+}
+
+export interface SessionRetentionSettings {
+  /** Enable automatic session cleanup */
+  enabled?: boolean;
+
+  /** Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w") */
+  maxAge?: string;
+
+  /** Alternative: Maximum number of sessions to keep (most recent) */
+  maxCount?: number;
+
+  /** Minimum retention period (safety limit, defaults to "1d") */
+  minRetention?: string;
 }
 
 export interface SettingsError {
   message: string;
   path: string;
+  severity: 'error' | 'warning';
 }
 
 export interface SettingsFile {
@@ -206,172 +204,63 @@ function setNestedProperty(
   current[lastKey] = value;
 }
 
-export function needsMigration(settings: Record<string, unknown>): boolean {
-  // A file needs migration if it contains any top-level key that is moved to a
-  // nested location in V2.
-  const hasV1Keys = Object.entries(MIGRATION_MAP).some(([v1Key, v2Path]) => {
-    if (v1Key === v2Path || !(v1Key in settings)) {
-      return false;
+export function getDefaultsFromSchema(
+  schema: SettingsSchema = getSettingsSchema(),
+): Settings {
+  const defaults: Record<string, unknown> = {};
+  for (const key in schema) {
+    const definition = schema[key];
+    if (definition.properties) {
+      defaults[key] = getDefaultsFromSchema(definition.properties);
+    } else if (definition.default !== undefined) {
+      defaults[key] = definition.default;
     }
-    // If a key exists that is both a V1 key and a V2 container (like 'model'),
-    // we need to check the type. If it's an object, it's a V2 container and not
-    // a V1 key that needs migration.
-    if (
-      KNOWN_V2_CONTAINERS.has(v1Key) &&
-      typeof settings[v1Key] === 'object' &&
-      settings[v1Key] !== null
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  return hasV1Keys;
+  }
+  return defaults as Settings;
 }
 
-function migrateSettingsToV2(
-  flatSettings: Record<string, unknown>,
-): Record<string, unknown> | null {
-  if (!needsMigration(flatSettings)) {
-    return null;
-  }
-
-  const v2Settings: Record<string, unknown> = {};
-  const flatKeys = new Set(Object.keys(flatSettings));
-
-  for (const [oldKey, newPath] of Object.entries(MIGRATION_MAP)) {
-    if (flatKeys.has(oldKey)) {
-      setNestedProperty(v2Settings, newPath, flatSettings[oldKey]);
-      flatKeys.delete(oldKey);
-    }
-  }
-
-  // Preserve mcpServers at the top level
-  if (flatSettings['mcpServers']) {
-    v2Settings['mcpServers'] = flatSettings['mcpServers'];
-    flatKeys.delete('mcpServers');
-  }
-
-  // Carry over any unrecognized keys
-  for (const remainingKey of flatKeys) {
-    const existingValue = v2Settings[remainingKey];
-    const newValue = flatSettings[remainingKey];
-
-    if (
-      typeof existingValue === 'object' &&
-      existingValue !== null &&
-      !Array.isArray(existingValue) &&
-      typeof newValue === 'object' &&
-      newValue !== null &&
-      !Array.isArray(newValue)
-    ) {
-      const pathAwareGetStrategy = (path: string[]) =>
-        getMergeStrategyForPath([remainingKey, ...path]);
-      v2Settings[remainingKey] = customDeepMerge(
-        pathAwareGetStrategy,
-        {},
-        newValue as MergeableObject,
-        existingValue as MergeableObject,
-      );
-    } else {
-      v2Settings[remainingKey] = newValue;
-    }
-  }
-
-  return v2Settings;
-}
-
-function getNestedProperty(
-  obj: Record<string, unknown>,
-  path: string,
-): unknown {
-  const keys = path.split('.');
-  let current: unknown = obj;
-  for (const key of keys) {
-    if (typeof current !== 'object' || current === null || !(key in current)) {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  return current;
-}
-
-const REVERSE_MIGRATION_MAP: Record<string, string> = Object.fromEntries(
-  Object.entries(MIGRATION_MAP).map(([key, value]) => [value, key]),
-);
-
-// Dynamically determine the top-level keys from the V2 settings structure.
-const KNOWN_V2_CONTAINERS = new Set(
-  Object.values(MIGRATION_MAP).map((path) => path.split('.')[0]),
-);
-
-export function migrateSettingsToV1(
-  v2Settings: Record<string, unknown>,
-): Record<string, unknown> {
-  const v1Settings: Record<string, unknown> = {};
-  const v2Keys = new Set(Object.keys(v2Settings));
-
-  for (const [newPath, oldKey] of Object.entries(REVERSE_MIGRATION_MAP)) {
-    const value = getNestedProperty(v2Settings, newPath);
-    if (value !== undefined) {
-      v1Settings[oldKey] = value;
-      v2Keys.delete(newPath.split('.')[0]);
-    }
-  }
-
-  // Preserve mcpServers at the top level
-  if (v2Settings['mcpServers']) {
-    v1Settings['mcpServers'] = v2Settings['mcpServers'];
-    v2Keys.delete('mcpServers');
-  }
-
-  // Carry over any unrecognized keys
-  for (const remainingKey of v2Keys) {
-    const value = v2Settings[remainingKey];
-    if (value === undefined) {
-      continue;
-    }
-
-    // Don't carry over empty objects that were just containers for migrated settings.
-    if (
-      KNOWN_V2_CONTAINERS.has(remainingKey) &&
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value) &&
-      Object.keys(value).length === 0
-    ) {
-      continue;
-    }
-
-    v1Settings[remainingKey] = value;
-  }
-
-  return v1Settings;
-}
-
-function mergeSettings(
+export function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
-): Settings {
+): MergedSettings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+  const schemaDefaults = getDefaultsFromSchema();
 
   // Settings are merged with the following precedence (last one wins for
   // single values):
-  // 1. System Defaults
-  // 2. User Settings
-  // 3. Workspace Settings
-  // 4. System Settings (as overrides)
+  // 1. Schema Defaults (Built-in)
+  // 2. System Defaults
+  // 3. User Settings
+  // 4. Workspace Settings
+  // 5. System Settings (as overrides)
   return customDeepMerge(
     getMergeStrategyForPath,
-    {}, // Start with an empty object
+    schemaDefaults,
     systemDefaults,
     user,
     safeWorkspace,
     system,
-  ) as Settings;
+  ) as MergedSettings;
+}
+
+/**
+ * Creates a fully populated MergedSettings object for testing purposes.
+ * It merges the provided overrides with the default settings from the schema.
+ *
+ * @param overrides Partial settings to override the defaults.
+ * @returns A complete MergedSettings object.
+ */
+export function createTestMergedSettings(
+  overrides: Partial<Settings> = {},
+): MergedSettings {
+  return customDeepMerge(
+    getMergeStrategyForPath,
+    getDefaultsFromSchema(),
+    overrides,
+  ) as MergedSettings;
 }
 
 export class LoadedSettings {
@@ -381,14 +270,14 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     isTrusted: boolean,
-    migratedInMemorScopes: Set<SettingScope>,
+    errors: SettingsError[] = [],
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
     this.isTrusted = isTrusted;
-    this.migratedInMemorScopes = migratedInMemorScopes;
+    this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
 
@@ -397,25 +286,43 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
-  readonly migratedInMemorScopes: Set<SettingScope>;
+  readonly errors: SettingsError[];
 
-  private _merged: Settings;
+  private _merged: MergedSettings;
+  private _remoteAdminSettings: Partial<Settings> | undefined;
 
-  get merged(): Settings {
+  get merged(): MergedSettings {
     return this._merged;
   }
 
-  private computeMergedSettings(): Settings {
-    return mergeSettings(
+  private computeMergedSettings(): MergedSettings {
+    const merged = mergeSettings(
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
       this.workspace.settings,
       this.isTrusted,
     );
+
+    // Remote admin settings always take precedence and file-based admin settings
+    // are ignored.
+    const adminSettingSchema = getSettingsSchema().admin;
+    if (adminSettingSchema?.properties) {
+      const adminSchema = adminSettingSchema.properties;
+      const adminDefaults = getDefaultsFromSchema(adminSchema);
+
+      // The final admin settings are the defaults overridden by remote settings.
+      // Any admin settings from files are ignored.
+      merged.admin = customDeepMerge(
+        (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
+        adminDefaults,
+        this._remoteAdminSettings?.admin ?? {},
+      ) as MergedSettings['admin'];
+    }
+    return merged;
   }
 
-  forScope(scope: SettingScope): SettingsFile {
+  forScope(scope: LoadableSettingScope): SettingsFile {
     switch (scope) {
       case SettingScope.User:
         return this.user;
@@ -430,12 +337,38 @@ export class LoadedSettings {
     }
   }
 
-  setValue(scope: SettingScope, key: string, value: unknown): void {
+  setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
+    coreEvents.emitSettingsChanged();
+  }
+
+  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
+    const admin: Settings['admin'] = {};
+    const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
+
+    if (secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = secureModeEnabled;
+    }
+
+    if (mcpSetting?.mcpEnabled !== undefined) {
+      admin.mcp = { enabled: mcpSetting.mcpEnabled };
+    }
+
+    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
+    if (extensionsSetting?.extensionsEnabled !== undefined) {
+      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
+    }
+
+    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
+      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
+    }
+
+    this._remoteAdminSettings = { admin };
+    this._merged = this.computeMergedSettings();
   }
 }
 
@@ -546,7 +479,6 @@ export function loadSettings(
   const settingsErrors: SettingsError[] = [];
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
-  const migratedInMemorScopes = new Set<SettingScope>();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -567,10 +499,7 @@ export function loadSettings(
     workspaceDir,
   ).getWorkspaceSettingsPath();
 
-  const loadAndMigrate = (
-    filePath: string,
-    scope: SettingScope,
-  ): { settings: Settings; rawJson?: string } => {
+  const load = (filePath: string): { settings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -584,62 +513,49 @@ export function loadSettings(
           settingsErrors.push({
             message: 'Settings file is not a valid JSON object.',
             path: filePath,
+            severity: 'error',
           });
           return { settings: {} };
         }
 
-        let settingsObject = rawSettings as Record<string, unknown>;
-        if (needsMigration(settingsObject)) {
-          const migratedSettings = migrateSettingsToV2(settingsObject);
-          if (migratedSettings) {
-            if (MIGRATE_V2_OVERWRITE) {
-              try {
-                fs.renameSync(filePath, `${filePath}.orig`);
-                fs.writeFileSync(
-                  filePath,
-                  JSON.stringify(migratedSettings, null, 2),
-                  'utf-8',
-                );
-              } catch (e) {
-                console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
-                    e,
-                  )}`,
-                );
-              }
-            } else {
-              migratedInMemorScopes.add(scope);
-            }
-            settingsObject = migratedSettings;
-          }
+        const settingsObject = rawSettings as Record<string, unknown>;
+
+        // Validate settings structure with Zod
+        const validationResult = validateSettings(settingsObject);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          settingsErrors.push({
+            message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          });
         }
+
         return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
         message: getErrorMessage(error),
         path: filePath,
+        severity: 'error',
       });
     }
     return { settings: {} };
   };
 
-  const systemResult = loadAndMigrate(systemSettingsPath, SettingScope.System);
-  const systemDefaultsResult = loadAndMigrate(
-    systemDefaultsPath,
-    SettingScope.SystemDefaults,
-  );
-  const userResult = loadAndMigrate(USER_SETTINGS_PATH, SettingScope.User);
+  const systemResult = load(systemSettingsPath);
+  const systemDefaultsResult = load(systemDefaultsPath);
+  const userResult = load(USER_SETTINGS_PATH);
 
   let workspaceResult: { settings: Settings; rawJson?: string } = {
     settings: {} as Settings,
     rawJson: undefined,
   };
   if (realWorkspaceDir !== realHomeDir) {
-    workspaceResult = loadAndMigrate(
-      workspaceSettingsPath,
-      SettingScope.Workspace,
-    );
+    workspaceResult = load(workspaceSettingsPath);
   }
 
   const systemOriginalSettings = structuredClone(systemResult.settings);
@@ -686,14 +602,14 @@ export function loadSettings(
     isTrusted,
   );
 
-  // loadEnviroment depends on settings so we have to create a temp version of
+  // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
-  // Create LoadedSettings first
-
-  if (settingsErrors.length > 0) {
-    const errorMessages = settingsErrors.map(
+  // Check for any fatal errors before proceeding
+  const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
+  if (fatalErrors.length > 0) {
+    const errorMessages = fatalErrors.map(
       (error) => `Error in ${error.path}: ${error.message}`,
     );
     throw new FatalConfigError(
@@ -701,7 +617,7 @@ export function loadSettings(
     );
   }
 
-  return new LoadedSettings(
+  const loadedSettings = new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -727,33 +643,175 @@ export function loadSettings(
       rawJson: workspaceResult.rawJson,
     },
     isTrusted,
-    migratedInMemorScopes,
+    settingsErrors,
   );
+
+  // Automatically migrate deprecated settings when loading.
+  migrateDeprecatedSettings(loadedSettings);
+
+  return loadedSettings;
 }
 
+/**
+ * Migrates deprecated settings to their new counterparts.
+ *
+ * TODO: After a couple of weeks (around early Feb 2026), we should start removing
+ * the deprecated settings from the settings files by default.
+ *
+ * @returns true if any changes were made and need to be saved.
+ */
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  workspaceDir: string = process.cwd(),
-): void {
-  const processScope = (scope: SettingScope) => {
+  removeDeprecated = false,
+): boolean {
+  let anyModified = false;
+  const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
-    if (settings.extensions?.disabled) {
-      console.log(
-        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
-      );
-      for (const extension of settings.extensions.disabled ?? []) {
-        disableExtension(extension, scope, workspaceDir);
+
+    // Migrate inverted boolean settings (disableX -> enableX)
+    // These settings were renamed and their boolean logic inverted
+    const generalSettings = settings.general as
+      | Record<string, unknown>
+      | undefined;
+    const uiSettings = settings.ui as Record<string, unknown> | undefined;
+    const contextSettings = settings.context as
+      | Record<string, unknown>
+      | undefined;
+
+    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
+    if (generalSettings) {
+      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      let modified = false;
+
+      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableAutoUpdate'];
+          newGeneral['enableAutoUpdate'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableAutoUpdate'];
+          }
+          modified = true;
+        }
       }
 
-      const newExtensionsValue = { ...settings.extensions };
-      newExtensionsValue.disabled = undefined;
+      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
+        if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+            modified = true;
+          }
+        } else {
+          const oldValue = newGeneral['disableUpdateNag'];
+          newGeneral['enableAutoUpdateNotification'] = !oldValue;
+          if (removeDeprecated) {
+            delete newGeneral['disableUpdateNag'];
+          }
+          modified = true;
+        }
+      }
 
-      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
+      if (modified) {
+        loadedSettings.setValue(scope, 'general', newGeneral);
+        anyModified = true;
+      }
+    }
+
+    // Migrate ui settings
+    if (uiSettings) {
+      const newUi: Record<string, unknown> = { ...uiSettings };
+      let modified = false;
+
+      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+      const accessibilitySettings = newUi['accessibility'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        accessibilitySettings &&
+        typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
+      ) {
+        const newAccessibility: Record<string, unknown> = {
+          ...accessibilitySettings,
+        };
+        if (
+          typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
+        ) {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+            newUi['accessibility'] = newAccessibility;
+            modified = true;
+          }
+        } else {
+          const oldValue = accessibilitySettings['disableLoadingPhrases'];
+          newAccessibility['enableLoadingPhrases'] = !oldValue;
+          if (removeDeprecated) {
+            delete newAccessibility['disableLoadingPhrases'];
+          }
+          newUi['accessibility'] = newAccessibility;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        anyModified = true;
+      }
+    }
+
+    // Migrate context settings
+    if (contextSettings) {
+      const newContext: Record<string, unknown> = { ...contextSettings };
+      let modified = false;
+
+      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+      const fileFilteringSettings = newContext['fileFiltering'] as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        fileFilteringSettings &&
+        typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
+      ) {
+        const newFileFiltering: Record<string, unknown> = {
+          ...fileFilteringSettings,
+        };
+        if (typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean') {
+          // Both exist, trust the new one
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+            newContext['fileFiltering'] = newFileFiltering;
+            modified = true;
+          }
+        } else {
+          const oldValue = fileFilteringSettings['disableFuzzySearch'];
+          newFileFiltering['enableFuzzySearch'] = !oldValue;
+          if (removeDeprecated) {
+            delete newFileFiltering['disableFuzzySearch'];
+          }
+          newContext['fileFiltering'] = newFileFiltering;
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        loadedSettings.setValue(scope, 'context', newContext);
+        anyModified = true;
+      }
     }
   };
 
   processScope(SettingScope.User);
   processScope(SettingScope.Workspace);
+  processScope(SettingScope.System);
+  processScope(SettingScope.SystemDefaults);
+
+  return anyModified;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
@@ -764,12 +822,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    let settingsToSave = settingsFile.originalSettings;
-    if (!MIGRATE_V2_OVERWRITE) {
-      settingsToSave = migrateSettingsToV1(
-        settingsToSave as Record<string, unknown>,
-      ) as Settings;
-    }
+    const settingsToSave = settingsFile.originalSettings;
 
     // Use the format-preserving update function
     updateSettingsFilePreservingFormat(
@@ -777,6 +830,25 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
-    console.error('Error saving user settings file:', error);
+    coreEvents.emitFeedback(
+      'error',
+      'There was an error saving your latest settings changes.',
+      error,
+    );
+  }
+}
+
+export function saveModelChange(
+  loadedSettings: LoadedSettings,
+  model: string,
+): void {
+  try {
+    loadedSettings.setValue(SettingScope.User, 'model.name', model);
+  } catch (error) {
+    coreEvents.emitFeedback(
+      'error',
+      'There was an error saving your preferred model.',
+      error,
+    );
   }
 }

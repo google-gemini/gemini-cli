@@ -7,6 +7,7 @@
 import { vi } from 'vitest';
 import type { CommandContext } from '../ui/commands/types.js';
 import type { LoadedSettings } from '../config/settings.js';
+import { mergeSettings } from '../config/settings.js';
 import type { GitService } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
 
@@ -27,6 +28,8 @@ type DeepPartial<T> = T extends object
 export const createMockCommandContext = (
   overrides: DeepPartial<CommandContext> = {},
 ): CommandContext => {
+  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+
   const defaultMocks: CommandContext = {
     invocation: {
       raw: '',
@@ -35,7 +38,11 @@ export const createMockCommandContext = (
     },
     services: {
       config: null,
-      settings: { merged: {} } as LoadedSettings,
+      settings: {
+        merged: defaultMergedSettings,
+        setValue: vi.fn(),
+        forScope: vi.fn().mockReturnValue({ settings: {} }),
+      } as unknown as LoadedSettings,
       git: undefined as GitService | undefined,
       logger: {
         log: vi.fn(),
@@ -88,7 +95,7 @@ export const createMockCommandContext = (
         const targetValue = output[key];
 
         if (
-          // We only want to recursivlty merge plain objects
+          // We only want to recursively merge plain objects
           Object.prototype.toString.call(sourceValue) === '[object Object]' &&
           Object.prototype.toString.call(targetValue) === '[object Object]'
         ) {

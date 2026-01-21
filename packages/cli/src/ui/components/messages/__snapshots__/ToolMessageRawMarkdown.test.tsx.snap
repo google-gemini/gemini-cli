@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false, useAlternateBuffer=false '(raw markdown, regular buffer)' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│  Test **bold** and \`code\` markdown                                           │"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false, useAlternateBuffer=true '(raw markdown, alternate buffer)' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│  Test **bold** and \`code\` markdown                                           │"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=false '(constrained height, regular buffer -…' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│ Test bold and code markdown                                                  │"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=false '(default, regular buffer)' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│ Test bold and code markdown                                                  │"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=true '(constrained height, alternate buffer…' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│ Test bold and code markdown                                                  │"
+`;
+
+exports[`<ToolMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true, useAlternateBuffer=true '(default, alternate buffer)' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│ Test bold and code markdown                                                  │"
+`;

@@ -1,0 +1,17 @@
+name: 'Trigger Docs Rebuild'
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'docs/**'
+jobs:
+  trigger-rebuild:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Trigger rebuild'
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${{ secrets.DOCS_REBUILD_URL }}"

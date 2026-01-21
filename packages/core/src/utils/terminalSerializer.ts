@@ -131,15 +131,12 @@ class Cell {
   }
 }
 
-export function serializeTerminalToObject(
-  terminal: Terminal,
-  options?: { defaultFg?: string; defaultBg?: string },
-): AnsiOutput {
+export function serializeTerminalToObject(terminal: Terminal): AnsiOutput {
   const buffer = terminal.buffer.active;
   const cursorX = buffer.cursorX;
   const cursorY = buffer.cursorY;
-  const defaultFg = options?.defaultFg ?? '#ffffff';
-  const defaultBg = options?.defaultBg ?? '#000000';
+  const defaultFg = '';
+  const defaultBg = '';
 
   const result: AnsiOutput = [];
 

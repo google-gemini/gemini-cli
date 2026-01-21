@@ -40,13 +40,12 @@ describe('helpCommand', () => {
         type: MessageType.HELP,
         timestamp: expect.any(Date),
       }),
-      expect.any(Number),
     );
   });
 
   it('should have the correct command properties', () => {
     expect(helpCommand.name).toBe('help');
     expect(helpCommand.kind).toBe(CommandKind.BUILT_IN);
-    expect(helpCommand.description).toBe('for help on gemini-cli');
+    expect(helpCommand.description).toBe('For help on gemini-cli');
   });
 });

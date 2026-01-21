@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DescriptiveRadioButtonSelect > should render correctly with custom props 1`] = `
+"▲
+  1. Foo Title
+     This is Foo.
+● 2. Bar Title
+     This is Bar.
+  3. Baz Title
+     This is Baz.
+▼"
+`;
+
+exports[`DescriptiveRadioButtonSelect > should render correctly with default props 1`] = `
+"● Foo Title
+  This is Foo.
+  Bar Title
+  This is Bar.
+  Baz Title
+  This is Baz."
+`;

@@ -50,6 +50,10 @@ export const computeSessionStats = (
     (acc, model) => acc + model.tokens.cached,
     0,
   );
+  const totalInputTokens = Object.values(models).reduce(
+    (acc, model) => acc + model.tokens.input,
+    0,
+  );
   const totalPromptTokens = Object.values(models).reduce(
     (acc, model) => acc + model.tokens.prompt,
     0,
@@ -60,12 +64,15 @@ export const computeSessionStats = (
   const totalDecisions =
     tools.totalDecisions.accept +
     tools.totalDecisions.reject +
-    tools.totalDecisions.modify;
+    tools.totalDecisions.modify +
+    tools.totalDecisions.auto_accept;
   const successRate =
     tools.totalCalls > 0 ? (tools.totalSuccess / tools.totalCalls) * 100 : 0;
   const agreementRate =
     totalDecisions > 0
-      ? (tools.totalDecisions.accept / totalDecisions) * 100
+      ? ((tools.totalDecisions.accept + tools.totalDecisions.auto_accept) /
+          totalDecisions) *
+        100
       : 0;
 
   return {
@@ -79,6 +86,7 @@ export const computeSessionStats = (
     successRate,
     agreementRate,
     totalCachedTokens,
+    totalInputTokens,
     totalPromptTokens,
     totalLinesAdded: files.totalLinesAdded,
     totalLinesRemoved: files.totalLinesRemoved,

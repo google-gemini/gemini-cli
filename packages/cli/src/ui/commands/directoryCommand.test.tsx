@@ -4,13 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { directoryCommand, expandHomeDir } from './directoryCommand.js';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { directoryCommand } from './directoryCommand.js';
+import {
+  expandHomeDir,
+  getDirectorySuggestions,
+} from '../utils/directoryUtils.js';
 import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
-import type { CommandContext } from './types.js';
+import type { MultiFolderTrustDialogProps } from '../components/MultiFolderTrustDialog.js';
+import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
 import { MessageType } from '../types.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as trustedFolders from '../../config/trustedFolders.js';
+import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+
+vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/directoryUtils.js')>();
+  return {
+    ...actual,
+    getDirectorySuggestions: vi.fn(),
+  };
+});
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;
@@ -26,6 +43,7 @@ describe('directoryCommand', () => {
   beforeEach(() => {
     mockWorkspaceContext = {
       addDirectory: vi.fn(),
+      addDirectories: vi.fn().mockReturnValue({ added: [], failed: [] }),
       getDirectories: vi
         .fn()
         .mockReturnValue([
@@ -44,7 +62,6 @@ describe('directoryCommand', () => {
       shouldLoadMemoryFromIncludeDirectories: () => false,
       getDebugMode: () => false,
       getFileService: () => ({}),
-      getExtensionContextFilePaths: () => [],
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
@@ -68,6 +85,7 @@ describe('directoryCommand', () => {
   describe('show', () => {
     it('should display the list of directories', () => {
       if (!showCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       showCommand.action(mockContext, '');
       expect(mockWorkspaceContext.getDirectories).toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -77,60 +95,82 @@ describe('directoryCommand', () => {
             '/home/user/project1',
           )}\n- ${path.normalize('/home/user/project2')}`,
         }),
-        expect.any(Number),
       );
     });
   });
 
   describe('add', () => {
+    it('should show an error in a restrictive sandbox', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      vi.mocked(mockConfig.isRestrictiveSandbox).mockReturnValue(true);
+      const result = await addCommand.action(mockContext, '/some/path');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+      });
+    });
+
     it('should show an error if no path is provided', () => {
       if (!addCommand?.action) throw new Error('No action');
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       addCommand.action(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
           text: 'Please provide at least one path to add.',
         }),
-        expect.any(Number),
       );
     });
 
     it('should call addDirectory and show a success message for a single path', async () => {
       const newPath = path.normalize('/home/user/new-project');
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [newPath],
+        failed: [],
+      });
       if (!addCommand?.action) throw new Error('No action');
       await addCommand.action(mockContext, newPath);
-      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath);
+      expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
+        newPath,
+      ]);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath}`,
         }),
-        expect.any(Number),
       );
     });
 
     it('should call addDirectory for each path and show a success message for multiple paths', async () => {
       const newPath1 = path.normalize('/home/user/new-project1');
       const newPath2 = path.normalize('/home/user/new-project2');
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [newPath1, newPath2],
+        failed: [],
+      });
       if (!addCommand?.action) throw new Error('No action');
       await addCommand.action(mockContext, `${newPath1},${newPath2}`);
-      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath1);
-      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath2);
+      expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
+        newPath1,
+        newPath2,
+      ]);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${newPath1}\n- ${newPath2}`,
         }),
-        expect.any(Number),
       );
     });
 
     it('should show an error if addDirectory throws an exception', async () => {
       const error = new Error('Directory does not exist');
-      vi.mocked(mockWorkspaceContext.addDirectory).mockImplementation(() => {
-        throw error;
-      });
       const newPath = path.normalize('/home/user/invalid-project');
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [],
+        failed: [{ path: newPath, error }],
+      });
       if (!addCommand?.action) throw new Error('No action');
       await addCommand.action(mockContext, newPath);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -138,7 +178,37 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${newPath}': ${error.message}`,
         }),
-        expect.any(Number),
+      );
+    });
+
+    it('should add directory directly when folder trust is disabled', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
+      const newPath = path.normalize('/home/user/new-project');
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [newPath],
+        failed: [],
+      });
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
+        newPath,
+      ]);
+    });
+
+    it('should show an info message for an already added directory', async () => {
+      const existingPath = path.normalize('/home/user/project1');
+      if (!addCommand?.action) throw new Error('No action');
+      await addCommand.action(mockContext, existingPath);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `The following directories are already in the workspace:\n- ${existingPath}`,
+        }),
+      );
+      expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalledWith(
+        existingPath,
       );
     });
 
@@ -146,13 +216,10 @@ describe('directoryCommand', () => {
       const validPath = path.normalize('/home/user/valid-project');
       const invalidPath = path.normalize('/home/user/invalid-project');
       const error = new Error('Directory does not exist');
-      vi.mocked(mockWorkspaceContext.addDirectory).mockImplementation(
-        (p: string) => {
-          if (p === invalidPath) {
-            throw error;
-          }
-        },
-      );
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [validPath],
+        failed: [{ path: invalidPath, error }],
+      });
 
       if (!addCommand?.action) throw new Error('No action');
       await addCommand.action(mockContext, `${validPath},${invalidPath}`);
@@ -162,7 +229,6 @@ describe('directoryCommand', () => {
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${validPath}`,
         }),
-        expect.any(Number),
       );
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -170,10 +236,129 @@ describe('directoryCommand', () => {
           type: MessageType.ERROR,
           text: `Error adding '${invalidPath}': ${error.message}`,
         }),
-        expect.any(Number),
       );
     });
+
+    describe('completion', () => {
+      const completion = addCommand!.completion!;
+
+      it('should return empty suggestions for an empty path', async () => {
+        const results = await completion(mockContext, '');
+        expect(results).toEqual([]);
+      });
+
+      it('should return empty suggestions for whitespace only path', async () => {
+        const results = await completion(mockContext, '  ');
+        expect(results).toEqual([]);
+      });
+
+      it('should return suggestions for a single path', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['docs/', 'src/']);
+
+        const results = await completion(mockContext, 'd');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('d');
+        expect(results).toEqual(['docs/', 'src/']);
+      });
+
+      it('should return suggestions for multiple paths', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/,s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/,src/']);
+      });
+
+      it('should handle leading whitespace in suggestions', async () => {
+        vi.mocked(getDirectorySuggestions).mockResolvedValue(['src/']);
+
+        const results = await completion(mockContext, 'docs/, s');
+
+        expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
+        expect(results).toEqual(['docs/, src/']);
+      });
+    });
   });
+
+  describe('add with folder trust enabled', () => {
+    let mockIsPathTrusted: Mock;
+
+    beforeEach(() => {
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(true);
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      mockIsPathTrusted = vi.fn();
+      const mockLoadedFolders = {
+        isPathTrusted: mockIsPathTrusted,
+      } as unknown as LoadedTrustedFolders;
+      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockReturnValue(
+        mockLoadedFolders,
+      );
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should add a trusted directory', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(true);
+      const newPath = path.normalize('/home/user/trusted-project');
+      vi.mocked(mockWorkspaceContext.addDirectories).mockReturnValue({
+        added: [newPath],
+        failed: [],
+      });
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
+        newPath,
+      ]);
+    });
+
+    it('should show an error for an untrusted directory', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(false);
+      const newPath = path.normalize('/home/user/untrusted-project');
+
+      await addCommand.action(mockContext, newPath);
+
+      expect(mockWorkspaceContext.addDirectories).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining('explicitly untrusted'),
+        }),
+      );
+    });
+
+    it('should return a custom dialog for a directory with undefined trust', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      mockIsPathTrusted.mockReturnValue(undefined);
+      const newPath = path.normalize('/home/user/undefined-trust-project');
+
+      const result = await addCommand.action(mockContext, newPath);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'custom_dialog',
+          component: expect.objectContaining({
+            type: expect.any(Function), // React component for MultiFolderTrustDialog
+          }),
+        }),
+      );
+      if (!result) {
+        throw new Error('Command did not return a result');
+      }
+      const component = (result as OpenCustomDialogActionReturn)
+        .component as React.ReactElement<MultiFolderTrustDialogProps>;
+      expect(component.props.folders.includes(newPath)).toBeTruthy();
+    });
+  });
+
   it('should correctly expand a Windows-style home directory path', () => {
     const windowsPath = '%userprofile%\\Documents';
     const expectedPath = path.win32.join(os.homedir(), 'Documents');

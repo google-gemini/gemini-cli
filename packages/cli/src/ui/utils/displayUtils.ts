@@ -19,7 +19,7 @@ export const CACHE_EFFICIENCY_MEDIUM = 15;
 // --- Color Logic ---
 export const getStatusColor = (
   value: number,
-  thresholds: { green: number; yellow: number },
+  thresholds: { green: number; yellow: number; red?: number },
   options: { defaultColor?: string } = {},
 ) => {
   if (value >= thresholds.green) {
@@ -28,5 +28,8 @@ export const getStatusColor = (
   if (value >= thresholds.yellow) {
     return theme.status.warning;
   }
-  return options.defaultColor || theme.status.error;
+  if (thresholds.red != null && value >= thresholds.red) {
+    return theme.status.error;
+  }
+  return options.defaultColor ?? theme.status.error;
 };

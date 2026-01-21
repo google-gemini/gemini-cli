@@ -9,20 +9,27 @@ import {
   type Config,
   type FallbackModelHandler,
   type FallbackIntent,
-  isGenericQuotaExceededError,
-  isProQuotaExceededError,
-  UserTierId,
+  type ValidationHandler,
+  type ValidationIntent,
+  TerminalQuotaError,
+  ModelNotFoundError,
+  type UserTierId,
+  PREVIEW_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  VALID_GEMINI_MODELS,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
-import { AuthState, MessageType } from '../types.js';
-import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
+import { MessageType } from '../types.js';
+import {
+  type ProQuotaDialogRequest,
+  type ValidationDialogRequest,
+} from '../contexts/UIStateContext.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
   historyManager: UseHistoryManagerReturn;
   userTier: UserTierId | undefined;
-  setAuthState: (state: AuthState) => void;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
 }
 
@@ -30,12 +37,14 @@ export function useQuotaAndFallback({
   config,
   historyManager,
   userTier,
-  setAuthState,
   setModelSwitchedFromQuotaError,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
+  const [validationRequest, setValidationRequest] =
+    useState<ValidationDialogRequest | null>(null);
   const isDialogPending = useRef(false);
+  const isValidationPending = useRef(false);
 
   // Set up Flash fallback handler
   useEffect(() => {
@@ -44,10 +53,6 @@ export function useQuotaAndFallback({
       fallbackModel,
       error,
     ): Promise<FallbackIntent | null> => {
-      if (config.isInFallbackMode()) {
-        return null;
-      }
-
       // Fallbacks are currently only handled for OAuth users.
       const contentGeneratorConfig = config.getContentGeneratorConfig();
       if (
@@ -57,119 +62,170 @@ export function useQuotaAndFallback({
         return null;
       }
 
-      // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
-      const isPaidTier =
-        userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
-
       let message: string;
-
-      if (error && isProQuotaExceededError(error)) {
-        // Pro Quota specific messages (Interactive)
-        if (isPaidTier) {
-          message = `⚡ You have reached your daily ${failedModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-        } else {
-          message = `⚡ You have reached your daily ${failedModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-        }
-      } else if (error && isGenericQuotaExceededError(error)) {
-        // Generic Quota (Automatic fallback)
-        const actionMessage = `⚡ You have reached your daily quota limit.\n⚡ Automatically switching from ${failedModel} to ${fallbackModel} for the remainder of this session.`;
-
-        if (isPaidTier) {
-          message = `${actionMessage}
-⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-        } else {
-          message = `${actionMessage}
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-        }
+      let isTerminalQuotaError = false;
+      let isModelNotFoundError = false;
+      const usageLimitReachedModel =
+        failedModel === DEFAULT_GEMINI_MODEL ||
+        failedModel === PREVIEW_GEMINI_MODEL
+          ? 'all Pro models'
+          : failedModel;
+      if (error instanceof TerminalQuotaError) {
+        isTerminalQuotaError = true;
+        // Common part of the message for both tiers
+        const messageLines = [
+          `Usage limit reached for ${usageLimitReachedModel}.`,
+          error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
+          `/stats for usage details`,
+          `/model to switch models.`,
+          `/auth to switch to API key.`,
+        ].filter(Boolean);
+        message = messageLines.join('\n');
+      } else if (
+        error instanceof ModelNotFoundError &&
+        VALID_GEMINI_MODELS.has(failedModel)
+      ) {
+        isModelNotFoundError = true;
+        const messageLines = [
+          `It seems like you don't have access to ${failedModel}.`,
+          `Learn more at https://goo.gle/enable-preview-features`,
+          `To disable ${failedModel}, disable "Preview features" in /settings.`,
+        ];
+        message = messageLines.join('\n');
       } else {
-        // Consecutive 429s or other errors (Automatic fallback)
-        const actionMessage = `⚡ Automatically switching from ${failedModel} to ${fallbackModel} for faster responses for the remainder of this session.`;
-
-        if (isPaidTier) {
-          message = `${actionMessage}
-⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${failedModel} quota limit
-⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-        } else {
-          message = `${actionMessage}
-⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${failedModel} quota limit
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-        }
+        const messageLines = [
+          `We are currently experiencing high demand.`,
+          'We apologize and appreciate your patience.',
+          '/model to switch models.',
+        ];
+        message = messageLines.join('\n');
       }
-
-      // Add message to UI history
-      historyManager.addItem(
-        {
-          type: MessageType.INFO,
-          text: message,
-        },
-        Date.now(),
-      );
 
       setModelSwitchedFromQuotaError(true);
       config.setQuotaErrorOccurred(true);
 
-      // Interactive Fallback for Pro quota
-      if (error && isProQuotaExceededError(error)) {
-        if (isDialogPending.current) {
-          return 'stop'; // A dialog is already active, so just stop this request.
-        }
-        isDialogPending.current = true;
-
-        const intent: FallbackIntent = await new Promise<FallbackIntent>(
-          (resolve) => {
-            setProQuotaRequest({
-              failedModel,
-              fallbackModel,
-              resolve,
-            });
-          },
-        );
-
-        return intent;
+      if (isDialogPending.current) {
+        return 'stop'; // A dialog is already active, so just stop this request.
       }
+      isDialogPending.current = true;
 
-      return 'stop';
+      const intent: FallbackIntent = await new Promise<FallbackIntent>(
+        (resolve) => {
+          setProQuotaRequest({
+            failedModel,
+            fallbackModel,
+            resolve,
+            message,
+            isTerminalQuotaError,
+            isModelNotFoundError,
+          });
+        },
+      );
+
+      return intent;
     };
 
     config.setFallbackModelHandler(fallbackHandler);
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
+  // Set up validation handler for 403 VALIDATION_REQUIRED errors
+  useEffect(() => {
+    const validationHandler: ValidationHandler = async (
+      validationLink,
+      validationDescription,
+      learnMoreUrl,
+    ): Promise<ValidationIntent> => {
+      if (isValidationPending.current) {
+        return 'cancel'; // A validation dialog is already active
+      }
+      isValidationPending.current = true;
+
+      const intent: ValidationIntent = await new Promise<ValidationIntent>(
+        (resolve) => {
+          // Call setValidationRequest directly - same pattern as proQuotaRequest
+          setValidationRequest({
+            validationLink,
+            validationDescription,
+            learnMoreUrl,
+            resolve,
+          });
+        },
+      );
+
+      return intent;
+    };
+
+    config.setValidationHandler(validationHandler);
+  }, [config]);
+
   const handleProQuotaChoice = useCallback(
-    (choice: 'auth' | 'continue') => {
+    (choice: FallbackIntent) => {
       if (!proQuotaRequest) return;
 
-      const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
+      const intent: FallbackIntent = choice;
       proQuotaRequest.resolve(intent);
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
-      if (choice === 'auth') {
-        setAuthState(AuthState.Updating);
-      } else {
+      if (choice === 'retry_always' || choice === 'retry_once') {
+        // Reset quota error flags to allow the agent loop to continue.
+        setModelSwitchedFromQuotaError(false);
+        config.setQuotaErrorOccurred(false);
+
+        if (choice === 'retry_always') {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Switched to fallback model ${proQuotaRequest.fallbackModel}`,
+            },
+            Date.now(),
+          );
+        }
+      }
+    },
+    [proQuotaRequest, historyManager, config, setModelSwitchedFromQuotaError],
+  );
+
+  const handleValidationChoice = useCallback(
+    (choice: ValidationIntent) => {
+      // Guard against double-execution (e.g. rapid clicks) and stale requests
+      if (!isValidationPending.current || !validationRequest) return;
+
+      // Immediately clear the flag to prevent any subsequent calls from passing the guard
+      isValidationPending.current = false;
+
+      validationRequest.resolve(choice);
+      setValidationRequest(null);
+
+      if (choice === 'change_auth') {
         historyManager.addItem(
           {
             type: MessageType.INFO,
-            text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
+            text: 'Use /auth to change authentication method.',
           },
           Date.now(),
         );
       }
     },
-    [proQuotaRequest, setAuthState, historyManager],
+    [validationRequest, historyManager],
   );
 
   return {
     proQuotaRequest,
     handleProQuotaChoice,
+    validationRequest,
+    handleValidationChoice,
   };
+}
+
+function getResetTimeMessage(delayMs: number): string {
+  const resetDate = new Date(Date.now() + delayMs);
+
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+
+  return `Access resets at ${timeFormatter.format(resetDate)}.`;
 }

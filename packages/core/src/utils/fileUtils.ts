@@ -13,6 +13,44 @@ import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { createRequire as createModuleRequire } from 'node:module';
+import { debugLogger } from './debugLogger.js';
+
+const requireModule = createModuleRequire(import.meta.url);
+
+export async function readWasmBinaryFromDisk(
+  specifier: string,
+): Promise<Uint8Array> {
+  const resolvedPath = requireModule.resolve(specifier);
+  const buffer = await fsPromises.readFile(resolvedPath);
+  return new Uint8Array(buffer);
+}
+
+export async function loadWasmBinary(
+  dynamicImport: () => Promise<{ default: Uint8Array }>,
+  fallbackSpecifier: string,
+): Promise<Uint8Array> {
+  try {
+    const module = await dynamicImport();
+    if (module?.default instanceof Uint8Array) {
+      return module.default;
+    }
+  } catch (error) {
+    try {
+      return await readWasmBinaryFromDisk(fallbackSpecifier);
+    } catch {
+      throw error;
+    }
+  }
+
+  try {
+    return await readWasmBinaryFromDisk(fallbackSpecifier);
+  } catch (error) {
+    throw new Error('WASM binary module did not provide a Uint8Array export', {
+      cause: error,
+    });
+  }
+}
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -223,7 +261,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
     // If >30% non-printable characters, consider it binary
     return nonPrintableCount / bytesRead > 0.3;
   } catch (error) {
-    console.warn(
+    debugLogger.warn(
       `Failed to check if file is binary: ${filePath}`,
       error instanceof Error ? error.message : String(error),
     );
@@ -233,7 +271,7 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
       try {
         await fh.close();
       } catch (closeError) {
-        console.warn(
+        debugLogger.warn(
           `Failed to close file handle for: ${filePath}`,
           closeError instanceof Error ? closeError.message : String(closeError),
         );
@@ -476,4 +514,73 @@ export async function fileExists(filePath: string): Promise<boolean> {
   } catch (_: unknown) {
     return false;
   }
+}
+
+const MAX_TRUNCATED_LINE_WIDTH = 1000;
+const MAX_TRUNCATED_CHARS = 4000;
+
+/**
+ * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ */
+export function formatTruncatedToolOutput(
+  contentStr: string,
+  outputFile: string,
+  truncateLines: number = 30,
+): string {
+  const physicalLines = contentStr.split('\n');
+  const totalPhysicalLines = physicalLines.length;
+
+  if (totalPhysicalLines > 1) {
+    // Multi-line case: show last N lines, but protect against "elephant" lines.
+    const lastLines = physicalLines.slice(-truncateLines);
+    let someLinesTruncatedInWidth = false;
+    const processedLines = lastLines.map((line) => {
+      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
+        someLinesTruncatedInWidth = true;
+        return (
+          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
+          '... [LINE WIDTH TRUNCATED]'
+        );
+      }
+      return line;
+    });
+
+    const widthWarning = someLinesTruncatedInWidth
+      ? ' (some long lines truncated)'
+      : '';
+    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
+...
+${processedLines.join('\n')}`;
+  } else {
+    // Single massive line case: use character-based truncation description.
+    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
+    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
+...${snippet}`;
+  }
+}
+
+/**
+ * Saves tool output to a temporary file for later retrieval.
+ */
+export async function saveTruncatedToolOutput(
+  content: string,
+  toolName: string,
+  id: string | number, // Accept string (callId) or number (truncationId)
+  projectTempDir: string,
+): Promise<{ outputFile: string; totalLines: number }> {
+  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const safeId = id
+    .toString()
+    .replace(/[^a-z0-9]/gi, '_')
+    .toLowerCase();
+  const fileName = `${safeToolName}_${safeId}.txt`;
+  const outputFile = path.join(projectTempDir, fileName);
+
+  await fsPromises.writeFile(outputFile, content);
+
+  const lines = content.split('\n');
+  return {
+    outputFile,
+    totalLines: lines.length,
+  };
 }

@@ -1,0 +1,170 @@
+name: 'Deflake E2E'
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
+      test_name_pattern:
+        description: 'The test name pattern to use'
+        required: false
+        type: 'string'
+      runs:
+        description: 'The number of runs'
+        required: false
+        default: 5
+        type: 'number'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: |-
+    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+jobs:
+  deflake_e2e_linux:
+    name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    strategy:
+      fail-fast: false
+      matrix:
+        sandbox:
+          - 'sandbox:none'
+          - 'sandbox:docker'
+        node-version:
+          - '20.x'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.pull_request.head.sha }}'
+          repository: '${{ github.repository }}'
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Set up Docker'
+        if: "matrix.sandbox == 'sandbox:docker'"
+        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
+          KEEP_OUTPUT: 'true'
+          RUNS: '${{ github.event.inputs.runs }}'
+          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          VERBOSE: 'true'
+        shell: 'bash'
+        run: |
+          if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
+            npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          else
+            npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          fi
+
+  deflake_e2e_mac:
+    name: 'E2E Test (macOS)'
+    runs-on: 'macos-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.pull_request.head.sha }}'
+          repository: '${{ github.repository }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Fix rollup optional dependencies on macOS'
+        if: "runner.os == 'macOS'"
+        run: |
+          npm cache clean --force
+      - name: 'Run E2E tests (non-Windows)'
+        if: "runner.os != 'Windows'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          RUNS: '${{ github.event.inputs.runs }}'
+          SANDBOX: 'sandbox:none'
+          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          VERBOSE: 'true'
+        run: |
+          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+
+  deflake_e2e_windows:
+    name: 'Slow E2E - Win'
+    runs-on: 'gemini-cli-windows-16-core'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.pull_request.head.sha }}'
+          repository: '${{ github.repository }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+          RUNS: '${{ github.event.inputs.runs }}'
+          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+        shell: 'pwsh'
+        run: |
+          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
