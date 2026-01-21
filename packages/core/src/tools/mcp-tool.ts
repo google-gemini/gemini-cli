@@ -264,6 +264,10 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return `${this.serverName}__`;
   }
 
+  getFullyQualifiedName(): string {
+    return `${this.getFullyQualifiedPrefix()}${generateValidName(this.serverToolName)}`;
+  }
+
   asFullyQualifiedTool(): DiscoveredMCPTool {
     return new DiscoveredMCPTool(
       this.mcpTool,
@@ -273,7 +277,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.parameterSchema,
       this.messageBus,
       this.trust,
-      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
+      this.getFullyQualifiedName(),
       this.cliConfig,
       this.extensionName,
       this.extensionId,

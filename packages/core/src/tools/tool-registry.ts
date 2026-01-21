@@ -530,7 +530,18 @@ export class ToolRegistry {
    * Get the definition of a specific tool.
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
-    const tool = this.allKnownTools.get(name);
+    let tool = this.allKnownTools.get(name);
+    if (!tool && name.includes('__')) {
+      for (const t of this.allKnownTools.values()) {
+        if (t instanceof DiscoveredMCPTool) {
+          if (t.getFullyQualifiedName() === name) {
+            tool = t;
+            break;
+          }
+        }
+      }
+    }
+
     if (tool && this.isActiveTool(tool)) {
       return tool;
     }
