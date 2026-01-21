@@ -45,7 +45,18 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   if (uiState.showEscapePrompt) {
-    return <Text color={theme.text.secondary}>Press Esc again to clear.</Text>;
+    const isPromptEmpty = uiState.buffer.text.length === 0;
+    const hasHistory = uiState.history.length > 0;
+
+    if (isPromptEmpty && !hasHistory) {
+      return null;
+    }
+
+    return (
+      <Text color={theme.text.secondary}>
+        Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
+      </Text>
+    );
   }
 
   if (uiState.queueErrorMessage) {
@@ -54,12 +65,12 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
 
   if (
     uiState.activeHooks.length > 0 &&
-    (settings.merged.hooks?.notifications ?? true)
+    settings.merged.hooksConfig.notifications
   ) {
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
-  if (!settings.merged.ui?.hideContextSummary && !hideContextSummary) {
+  if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}

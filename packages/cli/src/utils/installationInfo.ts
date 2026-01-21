@@ -33,7 +33,7 @@ export interface InstallationInfo {
 
 export function getInstallationInfo(
   projectRoot: string,
-  isAutoUpdateDisabled: boolean,
+  isAutoUpdateEnabled: boolean,
 ): InstallationInfo {
   const cliPath = process.argv[1];
   if (!cliPath) {
@@ -80,16 +80,22 @@ export function getInstallationInfo(
     // Check for Homebrew
     if (process.platform === 'darwin') {
       try {
-        // The package name in homebrew is gemini-cli
-        childProcess.execSync('brew list -1 | grep -q "^gemini-cli$"', {
-          stdio: 'ignore',
-        });
-        return {
-          packageManager: PackageManager.HOMEBREW,
-          isGlobal: true,
-          updateMessage:
-            'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
-        };
+        const brewPrefix = childProcess
+          .execSync('brew --prefix gemini-cli', {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          })
+          .trim();
+        const brewRealPath = fs.realpathSync(brewPrefix);
+
+        if (realPath.startsWith(brewRealPath)) {
+          return {
+            packageManager: PackageManager.HOMEBREW,
+            isGlobal: true,
+            updateMessage:
+              'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+          };
+        }
       } catch (_error) {
         // Brew is not installed or gemini-cli is not installed via brew.
         // Continue to the next check.
@@ -103,9 +109,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.PNPM,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateDisabled
-          ? `Please run ${updateCommand} to update`
-          : 'Installed with pnpm. Attempting to automatically update now...',
+        updateMessage: isAutoUpdateEnabled
+          ? 'Installed with pnpm. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
       };
     }
 
@@ -116,9 +122,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.YARN,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateDisabled
-          ? `Please run ${updateCommand} to update`
-          : 'Installed with yarn. Attempting to automatically update now...',
+        updateMessage: isAutoUpdateEnabled
+          ? 'Installed with yarn. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
       };
     }
 
@@ -136,9 +142,9 @@ export function getInstallationInfo(
         packageManager: PackageManager.BUN,
         isGlobal: true,
         updateCommand,
-        updateMessage: isAutoUpdateDisabled
-          ? `Please run ${updateCommand} to update`
-          : 'Installed with bun. Attempting to automatically update now...',
+        updateMessage: isAutoUpdateEnabled
+          ? 'Installed with bun. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
       };
     }
 
@@ -169,9 +175,9 @@ export function getInstallationInfo(
       packageManager: PackageManager.NPM,
       isGlobal: true,
       updateCommand,
-      updateMessage: isAutoUpdateDisabled
-        ? `Please run ${updateCommand} to update`
-        : 'Installed with npm. Attempting to automatically update now...',
+      updateMessage: isAutoUpdateEnabled
+        ? 'Installed with npm. Attempting to automatically update now...'
+        : `Please run ${updateCommand} to update`,
     };
   } catch (error) {
     debugLogger.log(error);

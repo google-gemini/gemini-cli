@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { debugLogger, coreEvents } from '@google/gemini-cli-core';
-import { type Settings } from './settings.js';
+import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 
@@ -31,6 +31,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
+    loadAgentsFromDirectory: vi
+      .fn()
+      .mockImplementation(async () => ({ agents: [], errors: [] })),
+    loadSkillsFromDir: (
+      await importOriginal<typeof import('@google/gemini-cli-core')>()
+    ).loadSkillsFromDir,
   };
 });
 
@@ -52,10 +58,9 @@ describe('ExtensionManager skills validation', () => {
     fs.mkdirSync(extensionsDir, { recursive: true });
 
     extensionManager = new ExtensionManager({
-      settings: {
+      settings: createTestMergedSettings({
         telemetry: { enabled: false },
-        trustedFolders: [tempDir],
-      } as unknown as Settings,
+      }),
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,
@@ -128,10 +133,9 @@ describe('ExtensionManager skills validation', () => {
 
     // 3. Create a fresh ExtensionManager to force loading from disk
     const newExtensionManager = new ExtensionManager({
-      settings: {
+      settings: createTestMergedSettings({
         telemetry: { enabled: false },
-        trustedFolders: [tempDir],
-      } as unknown as Settings,
+      }),
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: vi.fn(),
       workspaceDir: tempDir,

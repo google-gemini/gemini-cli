@@ -287,6 +287,43 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should handle Plan mode correctly', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.PLAN,
+      );
+      const engine = new PolicyEngine(config);
+
+      // Read and search tools should be allowed
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'google_web_search' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'list_directory' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Other tools should be denied via catch all
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // Unknown tools should be denied via catch-all
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should verify priority ordering works correctly in practice', async () => {
       const settings: Settings = {
         tools: {

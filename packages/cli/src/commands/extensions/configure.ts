@@ -12,7 +12,8 @@ import {
   getScopedEnvContents,
 } from '../../config/extensions/extensionSettings.js';
 import { getExtensionAndManager, getExtensionManager } from './utils.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { loadSettings } from '../../config/settings.js';
+import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 import prompts from 'prompts';
 import type { ExtensionConfig } from '../../config/extension.js';
@@ -43,6 +44,16 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
       }),
   handler: async (args) => {
     const { name, setting, scope } = args;
+    const settings = loadSettings(process.cwd()).merged;
+
+    if (!(settings.experimental?.extensionConfig ?? true)) {
+      coreEvents.emitFeedback(
+        'error',
+        'Extension configuration is currently disabled. Enable it by setting "experimental.extensionConfig" to true.',
+      );
+      await exitCli();
+      return;
+    }
 
     if (name) {
       if (name.includes('/') || name.includes('\\') || name.includes('..')) {

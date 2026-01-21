@@ -10,7 +10,12 @@ import { MessageType, type HistoryItemSkillsList } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
 import type { Config, SkillDefinition } from '@google/gemini-cli-core';
-import { SettingScope, type LoadedSettings } from '../../config/settings.js';
+import {
+  SettingScope,
+  type LoadedSettings,
+  createTestMergedSettings,
+  type MergedSettings,
+} from '../../config/settings.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -46,6 +51,7 @@ describe('skillsCommand', () => {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
+            isAdminEnabled: vi.fn().mockReturnValue(true),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -54,7 +60,7 @@ describe('skillsCommand', () => {
           }),
         } as unknown as Config,
         settings: {
-          merged: { skills: { disabled: [] } },
+          merged: createTestMergedSettings({ skills: { disabled: [] } }),
           workspace: { path: '/workspace' },
           setValue: vi.fn(),
         } as unknown as LoadedSettings,
@@ -91,7 +97,6 @@ describe('skillsCommand', () => {
         ],
         showDescriptions: true,
       }),
-      expect.any(Number),
     );
   });
 
@@ -120,7 +125,6 @@ describe('skillsCommand', () => {
         ],
         showDescriptions: true,
       }),
-      expect.any(Number),
     );
   });
 
@@ -132,7 +136,6 @@ describe('skillsCommand', () => {
       expect.objectContaining({
         showDescriptions: false,
       }),
-      expect.any(Number),
     );
   });
 
@@ -183,7 +186,11 @@ describe('skillsCommand', () => {
 
   describe('disable/enable', () => {
     beforeEach(() => {
-      context.services.settings.merged.skills = { disabled: [] };
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
+        skills: { enabled: true, disabled: [] },
+      });
       (
         context.services.settings as unknown as { workspace: { path: string } }
       ).workspace = {
@@ -227,9 +234,8 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" disabled by adding it to the disabled list in project (/workspace) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" disabled by adding it to the disabled list in workspace (/workspace) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -237,7 +243,14 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      context.services.settings.merged.skills = { disabled: ['skill1'] };
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
+        skills: {
+          enabled: true,
+          disabled: ['skill1'],
+        },
+      });
       (
         context.services.settings as unknown as {
           workspace: { settings: { skills: { disabled: string[] } } };
@@ -256,9 +269,8 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in workspace (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -296,9 +308,8 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in workspace (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -312,6 +323,42 @@ describe('skillsCommand', () => {
         expect.objectContaining({
           type: MessageType.ERROR,
           text: 'Skill "non-existent" not found.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during disable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      await disableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during enable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
+      await enableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
         }),
         expect.any(Number),
       );
@@ -359,7 +406,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -385,7 +431,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -409,7 +454,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 skill no longer available.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -434,7 +478,6 @@ describe('skillsCommand', () => {
           type: MessageType.INFO,
           text: 'Agent skills reloaded successfully. 1 newly available skill and 1 skill no longer available.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -451,7 +494,6 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Could not retrieve configuration.',
         }),
-        expect.any(Number),
       );
     });
 
@@ -477,7 +519,6 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Failed to reload skills: Reload failed',
         }),
-        expect.any(Number),
       );
     });
   });

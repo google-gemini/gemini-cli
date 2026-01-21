@@ -9,7 +9,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
-import type { Settings } from './settings.js';
+import { createTestMergedSettings } from './settings.js';
+import {
+  loadAgentsFromDirectory,
+  loadSkillsFromDir,
+} from '@google/gemini-cli-core';
 
 let currentTempHome = '';
 
@@ -24,6 +28,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       error: vi.fn(),
       warn: vi.fn(),
     },
+    loadAgentsFromDirectory: vi.fn().mockImplementation(async () => ({
+      agents: [],
+      errors: [],
+    })),
+    loadSkillsFromDir: vi.fn().mockImplementation(async () => []),
   };
 });
 
@@ -34,6 +43,11 @@ describe('ExtensionManager Settings Scope', () => {
   let extensionDir: string;
 
   beforeEach(async () => {
+    vi.mocked(loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
+    vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
     currentTempHome = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
@@ -91,11 +105,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -130,11 +143,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -167,11 +179,10 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();

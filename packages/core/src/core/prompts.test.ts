@@ -56,6 +56,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
