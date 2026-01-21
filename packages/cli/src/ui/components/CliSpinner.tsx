@@ -13,17 +13,21 @@ export type SpinnerProps = ComponentProps<typeof Spinner>;
 
 export const CliSpinner = (props: SpinnerProps) => {
   const settings = useSettings();
-
-  if (settings.merged.ui?.showSpinner === false) {
-    return null;
-  }
+  const shouldShow = settings.merged.ui?.showSpinner !== false;
 
   useEffect(() => {
-    debugState.debugNumAnimatedComponents++;
-    return () => {
-      debugState.debugNumAnimatedComponents--;
-    };
-  }, []);
+    if (shouldShow) {
+      debugState.debugNumAnimatedComponents++;
+      return () => {
+        debugState.debugNumAnimatedComponents--;
+      };
+    }
+    return undefined;
+  }, [shouldShow]);
+
+  if (!shouldShow) {
+    return null;
+  }
 
   return <Spinner {...props} />;
 };
