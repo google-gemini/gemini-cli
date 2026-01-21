@@ -286,10 +286,6 @@
       {
         "label": "Preview release",
         "slug": "docs/changelogs/preview"
-      },
-      {
-        "label": "Changelog",
-        "slug": "docs/changelogs/releases"
       }
     ]
   },
