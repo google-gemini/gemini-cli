@@ -801,6 +801,11 @@ export class Config {
     }
     this.initialized = true;
 
+    // Add pending directories to workspace context
+    for (const dir of this.pendingIncludeDirectories) {
+      this.workspaceContext.addDirectory(dir);
+    }
+
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
