@@ -366,46 +366,5 @@ npm install -g @google/gemini-cli
   @gemini-cli-robot in
   [#17098](https://github.com/google-gemini/gemini-cli/pull/17098)
 
-### New Contributors
-
-- @kevinfjiang made their first contribution in
-  [#16032](https://github.com/google-gemini/gemini-cli/pull/16032)
-- @jasmeetsb made their first contribution in
-  [#14738](https://github.com/google-gemini/gemini-cli/pull/14738)
-- @cayden-google made their first contribution in
-  [#15978](https://github.com/google-gemini/gemini-cli/pull/15978)
-- @vrv made their first contribution in
-  [#15656](https://github.com/google-gemini/gemini-cli/pull/15656)
-- @minglu7 made their first contribution in
-  [#16056](https://github.com/google-gemini/gemini-cli/pull/16056)
-- @alphanota made their first contribution in
-  [#15929](https://github.com/google-gemini/gemini-cli/pull/15929)
-- @phreakocious made their first contribution in
-  [#16083](https://github.com/google-gemini/gemini-cli/pull/16083)
-- @raky291 made their first contribution in
-  [#16051](https://github.com/google-gemini/gemini-cli/pull/16051)
-- @liqzheng made their first contribution in
-  [#14699](https://github.com/google-gemini/gemini-cli/pull/14699)
-- @dsherret made their first contribution in
-  [#16172](https://github.com/google-gemini/gemini-cli/pull/16172)
-- @wszqkzqk made their first contribution in
-  [#15979](https://github.com/google-gemini/gemini-cli/pull/15979)
-- @falouu made their first contribution in
-  [#15828](https://github.com/google-gemini/gemini-cli/pull/15828)
-- @JohnJAS made their first contribution in
-  [#12078](https://github.com/google-gemini/gemini-cli/pull/12078)
-- @wtanaka made their first contribution in
-  [#15461](https://github.com/google-gemini/gemini-cli/pull/15461)
-- @tt-a1i made their first contribution in
-  [#15767](https://github.com/google-gemini/gemini-cli/pull/15767)
-- @AbdulTawabJuly made their first contribution in
-  [#15552](https://github.com/google-gemini/gemini-cli/pull/15552)
-- @wanglc02 made their first contribution in
-  [#14774](https://github.com/google-gemini/gemini-cli/pull/14774)
-- @Gong-Mi made their first contribution in
-  [#15371](https://github.com/google-gemini/gemini-cli/pull/15371)
-- @assagman made their first contribution in
-  [#16554](https://github.com/google-gemini/gemini-cli/pull/16554)
-
 **Full changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.24.5...v0.25.0

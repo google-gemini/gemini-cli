@@ -328,38 +328,5 @@ npm install -g @google/gemini-cli@preview
 - Fix mcp tool lookup in tool registry by @werdnum in
   [#17054](https://github.com/google-gemini/gemini-cli/pull/17054)
 
-## New Contributors
-
-- @medic-code made their first contribution in
-  [#12899](https://github.com/google-gemini/gemini-cli/pull/12899)
-- @ehedlund made their first contribution in
-  [#16541](https://github.com/google-gemini/gemini-cli/pull/16541)
-- @codefromthecrypt made their first contribution in
-  [#14953](https://github.com/google-gemini/gemini-cli/pull/14953)
-- @alexaustin007 made their first contribution in
-  [#13981](https://github.com/google-gemini/gemini-cli/pull/13981)
-- @cosmopax made their first contribution in
-  [#13507](https://github.com/google-gemini/gemini-cli/pull/13507)
-- @Vist233 made their first contribution in
-  [#16587](https://github.com/google-gemini/gemini-cli/pull/16587)
-- @imaliabbas made their first contribution in
-  [#16479](https://github.com/google-gemini/gemini-cli/pull/16479)
-- @kij made their first contribution in
-  [#14727](https://github.com/google-gemini/gemini-cli/pull/14727)
-- @Thomas-Shephard made their first contribution in
-  [#16920](https://github.com/google-gemini/gemini-cli/pull/16920)
-- @Kimsoo0119 made their first contribution in
-  [#16958](https://github.com/google-gemini/gemini-cli/pull/16958)
-- @jw409 made their first contribution in
-  [#17073](https://github.com/google-gemini/gemini-cli/pull/17073)
-- @dzammit made their first contribution in
-  [#15757](https://github.com/google-gemini/gemini-cli/pull/15757)
-- @dsp made their first contribution in
-  [#13407](https://github.com/google-gemini/gemini-cli/pull/13407)
-- @imadraude made their first contribution in
-  [#17021](https://github.com/google-gemini/gemini-cli/pull/17021)
-- @pamanta made their first contribution in
-  [#16915](https://github.com/google-gemini/gemini-cli/pull/16915)
-
 **Full changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.25.0-preview.4...v0.26.0-preview.0
