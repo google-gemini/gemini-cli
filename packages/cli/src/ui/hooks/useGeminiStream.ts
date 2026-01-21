@@ -66,12 +66,12 @@ import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import {
-  useReactToolScheduler,
+  useToolScheduler,
   type TrackedToolCall,
   type TrackedCompletedToolCall,
   type TrackedCancelledToolCall,
   type TrackedWaitingToolCall,
-} from './useReactToolScheduler.js';
+} from './useToolScheduler.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -159,7 +159,7 @@ export const useGeminiStream = (
     setToolCallsForDisplay,
     cancelAllToolCalls,
     lastToolOutputTime,
-  ] = useReactToolScheduler(
+  ] = useToolScheduler(
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
       if (completedToolCallsFromScheduler.length > 0) {
