@@ -5,20 +5,20 @@
  */
 
 import type React from 'react';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import type {
-  ToolCallConfirmationDetails,
-  Config,
-} from '@google/gemini-cli-core';
 import {
-  IdeClient,
+  type SerializableConfirmationDetails,
+  type ToolCallConfirmationDetails,
+  type Config,
   ToolConfirmationOutcome,
   hasRedirection,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
@@ -32,7 +32,10 @@ import {
 } from '../../textConstants.js';
 
 export interface ToolConfirmationMessageProps {
-  confirmationDetails: ToolCallConfirmationDetails;
+  callId: string;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
   config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -42,52 +45,26 @@ export interface ToolConfirmationMessageProps {
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
 > = ({
+  callId,
   confirmationDetails,
   config,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { onConfirm } = confirmationDetails;
+  const { confirm } = useToolActions();
 
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
-  const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
-  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (config.getIdeMode()) {
-      const getIdeClient = async () => {
-        const client = await IdeClient.getInstance();
-        if (isMounted) {
-          setIdeClient(client);
-          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
-        }
-      };
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      getIdeClient();
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [config]);
-
-  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
-    if (confirmationDetails.type === 'edit') {
-      if (config.getIdeMode() && isDiffingEnabled) {
-        const cliOutcome =
-          outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient?.resolveDiffFromCli(
-          confirmationDetails.filePath,
-          cliOutcome,
-        );
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    onConfirm(outcome);
+  const handleConfirm = (outcome: ToolConfirmationOutcome) => {
+    void confirm(callId, outcome).catch((error) => {
+      debugLogger.error(
+        `Failed to handle tool confirmation for ${callId}:`,
+        error,
+      );
+    });
   };
 
   const isTrustedFolder = config.isTrustedFolder();
@@ -96,7 +73,6 @@ export const ToolConfirmationMessage: React.FC<
     (key) => {
       if (!isFocused) return;
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleConfirm(ToolConfirmationOutcome.Cancel);
       }
     },
@@ -132,7 +108,9 @@ export const ToolConfirmationMessage: React.FC<
             });
           }
         }
-        if (!config.getIdeMode() || !isDiffingEnabled) {
+        // We hide "Modify with external editor" if IDE mode is active, assuming
+        // the IDE provides a better interface (diff view) for this.
+        if (!config.getIdeMode()) {
           options.push({
             label: 'Modify with external editor',
             value: ToolConfirmationOutcome.ModifyWithEditor,
@@ -400,7 +378,6 @@ export const ToolConfirmationMessage: React.FC<
     confirmationDetails,
     isTrustedFolder,
     config,
-    isDiffingEnabled,
     availableTerminalHeight,
     terminalWidth,
     allowPermanentApproval,

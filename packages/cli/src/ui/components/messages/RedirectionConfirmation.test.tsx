@@ -35,6 +35,7 @@ describe('ToolConfirmationMessage Redirection', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
