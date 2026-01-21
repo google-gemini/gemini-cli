@@ -31,6 +31,13 @@ export const IMAGE_EXTENSIONS = [
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
+// Track which tool works on Linux to avoid redundant checks/failures
+let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
+
+export const resetDetectedLinuxClipboardTool = () => {
+  linuxClipboardTool = null;
+};
+
 /**
  * Helper to save command stdout to a file while preventing shell injections and race conditions
  */
@@ -108,10 +115,10 @@ export async function clipboardHasImage(): Promise<boolean> {
     try {
       const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
       if (stdout.includes('image/')) {
+        linuxClipboardTool = 'wl-paste';
         return true;
       }
-    } catch (e) {
-      debugLogger.debug('wl-paste check failed:', e);
+    } catch (_) {
       // Ignore error, try X11
     }
 
@@ -125,10 +132,10 @@ export async function clipboardHasImage(): Promise<boolean> {
         '-o',
       ]);
       if (stdout.includes('image/')) {
+        linuxClipboardTool = 'xclip';
         return true;
       }
-    } catch (e) {
-      debugLogger.debug('xclip check failed:', e);
+    } catch (_) {
       // Ignore error
     }
 
@@ -186,41 +193,63 @@ export async function saveClipboardImage(
     if (process.platform === 'linux') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
 
-      // Try Wayland (wl-clipboard)
-      const wlSuccess = await saveFromCommand(
-        'wl-paste',
-        ['--no-newline', '--type', 'image/png'],
-        tempFilePath,
-      );
+      const tryWlPaste = async () => {
+        const success = await saveFromCommand(
+          'wl-paste',
+          ['--no-newline', '--type', 'image/png'],
+          tempFilePath,
+        );
+        if (success) {
+          return true;
+        }
+        // Cleanup on failure
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          /* ignore */
+        }
+        return false;
+      };
 
-      if (wlSuccess) {
+      const tryXclip = async () => {
+        const success = await saveFromCommand(
+          'xclip',
+          ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+          tempFilePath,
+        );
+        if (success) {
+          return true;
+        }
+        // Cleanup on failure
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          /* ignore */
+        }
+        return false;
+      };
+
+      // If we know the tool, use it directly
+      if (linuxClipboardTool === 'wl-paste') {
+        if (await tryWlPaste()) return tempFilePath;
+        return null;
+      }
+      if (linuxClipboardTool === 'xclip') {
+        if (await tryXclip()) return tempFilePath;
+        return null;
+      }
+
+      // Otherwise try both
+      if (await tryWlPaste()) {
+        linuxClipboardTool = 'wl-paste';
         return tempFilePath;
       }
 
-      // Cleanup Wayland attempt on failure
-      try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        /* ignore */
-      }
-
-      // Try X11 (xclip)
-      const x11Success = await saveFromCommand(
-        'xclip',
-        ['-selection', 'clipboard', '-t', 'image/png', '-o'],
-        tempFilePath,
-      );
-
-      if (x11Success) {
+      if (await tryXclip()) {
+        linuxClipboardTool = 'xclip';
         return tempFilePath;
       }
 
-      // Cleanup X11 attempt on failure
-      try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        /* ignore */
-      }
       return null;
     }
 

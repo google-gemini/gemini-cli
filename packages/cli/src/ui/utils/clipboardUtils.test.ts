@@ -4,78 +4,277 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { spawn } from 'node:child_process';
+import EventEmitter from 'node:events';
+import { Stream } from 'node:stream';
+
+// Mock dependencies BEFORE imports
+vi.mock('node:fs/promises');
+vi.mock('node:fs', () => ({
+  createWriteStream: vi.fn(),
+}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    spawn: vi.fn(),
+  };
+});
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    spawnAsync: vi.fn(),
+    debugLogger: {
+      debug: vi.fn(),
+      warn: vi.fn(),
+    },
+  };
+});
+
+import { spawnAsync } from '@google/gemini-cli-core';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
   splitEscapedPaths,
   parsePastedPaths,
+  resetDetectedLinuxClipboardTool,
 } from './clipboardUtils.js';
 
 describe('clipboardUtils', () => {
-  describe('clipboardHasImage', () => {
-    it('should return false on unsupported platforms', async () => {
-      if (
-        process.platform !== 'darwin' &&
-        process.platform !== 'win32' &&
-        process.platform !== 'linux'
-      ) {
-        const result = await clipboardHasImage();
-        expect(result).toBe(false);
-      } else {
-        // Skip on macOS/Windows/Linux as it would require actual clipboard state
-        expect(true).toBe(true);
-      }
-    });
+  let originalPlatform: string;
 
-    it('should return boolean on macOS, Windows, or Linux', async () => {
-      if (
-        process.platform === 'darwin' ||
-        process.platform === 'win32' ||
-        process.platform === 'linux'
-      ) {
-        const result = await clipboardHasImage();
-        expect(typeof result).toBe('boolean');
-      } else {
-        // Skip on unsupported platforms
-        expect(true).toBe(true);
-      }
-    }, 10000);
+  beforeEach(() => {
+    vi.resetAllMocks();
+    originalPlatform = process.platform;
+    resetDetectedLinuxClipboardTool();
   });
 
-  describe('saveClipboardImage', () => {
-    it('should return null on unsupported platforms', async () => {
-      if (
-        process.platform !== 'darwin' &&
-        process.platform !== 'win32' &&
-        process.platform !== 'linux'
-      ) {
-        const result = await saveClipboardImage();
-        expect(result).toBe(null);
-      } else {
-        // Skip on macOS/Windows/Linux
-        expect(true).toBe(true);
-      }
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+    });
+    vi.restoreAllMocks();
+  });
+
+  const setPlatform = (platform: string) => {
+    Object.defineProperty(process, 'platform', {
+      value: platform,
+    });
+  };
+
+  describe('clipboardHasImage (Linux)', () => {
+    it('should return true when wl-paste shows image type', async () => {
+      setPlatform('linux');
+      (spawnAsync as Mock).mockResolvedValueOnce({
+        stdout: 'image/png\ntext/plain',
+      });
+
+      const result = await clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(spawnAsync).toHaveBeenCalledWith('wl-paste', ['--list-types']);
     });
 
-    it('should handle errors gracefully', async () => {
-      // Test with invalid directory (should not throw)
-      const result = await saveClipboardImage(
-        '/invalid/path/that/does/not/exist',
-      );
+    it('should fall back to xclip if wl-paste fails and return true if xclip shows image', async () => {
+      setPlatform('linux');
+      (spawnAsync as Mock).mockRejectedValueOnce(new Error('wl-paste failed'));
+      (spawnAsync as Mock).mockResolvedValueOnce({
+        stdout: 'image/png\nTARGETS',
+      });
 
-      if (
-        process.platform === 'darwin' ||
-        process.platform === 'win32' ||
-        process.platform === 'linux'
-      ) {
-        // On macOS/Windows/Linux, might return null due to various errors
-        expect(result === null || typeof result === 'string').toBe(true);
-      } else {
-        // On other platforms, should always return null
-        expect(result).toBe(null);
-      }
+      const result = await clipboardHasImage();
+
+      expect(result).toBe(true);
+      expect(spawnAsync).toHaveBeenCalledTimes(2);
+      expect(spawnAsync).toHaveBeenNthCalledWith(1, 'wl-paste', [
+        '--list-types',
+      ]);
+      expect(spawnAsync).toHaveBeenNthCalledWith(2, 'xclip', [
+        '-selection',
+        'clipboard',
+        '-t',
+        'TARGETS',
+        '-o',
+      ]);
+    });
+
+    it('should return false if both wl-paste and xclip fail', async () => {
+      setPlatform('linux');
+      (spawnAsync as Mock).mockRejectedValueOnce(new Error('wl-paste failed'));
+      (spawnAsync as Mock).mockRejectedValueOnce(new Error('xclip failed'));
+
+      const result = await clipboardHasImage();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false if no image type is found', async () => {
+      setPlatform('linux');
+      (spawnAsync as Mock).mockResolvedValueOnce({ stdout: 'text/plain' });
+      // If wl-paste works but has no image, it should verify with that and return false,
+      // NOT fall back to xclip?
+      // Looking at code:
+      // if (stdout.includes('image/')) return true;
+      // catch -> try xclip.
+      // So if wl-paste succeeds but returns text/plain, it falls through to xclip?
+      // Wait, let's check code logic:
+      // try { spawn(wl-paste...); if(includes(image)) return true; } catch {}
+      // try { spawn(xclip...); if(includes(image)) return true; } catch {}
+      // return false;
+
+      // So if wl-paste succeeds but NO image, it proceeds to try xclip.
+      // This seems intentional (maybe wl-paste missed it?).
+      // Let's mock xclip to also have no image.
+      (spawnAsync as Mock).mockResolvedValueOnce({ stdout: 'text/plain' });
+
+      const result = await clipboardHasImage();
+
+      expect(result).toBe(false);
+      expect(spawnAsync).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('saveClipboardImage (Linux)', () => {
+    const mockTargetDir = '/tmp/target';
+    const mockTempDir = '/tmp/target/.gemini-clipboard';
+
+    beforeEach(() => {
+      setPlatform('linux');
+      (fs.mkdir as Mock).mockResolvedValue(undefined);
+      (fs.unlink as Mock).mockResolvedValue(undefined);
+    });
+
+    const createMockChildProcess = (
+      shouldSucceed: boolean,
+      exitCode: number = 0,
+    ) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: Stream & { pipe: Mock };
+      };
+      child.stdout = new Stream() as Stream & { pipe: Mock }; // Dummy stream
+      child.stdout.pipe = vi.fn();
+
+      // Simulate process execution
+      setTimeout(() => {
+        if (!shouldSucceed) {
+          child.emit('error', new Error('Spawn failed'));
+        } else {
+          child.emit('close', exitCode);
+        }
+      }, 10);
+
+      return child;
+    };
+
+    it('should save image using wl-paste if successful', async () => {
+      // Mock fs.stat to return size > 0
+      (fs.stat as Mock).mockResolvedValue({ size: 100, mtimeMs: Date.now() });
+
+      // Mock spawn to return a successful process for wl-paste
+      const mockChild = createMockChildProcess(true, 0);
+      (spawn as Mock).mockReturnValueOnce(mockChild);
+
+      // Mock createWriteStream
+      const mockStream = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      mockStream.writableFinished = false;
+      (createWriteStream as Mock).mockReturnValue(mockStream);
+
+      const promise = saveClipboardImage(mockTargetDir);
+
+      // Simulate stream finishing successfully BEFORE process closes
+      mockStream.writableFinished = true;
+      mockStream.emit('finish');
+
+      const result = await promise;
+
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
+      expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
+    });
+
+    it('should fall back to xclip if wl-paste fails', async () => {
+      // Mock fs.stat to return size > 0
+      (fs.stat as Mock).mockResolvedValue({ size: 100, mtimeMs: Date.now() });
+
+      // 1. wl-paste fails (non-zero exit code)
+      const child1 = createMockChildProcess(true, 1);
+
+      // 2. xclip succeeds
+      const child2 = createMockChildProcess(true, 0);
+
+      (spawn as Mock).mockReturnValueOnce(child1).mockReturnValueOnce(child2);
+
+      const mockStream1 = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      const mockStream2 = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      (createWriteStream as Mock)
+        .mockReturnValueOnce(mockStream1)
+        .mockReturnValueOnce(mockStream2);
+
+      const promise = saveClipboardImage(mockTargetDir);
+
+      // Stream 1 finishes (but process fails)
+      mockStream1.writableFinished = true;
+      mockStream1.emit('finish');
+
+      // Stream 2 finishes (and process succeeds)
+      mockStream2.writableFinished = true;
+      mockStream2.emit('finish');
+
+      const result = await promise;
+
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      expect(spawn).toHaveBeenNthCalledWith(1, 'wl-paste', expect.any(Array));
+      expect(spawn).toHaveBeenNthCalledWith(2, 'xclip', expect.any(Array));
+    });
+
+    it('should return null if both fail', async () => {
+      // 1. wl-paste fails
+      const child1 = createMockChildProcess(true, 1);
+      // 2. xclip fails
+      const child2 = createMockChildProcess(true, 1);
+
+      (spawn as Mock).mockReturnValueOnce(child1).mockReturnValueOnce(child2);
+
+      const mockStream1 = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      const mockStream2 = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      (createWriteStream as Mock)
+        .mockReturnValueOnce(mockStream1)
+        .mockReturnValueOnce(mockStream2);
+
+      const promise = saveClipboardImage(mockTargetDir);
+
+      mockStream1.writableFinished = true;
+      mockStream1.emit('finish');
+      mockStream2.writableFinished = true;
+      mockStream2.emit('finish');
+
+      const result = await promise;
+
+      expect(result).toBe(null);
     });
   });
 
