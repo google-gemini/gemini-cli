@@ -11,13 +11,17 @@ import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
 import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 import { theme } from '../semantic-colors.js';
 
-export const ConfigInitDisplay = () => {
-  const [message, setMessage] = useState('Initializing...');
+export const ConfigInitDisplay = ({
+  message: initialMessage = 'Initializing...',
+}: {
+  message?: string;
+}) => {
+  const [message, setMessage] = useState(initialMessage);
 
   useEffect(() => {
     const onChange = (clients?: Map<string, McpClient>) => {
       if (!clients || clients.size === 0) {
-        setMessage(`Initializing...`);
+        setMessage(initialMessage);
         return;
       }
       let connected = 0;
@@ -49,7 +53,7 @@ export const ConfigInitDisplay = () => {
     return () => {
       appEvents.off(AppEvent.McpClientUpdate, onChange);
     };
-  }, []);
+  }, [initialMessage]);
 
   return (
     <Box marginTop={1}>
