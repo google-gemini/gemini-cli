@@ -303,6 +303,17 @@ describe('Gemini Client (client.ts)', () => {
     });
   });
 
+  describe('setHistory', () => {
+    it('should update telemetry token count when history is set', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'some message' }] },
+      ];
+      client.setHistory(history);
+
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
+    });
+  });
+
   describe('resumeChat', () => {
     it('should update telemetry token count when a chat is resumed', async () => {
       const history: Content[] = [
