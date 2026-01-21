@@ -433,6 +433,31 @@ describe('useAutoAcceptIndicator', () => {
       expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
+    it('should disable AUTO_EDIT mode when Shift+Tab is pressed', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({
+          name: 'tab',
+          shift: true,
+        } as Key);
+      });
+
+      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.DEFAULT,
+      );
+      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    });
+
     it('should show a warning when trying to enable privileged modes', () => {
       // Mock the error thrown by setApprovalMode
       const errorMessage =
@@ -479,31 +504,6 @@ describe('useAutoAcceptIndicator', () => {
       );
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
-    });
-
-    it('should disable AUTO_EDIT mode when Shift+Tab is pressed', () => {
-      mockConfigInstance.getApprovalMode.mockReturnValue(
-        ApprovalMode.AUTO_EDIT,
-      );
-      const mockAddItem = vi.fn();
-      renderHook(() =>
-        useAutoAcceptIndicator({
-          config: mockConfigInstance as unknown as ActualConfigType,
-          addItem: mockAddItem,
-        }),
-      );
-
-      act(() => {
-        capturedUseKeypressHandler({
-          name: 'tab',
-          shift: true,
-        } as Key);
-      });
-
-      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.DEFAULT,
-      );
-      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
   });
 
