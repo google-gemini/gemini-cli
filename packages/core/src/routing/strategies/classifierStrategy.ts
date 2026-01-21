@@ -156,7 +156,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      debugLogger.log(`[Routing] About to call classifier.`);
+      debugLogger.log(`[Routing] About to call Gemini classifier.`);
 
       const jsonResponse = await baseLlmClient.generateJson({
         modelConfigKey: { model: 'classifier' },

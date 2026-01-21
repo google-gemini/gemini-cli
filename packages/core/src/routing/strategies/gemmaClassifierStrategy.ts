@@ -6,9 +6,9 @@
 
 import { z } from 'zod';
 
-// TODO(sid): add error handling if the localhost env is not reachable.
-
 // TODO(sid): add tests.
+
+// TODO(sid): remove ollama from npm dependencies.
 
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
