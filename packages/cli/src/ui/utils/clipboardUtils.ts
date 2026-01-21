@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
   debugLogger,
@@ -33,6 +33,26 @@ const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
 // Track which tool works on Linux to avoid redundant checks/failures
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
+
+// Helper to check the user's display server and whether they have a compatible clipboard tool installed
+function isToolAvailable() {
+  let toolName: 'wl-paste' | 'xclip' | null = null;
+  const displayServer = process.env['XDG_SESSION_TYPE'];
+
+  if (displayServer === 'wayland') toolName = 'wl-paste';
+  else if (displayServer === 'x11') toolName = 'xclip';
+  else return false;
+
+  try {
+    // output is piped to stdio: 'ignore' to suppress the path printing to console
+    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
+    linuxClipboardTool = toolName;
+    return true;
+  } catch (e) {
+    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
+    return false;
+  }
+}
 
 /**
  * Helper to save command stdout to a file while preventing shell injections and race conditions
@@ -108,34 +128,47 @@ async function saveFromCommand(
 export async function clipboardHasImage(): Promise<boolean> {
   if (process.platform === 'linux') {
     // Try Wayland first (wl-clipboard)
-    try {
-      const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
-      if (stdout.includes('image/')) {
-        linuxClipboardTool = 'wl-paste';
-        return true;
-      }
-    } catch (_) {
-      // Ignore error, try X11
-    }
+    if (isToolAvailable()) {
+      const tryWlPaste = async () => {
+        try {
+          const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+          if (stdout.includes('image/')) {
+            linuxClipboardTool = 'wl-paste';
+            return true;
+          }
+        } catch (e) {
+          debugLogger.warn('Error checking wl-clipboard for image:', e);
+        }
+        return false;
+      };
 
-    // Try X11 (xclip)
-    try {
-      const { stdout } = await spawnAsync('xclip', [
-        '-selection',
-        'clipboard',
-        '-t',
-        'TARGETS',
-        '-o',
-      ]);
-      if (stdout.includes('image/')) {
-        linuxClipboardTool = 'xclip';
-        return true;
-      }
-    } catch (_) {
-      // Ignore error
-    }
+      const tryXclip = async () => {
+        try {
+          const { stdout } = await spawnAsync('xclip', [
+            '-selection',
+            'clipboard',
+            '-t',
+            'TARGETS',
+            '-o',
+          ]);
+          if (stdout.includes('image/')) {
+            linuxClipboardTool = 'xclip';
+            return true;
+          }
+        } catch (e) {
+          debugLogger.warn('Error checking wl-clipboard for image:', e);
+        }
+        return false;
+      };
 
-    return false;
+      if (linuxClipboardTool === 'wl-paste') {
+        if (await tryWlPaste()) return true;
+      } else if (linuxClipboardTool === 'xclip') {
+        if (await tryXclip()) return true;
+      }
+
+      return false;
+    }
   }
 
   if (process.platform === 'win32') {
@@ -233,17 +266,6 @@ export async function saveClipboardImage(
       if (linuxClipboardTool === 'xclip') {
         if (await tryXclip()) return tempFilePath;
         return null;
-      }
-
-      // Otherwise try both
-      if (await tryWlPaste()) {
-        linuxClipboardTool = 'wl-paste';
-        return tempFilePath;
-      }
-
-      if (await tryXclip()) {
-        linuxClipboardTool = 'xclip';
-        return tempFilePath;
       }
 
       return null;

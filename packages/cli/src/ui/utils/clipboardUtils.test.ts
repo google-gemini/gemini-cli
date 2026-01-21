@@ -15,7 +15,7 @@ import {
 } from 'vitest';
 import * as fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import EventEmitter from 'node:events';
 import { Stream } from 'node:stream';
 import * as path from 'node:path';
@@ -30,6 +30,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return {
     ...actual,
     spawn: vi.fn(),
+    execSync: vi.fn(),
   };
 });
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -58,12 +59,15 @@ type ClipboardUtilsModule = typeof import('./clipboardUtils.js');
 
 describe('clipboardUtils', () => {
   let originalPlatform: string;
+  let originalEnv: NodeJS.ProcessEnv;
   // Dynamic module instance for stateful functions
   let clipboardUtils: ClipboardUtilsModule;
 
   beforeEach(async () => {
     vi.resetAllMocks();
     originalPlatform = process.platform;
+    originalEnv = process.env;
+    process.env = { ...originalEnv };
 
     // Reset modules to clear internal state (linuxClipboardTool variable)
     vi.resetModules();
@@ -75,6 +79,7 @@ describe('clipboardUtils', () => {
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
     });
+    process.env = originalEnv;
     vi.restoreAllMocks();
   });
 
@@ -85,22 +90,28 @@ describe('clipboardUtils', () => {
   };
 
   describe('clipboardHasImage (Linux)', () => {
-    it('should return true when wl-paste shows image type', async () => {
+    it('should return true when wl-paste shows image type (Wayland)', async () => {
       setPlatform('linux');
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      (execSync as Mock).mockReturnValue(Buffer.from('')); // command -v succeeds
       (spawnAsync as Mock).mockResolvedValueOnce({
         stdout: 'image/png\ntext/plain',
       });
 
-      // Use dynamic instance
       const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(true);
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('wl-paste'),
+        expect.anything(),
+      );
       expect(spawnAsync).toHaveBeenCalledWith('wl-paste', ['--list-types']);
     });
 
-    it('should fall back to xclip if wl-paste fails and return true if xclip shows image', async () => {
+    it('should return true when xclip shows image type (X11)', async () => {
       setPlatform('linux');
-      (spawnAsync as Mock).mockRejectedValueOnce(new Error('wl-paste failed'));
+      process.env['XDG_SESSION_TYPE'] = 'x11';
+      (execSync as Mock).mockReturnValue(Buffer.from('')); // command -v succeeds
       (spawnAsync as Mock).mockResolvedValueOnce({
         stdout: 'image/png\nTARGETS',
       });
@@ -108,11 +119,11 @@ describe('clipboardUtils', () => {
       const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(true);
-      expect(spawnAsync).toHaveBeenCalledTimes(2);
-      expect(spawnAsync).toHaveBeenNthCalledWith(1, 'wl-paste', [
-        '--list-types',
-      ]);
-      expect(spawnAsync).toHaveBeenNthCalledWith(2, 'xclip', [
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining('xclip'),
+        expect.anything(),
+      );
+      expect(spawnAsync).toHaveBeenCalledWith('xclip', [
         '-selection',
         'clipboard',
         '-t',
@@ -121,10 +132,11 @@ describe('clipboardUtils', () => {
       ]);
     });
 
-    it('should return false if both wl-paste and xclip fail', async () => {
+    it('should return false if tool fails', async () => {
       setPlatform('linux');
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      (execSync as Mock).mockReturnValue(Buffer.from(''));
       (spawnAsync as Mock).mockRejectedValueOnce(new Error('wl-paste failed'));
-      (spawnAsync as Mock).mockRejectedValueOnce(new Error('xclip failed'));
 
       const result = await clipboardUtils.clipboardHasImage();
 
@@ -133,26 +145,25 @@ describe('clipboardUtils', () => {
 
     it('should return false if no image type is found', async () => {
       setPlatform('linux');
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      (execSync as Mock).mockReturnValue(Buffer.from(''));
       (spawnAsync as Mock).mockResolvedValueOnce({ stdout: 'text/plain' });
-      // If wl-paste works but has no image, it should verify with that and return false,
-      // NOT fall back to xclip?
-      // Looking at code:
-      // if (stdout.includes('image/')) return true;
-      // catch -> try xclip.
-      // So if wl-paste succeeds but returns text/plain, it falls through to xclip?
-      // Wait, let's check code logic:
-      // try { spawn(wl-paste...); if(includes(image)) return true; } catch {}
-      // try { spawn(xclip...); if(includes(image)) return true; } catch {}
-      // return false;
 
-      // So if wl-paste succeeds but NO image, it proceeds to try xclip.
-      // This seems intentional (maybe wl-paste missed it?).
-      // Let's mock xclip to also have no image.
-      (spawnAsync as Mock).mockResolvedValueOnce({ stdout: 'text/plain' });
       const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(false);
-      expect(spawnAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return false if tool not found', async () => {
+      setPlatform('linux');
+      process.env['XDG_SESSION_TYPE'] = 'wayland';
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+
+      const result = await clipboardUtils.clipboardHasImage();
+
+      expect(result).toBe(false);
     });
   });
 
@@ -188,7 +199,24 @@ describe('clipboardUtils', () => {
       return child;
     };
 
-    it('should save image using wl-paste if successful', async () => {
+    // Helper to prime the internal linuxClipboardTool state
+    const primeClipboardTool = async (
+      type: 'wayland' | 'x11',
+      hasImage = true,
+    ) => {
+      process.env['XDG_SESSION_TYPE'] = type;
+      (execSync as Mock).mockReturnValue(Buffer.from(''));
+      (spawnAsync as Mock).mockResolvedValueOnce({
+        stdout: hasImage ? 'image/png' : 'text/plain',
+      });
+      await clipboardUtils.clipboardHasImage();
+      (spawnAsync as Mock).mockClear();
+      (execSync as Mock).mockClear();
+    };
+
+    it('should save image using wl-paste if detected', async () => {
+      await primeClipboardTool('wayland');
+
       // Mock fs.stat to return size > 0
       (fs.stat as Mock).mockResolvedValue({ size: 100, mtimeMs: Date.now() });
 
@@ -217,188 +245,66 @@ describe('clipboardUtils', () => {
       expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
     });
 
-    it('should fall back to xclip if wl-paste fails', async () => {
+    it('should return null if wl-paste fails', async () => {
+      await primeClipboardTool('wayland');
+
       // Mock fs.stat to return size > 0
       (fs.stat as Mock).mockResolvedValue({ size: 100, mtimeMs: Date.now() });
 
-      // 1. wl-paste fails (non-zero exit code)
+      // wl-paste fails (non-zero exit code)
       const child1 = createMockChildProcess(true, 1);
-
-      // 2. xclip succeeds
-      const child2 = createMockChildProcess(true, 0);
-
-      (spawn as Mock).mockReturnValueOnce(child1).mockReturnValueOnce(child2);
+      (spawn as Mock).mockReturnValueOnce(child1);
 
       const mockStream1 = new EventEmitter() as EventEmitter & {
         writableFinished: boolean;
       };
-      const mockStream2 = new EventEmitter() as EventEmitter & {
-        writableFinished: boolean;
-      };
-      (createWriteStream as Mock)
-        .mockReturnValueOnce(mockStream1)
-        .mockReturnValueOnce(mockStream2);
-
-      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
-
-      // Stream 1 finishes (but process fails)
-      mockStream1.writableFinished = true;
-      mockStream1.emit('finish');
-
-      // Stream 2 finishes (and process succeeds)
-      mockStream2.writableFinished = true;
-      mockStream2.emit('finish');
-
-      const result = await promise;
-
-      expect(result).toMatch(/clipboard-\d+\.png$/);
-      expect(spawn).toHaveBeenNthCalledWith(1, 'wl-paste', expect.any(Array));
-      expect(spawn).toHaveBeenNthCalledWith(2, 'xclip', expect.any(Array));
-    });
-
-    it('should return null if both fail', async () => {
-      // 1. wl-paste fails
-      const child1 = createMockChildProcess(true, 1);
-      // 2. xclip fails
-      const child2 = createMockChildProcess(true, 1);
-
-      (spawn as Mock).mockReturnValueOnce(child1).mockReturnValueOnce(child2);
-
-      const mockStream1 = new EventEmitter() as EventEmitter & {
-        writableFinished: boolean;
-      };
-      const mockStream2 = new EventEmitter() as EventEmitter & {
-        writableFinished: boolean;
-      };
-      (createWriteStream as Mock)
-        .mockReturnValueOnce(mockStream1)
-        .mockReturnValueOnce(mockStream2);
+      (createWriteStream as Mock).mockReturnValueOnce(mockStream1);
 
       const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
 
       mockStream1.writableFinished = true;
       mockStream1.emit('finish');
-      mockStream2.writableFinished = true;
-      mockStream2.emit('finish');
 
       const result = await promise;
 
       expect(result).toBe(null);
+      // Should NOT try xclip
+      expect(spawn).toHaveBeenCalledTimes(1);
     });
 
-    describe('optimization', () => {
-      it('should only use wl-paste if previously detected', async () => {
-        // Mock fs.stat to return size > 0
-        (fs.stat as Mock).mockResolvedValue({
-          size: 100,
-          mtimeMs: Date.now(),
-        });
+    it('should save image using xclip if detected', async () => {
+      await primeClipboardTool('x11');
 
-        // Run 1: wl-paste succeeds
-        const child1 = createMockChildProcess(true, 0);
-        (spawn as Mock).mockReturnValue(child1);
+      // Mock fs.stat to return size > 0
+      (fs.stat as Mock).mockResolvedValue({ size: 100, mtimeMs: Date.now() });
 
-        const stream1 = new EventEmitter() as EventEmitter & {
-          writableFinished: boolean;
-        };
-        stream1.writableFinished = false;
-        (createWriteStream as Mock).mockReturnValue(stream1);
+      // Mock spawn to return a successful process for xclip
+      const mockChild = createMockChildProcess(true, 0);
+      (spawn as Mock).mockReturnValueOnce(mockChild);
 
-        const promise1 = clipboardUtils.saveClipboardImage(mockTargetDir);
-        stream1.writableFinished = true;
-        stream1.emit('finish');
-        await promise1;
+      // Mock createWriteStream
+      const mockStream = new EventEmitter() as EventEmitter & {
+        writableFinished: boolean;
+      };
+      mockStream.writableFinished = false;
+      (createWriteStream as Mock).mockReturnValue(mockStream);
 
-        // Reset mocks to track calls for Run 2
-        (spawn as Mock).mockClear();
-        // Create NEW child for Run 2
-        const child2 = createMockChildProcess(true, 0);
-        (spawn as Mock).mockReturnValue(child2);
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
 
-        // Create NEW stream for Run 2
-        const stream2 = new EventEmitter() as EventEmitter & {
-          writableFinished: boolean;
-        };
-        stream2.writableFinished = false;
-        (createWriteStream as Mock).mockReturnValue(stream2);
+      mockStream.writableFinished = true;
+      mockStream.emit('finish');
 
-        // Run 2 (using same clipboardUtils instance to test state)
-        const promise2 = clipboardUtils.saveClipboardImage(mockTargetDir);
-        stream2.writableFinished = true;
-        stream2.emit('finish');
-        await promise2;
+      const result = await promise;
 
-        // Should only have called wl-paste
-        expect(spawn).toHaveBeenCalledTimes(1);
-        expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
-        expect(spawn).not.toHaveBeenCalledWith('xclip', expect.any(Array));
-      });
+      expect(result).toMatch(/clipboard-\d+\.png$/);
+      expect(spawn).toHaveBeenCalledWith('xclip', expect.any(Array));
+    });
 
-      it('should only use xclip if previously detected', async () => {
-        // Mock fs.stat to return size > 0
-        (fs.stat as Mock).mockResolvedValue({
-          size: 100,
-          mtimeMs: Date.now(),
-        });
-
-        // Run 1: wl-paste fails, xclip succeeds
-        const failChild = createMockChildProcess(true, 1);
-        const successChild = createMockChildProcess(true, 0);
-
-        (spawn as Mock)
-          .mockReturnValueOnce(failChild)
-          .mockReturnValueOnce(successChild);
-
-        const stream1 = new EventEmitter() as EventEmitter & {
-          writableFinished: boolean;
-        };
-        stream1.writableFinished = false;
-        const stream2 = new EventEmitter() as EventEmitter & {
-          writableFinished: boolean;
-        };
-        stream2.writableFinished = false;
-
-        (createWriteStream as Mock)
-          .mockReturnValueOnce(stream1)
-          .mockReturnValueOnce(stream2);
-
-        const promise1 = clipboardUtils.saveClipboardImage(mockTargetDir);
-
-        // Fail stream finish
-        stream1.writableFinished = true;
-        stream1.emit('finish');
-
-        // Success stream finish
-        stream2.writableFinished = true;
-        stream2.emit('finish');
-
-        await promise1;
-
-        // Reset mocks for Run 2
-        (spawn as Mock).mockClear();
-        // Create NEW child for Run 2
-        const childRun2 = createMockChildProcess(true, 0);
-        // Return successChild. If wl-paste were called, it would succeed.
-        // But we expect it NOT to be called.
-        (spawn as Mock).mockReturnValue(childRun2);
-
-        const streamRun2 = new EventEmitter() as EventEmitter & {
-          writableFinished: boolean;
-        };
-        streamRun2.writableFinished = false;
-        (createWriteStream as Mock).mockReturnValue(streamRun2);
-
-        // Run 2
-        const promise2 = clipboardUtils.saveClipboardImage(mockTargetDir);
-        streamRun2.writableFinished = true;
-        streamRun2.emit('finish');
-        await promise2;
-
-        // Should only have called xclip
-        expect(spawn).toHaveBeenCalledTimes(1);
-        expect(spawn).toHaveBeenCalledWith('xclip', expect.any(Array));
-        expect(spawn).not.toHaveBeenCalledWith('wl-paste', expect.any(Array));
-      });
+    it('should return null if tool is not yet detected', async () => {
+      // Don't prime the tool
+      const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
+      expect(result).toBe(null);
+      expect(spawn).not.toHaveBeenCalled();
     });
   });
 
