@@ -664,9 +664,10 @@ export async function main() {
         const additionalContext = result.getAdditionalContext();
         if (additionalContext) {
           // Prepend context to input (System Context -> Stdin -> Question)
+          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
           input = input
-            ? `${additionalContext}\n\n${input}`
-            : additionalContext;
+            ? `${wrappedContext}\n\n${input}`
+            : wrappedContext;
         }
       }
     }
