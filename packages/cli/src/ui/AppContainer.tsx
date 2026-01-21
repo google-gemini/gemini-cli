@@ -25,9 +25,11 @@ import {
   type HistoryItem,
   ToolCallStatus,
   type HistoryItemWithoutId,
+  type HistoryItemToolGroup,
   AuthState,
 } from './types.js';
 import { MessageType, StreamingState } from './types.js';
+import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
   type EditorType,
   type Config,
@@ -102,7 +104,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import {
@@ -495,7 +497,12 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [authState, authContext, setAuthState]);
 
-  const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
+  const {
+    proQuotaRequest,
+    handleProQuotaChoice,
+    validationRequest,
+    handleValidationChoice,
+  } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
@@ -849,7 +856,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   // Auto-accept indicator
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+  const showApprovalModeIndicator = useApprovalModeIndicator({
     config,
     addItem: historyManager.addItem,
     onApprovalModeChange: handleApprovalModeChange,
@@ -1471,6 +1478,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showPrivacyNotice ||
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
+    !!validationRequest ||
     isSessionBrowserOpen ||
     isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput;
@@ -1478,6 +1486,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
+  const allToolCalls = useMemo(
+    () =>
+      pendingHistoryItems
+        .filter(
+          (item): item is HistoryItemToolGroup => item.type === 'tool_group',
+        )
+        .flatMap((item) => item.tools),
+    [pendingHistoryItems],
   );
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
@@ -1584,10 +1602,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
-      showAutoAcceptIndicator,
+      showApprovalModeIndicator,
       currentModel,
       userTier,
       proQuotaRequest,
+      validationRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1675,9 +1694,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
-      showAutoAcceptIndicator,
+      showApprovalModeIndicator,
       userTier,
       proQuotaRequest,
+      validationRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1747,6 +1767,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      handleValidationChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -1787,6 +1808,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      handleValidationChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -1822,9 +1844,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <ShellFocusContext.Provider value={isFocused}>
-              <App />
-            </ShellFocusContext.Provider>
+            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+              <ShellFocusContext.Provider value={isFocused}>
+                <App />
+              </ShellFocusContext.Provider>
+            </ToolActionsProvider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>

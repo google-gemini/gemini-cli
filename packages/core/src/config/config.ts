@@ -67,7 +67,10 @@ import {
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
-import type { FallbackModelHandler } from '../fallback/types.js';
+import type {
+  FallbackModelHandler,
+  ValidationHandler,
+} from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
@@ -375,14 +378,15 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  rawOutput?: boolean;
+  acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
-  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
-    disabled?: string[];
-  };
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
+  disabledHooks?: string[];
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -478,6 +482,7 @@ export class Config {
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
+  validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -517,6 +522,8 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly rawOutput: boolean;
+  private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -627,7 +634,7 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
-    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler =
       params.enableEventDrivenScheduler ?? false;
@@ -680,10 +687,7 @@ export class Config {
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? false;
-    this.disabledHooks =
-      (params.hooks && 'disabled' in params.hooks
-        ? params.hooks.disabled
-        : undefined) ?? [];
+    this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
@@ -722,10 +726,11 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.rawOutput = params.rawOutput ?? false;
+    this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
     if (params.hooks) {
-      const { disabled: _, ...restOfHooks } = params.hooks;
-      this.hooks = restOfHooks;
+      this.hooks = params.hooks;
     }
     if (params.projectHooks) {
       this.projectHooks = params.projectHooks;
@@ -795,6 +800,11 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
+
+    // Add pending directories to workspace context
+    for (const dir of this.pendingIncludeDirectories) {
+      this.workspaceContext.addDirectory(dir);
+    }
 
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
@@ -1069,6 +1079,14 @@ export class Config {
 
   getFallbackModelHandler(): FallbackModelHandler | undefined {
     return this.fallbackModelHandler;
+  }
+
+  setValidationHandler(handler: ValidationHandler): void {
+    this.validationHandler = handler;
+  }
+
+  getValidationHandler(): ValidationHandler | undefined {
+    return this.validationHandler;
   }
 
   resetTurn(): void {
@@ -1386,6 +1404,14 @@ export class Config {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getRawOutput(): boolean {
+    return this.rawOutput;
+  }
+
+  getAcceptRawOutputRisk(): boolean {
+    return this.acceptRawOutputRisk;
   }
 
   getPendingIncludeDirectories(): string[] {
@@ -1993,9 +2019,7 @@ export class Config {
   /**
    * Get project-specific hooks configuration
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.projectHooks;
   }
 
