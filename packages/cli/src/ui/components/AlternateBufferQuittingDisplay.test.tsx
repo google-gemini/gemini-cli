@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  renderWithProviders,
+  persistentStateMock,
+} from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay.js';
 import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
-import {
-  renderWithProviders,
-  persistentStateMock,
-} from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('../utils/terminalSetup.js', () => ({
@@ -102,8 +102,7 @@ const mockConfig = {
 describe('AlternateBufferQuittingDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockRestore();
-    persistentStateMock.set.mockRestore();
+    persistentStateMock.reset();
   });
   const baseUIState = {
     terminalWidth: 80,
@@ -119,6 +118,7 @@ describe('AlternateBufferQuittingDisplay', () => {
   };
 
   it('renders with active and pending tool messages', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const { lastFrame } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
@@ -128,15 +128,13 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: mockPendingHistoryItems,
         },
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
-        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
   });
 
   it('renders with empty history and no pending items', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const { lastFrame } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
@@ -146,15 +144,13 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
-        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('empty');
   });
 
   it('renders with history but no pending items', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const { lastFrame } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
@@ -164,15 +160,13 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
-        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
   });
 
   it('renders with pending items but no history', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const { lastFrame } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
@@ -182,15 +176,13 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: mockPendingHistoryItems,
         },
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
-        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
   });
 
   it('renders with user and gemini messages', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const history: HistoryItem[] = [
       { id: 1, type: 'user', text: 'Hello Gemini' },
       { id: 2, type: 'gemini', text: 'Hello User!' },
@@ -204,9 +196,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
-        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');

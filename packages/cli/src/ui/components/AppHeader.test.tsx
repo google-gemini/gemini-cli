@@ -20,8 +20,7 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockRestore();
-    persistentStateMock.set.mockRestore();
+    persistentStateMock.reset();
   });
 
   it('should render the banner with default text', () => {
@@ -40,13 +39,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -71,13 +63,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -101,13 +86,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -132,13 +110,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -162,13 +133,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -187,19 +151,20 @@ describe('<AppHeader />', () => {
       },
     };
 
+    persistentStateMock.setData({
+      defaultBannerShownCount: {
+        [crypto
+          .createHash('sha256')
+          .update(uiState.bannerData.defaultText)
+          .digest('hex')]: 5,
+      },
+    });
+
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            if (key === 'defaultBannerShownCount') return 5;
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -221,13 +186,6 @@ describe('<AppHeader />', () => {
     const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       uiState,
-      persistentState: {
-        get: vi.fn((key) => {
-          if (key === 'tipsShown') return 0;
-          if (key === 'defaultBannerShownCount') return {};
-          return undefined;
-        }),
-      },
     });
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
@@ -258,13 +216,6 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 0;
-            if (key === 'defaultBannerShownCount') return {};
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -282,17 +233,14 @@ describe('<AppHeader />', () => {
       },
       bannerVisible: true,
     };
+
+    persistentStateMock.setData({ tipsShown: 5 });
+
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         config: mockConfig,
         uiState,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 5;
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -303,16 +251,13 @@ describe('<AppHeader />', () => {
 
   it('should NOT render Tips when tipsShown is 10 or more', () => {
     const mockConfig = makeFakeConfig();
+
+    persistentStateMock.setData({ tipsShown: 10 });
+
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         config: mockConfig,
-        persistentState: {
-          get: vi.fn((key) => {
-            if (key === 'tipsShown') return 10;
-            return undefined;
-          }),
-        },
       },
     );
 
@@ -321,9 +266,7 @@ describe('<AppHeader />', () => {
   });
 
   it('should show tips until they have been shown 10 times (persistence flow)', () => {
-    const fakeStore: Record<string, number> = {
-      tipsShown: 9,
-    };
+    persistentStateMock.setData({ tipsShown: 9 });
 
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -334,29 +277,20 @@ describe('<AppHeader />', () => {
       },
       bannerVisible: true,
     };
+
+    // First session
     const session1 = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       uiState,
-      persistentState: {
-        get: vi.fn((key) => fakeStore[key]),
-        set: vi.fn((key, val) => {
-          fakeStore[key] = val;
-        }),
-      },
     });
 
     expect(session1.lastFrame()).toContain('Tips');
-    expect(fakeStore['tipsShown']).toBe(10);
+    expect(persistentStateMock.get('tipsShown')).toBe(10);
     session1.unmount();
 
+    // Second session - state is persisted in the fake
     const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
-      persistentState: {
-        get: vi.fn((key) => fakeStore[key]),
-        set: vi.fn((key, val) => {
-          fakeStore[key] = val;
-        }),
-      },
     });
 
     expect(session2.lastFrame()).not.toContain('Tips');

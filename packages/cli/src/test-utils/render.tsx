@@ -27,17 +27,9 @@ import {
 } from '../ui/contexts/UIActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+import { FakePersistentState } from './persistentStateFake.js';
 
-export const persistentStateMock = {
-  get: vi.fn(),
-  set: vi.fn(),
-};
-
-persistentStateMock.get.mockImplementation((key) => {
-  if (key === 'tipsShown') return 0;
-  if (key === 'defaultBannerShownCount') return {};
-  return undefined;
-});
+export const persistentStateMock = new FakePersistentState();
 
 vi.mock('../utils/persistentState.js', () => ({
   persistentState: persistentStateMock,
