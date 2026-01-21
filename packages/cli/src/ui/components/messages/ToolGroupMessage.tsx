@@ -62,7 +62,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const borderDimColor =
     hasPending && (!isShellCommand || !isEmbeddedShellFocused);
 
-  const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+  const staticHeight = /* border */ 2;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -101,6 +101,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
+      marginBottom={1}
     >
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;

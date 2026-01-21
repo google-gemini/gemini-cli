@@ -9,7 +9,8 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all t
 │ ✓  another-tool A tool for testing                                           │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shell commands even when successful 1`] = `
@@ -17,7 +18,8 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 │ ✓  run_shell_command A tool for testing                                      │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when tools are pending 1`] = `
@@ -25,7 +27,8 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when too
 │ o  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval disabled 1`] = `
@@ -41,7 +44,8 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 │   2. Allow for this session                                                  │
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval enabled 1`] = `
@@ -58,7 +62,8 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 │   3. Allow for all future sessions                                           │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
@@ -78,7 +83,8 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │ ?  second-confirm A tool for testing                                         │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
@@ -87,13 +93,13 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to be tr… │
 │──────────────────────────────────────────────────────────────────────────────│
-│ line5                                                                        │                                       █
-│                                                                              │                                       █
+│                                                                              │                                       ▄
 │ ✓  tool-2 Description 2                                                      │                                       █
 │                                                                              │                                       █
 │ line1                                                                        │                                       █
 │ line2                                                                        │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+╰──────────────────────────────────────────────────────────────────────────────╯                                       █
+                                                                                                                       █"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
@@ -109,7 +115,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │ o  write_file Write to file                                                  │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses 1`] = `
@@ -125,7 +132,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls w
 │ x  error-tool This tool failed                                               │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with yellow border 1`] = `
@@ -133,7 +141,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with ye
 │ ✓  run_shell_command Execute shell command                                   │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful tool call 1`] = `
@@ -141,7 +150,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful too
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
@@ -157,7 +167,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting co
 │   2. Allow for this session                                                  │
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with outputFile 1`] = `
@@ -166,16 +177,17 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with output
 │                                                                              │
 │ Test result                                                                  │
 │ Output too long and was saved to: /path/to/output.txt                        │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
+"╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-2 Description 2                                                      │
-│                                                                              │                                       ▄
-│ line1                                                                        │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+│                                                                              │
+│ line1                                                                        │                                       ▄
+╰──────────────────────────────────────────────────────────────────────────────╯                                       █
+                                                                                                                       █"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
@@ -183,7 +195,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] 
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
@@ -195,7 +208,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 │ ✓  another-tool Another tool                                                 │
 │                                                                              │
 │ More output here                                                             │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
@@ -203,7 +217,8 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal 
 │ ✓  very-long-tool-name-that-might-w… │
 │                                      │
 │ Test result                          │
-╰──────────────────────────────────────╯"
+╰──────────────────────────────────────╯
+"
 `;
 
 exports[`<ToolGroupMessage /> > Height Calculation > calculates available height correctly with multiple tools with results 1`] = `
@@ -218,5 +233,6 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
 │                                                                              │
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
 `;
