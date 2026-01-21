@@ -1,12 +1,36 @@
 # Gemini CLI extensions
 
-Gemini CLI extensions package prompts, MCP servers, and custom commands into a
-familiar and user-friendly format. With extensions, you can expand the
-capabilities of Gemini CLI and share those capabilities with others. They are
-designed to be easily installable and shareable.
+Gemini CLI extensions package prompts, MCP servers, custom commands, hooks, and
+agent skills into a familiar and user-friendly format. With extensions, you can
+expand the capabilities of Gemini CLI and share those capabilities with others.
+They are designed to be easily installable and shareable.
 
 To see examples of extensions, you can browse a gallery of
 [Gemini CLI extensions](https://geminicli.com/extensions/browse/).
+
+## Managing extensions
+
+You can verify your installed extensions and their status using the interactive
+command:
+
+```bash
+/extensions list
+```
+
+or in noninteractive mode:
+
+```bash
+gemini extensions list
+```
+
+## Installation
+
+To install a real extension, you can use the `extensions install` command with a
+GitHub repository URL. For example:
+
+```bash
+gemini extensions install https://github.com/gemini-cli-extensions/workspace
+```
 
 ## Next steps
 

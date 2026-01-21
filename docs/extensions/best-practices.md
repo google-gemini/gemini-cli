@@ -54,6 +54,21 @@ Your `GEMINI.md` file provides context to the model. Keep it focused:
 ### Minimal permissions
 
 When defining tools in your MCP server, only request the permissions necessary.
+Avoid giving the model broad access (like full shell access) if a more
+restricted set of tools will suffice.
+
+If you must use powerful tools like `run_shell_command`, consider restricting
+them to specific commands in your `gemini-extension.json`:
+
+```json
+{
+  "name": "my-safe-extension",
+  "excludeTools": ["run_shell_command(rm -rf *)"]
+}
+```
+
+This ensures that even if the model tries to execute a dangerous command, it
+will be blocked at the CLI level.
 
 ### Validate inputs
 

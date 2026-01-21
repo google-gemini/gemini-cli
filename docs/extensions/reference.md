@@ -8,11 +8,12 @@ This guide covers the `gemini extensions` commands and the structure of the
 We offer a suite of extension management tools using `gemini extensions`
 commands.
 
-Note that these commands are not supported from within the CLI, although you can
-list installed extensions using the `/extensions list` subcommand.
+Note that these commands (e.g. `gemini extensions install`) are not supported
+from within the CLI's **interactive mode**, although you can list installed
+extensions using the `/extensions list` slash command.
 
-Note that all of these commands will only be reflected in active CLI sessions on
-restart.
+Note that all of these management operations (including updates to slash
+commands) will only be reflected in active CLI sessions on **restart**.
 
 ### Installing an extension
 
@@ -133,6 +134,7 @@ The file has the following structure:
 {
   "name": "my-extension",
   "version": "1.0.0",
+  "description": "My awesome extension",
   "mcpServers": {
     "my-server": {
       "command": "node my-server.js"
@@ -150,6 +152,8 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
+- `description`: A short description of the extension. This will be displayed on
+  [geminicli.com/extensions](https://geminicli.com/extensions).
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
   loaded on startup just like MCP servers settingsd in a
@@ -258,6 +262,25 @@ must be defined in a `hooks/hooks.json` file within the extension directory.
 
 > [!IMPORTANT] Hooks are not defined directly in `gemini-extension.json`. The
 > CLI specifically looks for the `hooks/hooks.json` file.
+
+### Agent Skills
+
+Extensions can bundle [Agent Skills](../cli/skills.md) to provide specialized
+workflows. Skills must be placed in a `skills/` directory within the extension.
+
+**Example**
+
+An extension with the following structure:
+
+```
+.gemini/extensions/my-extension/
+├── gemini-extension.json
+└── skills/
+    └── security-audit/
+        └── SKILL.md
+```
+
+Will expose a `security-audit` skill that the model can activate.
 
 ### Conflict resolution
 
