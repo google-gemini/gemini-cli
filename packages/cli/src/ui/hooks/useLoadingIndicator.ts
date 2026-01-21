@@ -13,13 +13,19 @@ import {
   type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 
-export const useLoadingIndicator = (
-  streamingState: StreamingState,
-  customWittyPhrases?: string[],
-  isInteractiveShellWaiting: boolean = false,
-  lastOutputTime: number = 0,
-  retryStatus: RetryAttemptPayload | null = null,
-) => {
+export interface UseLoadingIndicatorProps {
+  streamingState: StreamingState;
+  shouldShowFocusHint: boolean;
+  retryStatus: RetryAttemptPayload | null;
+  customWittyPhrases?: string[];
+}
+
+export const useLoadingIndicator = ({
+  streamingState,
+  shouldShowFocusHint,
+  retryStatus,
+  customWittyPhrases,
+}: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
 
@@ -30,8 +36,7 @@ export const useLoadingIndicator = (
   const currentLoadingPhrase = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,
-    isInteractiveShellWaiting,
-    lastOutputTime,
+    shouldShowFocusHint,
     customWittyPhrases,
   );
 
@@ -61,7 +66,7 @@ export const useLoadingIndicator = (
   }, [streamingState, elapsedTimeFromTimer]);
 
   const retryPhrase = retryStatus
-    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Retry ${retryStatus.attempt}/${retryStatus.maxAttempts - 1})`
+    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
     : null;
 
   return {
