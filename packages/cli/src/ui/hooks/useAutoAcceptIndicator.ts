@@ -56,11 +56,25 @@ export function useAutoAcceptIndicator({
           config.getApprovalMode() === ApprovalMode.YOLO
             ? ApprovalMode.DEFAULT
             : ApprovalMode.YOLO;
-      } else if (keyMatchers[Command.TOGGLE_AUTO_EDIT](key)) {
-        nextApprovalMode =
-          config.getApprovalMode() === ApprovalMode.AUTO_EDIT
-            ? ApprovalMode.DEFAULT
-            : ApprovalMode.AUTO_EDIT;
+      } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
+        const currentMode = config.getApprovalMode();
+        switch (currentMode) {
+          case ApprovalMode.DEFAULT:
+            nextApprovalMode = ApprovalMode.AUTO_EDIT;
+            break;
+          case ApprovalMode.AUTO_EDIT:
+            nextApprovalMode = config.isPlanEnabled()
+              ? ApprovalMode.PLAN
+              : ApprovalMode.DEFAULT;
+            break;
+          case ApprovalMode.PLAN:
+            nextApprovalMode = ApprovalMode.DEFAULT;
+            break;
+          case ApprovalMode.YOLO:
+            nextApprovalMode = ApprovalMode.AUTO_EDIT;
+            break;
+          default:
+        }
       }
 
       if (nextApprovalMode) {

@@ -16,7 +16,16 @@ describe('AutoAcceptIndicator', () => {
     );
     const output = lastFrame();
     expect(output).toContain('accepting edits');
-    expect(output).toContain('(shift + tab to toggle)');
+    expect(output).toContain('(shift + tab to cycle)');
+  });
+
+  it('renders correctly for PLAN mode', () => {
+    const { lastFrame } = render(
+      <AutoAcceptIndicator approvalMode={ApprovalMode.PLAN} />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('plan mode');
+    expect(output).toContain('(shift + tab to cycle)');
   });
 
   it('renders correctly for YOLO mode', () => {

@@ -334,7 +334,7 @@ describe('keyMatchers', () => {
       negative: [createKey('y'), createKey('y', { meta: true })],
     },
     {
-      command: Command.TOGGLE_AUTO_EDIT,
+      command: Command.CYCLE_APPROVAL_MODE,
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
     },
