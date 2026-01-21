@@ -62,33 +62,34 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
       marginY={1}
       width="100%"
     >
-      <Box marginBottom={1}>
-        <Box marginTop={1} flexDirection="column">
-          <Text color={theme.status.warning} bold underline>
-            ⚠️ Security Warning:
-          </Text>
-          <Text color={theme.status.warning}>
-            Hooks can execute arbitrary commands on your system. Only use hooks
-            from sources you trust. Review hook scripts carefully.
-          </Text>
-        </Box>
-
-        <Box marginTop={1}>
-          <Text>
-            Learn more:{' '}
-            <Text color={theme.text.link}>
-              https://geminicli.com/docs/hooks
-            </Text>
-          </Text>
-        </Box>
-
-        <Box marginTop={1}>
-          <Text bold color={theme.text.accent}>
-            Configured Hooks
-          </Text>
-        </Box>
+      {/* Security Warning */}
+      <Box marginBottom={1} flexDirection="column">
+        <Text color={theme.status.warning} bold underline>
+          ⚠️ Security Warning:
+        </Text>
+        <Text color={theme.status.warning}>
+          Hooks can execute arbitrary commands on your system. Only use hooks
+          from sources you trust. Review hook scripts carefully.
+        </Text>
       </Box>
-      <Box flexDirection="column" marginTop={1}>
+
+      {/* Learn more link */}
+      <Box marginBottom={1}>
+        <Text>
+          Learn more:{' '}
+          <Text color={theme.text.link}>https://geminicli.com/docs/hooks</Text>
+        </Text>
+      </Box>
+
+      {/* Configured Hooks heading */}
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.accent}>
+          Configured Hooks
+        </Text>
+      </Box>
+
+      {/* Hooks list */}
+      <Box flexDirection="column">
         {Object.entries(hooksByEvent).map(([eventName, eventHooks]) => (
           <Box key={eventName} flexDirection="column" marginBottom={1}>
             <Box marginBottom={1}>
@@ -110,7 +111,7 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
                     flexDirection="column"
                     marginBottom={1}
                   >
-                    <Box flexDirection="row" marginBottom={0.5}>
+                    <Box flexDirection="row">
                       <Text color={theme.text.accent} bold>
                         {hookName}
                       </Text>
