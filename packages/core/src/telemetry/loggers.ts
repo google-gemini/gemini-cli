@@ -53,6 +53,7 @@ import type {
   HookCallEvent,
   StartupStatsEvent,
   LlmLoopCheckEvent,
+  OrphanedFunctionCallFixedEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -716,6 +717,20 @@ export function logHookCall(config: Config, event: HookCallEvent): void {
       event.duration_ms,
       event.success,
     );
+  });
+}
+
+export function logOrphanedFunctionCallFixed(
+  config: Config,
+  event: OrphanedFunctionCallFixedEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
   });
 }
 

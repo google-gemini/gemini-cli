@@ -1522,6 +1522,36 @@ export class LlmLoopCheckEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_ORPHANED_FUNCTION_CALL_FIXED =
+  'gemini_cli.chat.orphaned_function_call_fixed';
+export class OrphanedFunctionCallFixedEvent implements BaseTelemetryEvent {
+  'event.name': 'orphaned_function_call_fixed';
+  'event.timestamp': string;
+  model: string;
+  function_name: string;
+
+  constructor(model: string, function_name: string) {
+    this['event.name'] = 'orphaned_function_call_fixed';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model = model;
+    this.function_name = function_name;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ORPHANED_FUNCTION_CALL_FIXED,
+      'event.timestamp': this['event.timestamp'],
+      model: this.model,
+      function_name: this.function_name,
+    };
+  }
+
+  toLogBody(): string {
+    return `Orphaned function call fixed for ${this.function_name}.`;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -1555,7 +1585,8 @@ export type TelemetryEvent =
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
   | EditStrategyEvent
-  | EditCorrectionEvent;
+  | EditCorrectionEvent
+  | OrphanedFunctionCallFixedEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
 export class ExtensionDisableEvent implements BaseTelemetryEvent {

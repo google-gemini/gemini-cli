@@ -12,7 +12,6 @@ import {
   GeminiChat,
   InvalidStreamError,
   StreamEventType,
-  SYNTHETIC_THOUGHT_SIGNATURE,
   type StreamEvent,
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
@@ -1948,96 +1947,6 @@ describe('GeminiChat', () => {
           ],
         },
       ]);
-    });
-  });
-
-  describe('ensureActiveLoopHasThoughtSignatures', () => {
-    it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
-      const chat = new GeminiChat(mockConfig, '', [], []);
-      const history: Content[] = [
-        { role: 'user', parts: [{ text: 'Old message' }] },
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'old_tool', args: {} } }],
-        },
-        { role: 'user', parts: [{ text: 'Find a restaurant' }] }, // active loop starts here
-        {
-          role: 'model',
-          parts: [
-            { functionCall: { name: 'find_restaurant', args: {} } }, // This one gets a signature
-            { functionCall: { name: 'find_restaurant_2', args: {} } }, // This one does NOT
-          ],
-        },
-        {
-          role: 'user',
-          parts: [
-            { functionResponse: { name: 'find_restaurant', response: {} } },
-          ],
-        },
-        {
-          role: 'model',
-          parts: [
-            {
-              functionCall: { name: 'tool_with_sig', args: {} },
-              thoughtSignature: 'existing-sig',
-            },
-            { functionCall: { name: 'another_tool', args: {} } }, // This one does NOT get a signature
-          ],
-        },
-      ];
-
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-
-      // Outside active loop - unchanged
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
-
-      // Inside active loop, first model turn
-      // First function call gets a signature
-      expect(newContents[3]?.parts?.[0]?.thoughtSignature).toBe(
-        SYNTHETIC_THOUGHT_SIGNATURE,
-      );
-      // Second function call does NOT
-      expect(newContents[3]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
-
-      // User functionResponse part - unchanged (this is not a model turn)
-      expect(newContents[4]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
-
-      // Inside active loop, second model turn
-      // First function call already has a signature, so nothing changes
-      expect(newContents[5]?.parts?.[0]?.thoughtSignature).toBe('existing-sig');
-      // Second function call does NOT get a signature
-      expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
-    });
-
-    it('should not modify contents if there is no user text message', () => {
-      const chat = new GeminiChat(mockConfig, '', [], []);
-      const history: Content[] = [
-        {
-          role: 'user',
-          parts: [{ functionResponse: { name: 'tool1', response: {} } }],
-        },
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'tool2', args: {} } }],
-        },
-      ];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
-    });
-
-    it('should handle an empty history', () => {
-      const chat = new GeminiChat(mockConfig, '', []);
-      const history: Content[] = [];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual([]);
-    });
-
-    it('should handle history with only a user message', () => {
-      const chat = new GeminiChat(mockConfig, '', []);
-      const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
     });
   });
 

@@ -32,6 +32,7 @@ import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
+  logOrphanedFunctionCallFixed,
 } from '../telemetry/loggers.js';
 import {
   ChatRecordingService,
@@ -40,6 +41,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  OrphanedFunctionCallFixedEvent,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -441,15 +443,21 @@ export class GeminiChat {
     prompt_id: string,
     abortSignal: AbortSignal,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
-
     // Track final request parameters for AfterModel hooks
     const {
       model: availabilityFinalModel,
       config: newAvailabilityConfig,
       maxAttempts: availabilityMaxAttempts,
     } = applyModelSelection(this.config, modelConfigKey);
+
+    // Ensure all function calls in the history have responses.
+    requestContents = this.ensureActiveLoopHasFunctionResponses(
+      requestContents,
+      availabilityFinalModel,
+    );
+
+    const contentsForPreviewModel =
+      this.ensureActiveLoopHasThoughtSignatures(requestContents);
 
     let lastModelToUse = availabilityFinalModel;
     let currentGenerateContentConfig: GenerateContentConfig =
@@ -698,20 +706,105 @@ export class GeminiChat {
     });
   }
 
+  private findActiveLoopStartIndex(contents: Content[]): number {
+    for (let i = contents.length - 1; i >= 0; i--) {
+      const content = contents[i];
+      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  // To ensure our requests validate, every function call in the history
+  // must have a valid function response. If we do not do this, we will get
+  // back 400 errors from the API.
+  ensureActiveLoopHasFunctionResponses(
+    requestContents: Content[],
+    model: string,
+  ): Content[] {
+    // Iterate through every message in the history, ensuring that every
+    // function call in each model message has a corresponding function
+    // response in the next user message.
+    const newContents = requestContents.slice(); // Shallow copy the array
+    for (let i = 0; i < newContents.length; i++) {
+      const content = newContents[i];
+      if (content.role === 'model' && content.parts) {
+        const functionCalls = content.parts.filter((part) => part.functionCall);
+        if (functionCalls.length > 0) {
+          const nextIndex = i + 1;
+          const nextContent =
+            nextIndex < newContents.length ? newContents[nextIndex] : undefined;
+
+          const missingResponses: Part[] = [];
+          for (const callPart of functionCalls) {
+            const call = callPart.functionCall!;
+            const callId = (call as { id: string })['id'];
+
+            // Check if the next turn is a user turn and has a response for this call.
+            const hasResponse =
+              nextContent?.role === 'user' &&
+              nextContent.parts?.some((part) => {
+                if (!part.functionResponse) {
+                  return false;
+                }
+                if (callId && part.functionResponse.id) {
+                  return part.functionResponse.id === callId;
+                }
+                return part.functionResponse.name === call.name;
+              });
+
+            if (!hasResponse) {
+              logOrphanedFunctionCallFixed(
+                this.config,
+                new OrphanedFunctionCallFixedEvent(
+                  model,
+                  call.name ?? 'unknown',
+                ),
+              );
+
+              missingResponses.push({
+                functionResponse: {
+                  name: call.name,
+                  id: callId,
+                  response: {
+                    status: 'unknown',
+                    message:
+                      'The status of this function call is unknown. Please validate the state of the world before continuing.',
+                  },
+                },
+              });
+            }
+          }
+
+          if (missingResponses.length > 0) {
+            if (nextContent?.role === 'user') {
+              // Add missing responses to the existing user turn.
+              const updatedNextContent = {
+                ...nextContent,
+                parts: [...missingResponses, ...(nextContent.parts || [])],
+              };
+              newContents[nextIndex] = updatedNextContent;
+            } else {
+              // Insert a new user turn with the missing responses.
+              const newUserContent: Content = {
+                role: 'user',
+                parts: missingResponses,
+              };
+              newContents.splice(nextIndex, 0, newUserContent);
+            }
+          }
+        }
+      }
+    }
+    return newContents;
+  }
+
   // To ensure our requests validate, the first function call in every model
   // turn within the active loop must have a `thoughtSignature` property.
   // If we do not do this, we will get back 400 errors from the API.
   ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
-      const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
+    const activeLoopStartIndex = this.findActiveLoopStartIndex(requestContents);
 
     if (activeLoopStartIndex === -1) {
       return requestContents;
