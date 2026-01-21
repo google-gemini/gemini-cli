@@ -114,6 +114,7 @@ describe('handleAtCommand', () => {
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],

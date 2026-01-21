@@ -116,6 +116,7 @@ describe('handleAtCommand with Agents', () => {
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],
