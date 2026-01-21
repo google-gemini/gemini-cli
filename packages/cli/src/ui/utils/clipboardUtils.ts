@@ -34,10 +34,6 @@ const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 // Track which tool works on Linux to avoid redundant checks/failures
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
-export const resetDetectedLinuxClipboardTool = () => {
-  linuxClipboardTool = null;
-};
-
 /**
  * Helper to save command stdout to a file while preventing shell injections and race conditions
  */

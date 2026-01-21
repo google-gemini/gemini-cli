@@ -18,6 +18,7 @@ import { createWriteStream } from 'node:fs';
 import { spawn } from 'node:child_process';
 import EventEmitter from 'node:events';
 import { Stream } from 'node:stream';
+import * as path from 'node:path';
 
 // Mock dependencies BEFORE imports
 vi.mock('node:fs/promises');
@@ -45,22 +46,29 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 import { spawnAsync } from '@google/gemini-cli-core';
+// Keep static imports for stateless functions
 import {
-  clipboardHasImage,
-  saveClipboardImage,
   cleanupOldClipboardImages,
   splitEscapedPaths,
   parsePastedPaths,
-  resetDetectedLinuxClipboardTool,
 } from './clipboardUtils.js';
+
+// Define the type for the module to use in tests
+type ClipboardUtilsModule = typeof import('./clipboardUtils.js');
 
 describe('clipboardUtils', () => {
   let originalPlatform: string;
+  // Dynamic module instance for stateful functions
+  let clipboardUtils: ClipboardUtilsModule;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
     originalPlatform = process.platform;
-    resetDetectedLinuxClipboardTool();
+
+    // Reset modules to clear internal state (linuxClipboardTool variable)
+    vi.resetModules();
+    // Dynamically import the module to get a fresh instance for each test
+    clipboardUtils = await import('./clipboardUtils.js');
   });
 
   afterEach(() => {
@@ -83,7 +91,8 @@ describe('clipboardUtils', () => {
         stdout: 'image/png\ntext/plain',
       });
 
-      const result = await clipboardHasImage();
+      // Use dynamic instance
+      const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(true);
       expect(spawnAsync).toHaveBeenCalledWith('wl-paste', ['--list-types']);
@@ -96,7 +105,7 @@ describe('clipboardUtils', () => {
         stdout: 'image/png\nTARGETS',
       });
 
-      const result = await clipboardHasImage();
+      const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(true);
       expect(spawnAsync).toHaveBeenCalledTimes(2);
@@ -117,7 +126,7 @@ describe('clipboardUtils', () => {
       (spawnAsync as Mock).mockRejectedValueOnce(new Error('wl-paste failed'));
       (spawnAsync as Mock).mockRejectedValueOnce(new Error('xclip failed'));
 
-      const result = await clipboardHasImage();
+      const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(false);
     });
@@ -140,8 +149,7 @@ describe('clipboardUtils', () => {
       // This seems intentional (maybe wl-paste missed it?).
       // Let's mock xclip to also have no image.
       (spawnAsync as Mock).mockResolvedValueOnce({ stdout: 'text/plain' });
-
-      const result = await clipboardHasImage();
+      const result = await clipboardUtils.clipboardHasImage();
 
       expect(result).toBe(false);
       expect(spawnAsync).toHaveBeenCalledTimes(2);
@@ -150,7 +158,7 @@ describe('clipboardUtils', () => {
 
   describe('saveClipboardImage (Linux)', () => {
     const mockTargetDir = '/tmp/target';
-    const mockTempDir = '/tmp/target/.gemini-clipboard';
+    const mockTempDir = path.join(mockTargetDir, '.gemini-clipboard');
 
     beforeEach(() => {
       setPlatform('linux');
@@ -195,7 +203,8 @@ describe('clipboardUtils', () => {
       mockStream.writableFinished = false;
       (createWriteStream as Mock).mockReturnValue(mockStream);
 
-      const promise = saveClipboardImage(mockTargetDir);
+      // Use dynamic instance
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
 
       // Simulate stream finishing successfully BEFORE process closes
       mockStream.writableFinished = true;
@@ -230,7 +239,7 @@ describe('clipboardUtils', () => {
         .mockReturnValueOnce(mockStream1)
         .mockReturnValueOnce(mockStream2);
 
-      const promise = saveClipboardImage(mockTargetDir);
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
 
       // Stream 1 finishes (but process fails)
       mockStream1.writableFinished = true;
@@ -265,7 +274,7 @@ describe('clipboardUtils', () => {
         .mockReturnValueOnce(mockStream1)
         .mockReturnValueOnce(mockStream2);
 
-      const promise = saveClipboardImage(mockTargetDir);
+      const promise = clipboardUtils.saveClipboardImage(mockTargetDir);
 
       mockStream1.writableFinished = true;
       mockStream1.emit('finish');
@@ -295,7 +304,7 @@ describe('clipboardUtils', () => {
         stream1.writableFinished = false;
         (createWriteStream as Mock).mockReturnValue(stream1);
 
-        const promise1 = saveClipboardImage(mockTargetDir);
+        const promise1 = clipboardUtils.saveClipboardImage(mockTargetDir);
         stream1.writableFinished = true;
         stream1.emit('finish');
         await promise1;
@@ -313,8 +322,8 @@ describe('clipboardUtils', () => {
         stream2.writableFinished = false;
         (createWriteStream as Mock).mockReturnValue(stream2);
 
-        // Run 2
-        const promise2 = saveClipboardImage(mockTargetDir);
+        // Run 2 (using same clipboardUtils instance to test state)
+        const promise2 = clipboardUtils.saveClipboardImage(mockTargetDir);
         stream2.writableFinished = true;
         stream2.emit('finish');
         await promise2;
@@ -353,7 +362,7 @@ describe('clipboardUtils', () => {
           .mockReturnValueOnce(stream1)
           .mockReturnValueOnce(stream2);
 
-        const promise1 = saveClipboardImage(mockTargetDir);
+        const promise1 = clipboardUtils.saveClipboardImage(mockTargetDir);
 
         // Fail stream finish
         stream1.writableFinished = true;
@@ -380,7 +389,7 @@ describe('clipboardUtils', () => {
         (createWriteStream as Mock).mockReturnValue(streamRun2);
 
         // Run 2
-        const promise2 = saveClipboardImage(mockTargetDir);
+        const promise2 = clipboardUtils.saveClipboardImage(mockTargetDir);
         streamRun2.writableFinished = true;
         streamRun2.emit('finish');
         await promise2;
@@ -393,6 +402,7 @@ describe('clipboardUtils', () => {
     });
   });
 
+  // Stateless functions continue to use static imports
   describe('cleanupOldClipboardImages', () => {
     it('should not throw errors', async () => {
       // Should handle missing directories gracefully
