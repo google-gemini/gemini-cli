@@ -1107,14 +1107,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Text>
         <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
           {buffer.text.length === 0 && placeholder ? (
-            showCursor ? (
-              <Text>
-                {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
-              </Text>
-            ) : (
-              <Text color={theme.text.secondary}>{placeholder}</Text>
-            )
+            <Text terminalCursorFocus={showCursor} terminalCursorPosition={0}>
+              {showCursor ? (
+                <Text>
+                  {chalk.inverse(placeholder.slice(0, 1))}
+                  <Text color={theme.text.secondary}>
+                    {placeholder.slice(1)}
+                  </Text>
+                </Text>
+              ) : (
+                <Text color={theme.text.secondary}>{placeholder}</Text>
+              )}
+            </Text>
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
@@ -1223,7 +1227,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 return (
                   <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                    <Text>
+                    <Text
+                      terminalCursorFocus={showCursor && isOnCursorLine}
+                      terminalCursorPosition={cursorVisualColAbsolute}
+                    >
                       {renderedLine}
                       {showCursorBeforeGhost &&
                         (showCursor ? chalk.inverse(' ') : ' ')}
