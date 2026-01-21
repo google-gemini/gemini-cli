@@ -229,7 +229,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBe(
-      'Trying to reach gemini-pro (Attempt 2/3)',
+      'Trying to reach gemini-pro (Retry 2/2)',
     );
   });
 });

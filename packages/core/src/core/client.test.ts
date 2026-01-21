@@ -48,6 +48,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -281,6 +282,7 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   afterEach(() => {
+    client.dispose();
     vi.restoreAllMocks();
   });
 
@@ -298,6 +300,17 @@ describe('Gemini Client (client.ts)', () => {
       await client.addHistory(newContent);
 
       expect(mockChat.addHistory).toHaveBeenCalledWith(newContent);
+    });
+  });
+
+  describe('resumeChat', () => {
+    it('should update telemetry token count when a chat is resumed', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'resumed message' }] },
+      ];
+      await client.resumeChat(history);
+
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalled();
     });
   });
 
@@ -1757,6 +1770,55 @@ ${JSON.stringify(
           expect.any(AbortSignal),
         );
       });
+
+      it('should re-route within the same prompt when the configured model changes', async () => {
+        mockTurnRunFn.mockClear();
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: 'content', value: 'Hello' };
+        });
+
+        mockRouterService.route.mockResolvedValueOnce({
+          model: 'original-model',
+          reason: 'test',
+        });
+
+        let stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(1);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          1,
+          { model: 'original-model' },
+          [{ text: 'Hi' }],
+          expect.any(AbortSignal),
+        );
+
+        mockRouterService.route.mockResolvedValue({
+          model: 'fallback-model',
+          reason: 'test',
+        });
+        vi.mocked(mockConfig.getModel).mockReturnValue('gemini-2.5-flash');
+        coreEvents.emitModelChanged('gemini-2.5-flash');
+
+        stream = client.sendMessageStream(
+          [{ text: 'Continue' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          { model: 'fallback-model' },
+          [{ text: 'Continue' }],
+          expect.any(AbortSignal),
+        );
+      });
     });
 
     it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
@@ -1827,7 +1889,6 @@ ${JSON.stringify(
       expect(events).toEqual([
         { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.InvalidStream },
-        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
 
@@ -1915,13 +1976,13 @@ ${JSON.stringify(
       const events = await fromAsync(stream);
 
       // Assert
-      // We expect 4 events (model_info + original + model_info + 1 retry)
-      expect(events.length).toBe(4);
+      // We expect 3 events (model_info + original + 1 retry)
+      expect(events.length).toBe(3);
       expect(
         events
-          .filter((e) => e.type !== GeminiEventType.ModelInfo)
-          .every((e) => e.type === GeminiEventType.InvalidStream),
-      ).toBe(true);
+          .filter((e) => e.type === GeminiEventType.ModelInfo)
+          .map((e) => e.value),
+      ).toEqual(['default-routed-model']);
 
       // Verify that turn.run was called twice
       expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
