@@ -11,6 +11,7 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { GeneralistAgent } from './generalist-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
@@ -26,6 +27,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
+import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -150,7 +152,7 @@ export class AgentRegistry {
     // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
     if (
       investigatorSettings?.enabled &&
-      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
+      agentsOverrides[CodebaseInvestigatorAgent.name]?.enabled !== false
     ) {
       let model;
       const settingsModel = investigatorSettings.model;
@@ -198,10 +200,13 @@ export class AgentRegistry {
     // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
     if (
       cliHelpSettings.enabled &&
-      !agentsOverrides[CliHelpAgent.name]?.disabled
+      agentsOverrides[CliHelpAgent.name]?.enabled !== false
     ) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
+
+    // Register the generalist agent.
+    this.registerLocalAgent(GeneralistAgent(this.config));
   }
 
   private async refreshAgents(): Promise<void> {
@@ -248,7 +253,8 @@ export class AgentRegistry {
 
     const settingsOverrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
-    if (settingsOverrides?.disabled) {
+
+    if (!this.isAgentEnabled(definition, settingsOverrides)) {
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Skipping disabled agent '${definition.name}'`,
@@ -265,6 +271,20 @@ export class AgentRegistry {
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
+  }
+
+  private isAgentEnabled<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+    overrides?: AgentOverride,
+  ): boolean {
+    const isExperimental = definition.experimental === true;
+    let isEnabled = !isExperimental;
+
+    if (overrides && overrides.enabled !== undefined) {
+      isEnabled = overrides.enabled;
+    }
+
+    return isEnabled;
   }
 
   /**
@@ -287,7 +307,8 @@ export class AgentRegistry {
 
     const overrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
-    if (overrides?.disabled) {
+
+    if (!this.isAgentEnabled(definition, overrides)) {
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Skipping disabled remote agent '${definition.name}'`,
@@ -340,17 +361,24 @@ export class AgentRegistry {
       return definition;
     }
 
-    return {
-      ...definition,
-      runConfig: {
+    // Use Object.create to preserve lazy getters on the definition object
+    const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
+
+    if (overrides.runConfig) {
+      merged.runConfig = {
         ...definition.runConfig,
         ...overrides.runConfig,
-      },
-      modelConfig: ModelConfigService.merge(
+      };
+    }
+
+    if (overrides.modelConfig) {
+      merged.modelConfig = ModelConfigService.merge(
         definition.modelConfig,
-        overrides.modelConfig ?? {},
-      ),
-    };
+        overrides.modelConfig,
+      );
+    }
+
+    return merged;
   }
 
   private registerModelConfigs<TOutput extends z.ZodTypeAny>(
@@ -434,8 +462,19 @@ export class AgentRegistry {
     }
 
     let context = '## Available Sub-Agents\n';
-    context +=
-      'Use `delegate_to_agent` for complex tasks requiring specialized analysis.\n\n';
+    context += `Sub-agents are specialized expert agents that you can use to assist you in
+      the completion of all or part of a task.
+
+      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
+      exists that has expertise relevant to your task.
+
+      For example:
+      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
+      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
+      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
+      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+
+      The following are the available sub-agents:\n\n`;
 
     for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;

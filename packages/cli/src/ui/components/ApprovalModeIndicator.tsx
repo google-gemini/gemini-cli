@@ -9,11 +9,11 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
-interface AutoAcceptIndicatorProps {
+interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
 }
 
-export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
+export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
 }) => {
   let textColor = '';
@@ -24,7 +24,12 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
       textContent = 'accepting edits';
-      subText = ' (shift + tab to toggle)';
+      subText = ' (shift + tab to cycle)';
+      break;
+    case ApprovalMode.PLAN:
+      textColor = theme.status.success;
+      textContent = 'plan mode';
+      subText = ' (shift + tab to cycle)';
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;

@@ -46,6 +46,7 @@ export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
+  PLAN = 'plan',
 }
 
 /**
@@ -263,4 +264,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+}
+
+export interface CheckResult {
+  decision: PolicyDecision;
+  rule?: PolicyRule;
 }

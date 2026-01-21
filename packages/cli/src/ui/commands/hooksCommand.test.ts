@@ -22,10 +22,11 @@ describe('hooksCommand', () => {
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
     getEnableHooks: ReturnType<typeof vi.fn>;
+    updateDisabledHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
-      hooks?: {
+      hooksConfig?: {
         disabled?: string[];
       };
       tools?: {
@@ -51,12 +52,13 @@ describe('hooksCommand', () => {
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
       getEnableHooks: vi.fn().mockReturnValue(true),
+      updateDisabledHooks: vi.fn(),
     };
 
     // Create mock settings
     mockSettings = {
       merged: {
-        hooks: {
+        hooksConfig: {
           disabled: [],
         },
       },
@@ -271,7 +273,7 @@ describe('hooksCommand', () => {
 
     it('should enable a hook and update settings', async () => {
       // Update the context's settings with disabled hooks
-      mockContext.services.settings.merged.hooks.disabled = [
+      mockContext.services.settings.merged.hooksConfig.disabled = [
         'test-hook',
         'other-hook',
       ];
@@ -287,7 +289,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['other-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -402,7 +404,7 @@ describe('hooksCommand', () => {
     });
 
     it('should disable a hook and update settings', async () => {
-      mockContext.services.settings.merged.hooks.disabled = [];
+      mockContext.services.settings.merged.hooksConfig.disabled = [];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -415,7 +417,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['test-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -429,9 +431,9 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should return info when hook is already disabled', async () => {
+    it('should synchronize with hook system even if hook is already in disabled list', async () => {
       // Update the context's settings with the hook already disabled
-      mockContext.services.settings.merged.hooks.disabled = ['test-hook'];
+      mockContext.services.settings.merged.hooksConfig.disabled = ['test-hook'];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -443,16 +445,20 @@ describe('hooksCommand', () => {
       const result = await disableCmd.action(mockContext, 'test-hook');
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
-      expect(mockHookSystem.setHookEnabled).not.toHaveBeenCalled();
+      expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
+        'test-hook',
+        false,
+      );
+      expect(mockConfig.updateDisabledHooks).toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'Hook "test-hook" is already disabled.',
+        content: 'Hook "test-hook" disabled successfully.',
       });
     });
 
     it('should handle error when disabling hook fails', async () => {
-      mockContext.services.settings.merged.hooks.disabled = [];
+      mockContext.services.settings.merged.hooksConfig.disabled = [];
       mockSettings.setValue.mockImplementationOnce(() => {
         throw new Error('Failed to save settings');
       });
@@ -631,7 +637,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         [],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -755,7 +761,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['hook-1', 'hook-2', 'hook-3'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
