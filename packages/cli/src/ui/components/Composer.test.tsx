@@ -100,7 +100,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showErrorDetails: false,
     constrainHeight: false,
     isInputActive: true,
-    buffer: '',
+    buffer: { text: '' },
     inputWidth: 80,
     suggestionsWidth: 40,
     userMessages: [],
@@ -283,7 +283,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const config = createMockConfig({
-        getAccessibility: vi.fn(() => ({ disableLoadingPhrases: true })),
+        getAccessibility: vi.fn(() => ({ enableLoadingPhrases: false })),
       });
 
       const { lastFrame } = renderComposer(uiState, undefined, config);
@@ -389,6 +389,7 @@ describe('Composer', () => {
     it('shows escape prompt when showEscapePrompt is true', () => {
       const uiState = createMockUIState({
         showEscapePrompt: true,
+        history: [{ id: 1, type: 'user', text: 'test' }],
       });
 
       const { lastFrame } = renderComposer(uiState);

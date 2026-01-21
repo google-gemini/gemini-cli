@@ -8,17 +8,19 @@ available combinations.
 
 #### Basic Controls
 
-| Action                                       | Keys    |
-| -------------------------------------------- | ------- |
-| Confirm the current selection or choice.     | `Enter` |
-| Dismiss dialogs or cancel the current focus. | `Esc`   |
+| Action                                                          | Keys       |
+| --------------------------------------------------------------- | ---------- |
+| Confirm the current selection or choice.                        | `Enter`    |
+| Dismiss dialogs or cancel the current focus.                    | `Esc`      |
+| Cancel the current request or quit the CLI when input is empty. | `Ctrl + C` |
+| Exit the CLI when the input buffer is empty.                    | `Ctrl + D` |
 
 #### Cursor Movement
 
 | Action                                      | Keys                                                         |
 | ------------------------------------------- | ------------------------------------------------------------ |
-| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home`                                       |
-| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End`                                        |
+| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home (no Ctrl, no Shift)`                   |
+| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Ctrl, no Shift)`                    |
 | Move the cursor up one line.                | `Up Arrow (no Ctrl, no Cmd)`                                 |
 | Move the cursor down one line.              | `Down Arrow (no Ctrl, no Cmd)`                               |
 | Move the cursor one character to the left.  | `Left Arrow (no Ctrl, no Cmd)`<br />`Ctrl + B`               |
@@ -40,22 +42,16 @@ available combinations.
 | Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
 | Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
 
-#### Screen Control
-
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Clear the terminal screen and redraw the UI. | `Ctrl + L` |
-
 #### Scrolling
 
-| Action                   | Keys                 |
-| ------------------------ | -------------------- |
-| Scroll content up.       | `Shift + Up Arrow`   |
-| Scroll content down.     | `Shift + Down Arrow` |
-| Scroll to the top.       | `Home`               |
-| Scroll to the bottom.    | `End`                |
-| Scroll up by one page.   | `Page Up`            |
-| Scroll down by one page. | `Page Down`          |
+| Action                   | Keys                              |
+| ------------------------ | --------------------------------- |
+| Scroll content up.       | `Shift + Up Arrow`                |
+| Scroll content down.     | `Shift + Down Arrow`              |
+| Scroll to the top.       | `Ctrl + Home`<br />`Shift + Home` |
+| Scroll to the bottom.    | `Ctrl + End`<br />`Shift + End`   |
+| Scroll up by one page.   | `Page Up`                         |
+| Scroll down by one page. | `Page Down`                       |
 
 #### History & Search
 
@@ -88,39 +84,29 @@ available combinations.
 
 #### Text Input
 
-| Action                               | Keys                                                                   |
-| ------------------------------------ | ---------------------------------------------------------------------- |
-| Submit the current prompt.           | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
-| Insert a newline without submitting. | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
-
-#### External Tools
-
-| Action                                         | Keys                      |
-| ---------------------------------------------- | ------------------------- |
-| Open the current prompt in an external editor. | `Ctrl + X`                |
-| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V` |
+| Action                                         | Keys                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Submit the current prompt.                     | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
+| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Open the current prompt in an external editor. | `Ctrl + X`                                                             |
+| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`                                              |
 
 #### App Controls
 
-| Action                                                            | Keys             |
-| ----------------------------------------------------------------- | ---------------- |
-| Toggle detailed error information.                                | `F12`            |
-| Toggle the full TODO list.                                        | `Ctrl + T`       |
-| Show IDE context details.                                         | `Ctrl + G`       |
-| Toggle Markdown rendering.                                        | `Cmd + M`        |
-| Toggle copy mode when the terminal is using the alternate buffer. | `Ctrl + S`       |
-| Toggle YOLO (auto-approval) mode for tool calls.                  | `Ctrl + Y`       |
-| Toggle Auto Edit (auto-accept edits) mode.                        | `Shift + Tab`    |
-| Expand a height-constrained response to show additional lines.    | `Ctrl + S`       |
-| Focus the shell input from the gemini input.                      | `Tab (no Shift)` |
-| Focus the Gemini input from the shell input.                      | `Tab`            |
-
-#### Session Control
-
-| Action                                       | Keys       |
-| -------------------------------------------- | ---------- |
-| Cancel the current request or quit the CLI.  | `Ctrl + C` |
-| Exit the CLI when the input buffer is empty. | `Ctrl + D` |
+| Action                                                                                           | Keys             |
+| ------------------------------------------------------------------------------------------------ | ---------------- |
+| Toggle detailed error information.                                                               | `F12`            |
+| Toggle the full TODO list.                                                                       | `Ctrl + T`       |
+| Show IDE context details.                                                                        | `Ctrl + G`       |
+| Toggle Markdown rendering.                                                                       | `Cmd + M`        |
+| Toggle copy mode when in alternate buffer mode.                                                  | `Ctrl + S`       |
+| Toggle YOLO (auto-approval) mode for tool calls.                                                 | `Ctrl + Y`       |
+| Toggle Auto Edit (auto-accept edits) mode.                                                       | `Shift + Tab`    |
+| Expand a height-constrained response to show additional lines when not in alternate buffer mode. | `Ctrl + S`       |
+| Focus the shell input from the gemini input.                                                     | `Tab (no Shift)` |
+| Focus the Gemini input from the shell input.                                                     | `Tab`            |
+| Clear the terminal screen and redraw the UI.                                                     | `Ctrl + L`       |
+| Restart the application.                                                                         | `R`              |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -131,7 +117,8 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
-- `Esc` pressed twice quickly: Browse and rewind previous interactions.
+- `Esc` pressed twice quickly: Clear the input prompt if it is not empty,
+  otherwise browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to

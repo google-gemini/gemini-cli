@@ -83,6 +83,8 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  rawOutput: boolean | undefined;
+  acceptRawOutputRisk: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -248,6 +250,15 @@ export async function parseArguments(
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('raw-output', {
+          type: 'boolean',
+          description:
+            'Disable sanitization of model output (e.g. allow ANSI escape sequences). WARNING: This can be a security risk if the model output is untrusted.',
+        })
+        .option('accept-raw-output-risk', {
+          type: 'boolean',
+          description: 'Suppress the security warning when using --raw-output.',
         }),
     )
     // Register MCP subcommands
@@ -285,16 +296,15 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental.extensionManagement) {
+  if (settings.experimental?.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental.skills) {
+  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
     yargsInstance.command(skillsCommand);
   }
-
   // Register hooks command if hooks are enabled
-  if (settings.tools.enableHooks) {
+  if (settings.tools?.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -452,6 +462,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
 
@@ -654,6 +665,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
+    clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
@@ -722,7 +734,10 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    skillsSupport: settings.experimental?.skills,
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler,
+    skillsSupport:
+      settings.experimental?.skills || (settings.skills?.enabled ?? true),
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
@@ -755,13 +770,16 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    rawOutput: argv.rawOutput,
+    acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooks?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? false),
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
+    disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
