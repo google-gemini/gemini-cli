@@ -1389,6 +1389,61 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should show Working… in title for silent non-redirected commands after 1 min', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with NO output since operation started (silent)
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [],
+          handleApprovalModeChange: vi.fn(),
+          activePtyId: 'pty-1',
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime, // lastOutputTime <= operationStartTime
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWrites[titleWrites.length - 1][0];
+        // Should show Working… (⏲) instead of Action Required (✋)
+        expect(lastTitle).toContain('⏲  Working…');
+
+        unmount();
+      });
+
       it('should NOT show Action Required in title if shell is streaming output', async () => {
         const startTime = 1000000;
         vi.setSystemTime(startTime);
@@ -1407,7 +1462,7 @@ describe('AppContainer State Management', () => {
         } as unknown as LoadedSettings;
 
         // Mock an active shell pty but not focused
-        let lastOutputTime = 1000;
+        let lastOutputTime = startTime + 1000;
         mockedUseGeminiStream.mockImplementation(() => ({
           streamingState: 'responding',
           submitQuery: vi.fn(),
@@ -1433,7 +1488,7 @@ describe('AppContainer State Management', () => {
         });
 
         // Update lastOutputTime to simulate new output
-        lastOutputTime = 21000;
+        lastOutputTime = startTime + 21000;
         mockedUseGeminiStream.mockImplementation(() => ({
           streamingState: 'responding',
           submitQuery: vi.fn(),

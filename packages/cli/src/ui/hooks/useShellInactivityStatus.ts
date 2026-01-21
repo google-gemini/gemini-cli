@@ -65,21 +65,23 @@ export const useShellInactivityStatus = ({
   );
 
   // 2. Action Required Status (The ✋ icon in the terminal window title)
-  // Triggered after 30s/60s of silence, but SUPPRESSED if redirection is active.
+  // Logic: Only if output has been produced (likely a prompt).
+  // Triggered after 30s of silence, but SUPPRESSED if redirection is active.
   const shouldShowActionRequiredTitle = useInactivityTimer(
-    isAwaitingFocus && !isRedirectionActive,
+    isAwaitingFocus && !isRedirectionActive && hasProducedOutput,
     lastOutputTime,
-    hasProducedOutput
-      ? SHELL_ACTION_REQUIRED_TITLE_DELAY_MS
-      : SHELL_ACTION_REQUIRED_TITLE_DELAY_MS * 2,
+    SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
   );
 
   // 3. Silent Working Status (The ⏲ icon in the terminal window title)
-  // Triggered after 2 mins of silence specifically for redirected commands.
+  // Logic: If redirected OR if no output has been produced yet (e.g. sleep 600).
+  // Triggered after 2 mins for redirected, or 60s for non-redirected silent commands.
   const shouldShowSilentWorkingTitle = useInactivityTimer(
-    isAwaitingFocus && isRedirectionActive,
+    isAwaitingFocus && (isRedirectionActive || !hasProducedOutput),
     lastOutputTime,
-    SHELL_SILENT_WORKING_TITLE_DELAY_MS,
+    isRedirectionActive
+      ? SHELL_SILENT_WORKING_TITLE_DELAY_MS
+      : SHELL_ACTION_REQUIRED_TITLE_DELAY_MS * 2,
   );
 
   let inactivityStatus: InactivityStatus = 'none';

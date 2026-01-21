@@ -49,7 +49,7 @@ describe('useShellInactivityStatus', () => {
     expect(result.current.inactivityStatus).toBe('action_required');
   });
 
-  it('should show action_required status after 60s when no output has been produced (silent)', async () => {
+  it('should show silent_working status after 60s when no output has been produced (silent)', async () => {
     const { result } = renderHook(() =>
       useShellInactivityStatus({ ...defaultProps, lastOutputTime: 500 }),
     );
@@ -62,7 +62,7 @@ describe('useShellInactivityStatus', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000);
     });
-    expect(result.current.inactivityStatus).toBe('action_required');
+    expect(result.current.inactivityStatus).toBe('silent_working');
   });
 
   it('should show silent_working status after 2 mins for redirected commands', async () => {
