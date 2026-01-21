@@ -19,8 +19,8 @@ available combinations.
 
 | Action                                      | Keys                                                         |
 | ------------------------------------------- | ------------------------------------------------------------ |
-| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home`                                       |
-| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End`                                        |
+| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home (no Ctrl, no Shift)`                   |
+| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Ctrl, no Shift)`                    |
 | Move the cursor up one line.                | `Up Arrow (no Ctrl, no Cmd)`                                 |
 | Move the cursor down one line.              | `Down Arrow (no Ctrl, no Cmd)`                               |
 | Move the cursor one character to the left.  | `Left Arrow (no Ctrl, no Cmd)`<br />`Ctrl + B`               |
@@ -44,14 +44,14 @@ available combinations.
 
 #### Scrolling
 
-| Action                   | Keys                 |
-| ------------------------ | -------------------- |
-| Scroll content up.       | `Shift + Up Arrow`   |
-| Scroll content down.     | `Shift + Down Arrow` |
-| Scroll to the top.       | `Home`               |
-| Scroll to the bottom.    | `End`                |
-| Scroll up by one page.   | `Page Up`            |
-| Scroll down by one page. | `Page Down`          |
+| Action                   | Keys                              |
+| ------------------------ | --------------------------------- |
+| Scroll content up.       | `Shift + Up Arrow`                |
+| Scroll content down.     | `Shift + Down Arrow`              |
+| Scroll to the top.       | `Ctrl + Home`<br />`Shift + Home` |
+| Scroll to the bottom.    | `Ctrl + End`<br />`Shift + End`   |
+| Scroll up by one page.   | `Page Up`                         |
+| Scroll down by one page. | `Page Down`                       |
 
 #### History & Search
 
