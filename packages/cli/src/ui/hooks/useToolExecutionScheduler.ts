@@ -6,6 +6,7 @@
 
 import {
   type Config,
+  type MessageBus,
   type ToolCallRequestInfo,
   type ToolCall,
   type CompletedToolCall,
@@ -79,62 +80,16 @@ export function useToolExecutionScheduler(
     [config, messageBus],
   );
 
-  /**
-   * ADAPTER: Merges UI metadata (submitted flag) and injects legacy callbacks.
-   */
-  const adaptToolCalls = useCallback(
-    (
-      coreCalls: ToolCall[],
-      prevTracked: TrackedToolCall[],
-    ): TrackedToolCall[] => {
-      const prevMap = new Map(prevTracked.map((t) => [t.request.callId, t]));
-
-      return coreCalls.map((coreCall): TrackedToolCall => {
-        const prev = prevMap.get(coreCall.request.callId);
-        const responseSubmittedToGemini =
-          prev?.responseSubmittedToGemini ?? false;
-
-        // Inject onConfirm adapter for tools awaiting approval.
-        // The Core provides data-only (serializable) confirmationDetails. We must
-        // inject the legacy callback function that proxies responses back to the
-        // MessageBus.
-        if (coreCall.status === 'awaiting_approval' && coreCall.correlationId) {
-          const correlationId = coreCall.correlationId;
-          return {
-            ...coreCall,
-            confirmationDetails: {
-              ...coreCall.confirmationDetails,
-              onConfirm: async (
-                outcome: ToolConfirmationOutcome,
-                payload?: ToolConfirmationPayload,
-              ) => {
-                await messageBus.publish({
-                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                  correlationId,
-                  confirmed: outcome !== ToolConfirmationOutcome.Cancel,
-                  requiresUserConfirmation: false,
-                  outcome,
-                  payload,
-                });
-              },
-            },
-            responseSubmittedToGemini,
-          };
-        }
-
-        return {
-          ...coreCall,
-          responseSubmittedToGemini,
-        };
-      });
-    },
+  const internalAdaptToolCalls = useCallback(
+    (coreCalls: ToolCall[], prevTracked: TrackedToolCall[]) =>
+      adaptToolCalls(coreCalls, prevTracked, messageBus),
     [messageBus],
   );
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
       setToolCalls((prev) => {
-        const adapted = adaptToolCalls(event.toolCalls, prev);
+        const adapted = internalAdaptToolCalls(event.toolCalls, prev);
 
         // Update output timer for UI spinners
         if (event.toolCalls.some((tc) => tc.status === 'executing')) {
@@ -149,7 +104,7 @@ export function useToolExecutionScheduler(
     return () => {
       messageBus.unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);
     };
-  }, [messageBus, adaptToolCalls]);
+  }, [messageBus, internalAdaptToolCalls]);
 
   const schedule: ScheduleFn = useCallback(
     async (request, signal) => {
@@ -195,4 +150,53 @@ export function useToolExecutionScheduler(
     cancelAll,
     lastToolOutputTime,
   ];
+}
+
+/**
+ * ADAPTER: Merges UI metadata (submitted flag) and injects legacy callbacks.
+ */
+function adaptToolCalls(
+  coreCalls: ToolCall[],
+  prevTracked: TrackedToolCall[],
+  messageBus: MessageBus,
+): TrackedToolCall[] {
+  const prevMap = new Map(prevTracked.map((t) => [t.request.callId, t]));
+
+  return coreCalls.map((coreCall): TrackedToolCall => {
+    const prev = prevMap.get(coreCall.request.callId);
+    const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
+
+    // Inject onConfirm adapter for tools awaiting approval.
+    // The Core provides data-only (serializable) confirmationDetails. We must
+    // inject the legacy callback function that proxies responses back to the
+    // MessageBus.
+    if (coreCall.status === 'awaiting_approval' && coreCall.correlationId) {
+      const correlationId = coreCall.correlationId;
+      return {
+        ...coreCall,
+        confirmationDetails: {
+          ...coreCall.confirmationDetails,
+          onConfirm: async (
+            outcome: ToolConfirmationOutcome,
+            payload?: ToolConfirmationPayload,
+          ) => {
+            await messageBus.publish({
+              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+              correlationId,
+              confirmed: outcome !== ToolConfirmationOutcome.Cancel,
+              requiresUserConfirmation: false,
+              outcome,
+              payload,
+            });
+          },
+        },
+        responseSubmittedToGemini,
+      };
+    }
+
+    return {
+      ...coreCall,
+      responseSubmittedToGemini,
+    };
+  });
 }
