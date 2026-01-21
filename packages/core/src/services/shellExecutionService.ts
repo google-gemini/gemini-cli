@@ -174,7 +174,23 @@ export class ShellExecutionService {
    * @param abortSignal An AbortSignal to terminate the process and its children.
    * @returns An object containing the process ID (pid) and a promise that
    *          resolves with the complete execution result.
+   * @param sanitizationConfig Configuration for environment variable sanitization.
+   * @param pager The pager command to use (defaults to 'cat')
    */
+
+  private static createShellEnvironment(
+    sanitizationConfig: EnvironmentSanitizationConfig,
+    pager: string = 'cat',
+  ): NodeJS.ProcessEnv {
+    return {
+      ...sanitizeEnvironment(process.env, sanitizationConfig),
+      GEMINI_CLI: '1',
+      TERM: 'xterm-256color',
+      PAGER: pager,
+      GIT_PAGER: pager,
+    };
+  }
+
   static async execute(
     commandToExecute: string,
     cwd: string,
@@ -259,13 +275,7 @@ export class ShellExecutionService {
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...sanitizeEnvironment(process.env, sanitizationConfig),
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-          GIT_PAGER: 'cat',
-        },
+        env: this.createShellEnvironment(sanitizationConfig),
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -481,16 +491,10 @@ export class ShellExecutionService {
         name: 'xterm-256color',
         cols,
         rows,
-        env: {
-          ...sanitizeEnvironment(
-            process.env,
-            shellExecutionConfig.sanitizationConfig,
-          ),
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env: this.createShellEnvironment(
+          shellExecutionConfig.sanitizationConfig,
+          shellExecutionConfig.pager ?? 'cat',
+        ),
         handleFlowControl: true,
       });
 
