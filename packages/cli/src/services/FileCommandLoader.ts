@@ -33,6 +33,7 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
+import { sanitizeForListDisplay } from '../ui/utils/textUtils.js';
 
 interface CommandDirectory {
   path: string;
@@ -233,12 +234,28 @@ export class FileCommandLoader implements ICommandLoader {
       // Sanitize each path segment to prevent ambiguity. Since ':' is our
       // namespace separator, we replace any literal colons in filenames
       // with underscores to avoid naming conflicts.
-      .map((segment) => segment.replaceAll(':', '_'))
+      .map((segment) => {
+        let sanitized = segment
+          .replaceAll(':', '_')
+          .replaceAll('\t', '\\t')
+          .replaceAll('\n', '\\n')
+          .replaceAll('\r', '\\r');
+
+        // Truncate excessively long segments to prevent UI overflow
+        if (sanitized.length > 50) {
+          sanitized = sanitized.substring(0, 47) + '...';
+        }
+        return sanitized;
+      })
       .join(':');
 
     // Add extension name tag for extension commands
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
     let description = validDef.description || defaultDescription;
+
+    // Sanitize description: strip ANSI codes, replace newlines with spaces, and truncate
+    description = sanitizeForListDisplay(description, 100);
+
     if (extensionName) {
       description = `[${extensionName}] ${description}`;
     }

@@ -13,9 +13,29 @@ import {
   escapeAnsiCtrlCodes,
   stripUnsafeCharacters,
   getCachedStringWidth,
+  sanitizeForListDisplay,
 } from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('sanitizeForListDisplay', () => {
+    it('should strip ANSI codes and replace newlines/tabs with spaces', () => {
+      const input = '\u001b[31mLine 1\nLine 2\tTabbed\r\nEnd\u001b[0m';
+      expect(sanitizeForListDisplay(input)).toBe('Line 1 Line 2 Tabbed End');
+    });
+
+    it('should truncate long strings', () => {
+      const longInput = 'a'.repeat(50);
+      expect(sanitizeForListDisplay(longInput, 20)).toBe(
+        'a'.repeat(17) + '...',
+      );
+    });
+
+    it('should handle empty or null input', () => {
+      expect(sanitizeForListDisplay('')).toBe('');
+      expect(sanitizeForListDisplay(null as unknown as string)).toBe('');
+    });
+  });
+
   describe('getCachedStringWidth', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
