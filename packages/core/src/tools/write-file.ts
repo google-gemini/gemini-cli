@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
@@ -251,7 +252,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     if (validationError) {
       return {
         llmContent: validationError,
-        returnDisplay: 'Error: Path validation failed.',
+        returnDisplay: 'Error: Path not in workspace.',
         error: {
           message: validationError,
           type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
@@ -296,8 +297,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     try {
       const dirName = path.dirname(this.resolvedPath);
-      if (!fs.existsSync(dirName)) {
-        fs.mkdirSync(dirName, { recursive: true });
+      try {
+        await fsPromises.access(dirName);
+      } catch {
+        await fsPromises.mkdir(dirName, { recursive: true });
       }
 
       await this.config

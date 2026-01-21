@@ -67,7 +67,7 @@ describe('GlobTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
 
@@ -233,7 +233,7 @@ describe('GlobTool', () => {
 
     it('should return a PATH_NOT_IN_WORKSPACE error if path is outside workspace', async () => {
       const params: GlobToolParams = { pattern: '*', dir_path: '/etc' };
-      expect(() => globTool.build(params)).toThrow(/Path validation failed/);
+      expect(() => globTool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should return a GLOB_EXECUTION_ERROR on glob failure', async () => {

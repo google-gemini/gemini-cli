@@ -113,7 +113,7 @@ describe('ReadManyFilesTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
     tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
@@ -552,7 +552,7 @@ describe('ReadManyFilesTool', () => {
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
           const projectTempDir = this.storage.getProjectTempDir();
-          return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
         },
       } as unknown as Config;
       tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());

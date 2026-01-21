@@ -128,7 +128,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         if (validationError) {
           return {
             llmContent: validationError,
-            returnDisplay: 'Path validation failed.',
+            returnDisplay: 'Path not in workspace.',
             error: {
               message: validationError,
               type: ToolErrorType.PATH_NOT_IN_WORKSPACE,

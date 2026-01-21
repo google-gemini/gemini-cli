@@ -8,7 +8,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
 import type { ProcessedFileReadResult } from '../utils/fileUtils.js';
@@ -169,7 +169,15 @@ ${finalExclusionPatternsForDescription
         for (const p of include) {
           const normalizedP = p.replace(/\\/g, '/');
           const fullPath = path.join(dir, normalizedP);
-          if (fs.existsSync(fullPath)) {
+          let exists = false;
+          try {
+            await fsPromises.access(fullPath);
+            exists = true;
+          } catch {
+            exists = false;
+          }
+
+          if (exists) {
             processedPatterns.push(escape(normalizedP));
           } else {
             // The path does not exist or is not a file, so we treat it as a glob pattern.
@@ -217,7 +225,7 @@ ${finalExclusionPatternsForDescription
         if (validationError) {
           skippedFiles.push({
             path: fullPath,
-            reason: 'Security: Path validation failed',
+            reason: 'Security: Path not in workspace',
           });
           continue;
         }

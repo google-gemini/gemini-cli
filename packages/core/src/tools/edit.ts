@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
@@ -771,7 +771,7 @@ class EditToolInvocation
     if (validationError) {
       return {
         llmContent: validationError,
-        returnDisplay: 'Error: Path validation failed.',
+        returnDisplay: 'Error: Path not in workspace.',
         error: {
           message: validationError,
           type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
@@ -809,7 +809,7 @@ class EditToolInvocation
     }
 
     try {
-      this.ensureParentDirectoriesExist(this.params.file_path);
+      await this.ensureParentDirectoriesExistAsync(this.params.file_path);
       let finalContent = editData.newContent;
 
       // Restore original line endings if they were CRLF
@@ -884,10 +884,14 @@ class EditToolInvocation
   /**
    * Creates parent directories if they don't exist
    */
-  private ensureParentDirectoriesExist(filePath: string): void {
+  private async ensureParentDirectoriesExistAsync(
+    filePath: string,
+  ): Promise<void> {
     const dirName = path.dirname(filePath);
-    if (!fs.existsSync(dirName)) {
-      fs.mkdirSync(dirName, { recursive: true });
+    try {
+      await fsPromises.access(dirName);
+    } catch {
+      await fsPromises.mkdir(dirName, { recursive: true });
     }
   }
 }

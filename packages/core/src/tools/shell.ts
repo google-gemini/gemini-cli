@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
@@ -187,14 +187,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (validationError) {
         return {
           llmContent: validationError,
-          returnDisplay: 'Path validation failed.',
+          returnDisplay: 'Path not in workspace.',
           error: {
             message: validationError,
             type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
           },
         };
       }
-
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
@@ -279,11 +278,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
-        if (fs.existsSync(tempFilePath)) {
-          const pgrepLines = fs
-            .readFileSync(tempFilePath, 'utf8')
-            .split(EOL)
-            .filter(Boolean);
+        let tempFileExists = false;
+        try {
+          await fsPromises.access(tempFilePath);
+          tempFileExists = true;
+        } catch {
+          tempFileExists = false;
+        }
+
+        if (tempFileExists) {
+          const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
+          const pgrepLines = pgrepContent.split(EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
@@ -407,8 +412,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+      try {
+        await fsPromises.unlink(tempFilePath);
+      } catch {
+        // Ignore errors during unlink
       }
     }
   }

@@ -66,7 +66,7 @@ describe('ReadFileTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
@@ -104,7 +104,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = {
         file_path: '/outside/root.txt',
       };
-      expect(() => tool.build(params)).toThrow(/Path validation failed/);
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should allow access to files in project temp directory', () => {
@@ -120,7 +120,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = {
         file_path: '/completely/outside/path.txt',
       };
-      expect(() => tool.build(params)).toThrow(/Path validation failed/);
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should throw error if path is empty', () => {
@@ -475,7 +475,7 @@ describe('ReadFileTool', () => {
 
             const workspaceDirs = this.getWorkspaceContext().getDirectories();
             const projectTempDir = this.storage.getProjectTempDir();
-            return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
           },
         } as unknown as Config;
         tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());

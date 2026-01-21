@@ -128,7 +128,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (validationError) {
           return {
             llmContent: validationError,
-            returnDisplay: 'Error: Path validation failed.',
+            returnDisplay: 'Error: Path not in workspace.',
             error: {
               message: validationError,
               type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
@@ -137,7 +137,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
 
         try {
-          const stats = fs.statSync(searchDirAbs);
+          const stats = await fsPromises.stat(searchDirAbs);
           if (!stats.isDirectory()) {
             return {
               llmContent: `Path is not a directory: ${searchDirAbs}`,

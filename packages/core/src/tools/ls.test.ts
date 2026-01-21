@@ -63,7 +63,7 @@ describe('LSTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
 
@@ -97,7 +97,7 @@ describe('LSTool', () => {
 
     it('should reject paths outside workspace with clear error message', () => {
       expect(() => lsTool.build({ dir_path: '/etc/passwd' })).toThrow(
-        /Path validation failed: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 
@@ -324,7 +324,7 @@ describe('LSTool', () => {
     it('should reject paths outside all workspace directories', () => {
       const params = { dir_path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
-        /Path validation failed: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 

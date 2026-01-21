@@ -6,6 +6,7 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
@@ -168,13 +169,40 @@ class GrepToolInvocation extends BaseToolInvocation<
       if (validationError) {
         return {
           llmContent: validationError,
-          returnDisplay: 'Error: Path validation failed.',
+          returnDisplay: 'Error: Path not in workspace.',
           error: {
             message: validationError,
             type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
           },
         };
       }
+
+      // Check existence and type asynchronously
+      try {
+        const stats = await fsPromises.stat(searchDirAbs);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return {
+            llmContent: `Path is not a valid directory or file: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path is not a valid directory or file.',
+          };
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            llmContent: `Path does not exist: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path does not exist.',
+            error: {
+              message: `Path does not exist: ${searchDirAbs}`,
+              type: ToolErrorType.FILE_NOT_FOUND,
+            },
+          };
+        }
+        return {
+          llmContent: `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          returnDisplay: 'Error: Failed to access path.',
+        };
+      }
+
       const searchDirDisplay = pathParam;
 
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;

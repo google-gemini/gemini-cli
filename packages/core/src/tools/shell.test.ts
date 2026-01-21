@@ -122,7 +122,7 @@ describe('ShellTool', () => {
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
         const projectTempDir = this.storage.getProjectTempDir();
-        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
@@ -208,7 +208,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(/Path validation failed/);
+      ).toThrow(/Path not in workspace/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {

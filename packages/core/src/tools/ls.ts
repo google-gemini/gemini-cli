@@ -146,11 +146,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     const validationError =
       this.config.getValidationErrorForPath(resolvedDirPath);
     if (validationError) {
-      return this.errorResult(
-        validationError,
-        'Path validation failed.',
-        ToolErrorType.PATH_NOT_IN_WORKSPACE,
-      );
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
     }
 
     try {
