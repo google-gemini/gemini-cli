@@ -1660,9 +1660,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 'c',
-            ctrl: false,
-            meta: false,
             shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
             ...key,
           } as Key);
         });
@@ -1870,9 +1871,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 's',
-            ctrl: true,
-            meta: false,
             shift: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -1896,9 +1898,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1910,9 +1913,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'any', // Any key should exit copy mode
-              ctrl: false,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1930,9 +1934,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1945,9 +1950,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'a',
-              ctrl: false,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
