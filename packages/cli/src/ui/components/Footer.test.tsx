@@ -203,6 +203,15 @@ describe('<Footer />', () => {
   });
 
   describe('footer configuration filtering (golden snapshots)', () => {
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX', '');
+      vi.stubEnv('SEATBELT_PROFILE', '');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('renders complete footer with all sections visible (baseline)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,

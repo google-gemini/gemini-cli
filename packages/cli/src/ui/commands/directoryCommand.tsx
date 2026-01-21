@@ -17,6 +17,7 @@ import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
 import {
   expandHomeDir,
   getDirectorySuggestions,
+  batchAddDirectories,
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -193,14 +194,10 @@ export const directoryCommand: SlashCommand = {
             );
           }
 
-          for (const pathToAdd of trustedDirs) {
-            try {
-              workspaceContext.addDirectory(expandHomeDir(pathToAdd));
-              added.push(pathToAdd);
-            } catch (e) {
-              const error = e as Error;
-              errors.push(`Error adding '${pathToAdd}': ${error.message}`);
-            }
+          if (trustedDirs.length > 0) {
+            const result = batchAddDirectories(workspaceContext, trustedDirs);
+            added.push(...result.added);
+            errors.push(...result.errors);
           }
 
           if (undefinedTrustDirs.length > 0) {
@@ -220,17 +217,9 @@ export const directoryCommand: SlashCommand = {
             };
           }
         } else {
-          for (const pathToAdd of pathsToProcess) {
-            try {
-              workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
-              added.push(pathToAdd.trim());
-            } catch (e) {
-              const error = e as Error;
-              errors.push(
-                `Error adding '${pathToAdd.trim()}': ${error.message}`,
-              );
-            }
-          }
+          const result = batchAddDirectories(workspaceContext, pathsToProcess);
+          added.push(...result.added);
+          errors.push(...result.errors);
         }
 
         await finishAddingDirectories(config, addItem, added, errors);

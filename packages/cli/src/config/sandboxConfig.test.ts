@@ -25,11 +25,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('command-exists', () => ({
-  default: {
-    sync: vi.fn(),
-  },
-}));
+vi.mock('command-exists', () => {
+  const sync = vi.fn();
+  return {
+    sync,
+    default: {
+      sync,
+    },
+  };
+});
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal();
@@ -49,6 +53,8 @@ describe('loadSandboxConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     process.env = { ...originalEnv };
+    delete process.env['SANDBOX'];
+    delete process.env['GEMINI_SANDBOX'];
     mockedGetPackageJson.mockResolvedValue({
       config: { sandboxImageUri: 'default/image' },
     });
