@@ -67,7 +67,10 @@ import {
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
-import type { FallbackModelHandler } from '../fallback/types.js';
+import type {
+  FallbackModelHandler,
+  ValidationHandler,
+} from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
@@ -177,7 +180,6 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
-  disabled?: boolean;
   enabled?: boolean;
 }
 
@@ -291,6 +293,7 @@ export interface SandboxConfig {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -379,10 +382,9 @@ export interface ConfigParameters {
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
-  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
-    disabled?: string[];
-  };
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
+  disabledHooks?: string[];
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -416,6 +418,7 @@ export class Config {
   private agentRegistry!: AgentRegistry;
   private skillManager!: SkillManager;
   private sessionId: string;
+  private clientVersion: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -477,6 +480,7 @@ export class Config {
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
+  validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -554,6 +558,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.clientVersion = params.clientVersion ?? 'unknown';
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -678,10 +683,7 @@ export class Config {
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? false;
-    this.disabledHooks =
-      (params.hooks && 'disabled' in params.hooks
-        ? params.hooks.disabled
-        : undefined) ?? [];
+    this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
@@ -722,8 +724,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
 
     if (params.hooks) {
-      const { disabled: _, ...restOfHooks } = params.hooks;
-      this.hooks = restOfHooks;
+      this.hooks = params.hooks;
     }
     if (params.projectHooks) {
       this.projectHooks = params.projectHooks;
@@ -811,6 +812,7 @@ export class Config {
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
+      this.clientVersion,
       this.toolRegistry,
       this,
       this.eventEmitter,
@@ -1066,6 +1068,14 @@ export class Config {
 
   getFallbackModelHandler(): FallbackModelHandler | undefined {
     return this.fallbackModelHandler;
+  }
+
+  setValidationHandler(handler: ValidationHandler): void {
+    this.validationHandler = handler;
+  }
+
+  getValidationHandler(): ValidationHandler | undefined {
+    return this.validationHandler;
   }
 
   resetTurn(): void {
@@ -1990,9 +2000,7 @@ export class Config {
   /**
    * Get project-specific hooks configuration
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.projectHooks;
   }
 
