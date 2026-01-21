@@ -52,6 +52,17 @@ export const rewindCommand: SlashCommand = {
         content: 'No conversation found.',
       };
 
+    const hasUserInteractions = conversation.messages.some(
+      (msg) => msg.type === 'user',
+    );
+    if (!hasUserInteractions) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'Nothing to rewind to.',
+      };
+    }
+
     return {
       type: 'custom_dialog',
       component: (
@@ -59,14 +70,12 @@ export const rewindCommand: SlashCommand = {
           conversation={conversation}
           onExit={() => {
             context.ui.removeComponent();
-            context.ui.clearTextToast();
           }}
           onRewind={async (messageId, newText, outcome) => {
             try {
               switch (outcome) {
                 case RewindOutcome.Cancel:
                   context.ui.removeComponent();
-                  context.ui.clearTextToast();
                   return;
 
                 case RewindOutcome.RevertOnly:
@@ -92,8 +101,8 @@ export const rewindCommand: SlashCommand = {
                   checkExhaustive(outcome);
               }
 
-              const rewindedConvesation = recordingService.rewindTo(messageId);
-              if (!rewindedConvesation) {
+              const rewindedConversation = recordingService.rewindTo(messageId);
+              if (!rewindedConversation) {
                 const errorMsg = 'Could not fetch conversation file';
                 debugLogger.error(errorMsg);
                 context.ui.removeComponent();
@@ -103,7 +112,7 @@ export const rewindCommand: SlashCommand = {
 
               // Convert to UI and Client formats
               const { uiHistory, clientHistory } =
-                convertSessionToHistoryFormats(rewindedConvesation.messages);
+                convertSessionToHistoryFormats(rewindedConversation.messages);
 
               // Reset the client's internal history to match the file
               client.setHistory(clientHistory as Content[]);

@@ -100,7 +100,6 @@ export interface UIState {
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
-  showClearTextToast: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;

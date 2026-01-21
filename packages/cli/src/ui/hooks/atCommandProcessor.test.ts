@@ -12,6 +12,8 @@ import {
   FileDiscoveryService,
   GlobTool,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
@@ -172,10 +174,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `@${relativePath}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${relativePath}:\n` },
         { text: fileContent },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
     expect(mockAddItem).toHaveBeenCalledWith(
@@ -211,10 +213,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `@${resolvedGlob}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${relativeFilePath}:\n` },
         { text: fileContent },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -245,10 +247,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `${textBefore}@${relativePath}${textAfter}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${relativePath}:\n` },
         { text: fileContent },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
   });
@@ -274,10 +276,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `@${getRelativePath(filePath)}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(filePath)}:\n` },
         { text: fileContent },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
     expect(mockAddItem).toHaveBeenCalledWith(
@@ -316,12 +318,12 @@ describe('handleAtCommand', () => {
         {
           text: `@${getRelativePath(file1Path)} @${getRelativePath(file2Path)}`,
         },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
         { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
   });
@@ -356,12 +358,12 @@ describe('handleAtCommand', () => {
         {
           text: `${text1}@${getRelativePath(file1Path)}${text2}@${getRelativePath(file2Path)}${text3}`,
         },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
         { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
   });
@@ -394,12 +396,12 @@ describe('handleAtCommand', () => {
         {
           text: `Look at @${getRelativePath(file1Path)} then @${invalidFile} and also just @ symbol, then @${getRelativePath(file2Path)}`,
         },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
         { text: content2 },
         { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
         { text: content1 },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -493,10 +495,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `@${getRelativePath(validFile)}` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(validFile)}:\n` },
           { text: 'console.log("Hello world");' },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -525,10 +527,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `@${getRelativePath(validFile)} @${gitIgnoredFile}` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(validFile)}:\n` },
           { text: '# Project README' },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -649,10 +651,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `@${getRelativePath(validFile)}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(validFile)}:\n` },
         { text: 'console.log("Hello world");' },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
   });
@@ -684,10 +686,10 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [
         { text: `@${getRelativePath(validFile)} @${geminiIgnoredFile}` },
-        { text: '\n--- Content from referenced files ---' },
+        { text: `\n${REFERENCE_CONTENT_START}` },
         { text: `\nContent from @${getRelativePath(validFile)}:\n` },
         { text: '// Main application entry' },
-        { text: '\n--- End of content ---' },
+        { text: `\n${REFERENCE_CONTENT_END}` },
       ],
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -811,10 +813,10 @@ describe('handleAtCommand', () => {
         expect(result).toEqual({
           processedQuery: [
             { text: query },
-            { text: '\n--- Content from referenced files ---' },
+            { text: `\n${REFERENCE_CONTENT_START}` },
             { text: `\nContent from @${getRelativePath(filePath)}:\n` },
             { text: fileContent },
-            { text: '\n--- End of content ---' },
+            { text: `\n${REFERENCE_CONTENT_END}` },
           ],
         });
       },
@@ -847,12 +849,12 @@ describe('handleAtCommand', () => {
           {
             text: `Compare @${getRelativePath(file1Path)}, @${getRelativePath(file2Path)}; what's different?`,
           },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(file1Path)}:\n` },
           { text: content1 },
           { text: `\nContent from @${getRelativePath(file2Path)}:\n` },
           { text: content2 },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -878,10 +880,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `Check @${getRelativePath(filePath)}, it has spaces.` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -908,10 +910,10 @@ describe('handleAtCommand', () => {
           {
             text: `Analyze @${getRelativePath(filePath)} for type definitions.`,
           },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -938,10 +940,10 @@ describe('handleAtCommand', () => {
           {
             text: `Check @${getRelativePath(filePath)}. This file contains settings.`,
           },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -968,10 +970,10 @@ describe('handleAtCommand', () => {
           {
             text: `Review @${getRelativePath(filePath)}, then check dependencies.`,
           },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -998,10 +1000,10 @@ describe('handleAtCommand', () => {
           {
             text: `Check @${getRelativePath(filePath)} contains version information.`,
           },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -1026,10 +1028,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `Show me @${getRelativePath(filePath)}.` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -1054,10 +1056,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `Check @${getRelativePath(filePath)} for content.` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -1082,10 +1084,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `Check @${getRelativePath(filePath)} please.` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${getRelativePath(filePath)}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
     });
@@ -1113,10 +1115,10 @@ describe('handleAtCommand', () => {
       expect(result).toEqual({
         processedQuery: [
           { text: `Check @${relativePath} please.` },
-          { text: '\n--- Content from referenced files ---' },
+          { text: `\n${REFERENCE_CONTENT_START}` },
           { text: `\nContent from @${relativePath}:\n` },
           { text: fileContent },
-          { text: '\n--- End of content ---' },
+          { text: `\n${REFERENCE_CONTENT_END}` },
         ],
       });
 
@@ -1152,7 +1154,7 @@ describe('handleAtCommand', () => {
         expect.arrayContaining([
           { text: `Check @${path.join(subDirPath, '**')} please.` },
           expect.objectContaining({
-            text: '\n--- Content from referenced files ---',
+            text: `\n${REFERENCE_CONTENT_START}`,
           }),
         ]),
       );

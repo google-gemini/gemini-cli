@@ -57,6 +57,11 @@ const createConversation = (messages: MessageRecord[]): ConversationRecord => ({
   messages,
 });
 
+import {
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
+} from '@google/gemini-cli-core';
+
 describe('RewindViewer', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -252,17 +257,16 @@ describe('RewindViewer', () => {
     it.each([
       {
         description: 'removes reference markers',
-        prompt:
-          'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---',
+        prompt: `some command @file\n${REFERENCE_CONTENT_START}\nContent from file:\nblah blah\n${REFERENCE_CONTENT_END}`,
       },
       {
         description: 'strips expanded MCP resource content',
         prompt:
           'read @server3:mcp://demo-resource hello\n' +
-          '--- Content from referenced files ---\n' +
+          `${REFERENCE_CONTENT_START}\n` +
           '\nContent from @server3:mcp://demo-resource:\n' +
           'This is the content of the demo resource.\n' +
-          '--- End of content ---',
+          `${REFERENCE_CONTENT_END}`,
       },
     ])('$description', async ({ prompt }) => {
       const conversation = createConversation([

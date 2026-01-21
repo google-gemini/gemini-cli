@@ -659,23 +659,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     exitEditorDialog,
   } = useEditorSettings(settings, setEditorError, historyManager.addItem);
 
-  const [showClearTextToast, setShowClearTextToast] = useState(false);
-  const clearTextToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleClearTextToastChange = useCallback((show: boolean) => {
-    setShowClearTextToast(show);
-    if (clearTextToastTimeoutRef.current) {
-      clearTimeout(clearTextToastTimeoutRef.current);
-      clearTextToastTimeoutRef.current = null;
-    }
-    if (show) {
-      clearTextToastTimeoutRef.current = setTimeout(() => {
-        setShowClearTextToast(false);
-        clearTextToastTimeoutRef.current = null;
-      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
-    }
-  }, []);
-
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
@@ -707,7 +690,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
       setText: (text: string) => buffer.setText(text),
-      clearTextToast: () => handleClearTextToastChange(false),
     }),
     [
       setAuthState,
@@ -725,7 +707,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       buffer,
-      handleClearTextToastChange,
     ],
   );
 
@@ -1604,7 +1585,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
-      showClearTextToast,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -1697,7 +1677,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,
-      showClearTextToast,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -1774,7 +1753,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFolderTrustSelect,
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
-      onClearTextToastChange: handleClearTextToastChange,
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,
@@ -1816,7 +1794,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFolderTrustSelect,
       setConstrainHeight,
       handleEscapePromptChange,
-      handleClearTextToastChange,
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,

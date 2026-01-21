@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
@@ -62,27 +62,30 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     [conversation.messages],
   );
 
-  const items = useMemo(
-    () =>
-      interactions
-        .map((msg, idx) => ({
-          key: `${msg.id || 'msg'}-${idx}`,
-          value: msg,
-          index: idx,
-        }))
-        .reverse(),
-    [interactions],
-  );
+  const items = useMemo(() => {
+    const interactionItems = interactions.map((msg, idx) => ({
+      key: `${msg.id || 'msg'}-${idx}`,
+      value: msg,
+      index: idx,
+    }));
 
-  useEffect(() => {
-    if (items.length > 0 && !highlightedMessageId) {
-      // Initialize with the first item (most recent)
-      const firstItem = items[0];
-      if (firstItem?.value.id) {
-        setHighlightedMessageId(firstItem.value.id);
-      }
-    }
-  }, [items, highlightedMessageId]);
+    // Add "Current Position" as the last item
+    return [
+      ...interactionItems,
+      {
+        key: 'current-position',
+        value: {
+          id: 'current-position',
+          type: 'user',
+          content: 'Stay at current position',
+          timestamp: new Date().toISOString(),
+        } as MessageRecord,
+        index: interactionItems.length,
+      },
+    ];
+  }, [interactions]);
+
+  const initialIndex = useMemo(() => Math.max(0, items.length - 2), [items]);
 
   useKeypress(
     (key) => {
@@ -92,7 +95,10 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           return;
         }
         if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
-          if (highlightedMessageId) {
+          if (
+            highlightedMessageId &&
+            highlightedMessageId !== 'current-position'
+          ) {
             setExpandedMessageId(highlightedMessageId);
           }
         }
@@ -132,6 +138,11 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           <Text>Rewinding...</Text>
         </Box>
       );
+    }
+
+    if (selectedMessageId === 'current-position') {
+      onExit();
+      return null;
     }
 
     const selectedMessage = interactions.find(
@@ -179,12 +190,17 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       <Box flexDirection="column" flexGrow={1}>
         <BaseSelectionList
           items={items}
+          initialIndex={initialIndex}
           isFocused={true}
           showNumbers={false}
           onSelect={(item: MessageRecord) => {
             const userPrompt = item;
             if (userPrompt && userPrompt.id) {
-              selectMessage(userPrompt.id);
+              if (userPrompt.id === 'current-position') {
+                onExit();
+              } else {
+                selectMessage(userPrompt.id);
+              }
             }
           }}
           onHighlight={(item: MessageRecord) => {
@@ -197,6 +213,24 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
+
+            if (userPrompt.id === 'current-position') {
+              return (
+                <Box flexDirection="column" marginBottom={1}>
+                  <Text
+                    color={
+                      isSelected ? theme.status.success : theme.text.primary
+                    }
+                  >
+                    {partToString(userPrompt.content)}
+                  </Text>
+                  <Text color={theme.text.secondary}>
+                    Cancel rewind and stay here
+                  </Text>
+                </Box>
+              );
+            }
+
             const stats = getStats(userPrompt);
             const firstFileName = stats?.details?.at(0)?.fileName;
             const originalUserText = userPrompt.content

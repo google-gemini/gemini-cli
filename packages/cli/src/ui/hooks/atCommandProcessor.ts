@@ -18,14 +18,16 @@ import {
   isNodeError,
   unescapePath,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
-const REF_CONTENT_HEADER = '\n--- Content from referenced files ---';
-const REF_CONTENT_FOOTER = '\n--- End of content ---';
+const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
+const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
 
 interface HandleAtCommandParams {
   query: string;

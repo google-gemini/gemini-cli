@@ -28,6 +28,5 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
     removeComponent: () => {},
-    clearTextToast: () => {},
   };
 }

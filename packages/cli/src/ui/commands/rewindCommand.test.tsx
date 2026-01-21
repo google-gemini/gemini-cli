@@ -31,7 +31,6 @@ const mockResetContext = vi.fn();
 const mockSetInput = vi.fn();
 const mockRevertFileChanges = vi.fn();
 const mockGetProjectRoot = vi.fn().mockReturnValue('/mock/root');
-const mockClearTextToast = vi.fn();
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -80,7 +79,7 @@ describe('rewindCommand', () => {
     vi.clearAllMocks();
 
     mockGetConversation.mockReturnValue({
-      messages: [],
+      messages: [{ id: 'msg-1', type: 'user', content: 'hello' }],
       sessionId: 'test-session',
     });
 
@@ -112,7 +111,6 @@ describe('rewindCommand', () => {
         loadHistory: mockLoadHistory,
         addItem: mockAddItem,
         setPendingItem: mockSetPendingItem,
-        clearTextToast: mockClearTextToast,
       },
     }) as unknown as CommandContext;
   });
@@ -218,7 +216,6 @@ describe('rewindCommand', () => {
       expect(mockRevertFileChanges).not.toHaveBeenCalled();
       expect(mockRewindTo).not.toHaveBeenCalled();
       expect(mockRemoveComponent).toHaveBeenCalled();
-      expect(mockClearTextToast).toHaveBeenCalled();
     });
     expect(mockSetInput).not.toHaveBeenCalled();
   });
@@ -234,7 +231,6 @@ describe('rewindCommand', () => {
     onExit();
 
     expect(mockRemoveComponent).toHaveBeenCalled();
-    expect(mockClearTextToast).toHaveBeenCalled();
   });
 
   it('should handle rewind error correctly', async () => {
@@ -335,6 +331,21 @@ describe('rewindCommand', () => {
       type: 'message',
       messageType: 'info',
       content: 'No conversation found.',
+    });
+  });
+
+  it('should return info if no user interactions found', () => {
+    mockGetConversation.mockReturnValue({
+      messages: [{ id: 'msg-1', type: 'gemini', content: 'hello' }],
+      sessionId: 'test-session',
+    });
+
+    const result = rewindCommand.action!(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Nothing to rewind to.',
     });
   });
 });

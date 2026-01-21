@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
+import { REFERENCE_CONTENT_END } from '../utils/constants.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
 import fs from 'node:fs'; // Actual fs for setup
@@ -234,7 +235,7 @@ describe('ReadManyFilesTool', () => {
       const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
-        `\n--- End of content ---`,
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -301,7 +302,7 @@ describe('ReadManyFilesTool', () => {
       const expectedPath = path.join(tempRootDir, 'src/main.ts');
       expect(content).toEqual([
         `--- ${expectedPath} ---\n\nMain content\n\n`,
-        `\n--- End of content ---`,
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
@@ -333,7 +334,7 @@ describe('ReadManyFilesTool', () => {
       const expectedPath = path.join(tempRootDir, 'src/app.js');
       expect(content).toEqual([
         `--- ${expectedPath} ---\n\napp code\n\n`,
-        `\n--- End of content ---`,
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
@@ -387,7 +388,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
-        '\n--- End of content ---',
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -411,7 +412,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
-        '\n--- End of content ---',
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
     });
 
@@ -448,7 +449,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
-        '\n--- End of content ---',
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
     });
 
@@ -464,7 +465,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
-        '\n--- End of content ---',
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
     });
 
@@ -581,7 +582,7 @@ describe('ReadManyFilesTool', () => {
 Content of receive-detail
 
 `,
-        `\n--- End of content ---`,
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -600,7 +601,7 @@ Content of receive-detail
 Content of file[1]
 
 `,
-        `\n--- End of content ---`,
+        `\n${REFERENCE_CONTENT_END}`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',

@@ -78,8 +78,6 @@ export interface CommandContext {
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    /** Clears the "Ctrl+C to clear text" toast if it is visible. */
-    clearTextToast: () => void;
   };
   // Session-specific data
   session: {
