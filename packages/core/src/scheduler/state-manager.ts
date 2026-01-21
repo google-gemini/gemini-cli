@@ -130,6 +130,7 @@ export class SchedulerStateManager {
     if (this.isTerminalCall(call)) {
       this._completedBatch.push(call);
       this.activeCalls.delete(callId);
+      this.emitUpdate();
     }
   }
 
@@ -160,6 +161,10 @@ export class SchedulerStateManager {
   }
 
   cancelAllQueued(reason: string): void {
+    if (this.queue.length === 0) {
+      return;
+    }
+
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
       if (queuedCall.status === 'error') {
