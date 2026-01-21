@@ -106,7 +106,7 @@ const mockConfigInternal = {
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
-  getDisableLLMCorrection: vi.fn(() => false),
+  getDisableLLMCorrection: vi.fn(() => true),
 };
 const mockConfig = mockConfigInternal as unknown as Config;
 
@@ -294,7 +294,7 @@ describe('WriteFileTool', () => {
         proposedContent,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(mockEnsureCorrectEdit).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedContent);
@@ -339,7 +339,7 @@ describe('WriteFileTool', () => {
         mockGeminiClientInstance,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(mockEnsureCorrectFileContent).not.toHaveBeenCalled();
       expect(result.correctedContent).toBe(correctedProposedContent);
@@ -417,7 +417,7 @@ describe('WriteFileTool', () => {
         proposedContent,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -468,7 +468,7 @@ describe('WriteFileTool', () => {
         mockGeminiClientInstance,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(confirmation).toEqual(
         expect.objectContaining({
@@ -663,7 +663,7 @@ describe('WriteFileTool', () => {
         proposedContent,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(result.llmContent).toMatch(
         /Successfully created and wrote to new file/,
@@ -721,7 +721,7 @@ describe('WriteFileTool', () => {
         mockGeminiClientInstance,
         mockBaseLlmClientInstance,
         abortSignal,
-        false,
+        true,
       );
       expect(result.llmContent).toMatch(/Successfully overwrote file/);
       const writtenContent = await fsService.readTextFile(filePath);
