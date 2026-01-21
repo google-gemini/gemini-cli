@@ -223,6 +223,6 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
-    expect(result.current.currentLoadingPhrase).toContain('Attempt 2/3');
+    expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
   });
 });
