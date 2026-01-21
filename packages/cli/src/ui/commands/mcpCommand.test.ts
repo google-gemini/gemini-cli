@@ -261,5 +261,59 @@ describe('mcpCommand', () => {
         }),
       );
     });
+
+    it('should filter output when desc command provides a server name', async () => {
+      const descSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'desc',
+      );
+
+      const mockServer1Tools = [createMockMCPTool('server1_tool1', 'server1')];
+      const mockServer2Tools = [createMockMCPTool('server2_tool1', 'server2')];
+      const allTools = [...mockServer1Tools, ...mockServer2Tools];
+
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
+        getAllTools: vi.fn().mockReturnValue(allTools),
+      });
+
+      await descSubCommand!.action!(mockContext, 'server1');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.MCP_STATUS,
+          servers: expect.objectContaining({
+            server1: expect.anything(),
+          }),
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              serverName: 'server1',
+            }),
+          ]),
+          showDescriptions: true,
+        }),
+      );
+
+      // Should NOT contain server2
+      const callArgs = vi.mocked(mockContext.ui.addItem).mock
+        .lastCall![0] as any;
+      expect(callArgs.servers).not.toHaveProperty('server2');
+      expect(callArgs.tools).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ serverName: 'server2' }),
+        ]),
+      );
+    });
+
+    it('should show error when desc command provides non-existent server name', async () => {
+      const descSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'desc',
+      );
+      const result = await descSubCommand!.action!(mockContext, 'non-existent');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: "MCP server 'non-existent' not found.",
+      });
+    });
   });
 });
