@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import type {
@@ -1702,15 +1703,17 @@ export class Config {
       return true;
     }
 
-    // Try to resolve both paths to handle symbolic links and ensure consistent casing
-    let resolvedPath = absolutePath;
-    try {
-      resolvedPath = fs.realpathSync(absolutePath);
-    } catch {
-      // If the path doesn't exist yet, we can't realpath it, so we use it as is
-      // but ensure it's absolute
-      resolvedPath = path.resolve(absolutePath);
-    }
+    const realpath = (p: string) => {
+      let resolved: string;
+      try {
+        resolved = fs.realpathSync(p);
+      } catch {
+        resolved = path.resolve(p);
+      }
+      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
+    };
+
+    const resolvedPath = realpath(absolutePath);
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
@@ -1718,12 +1721,7 @@ export class Config {
     }
 
     const projectTempDir = this.storage.getProjectTempDir();
-    let resolvedTempDir = projectTempDir;
-    try {
-      resolvedTempDir = fs.realpathSync(projectTempDir);
-    } catch {
-      resolvedTempDir = path.resolve(projectTempDir);
-    }
+    const resolvedTempDir = realpath(projectTempDir);
 
     return isSubpath(resolvedTempDir, resolvedPath);
   }
