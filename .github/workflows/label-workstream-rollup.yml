@@ -28,14 +28,27 @@ jobs:
               'https://github.com/google-gemini/gemini-cli/issues/17203'
             ];
 
-            async function getIssueParent(owner, repo, number) {
+            // Single issue processing (for event triggers)
+            async function processSingleIssue(owner, repo, number) {
               const query = `
                 query($owner:String!, $repo:String!, $number:Int!) {
                   repository(owner:$owner, name:$repo) {
                     issue(number:$number) {
+                      number
                       parent {
                         url
-                        number
+                        parent {
+                          url
+                          parent {
+                            url
+                            parent {
+                              url
+                              parent {
+                                url
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   }
@@ -43,73 +56,102 @@ jobs:
               `;
               try {
                 const result = await github.graphql(query, { owner, repo, number });
-                return result.repository.issue.parent || null;
+                const issue = result.repository.issue;
+                checkAndLabel(issue, owner, repo);
               } catch (error) {
-                console.error(`Failed to fetch parent for #${number}:`, error);
-                return null;
+                console.error(`Failed to process issue #${number}:`, error);
               }
             }
 
-            // Determine which issues to process
-            let issuesToProcess = [];
+            // Bulk processing (for schedule/dispatch)
+            async function processAllOpenIssues(owner, repo) {
+              const query = `
+                query($owner:String!, $repo:String!, $cursor:String) {
+                  repository(owner:$owner, name:$repo) {
+                    issues(first: 100, states: OPEN, after: $cursor) {
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                      nodes {
+                        number
+                        parent {
+                          url
+                          parent {
+                            url
+                            parent {
+                              url
+                              parent {
+                                url
+                                parent {
+                                  url
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `;
 
-            if (context.eventName === 'issues') {
-               // Context payload for 'issues' event already has the issue object
-               issuesToProcess.push({
-                 number: context.payload.issue.number,
-                 owner: context.repo.owner,
-                 repo: context.repo.repo
-               });
-            } else {
-              // For schedule/dispatch, fetch open issues (lightweight list)
-              console.log(`Running for event: ${context.eventName}. Fetching open issues...`);
-              const openIssues = await github.paginate(github.rest.issues.listForRepo, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open'
-              });
-              issuesToProcess = openIssues.map(i => ({
-                number: i.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              }));
+              let hasNextPage = true;
+              let cursor = null;
+
+              while (hasNextPage) {
+                try {
+                  const result = await github.graphql(query, { owner, repo, cursor });
+                  const issues = result.repository.issues.nodes;
+
+                  console.log(`Processing batch of ${issues.length} issues...`);
+                  for (const issue of issues) {
+                    await checkAndLabel(issue, owner, repo);
+                  }
+
+                  hasNextPage = result.repository.issues.pageInfo.hasNextPage;
+                  cursor = result.repository.issues.pageInfo.endCursor;
+                } catch (error) {
+                  console.error('Failed to fetch issues batch:', error);
+                  hasNextPage = false;
+                }
+              }
             }
 
-            console.log(`Processing ${issuesToProcess.length} issue(s)...`);
+            async function checkAndLabel(issue, owner, repo) {
+              if (!issue || !issue.parent) return;
 
-            for (const issue of issuesToProcess) {
-              let currentNumber = issue.number;
-              let depth = 0;
-              const MAX_DEPTH = 5; // Safety limit for recursion
-              let matched = false;
+              let currentParent = issue.parent;
               let tracedParents = [];
+              let matched = false;
 
-              while (depth < MAX_DEPTH) {
-                const parent = await getIssueParent(issue.owner, issue.repo, currentNumber);
+              while (currentParent) {
+                tracedParents.push(currentParent.url);
 
-                if (!parent) {
-                  break;
-                }
-
-                tracedParents.push(parent.url);
-
-                if (allowedParentUrls.includes(parent.url)) {
-                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${parent.url}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
+                if (allowedParentUrls.includes(currentParent.url)) {
+                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${currentParent.url}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
                   await github.rest.issues.addLabels({
-                    owner: issue.owner,
-                    repo: issue.repo,
+                    owner,
+                    repo,
                     issue_number: issue.number,
                     labels: [labelToAdd]
                   });
                   matched = true;
                   break;
                 }
-
-                currentNumber = parent.number;
-                depth++;
+                currentParent = currentParent.parent;
               }
 
               if (!matched && context.eventName === 'issues') {
-                 console.log(`Issue #${issue.number} did not match any allowed workstreams after checking ${depth} levels. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
+                 console.log(`Issue #${issue.number} did not match any allowed workstreams. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
               }
             }
+
+            // Main execution
+            if (context.eventName === 'issues') {
+              console.log(`Processing single issue #${context.payload.issue.number}...`);
+              await processSingleIssue(context.repo.owner, context.repo.repo, context.payload.issue.number);
+            } else {
+              console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
+              await processAllOpenIssues(context.repo.owner, context.repo.repo);
+
