@@ -217,7 +217,7 @@ ${finalExclusionPatternsForDescription
         if (validationError) {
           skippedFiles.push({
             path: fullPath,
-            reason: validationError,
+            reason: 'Security: Path validation failed',
           });
           continue;
         }

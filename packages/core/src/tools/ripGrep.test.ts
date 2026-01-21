@@ -16,6 +16,7 @@ import {
 import type { RipGrepToolParams } from './ripGrep.js';
 import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -276,11 +277,7 @@ describe('RipGrepTool', () => {
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,
@@ -821,11 +818,7 @@ describe('RipGrepTool', () => {
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
@@ -936,11 +929,7 @@ describe('RipGrepTool', () => {
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
@@ -1467,11 +1456,7 @@ describe('RipGrepTool', () => {
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
@@ -1529,17 +1514,13 @@ describe('RipGrepTool', () => {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
-          const wc = this.getWorkspaceContext();
-          if (wc.isPathWithinWorkspace(absolutePath)) {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
             return true;
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
@@ -1682,17 +1663,13 @@ describe('RipGrepTool', () => {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
-          const wc = this.getWorkspaceContext();
-          if (wc.isPathWithinWorkspace(absolutePath)) {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
             return true;
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,

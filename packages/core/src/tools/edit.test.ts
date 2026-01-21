@@ -55,6 +55,7 @@ import {
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
@@ -126,17 +127,13 @@ describe('EditTool', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
-        const wc = this.getWorkspaceContext();
-        if (wc.isPathWithinWorkspace(absolutePath)) {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
           return true;
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,

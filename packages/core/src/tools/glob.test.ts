@@ -8,6 +8,7 @@ import type { GlobToolParams, GlobPath } from './glob.js';
 import { GlobTool, sortFileEntries } from './glob.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -54,11 +55,7 @@ describe('GlobTool', () => {
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,

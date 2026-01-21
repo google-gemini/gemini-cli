@@ -9,6 +9,7 @@ import type { GrepToolParams } from './grep.js';
 import { GrepTool } from './grep.js';
 import type { ToolResult } from './tools.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -63,11 +64,7 @@ describe('GrepTool', () => {
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,
@@ -351,11 +348,7 @@ describe('GrepTool', () => {
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
@@ -435,11 +428,7 @@ describe('GrepTool', () => {
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,

@@ -116,6 +116,7 @@ import {
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
+import { isSubpath } from '../utils/paths.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -1701,17 +1702,30 @@ export class Config {
       return true;
     }
 
+    // Try to resolve both paths to handle symbolic links and ensure consistent casing
+    let resolvedPath = absolutePath;
+    try {
+      resolvedPath = fs.realpathSync(absolutePath);
+    } catch {
+      // If the path doesn't exist yet, we can't realpath it, so we use it as is
+      // but ensure it's absolute
+      resolvedPath = path.resolve(absolutePath);
+    }
+
     const workspaceContext = this.getWorkspaceContext();
-    if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+    if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
       return true;
     }
 
     const projectTempDir = this.storage.getProjectTempDir();
-    const resolvedProjectTempDir = path.resolve(projectTempDir);
-    return (
-      absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-      absolutePath === resolvedProjectTempDir
-    );
+    let resolvedTempDir = projectTempDir;
+    try {
+      resolvedTempDir = fs.realpathSync(projectTempDir);
+    } catch {
+      resolvedTempDir = path.resolve(projectTempDir);
+    }
+
+    return isSubpath(resolvedTempDir, resolvedPath);
   }
 
   /**

@@ -165,7 +165,14 @@ class GrepToolInvocation extends BaseToolInvocation<
       const validationError =
         this.config.getValidationErrorForPath(searchDirAbs);
       if (validationError) {
-        throw new Error(validationError);
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Error: Path validation failed.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
       }
       const searchDirDisplay = pathParam;
 

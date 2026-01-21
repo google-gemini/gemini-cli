@@ -126,21 +126,48 @@ class GrepToolInvocation extends BaseToolInvocation<
         const validationError =
           this.config.getValidationErrorForPath(searchDirAbs);
         if (validationError) {
-          throw new Error(validationError);
+          return {
+            llmContent: validationError,
+            returnDisplay: 'Error: Path validation failed.',
+            error: {
+              message: validationError,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
+          };
         }
 
         try {
           const stats = fs.statSync(searchDirAbs);
           if (!stats.isDirectory()) {
-            throw new Error(`Path is not a directory: ${searchDirAbs}`);
+            return {
+              llmContent: `Path is not a directory: ${searchDirAbs}`,
+              returnDisplay: 'Error: Path is not a directory.',
+              error: {
+                message: `Path is not a directory: ${searchDirAbs}`,
+                type: ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
+              },
+            };
           }
         } catch (error: unknown) {
           if (isNodeError(error) && error.code === 'ENOENT') {
-            throw new Error(`Path does not exist: ${searchDirAbs}`);
+            return {
+              llmContent: `Path does not exist: ${searchDirAbs}`,
+              returnDisplay: 'Error: Path does not exist.',
+              error: {
+                message: `Path does not exist: ${searchDirAbs}`,
+                type: ToolErrorType.FILE_NOT_FOUND,
+              },
+            };
           }
-          throw new Error(
-            `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
-          );
+          const errorMessage = getErrorMessage(error);
+          return {
+            llmContent: `Failed to access path stats for ${searchDirAbs}: ${errorMessage}`,
+            returnDisplay: 'Error: Failed to access path.',
+            error: {
+              message: `Failed to access path stats for ${searchDirAbs}: ${errorMessage}`,
+              type: ToolErrorType.GREP_EXECUTION_ERROR,
+            },
+          };
         }
       }
 

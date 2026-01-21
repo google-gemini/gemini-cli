@@ -245,6 +245,20 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(abortSignal: AbortSignal): Promise<ToolResult> {
+    const validationError = this.config.getValidationErrorForPath(
+      this.resolvedPath,
+    );
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Error: Path validation failed.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,

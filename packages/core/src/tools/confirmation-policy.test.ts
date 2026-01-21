@@ -16,6 +16,7 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 
@@ -80,11 +81,7 @@ describe('Tool Confirmation Policy Updates', () => {
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,

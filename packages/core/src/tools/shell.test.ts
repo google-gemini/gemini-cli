@@ -47,6 +47,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { EOL } from 'node:os';
 import * as path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
@@ -103,17 +104,13 @@ describe('ShellTool', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
-        const wc = this.getWorkspaceContext();
-        if (wc.isPathWithinWorkspace(absolutePath)) {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
           return true;
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,

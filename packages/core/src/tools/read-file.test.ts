@@ -9,6 +9,7 @@ import type { ReadFileToolParams } from './read-file.js';
 import { ReadFileTool } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -53,11 +54,7 @@ describe('ReadFileTool', () => {
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,
@@ -460,17 +457,13 @@ describe('ReadFileTool', () => {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
           },
           isPathAllowed(this: Config, absolutePath: string): boolean {
-            const wc = this.getWorkspaceContext();
-            if (wc.isPathWithinWorkspace(absolutePath)) {
+            const workspaceContext = this.getWorkspaceContext();
+            if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
               return true;
             }
 
             const projectTempDir = this.storage.getProjectTempDir();
-            const resolvedProjectTempDir = path.resolve(projectTempDir);
-            return (
-              absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-              absolutePath === resolvedProjectTempDir
-            );
+            return isSubpath(path.resolve(projectTempDir), absolutePath);
           },
           getValidationErrorForPath(
             this: Config,

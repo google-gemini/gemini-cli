@@ -10,6 +10,7 @@ import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs'; // Actual fs for setup
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -94,17 +95,13 @@ describe('ReadManyFilesTool', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
-        const wc = this.getWorkspaceContext();
-        if (wc.isPathWithinWorkspace(absolutePath)) {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
           return true;
         }
 
         const projectTempDir = this.storage.getProjectTempDir();
-        const resolvedProjectTempDir = path.resolve(projectTempDir);
-        return (
-          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-          absolutePath === resolvedProjectTempDir
-        );
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
       getValidationErrorForPath(
         this: Config,
@@ -537,17 +534,13 @@ describe('ReadManyFilesTool', () => {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
-          const wc = this.getWorkspaceContext();
-          if (wc.isPathWithinWorkspace(absolutePath)) {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
             return true;
           }
 
           const projectTempDir = this.storage.getProjectTempDir();
-          const resolvedProjectTempDir = path.resolve(projectTempDir);
-          return (
-            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
-            absolutePath === resolvedProjectTempDir
-          );
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
         getValidationErrorForPath(
           this: Config,
