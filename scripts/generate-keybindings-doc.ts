@@ -154,9 +154,10 @@ function formatBindings(bindings: readonly KeyBinding[]): string[] {
 
 function formatBinding(binding: KeyBinding): string {
   const modifiers: string[] = [];
-  if (binding.ctrl) modifiers.push('Ctrl');
-  if (binding.command) modifiers.push('Cmd');
   if (binding.shift) modifiers.push('Shift');
+  if (binding.alt) modifiers.push('Alt');
+  if (binding.ctrl) modifiers.push('Ctrl');
+  if (binding.cmd) modifiers.push('Cmd');
 
   const keyName = formatKeyName(binding.key);
   if (!keyName) {
@@ -167,9 +168,10 @@ function formatBinding(binding: KeyBinding): string {
   let combo = segments.join(' + ');
 
   const restrictions: string[] = [];
-  if (binding.ctrl === false) restrictions.push('no Ctrl');
   if (binding.shift === false) restrictions.push('no Shift');
-  if (binding.command === false) restrictions.push('no Cmd');
+  if (binding.alt === false) restrictions.push('no Alt');
+  if (binding.ctrl === false) restrictions.push('no Ctrl');
+  if (binding.cmd === false) restrictions.push('no Cmd');
 
   if (restrictions.length > 0) {
     combo = `${combo} (${restrictions.join(', ')})`;

@@ -91,7 +91,7 @@ export const INFORMATIVE_TIPS = [
   'See full, untruncated responses with Ctrl+S…',
   'Toggle auto-approval (YOLO mode) for all tools with Ctrl+Y…',
   'Cycle through approval modes (Default, Plan, Auto-Edit) with Shift+Tab…',
-  'Toggle Markdown rendering (raw markdown mode) with Option+M…',
+  'Toggle Markdown rendering (raw markdown mode) with Alt+M…',
   'Toggle shell mode by typing ! in an empty prompt…',
   'Insert a newline with a backslash (\\) followed by Enter…',
   'Navigate your prompt history with the Up and Down arrows…',
