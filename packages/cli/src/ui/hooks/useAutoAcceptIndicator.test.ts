@@ -67,7 +67,9 @@ describe('useAutoAcceptIndicator', () => {
     (
       Config as unknown as MockedFunction<() => MockConfigInstanceShape>
     ).mockImplementation(() => {
-      const instanceGetApprovalModeMock = vi.fn();
+      const instanceGetApprovalModeMock = vi
+        .fn()
+        .mockReturnValue(ApprovalMode.DEFAULT);
       const instanceSetApprovalModeMock = vi.fn();
 
       const instance: MockConfigInstanceShape = {
@@ -183,6 +185,14 @@ describe('useAutoAcceptIndicator', () => {
     );
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
 
+    act(() => {
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    expect(result.current).toBe(ApprovalMode.YOLO);
+
     // Shift+Tab cycles back to DEFAULT (since PLAN is disabled by default in mock)
     act(() => {
       capturedUseKeypressHandler({
@@ -191,9 +201,9 @@ describe('useAutoAcceptIndicator', () => {
       } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.DEFAULT,
+      ApprovalMode.AUTO_EDIT,
     );
-    expect(result.current).toBe(ApprovalMode.DEFAULT);
+    expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
 
     // Ctrl+Y toggles YOLO
     act(() => {
@@ -421,6 +431,54 @@ describe('useAutoAcceptIndicator', () => {
         ApprovalMode.DEFAULT,
       );
       expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    });
+
+    it('should show a warning when trying to enable privileged modes', () => {
+      // Mock the error thrown by setApprovalMode
+      const errorMessage =
+        'Cannot enable privileged approval modes in an untrusted folder.';
+      mockConfigInstance.setApprovalMode.mockImplementation(() => {
+        throw new Error(errorMessage);
+      });
+
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      // Try to enable YOLO mode
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: errorMessage,
+        },
+        expect.any(Number),
+      );
+
+      // Try to enable AUTO_EDIT mode
+      act(() => {
+        capturedUseKeypressHandler({
+          name: 'tab',
+          shift: true,
+        } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: errorMessage,
+        },
+        expect.any(Number),
+      );
+
+      expect(mockAddItem).toHaveBeenCalledTimes(2);
     });
 
     it('should disable AUTO_EDIT mode when Shift+Tab is pressed', () => {
