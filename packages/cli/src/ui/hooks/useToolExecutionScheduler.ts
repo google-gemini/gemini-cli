@@ -9,7 +9,6 @@ import {
   type ToolCallRequestInfo,
   type ToolCall,
   type CompletedToolCall,
-  type ToolCallConfirmationDetails,
   type ToolConfirmationPayload,
   MessageBusType,
   ToolConfirmationOutcome,
@@ -92,52 +91,33 @@ export function useToolExecutionScheduler(
 
       return coreCalls.map((coreCall): TrackedToolCall => {
         const prev = prevMap.get(coreCall.request.callId);
-
-        // 1. Preserve metadata
         const responseSubmittedToGemini =
           prev?.responseSubmittedToGemini ?? false;
 
-        // 2. Inject onConfirm adapter if needed
-        // The Core provides data-only confirmationDetails. We must inject the
-        // legacy function that proxies to the Event Bus.
-        let confirmationDetails =
-          coreCall.status === 'awaiting_approval'
-            ? coreCall.confirmationDetails
-            : undefined;
-
-        if (
-          coreCall.status === 'awaiting_approval' &&
-          coreCall.correlationId &&
-          confirmationDetails
-        ) {
+        // Inject onConfirm adapter for tools awaiting approval.
+        // The Core provides data-only (serializable) confirmationDetails. We must
+        // inject the legacy callback function that proxies responses back to the
+        // MessageBus.
+        if (coreCall.status === 'awaiting_approval' && coreCall.correlationId) {
           const correlationId = coreCall.correlationId;
-          confirmationDetails = {
-            ...confirmationDetails,
-            onConfirm: async (
-              outcome: ToolConfirmationOutcome,
-              payload?: ToolConfirmationPayload,
-            ) => {
-              await messageBus.publish({
-                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-                correlationId,
-                confirmed: outcome !== ToolConfirmationOutcome.Cancel,
-                requiresUserConfirmation: false, // Explicitly false as UI handled it
-                outcome,
-                payload, // Pass payload (e.g. inline edits) to the bus
-              });
-            },
-          } as ToolCallConfirmationDetails;
-        }
-
-        // Return the enriched object
-        if (
-          coreCall.status === 'awaiting_approval' &&
-          confirmationDetails !== coreCall.confirmationDetails
-        ) {
           return {
             ...coreCall,
-            confirmationDetails:
-              confirmationDetails as ToolCallConfirmationDetails,
+            confirmationDetails: {
+              ...coreCall.confirmationDetails,
+              onConfirm: async (
+                outcome: ToolConfirmationOutcome,
+                payload?: ToolConfirmationPayload,
+              ) => {
+                await messageBus.publish({
+                  type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                  correlationId,
+                  confirmed: outcome !== ToolConfirmationOutcome.Cancel,
+                  requiresUserConfirmation: false,
+                  outcome,
+                  payload,
+                });
+              },
+            },
             responseSubmittedToGemini,
           };
         }
@@ -152,12 +132,7 @@ export function useToolExecutionScheduler(
   );
 
   useEffect(() => {
-    const handler = (message: unknown) => {
-      const event = message as ToolCallsUpdateMessage;
-      if (event.type !== MessageBusType.TOOL_CALLS_UPDATE) {
-        return;
-      }
-
+    const handler = (event: ToolCallsUpdateMessage) => {
       setToolCalls((prev) => {
         const adapted = adaptToolCalls(event.toolCalls, prev);
 
