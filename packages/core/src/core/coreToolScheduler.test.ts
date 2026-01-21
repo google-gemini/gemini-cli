@@ -1889,10 +1889,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
         }) as unknown as PolicyEngine,
       isInteractive: () => false,
     });
-    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    // mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    // mockConfig.getHookSystem = vi
+    //   .fn()
+    //   .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -2022,10 +2023,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
-    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    // mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    // mockConfig.getHookSystem = vi
+    //   .fn()
+    //   .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -2113,10 +2115,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
             check: async () => ({ decision: PolicyDecision.DENY }),
           }) as unknown as PolicyEngine,
       });
-      mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
-      mockConfig.getHookSystem = vi
-        .fn()
-        .mockReturnValue(new HookSystem(mockConfig));
+      // mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+      // mockConfig.getHookSystem = vi
+      //   .fn()
+      //   .mockReturnValue(new HookSystem(mockConfig));
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
       const scheduler = new CoreToolScheduler({
         config: mockConfig,
