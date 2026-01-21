@@ -11,19 +11,22 @@ import {
   type HookExecutionResponse,
 } from '../confirmation-bus/types.js';
 import {
-  createHookOutput,
   NotificationType,
-  type DefaultHookOutput,
+  type McpToolContext,
+  BeforeToolHookOutput,
 } from '../hooks/types.js';
+import type { Config } from '../config/config.js';
 import type {
   ToolCallConfirmationDetails,
   ToolResult,
+  AnyDeclarativeTool,
 } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { ShellToolInvocation } from '../tools/shell.js';
+import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
 /**
  * Serializable representation of tool confirmation details for hooks.
@@ -153,86 +156,40 @@ export async function fireToolNotificationHook(
 }
 
 /**
- * Fires the BeforeTool hook and returns the hook output.
+ * Extracts MCP context from a tool invocation if it's an MCP tool.
  *
- * @param messageBus The message bus to use for hook communication
- * @param toolName The name of the tool being executed
- * @param toolInput The input parameters for the tool
- * @returns The hook output, or undefined if no hook was executed or on error
+ * @param invocation The tool invocation
+ * @param config Config to look up server details
+ * @returns MCP context if this is an MCP tool, undefined otherwise
  */
-export async function fireBeforeToolHook(
-  messageBus: MessageBus,
-  toolName: string,
-  toolInput: Record<string, unknown>,
-): Promise<DefaultHookOutput | undefined> {
-  try {
-    const response = await messageBus.request<
-      HookExecutionRequest,
-      HookExecutionResponse
-    >(
-      {
-        type: MessageBusType.HOOK_EXECUTION_REQUEST,
-        eventName: 'BeforeTool',
-        input: {
-          tool_name: toolName,
-          tool_input: toolInput,
-        },
-      },
-      MessageBusType.HOOK_EXECUTION_RESPONSE,
-    );
-
-    return response.output
-      ? createHookOutput('BeforeTool', response.output)
-      : undefined;
-  } catch (error) {
-    debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
+function extractMcpContext(
+  invocation: ShellToolInvocation | AnyToolInvocation,
+  config: Config,
+): McpToolContext | undefined {
+  if (!(invocation instanceof DiscoveredMCPToolInvocation)) {
     return undefined;
   }
-}
 
-/**
- * Fires the AfterTool hook and returns the hook output.
- *
- * @param messageBus The message bus to use for hook communication
- * @param toolName The name of the tool that was executed
- * @param toolInput The input parameters for the tool
- * @param toolResponse The result from the tool execution
- * @returns The hook output, or undefined if no hook was executed or on error
- */
-export async function fireAfterToolHook(
-  messageBus: MessageBus,
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  toolResponse: {
-    llmContent: ToolResult['llmContent'];
-    returnDisplay: ToolResult['returnDisplay'];
-    error: ToolResult['error'];
-  },
-): Promise<DefaultHookOutput | undefined> {
-  try {
-    const response = await messageBus.request<
-      HookExecutionRequest,
-      HookExecutionResponse
-    >(
-      {
-        type: MessageBusType.HOOK_EXECUTION_REQUEST,
-        eventName: 'AfterTool',
-        input: {
-          tool_name: toolName,
-          tool_input: toolInput,
-          tool_response: toolResponse,
-        },
-      },
-      MessageBusType.HOOK_EXECUTION_RESPONSE,
-    );
-
-    return response.output
-      ? createHookOutput('AfterTool', response.output)
-      : undefined;
-  } catch (error) {
-    debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
+  // Get the server config
+  const mcpServers =
+    config.getMcpClientManager()?.getMcpServers() ??
+    config.getMcpServers() ??
+    {};
+  const serverConfig = mcpServers[invocation.serverName];
+  if (!serverConfig) {
     return undefined;
   }
+
+  return {
+    server_name: invocation.serverName,
+    tool_name: invocation.serverToolName,
+    // Non-sensitive connection details only
+    command: serverConfig.command,
+    args: serverConfig.args,
+    cwd: serverConfig.cwd,
+    url: serverConfig.url ?? serverConfig.httpUrl,
+    tcp: serverConfig.tcp,
+  };
 }
 
 /**
@@ -241,32 +198,49 @@ export async function fireAfterToolHook(
  * @param invocation The tool invocation to execute
  * @param toolName The name of the tool
  * @param signal Abort signal for cancellation
- * @param messageBus Optional message bus for hook communication
- * @param hooksEnabled Whether hooks are enabled
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
  * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param config Config to look up MCP server details for hook context
  * @returns The tool result
  */
 export async function executeToolWithHooks(
   invocation: ShellToolInvocation | AnyToolInvocation,
   toolName: string,
   signal: AbortSignal,
-  messageBus: MessageBus | undefined,
-  hooksEnabled: boolean,
+  tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
+  config?: Config,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
+  let inputWasModified = false;
+  let modifiedKeys: string[] = [];
 
-  // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const beforeOutput = await fireBeforeToolHook(
-      messageBus,
+  // Extract MCP context if this is an MCP tool (only if config is provided)
+  const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
+
+  const hookSystem = config?.getHookSystem();
+  if (hookSystem) {
+    const beforeOutput = await hookSystem.fireBeforeToolEvent(
       toolName,
       toolInput,
+      mcpContext,
     );
+
+    // Check if hook requested to stop entire agent execution
+    if (beforeOutput?.shouldStopExecution()) {
+      const reason = beforeOutput.getEffectiveReason();
+      return {
+        llmContent: `Agent execution stopped by hook: ${reason}`,
+        returnDisplay: `Agent execution stopped by hook: ${reason}`,
+        error: {
+          type: ToolErrorType.STOP_EXECUTION,
+          message: reason,
+        },
+      };
+    }
 
     // Check if hook blocked the tool execution
     const blockingError = beforeOutput?.getBlockingError();
@@ -281,17 +255,36 @@ export async function executeToolWithHooks(
       };
     }
 
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
-        },
-      };
+    // Check if hook requested to update tool input
+    if (beforeOutput instanceof BeforeToolHookOutput) {
+      const modifiedInput = beforeOutput.getModifiedToolInput();
+      if (modifiedInput) {
+        // We modify the toolInput object in-place, which should be the same reference as invocation.params
+        // We use Object.assign to update properties
+        Object.assign(invocation.params, modifiedInput);
+        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
+        inputWasModified = true;
+        modifiedKeys = Object.keys(modifiedInput);
+
+        // Recreate the invocation with the new parameters
+        // to ensure any derived state (like resolvedPath in ReadFileTool) is updated.
+        try {
+          // We use the tool's build method to validate and create the invocation
+          // This ensures consistent behavior with the initial creation
+          invocation = tool.build(invocation.params);
+        } catch (error) {
+          return {
+            llmContent: `Tool parameter modification by hook failed validation: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            returnDisplay: `Tool parameter modification by hook failed validation.`,
+            error: {
+              type: ToolErrorType.INVALID_TOOL_PARAMS,
+              message: String(error),
+            },
+          };
+        }
+      }
     }
   }
 
@@ -312,10 +305,26 @@ export async function executeToolWithHooks(
     );
   }
 
-  // Fire AfterTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const afterOutput = await fireAfterToolHook(
-      messageBus,
+  // Append notification if parameters were modified
+  if (inputWasModified) {
+    const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
+      ', ',
+    )}) were modified by a hook before execution.`;
+    if (typeof toolResult.llmContent === 'string') {
+      toolResult.llmContent += modificationMsg;
+    } else if (Array.isArray(toolResult.llmContent)) {
+      toolResult.llmContent.push({ text: modificationMsg });
+    } else if (toolResult.llmContent) {
+      // Handle single Part case by converting to an array
+      toolResult.llmContent = [
+        toolResult.llmContent,
+        { text: modificationMsg },
+      ];
+    }
+  }
+
+  if (hookSystem) {
+    const afterOutput = await hookSystem.fireAfterToolEvent(
       toolName,
       toolInput,
       {
@@ -323,6 +332,7 @@ export async function executeToolWithHooks(
         returnDisplay: toolResult.returnDisplay,
         error: toolResult.error,
       },
+      mcpContext,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -332,8 +342,21 @@ export async function executeToolWithHooks(
         llmContent: `Agent execution stopped by hook: ${reason}`,
         returnDisplay: `Agent execution stopped by hook: ${reason}`,
         error: {
+          type: ToolErrorType.STOP_EXECUTION,
+          message: reason,
+        },
+      };
+    }
+
+    // Check if hook blocked the tool result
+    const blockingError = afterOutput?.getBlockingError();
+    if (blockingError?.blocked) {
+      return {
+        llmContent: `Tool result blocked: ${blockingError.reason}`,
+        returnDisplay: `Tool result blocked: ${blockingError.reason}`,
+        error: {
           type: ToolErrorType.EXECUTION_FAILED,
-          message: `Agent execution stopped: ${reason}`,
+          message: blockingError.reason,
         },
       };
     }

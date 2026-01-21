@@ -22,6 +22,7 @@ export * from './confirmation-bus/message-bus.js';
 export * from './commands/extensions.js';
 export * from './commands/restore.js';
 export * from './commands/init.js';
+export * from './commands/memory.js';
 export * from './commands/types.js';
 
 // Export Core Logic
@@ -35,7 +36,9 @@ export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
+export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
+export * from './scheduler/tool-executor.js';
 export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
@@ -49,6 +52,7 @@ export * from './code_assist/telemetry.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
@@ -63,9 +67,11 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export * from './utils/shell-permissions.js';
+export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
@@ -85,6 +91,9 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
+export * from './utils/secure-browser-launcher.js';
+export * from './utils/apiConversionUtils.js';
+export * from './utils/channel.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -93,6 +102,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './skills/skillManager.js';
+export * from './skills/skillLoader.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -114,6 +125,11 @@ export * from './resources/resource-registry.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
+
+// Export agent definitions
+export * from './agents/types.js';
+export * from './agents/agentLoader.js';
+export * from './agents/local-executor.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -155,11 +171,11 @@ export { Storage } from './config/storage.js';
 // Export hooks system
 export * from './hooks/index.js';
 
-// Export test utils
-export * from './test-utils/index.js';
-
 // Export hook types
 export * from './hooks/types.js';
+
+// Export agent types
+export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

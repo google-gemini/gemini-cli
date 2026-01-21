@@ -108,4 +108,25 @@ describe('FallbackStrategy', () => {
     // Important: check that it queried snapshot with the RESOLVED model, not 'auto'
     expect(mockService.snapshot).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
   });
+
+  it('should respect requestedModel from context', async () => {
+    const requestedModel = 'requested-model';
+    const configModel = 'config-model';
+    vi.mocked(mockConfig.getModel).mockReturnValue(configModel);
+    vi.mocked(mockService.snapshot).mockReturnValue({ available: true });
+
+    const contextWithRequestedModel = {
+      requestedModel,
+    } as RoutingContext;
+
+    const decision = await strategy.route(
+      contextWithRequestedModel,
+      mockConfig,
+      mockClient,
+    );
+
+    expect(decision).toBeNull();
+    // Should check availability of the requested model from context
+    expect(mockService.snapshot).toHaveBeenCalledWith(requestedModel);
+  });
 });

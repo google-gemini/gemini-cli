@@ -1,8 +1,21 @@
-# Gemini CLI hooks
+# Gemini CLI hooks (experimental)
 
 Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
+
+> [!NOTE] **Hooks are currently an experimental feature.**
+>
+> To use hooks, you must explicitly enable them in your `settings.json`:
+>
+> ```json
+> {
+>   "tools": { "enableHooks": true },
+>   "hooks": { "enabled": true }
+> }
+> ```
+>
+> Both of these are needed in this experimental phase.
 
 See [writing hooks guide](writing-hooks.md) for a tutorial on creating your
 first hook and a comprehensive example.
@@ -26,6 +39,33 @@ With hooks, you can:
 
 Hooks run synchronously as part of the agent loop—when a hook event fires,
 Gemini CLI waits for all matching hooks to complete before continuing.
+
+## Security and Risks
+
+> **Warning: Hooks execute arbitrary code with your user privileges.**
+>
+> By configuring hooks, you are explicitly allowing Gemini CLI to run shell
+> commands on your machine. Malicious or poorly configured hooks can:
+
+- **Exfiltrate data**: Read sensitive files (`.env`, ssh keys) and send them to
+  remote servers.
+- **Modify system**: Delete files, install malware, or change system settings.
+- **Consume resources**: Run infinite loops or crash your system.
+
+**Project-level hooks** (in `.gemini/settings.json`) and **Extension hooks** are
+particularly risky when opening third-party projects or extensions from
+untrusted authors. Gemini CLI will **warn you** the first time it detects a new
+project hook (identified by its name and command), but it is **your
+responsibility** to review these hooks (and any installed extensions) before
+trusting them.
+
+> **Note:** Extension hooks are subject to a mandatory security warning and
+> consent flow during extension installation or update if hooks are detected.
+> You must explicitly approve the installation or update of any extension that
+> contains hooks.
+
+See [Security Considerations](best-practices.md#using-hooks-securely) for a
+detailed threat model and mitigation strategies.
 
 ## Core concepts
 
@@ -422,7 +462,8 @@ numbers run first):
 2.  **User settings:** `~/.gemini/settings.json`
 3.  **System settings:** `/etc/gemini-cli/settings.json`
 4.  **Extensions:** Internal hooks defined by installed extensions (lowest
-    priority)
+    priority). See [Extensions documentation](../extensions/index.md#hooks) for
+    details on how extensions define and configure hooks.
 
 #### Deduplication and shadowing
 
@@ -492,14 +533,29 @@ Use the `/hooks panel` command to view all registered hooks:
 
 This command displays:
 
-- All active hooks organized by event
+- All configured hooks organized by event
 - Hook source (user, project, system)
 - Hook type (command or plugin)
-- Execution status and recent output
+- Individual hook status (enabled/disabled)
 
-### Enable and disable hooks
+### Enable and disable all hooks at once
 
-You can temporarily enable or disable individual hooks using commands:
+You can enable or disable all hooks at once using commands:
+
+```bash
+/hooks enable-all
+/hooks disable-all
+```
+
+These commands provide a shortcut to enable or disable all configured hooks
+without managing them individually. The `enable-all` command removes all hooks
+from the `hooks.disabled` array, while `disable-all` adds all configured hooks
+to the disabled list. Changes take effect immediately without requiring a
+restart.
+
+### Enable and disable individual hooks
+
+You can enable or disable individual hooks using commands:
 
 ```bash
 /hooks enable hook-name
@@ -508,7 +564,8 @@ You can temporarily enable or disable individual hooks using commands:
 
 These commands allow you to control hook execution without editing configuration
 files. The hook name should match the `name` field in your hook configuration.
-Changes made via these commands are persisted to your global User settings
+Changes made via these commands are persisted to your settings. The settings are
+saved to workspace scope if available, otherwise to your global user settings
 (`~/.gemini/settings.json`).
 
 ### Disabled hooks configuration
@@ -661,5 +718,6 @@ matchers:
 - [Best Practices](best-practices.md) - Security, performance, and debugging
 - [Custom Commands](../cli/custom-commands.md) - Create reusable prompt
   shortcuts
-- [Configuration](../cli/configuration.md) - Gemini CLI configuration options
+- [Configuration](../get-started/configuration.md) - Gemini CLI configuration
+  options
 - [Hooks Design Document](../hooks-design.md) - Technical architecture details

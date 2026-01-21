@@ -35,9 +35,10 @@ import {
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 // Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn();
+const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
 const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
@@ -104,7 +105,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -253,7 +254,12 @@ const renderDialog = (
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
-    mockToggleVimEnabled.mockResolvedValue(true);
+    vi.clearAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isKittyProtocolEnabled',
+    ).mockReturnValue(true);
+    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
@@ -303,6 +309,23 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Setting Descriptions', () => {
+    it('should render descriptions for settings that have them', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = renderDialog(settings, onSelect);
+
+      const output = lastFrame();
+      // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
+      expect(output).toContain('Vim Mode');
+      expect(output).toContain('Enable Vim keybindings');
+      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
+      expect(output).toContain('Enable Auto Update');
+      expect(output).toContain('Enable automatic updates.');
+    });
+  });
+
   describe('Settings Navigation', () => {
     it.each([
       {
@@ -330,7 +353,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Enable Auto Update');
       });
 
       // Navigate up
@@ -1213,7 +1236,7 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('nonexistentsetting');
         expect(lastFrame()).toContain('');
         expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
-        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1240,7 +1263,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
           },
@@ -1251,7 +1274,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
           },
@@ -1264,7 +1287,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: true,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {
@@ -1287,7 +1310,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1325,7 +1348,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1347,7 +1370,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: true,
+              enableFuzzySearch: false,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1386,7 +1409,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: false,
+            enableAutoUpdate: true,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
           },
@@ -1397,7 +1420,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              disableLoadingPhrases: false,
+              enableLoadingPhrases: true,
               screenReader: false,
             },
           },
@@ -1410,7 +1433,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {

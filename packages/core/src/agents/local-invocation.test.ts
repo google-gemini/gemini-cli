@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { type z } from 'zod';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('./local-executor.js');
 
@@ -32,17 +33,25 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
       priority: { type: 'number', required: false, description: 'prio' },
     },
   },
-  modelConfig: { model: 'test', temp: 0, top_p: 1 },
-  runConfig: { max_time_minutes: 1 },
+  modelConfig: {
+    model: 'test',
+    generateContentConfig: {
+      temperature: 0,
+      topP: 1,
+    },
+  },
+  runConfig: { maxTimeMinutes: 1 },
   promptConfig: { systemPrompt: 'test' },
 };
 
 describe('LocalSubagentInvocation', () => {
   let mockExecutorInstance: Mocked<LocalAgentExecutor<z.ZodUnknown>>;
+  let mockMessageBus: MessageBus;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
 
     mockExecutorInstance = {
       run: vi.fn(),
@@ -55,7 +64,6 @@ describe('LocalSubagentInvocation', () => {
   });
 
   it('should pass the messageBus to the parent constructor', () => {
-    const mockMessageBus = {} as MessageBus;
     const params = { task: 'Analyze data' };
     const invocation = new LocalSubagentInvocation(
       testDefinition,
@@ -76,6 +84,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       expect(description).toBe(
@@ -90,6 +99,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default INPUT_PREVIEW_MAX_LENGTH is 50
@@ -112,6 +122,7 @@ describe('LocalSubagentInvocation', () => {
         longNameDef,
         mockConfig,
         params,
+        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default DESCRIPTION_MAX_LENGTH is 200
@@ -137,6 +148,7 @@ describe('LocalSubagentInvocation', () => {
         testDefinition,
         mockConfig,
         params,
+        mockMessageBus,
       );
     });
 
