@@ -55,6 +55,7 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['POSITRON'] === '1') {
     return IDE_DEFINITIONS.positron;
+  }
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
   }

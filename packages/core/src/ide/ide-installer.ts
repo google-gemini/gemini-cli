@@ -145,7 +145,6 @@ async function findCommand(
   return null;
 }
 
-
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
 
@@ -196,7 +195,6 @@ class VsCodeInstaller implements IdeInstaller {
   }
 }
 
-
 class PositronInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
 
@@ -246,7 +244,6 @@ class PositronInstaller implements IdeInstaller {
     }
   }
 }
-
 
 class AntigravityInstaller implements IdeInstaller {
   constructor(
