@@ -34,6 +34,7 @@ const {
     getExtensions: vi.fn(),
     loadExtensions: vi.fn(),
     getSettings: vi.fn(),
+    restartExtension: vi.fn(),
   };
   return {
     mockExtensionManager: extensionManager,

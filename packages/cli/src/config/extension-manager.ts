@@ -57,6 +57,7 @@ import {
   INSTALL_METADATA_FILENAME,
   recursivelyHydrateStrings,
   type JsonObject,
+  type VariableContext,
 } from './extensions/variables.js';
 import {
   getEnvContents,
@@ -612,23 +613,73 @@ Would you like to attempt to install via "git clone" instead?`,
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+      const hydrationContext: VariableContext = {
+        extensionPath: effectiveExtensionPath,
+        workspacePath: this.workspaceDir,
+        '/': path.sep,
+        pathSeparator: path.sep,
+        ...customEnv,
+      };
+
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
       if (
         this.settings.tools.enableHooks &&
         this.settings.hooksConfig.enabled
       ) {
-        hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
-          extensionPath: effectiveExtensionPath,
-          workspacePath: this.workspaceDir,
-        });
+        hooks = await this.loadExtensionHooks(
+          effectiveExtensionPath,
+          hydrationContext,
+        );
       }
 
-      const skills = await loadSkillsFromDir(
+      // Hydrate hooks with extension settings as environment variables
+      if (
+        hooks &&
+        hydrationContext &&
+        Object.keys(hydrationContext).length > 0
+      ) {
+        // Filter out system hydration variables to get only user-defined settings for env injection
+        const {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          extensionPath,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          workspacePath,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          pathSeparator,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          ['/']: slash,
+          ...envVars
+        } = hydrationContext;
+
+        const safeEnvVars = envVars as Record<string, string>;
+
+        if (Object.keys(safeEnvVars).length > 0) {
+          for (const eventName of Object.keys(hooks)) {
+            const eventHooks = hooks[eventName as HookEventName];
+            if (eventHooks) {
+              for (const definition of eventHooks) {
+                for (const hook of definition.hooks) {
+                  // Merge existing env with new env vars
+                  hook.env = { ...hook.env, ...safeEnvVars };
+                }
+              }
+            }
+          }
+        }
+      }
+
+      let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
+      );
+      skills = skills.map((skill) =>
+        recursivelyHydrateStrings(skill, hydrationContext),
       );
 
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
+      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
+        recursivelyHydrateStrings(agent, hydrationContext),
       );
 
       // Log errors but don't fail the entire extension load
@@ -669,6 +720,14 @@ Would you like to attempt to install via "git clone" instead?`,
       );
       return null;
     }
+  }
+
+  override async restartExtension(
+    extension: GeminiCLIExtension,
+  ): Promise<void> {
+    const extensionDir = extension.path;
+    await this.unloadExtension(extension);
+    await this.loadExtension(extensionDir);
   }
 
   /**
@@ -720,7 +779,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
   private async loadExtensionHooks(
     extensionDir: string,
-    context: { extensionPath: string; workspacePath: string },
+    context: VariableContext,
   ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
     const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
 
