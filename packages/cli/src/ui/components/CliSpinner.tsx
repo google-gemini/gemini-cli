@@ -14,16 +14,16 @@ export type SpinnerProps = ComponentProps<typeof Spinner>;
 export const CliSpinner = (props: SpinnerProps) => {
   const settings = useSettings();
 
+  if (settings.merged.ui?.showSpinner === false) {
+    return null;
+  }
+
   useEffect(() => {
     debugState.debugNumAnimatedComponents++;
     return () => {
       debugState.debugNumAnimatedComponents--;
     };
   }, []);
-
-  if (settings.merged.ui?.showSpinner === false) {
-    return null;
-  }
 
   return <Spinner {...props} />;
 };
