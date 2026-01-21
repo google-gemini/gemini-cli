@@ -276,6 +276,121 @@ describe('clipboardUtils', () => {
 
       expect(result).toBe(null);
     });
+
+    describe('optimization', () => {
+      it('should only use wl-paste if previously detected', async () => {
+        // Mock fs.stat to return size > 0
+        (fs.stat as Mock).mockResolvedValue({
+          size: 100,
+          mtimeMs: Date.now(),
+        });
+
+        // Run 1: wl-paste succeeds
+        const child1 = createMockChildProcess(true, 0);
+        (spawn as Mock).mockReturnValue(child1);
+
+        const stream1 = new EventEmitter() as EventEmitter & {
+          writableFinished: boolean;
+        };
+        stream1.writableFinished = false;
+        (createWriteStream as Mock).mockReturnValue(stream1);
+
+        const promise1 = saveClipboardImage(mockTargetDir);
+        stream1.writableFinished = true;
+        stream1.emit('finish');
+        await promise1;
+
+        // Reset mocks to track calls for Run 2
+        (spawn as Mock).mockClear();
+        // Create NEW child for Run 2
+        const child2 = createMockChildProcess(true, 0);
+        (spawn as Mock).mockReturnValue(child2);
+
+        // Create NEW stream for Run 2
+        const stream2 = new EventEmitter() as EventEmitter & {
+          writableFinished: boolean;
+        };
+        stream2.writableFinished = false;
+        (createWriteStream as Mock).mockReturnValue(stream2);
+
+        // Run 2
+        const promise2 = saveClipboardImage(mockTargetDir);
+        stream2.writableFinished = true;
+        stream2.emit('finish');
+        await promise2;
+
+        // Should only have called wl-paste
+        expect(spawn).toHaveBeenCalledTimes(1);
+        expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
+        expect(spawn).not.toHaveBeenCalledWith('xclip', expect.any(Array));
+      });
+
+      it('should only use xclip if previously detected', async () => {
+        // Mock fs.stat to return size > 0
+        (fs.stat as Mock).mockResolvedValue({
+          size: 100,
+          mtimeMs: Date.now(),
+        });
+
+        // Run 1: wl-paste fails, xclip succeeds
+        const failChild = createMockChildProcess(true, 1);
+        const successChild = createMockChildProcess(true, 0);
+
+        (spawn as Mock)
+          .mockReturnValueOnce(failChild)
+          .mockReturnValueOnce(successChild);
+
+        const stream1 = new EventEmitter() as EventEmitter & {
+          writableFinished: boolean;
+        };
+        stream1.writableFinished = false;
+        const stream2 = new EventEmitter() as EventEmitter & {
+          writableFinished: boolean;
+        };
+        stream2.writableFinished = false;
+
+        (createWriteStream as Mock)
+          .mockReturnValueOnce(stream1)
+          .mockReturnValueOnce(stream2);
+
+        const promise1 = saveClipboardImage(mockTargetDir);
+
+        // Fail stream finish
+        stream1.writableFinished = true;
+        stream1.emit('finish');
+
+        // Success stream finish
+        stream2.writableFinished = true;
+        stream2.emit('finish');
+
+        await promise1;
+
+        // Reset mocks for Run 2
+        (spawn as Mock).mockClear();
+        // Create NEW child for Run 2
+        const childRun2 = createMockChildProcess(true, 0);
+        // Return successChild. If wl-paste were called, it would succeed.
+        // But we expect it NOT to be called.
+        (spawn as Mock).mockReturnValue(childRun2);
+
+        const streamRun2 = new EventEmitter() as EventEmitter & {
+          writableFinished: boolean;
+        };
+        streamRun2.writableFinished = false;
+        (createWriteStream as Mock).mockReturnValue(streamRun2);
+
+        // Run 2
+        const promise2 = saveClipboardImage(mockTargetDir);
+        streamRun2.writableFinished = true;
+        streamRun2.emit('finish');
+        await promise2;
+
+        // Should only have called xclip
+        expect(spawn).toHaveBeenCalledTimes(1);
+        expect(spawn).toHaveBeenCalledWith('xclip', expect.any(Array));
+        expect(spawn).not.toHaveBeenCalledWith('wl-paste', expect.any(Array));
+      });
+    });
   });
 
   describe('cleanupOldClipboardImages', () => {
