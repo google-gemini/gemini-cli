@@ -234,7 +234,7 @@ describe('executeToolWithHooks', () => {
       continue: true,
       hookSpecificOutput: {
         hookEventName: 'BeforeTool',
-        // No tool_input
+        // No tool input
       },
     });
     vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue(
