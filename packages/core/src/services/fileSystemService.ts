@@ -578,11 +578,11 @@ export class VirtualFileSystem implements FileSystemService {
         throw new Error(`File conflict: ${filePath} has been modified externally. Keeping existing version.`);
 
       case ConflictResolution.MERGE:
-        // For now, overwrite (could be enhanced with LLM-based merging)
+        // True merge is not yet implemented. Throw an error to prevent data loss.
         if (this.config.enableLogging) {
-          console.log(`[VFS] Auto-resolving conflict by overwriting ${filePath}`);
+          console.warn(`[VFS] Auto-merge is not implemented for ${filePath}. Manual resolution is required.`);
         }
-        break;
+        throw new Error(`File conflict: ${filePath} requires a merge, but auto-merging is not yet implemented. Please resolve manually.`);
 
       case ConflictResolution.MANUAL:
         throw new Error(`File conflict: ${filePath} has been modified externally. Manual resolution required.`);
