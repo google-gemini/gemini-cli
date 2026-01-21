@@ -1,5 +1,20 @@
 {
   "experimental": {
-    "skills": true
+    "skills": true,
+    "useModelRouter": {
+      "enabled": true,
+      // "useGemmaRouting": {
+      //   "enabled": true,
+      //   "host": "http://localhost:11434",
+      //   "model": "gemma3:1b",
+      //   "provider": "ollama"
+      // }
+      "useGemmaRouting": {
+        "enabled": true,
+        "host": "http://localhost:3000",
+        "model": "gemma3:1b",
+        "provider": "litert-lm"
+      }
+    }
   }
 }

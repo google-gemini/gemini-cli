@@ -144,6 +144,16 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface UseModelRouterSettings {
+  enabled?: boolean;
+  useGemmaRouting?: {
+    enabled?: boolean;
+    model?: string;
+    host?: string;
+    provider?: 'ollama' | 'litert-lm';
+  };
+}
+
 export interface CodebaseInvestigatorSettings {
   enabled?: boolean;
   maxNumTurns?: number;
@@ -367,6 +377,7 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
+  useModelRouter?: UseModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   cliHelpAgentSettings?: CliHelpAgentSettings;
@@ -513,6 +524,7 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
+  private readonly useModelRouter: UseModelRouterSettings;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -723,6 +735,17 @@ export class Config {
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
+    };
+    this.useModelRouter = {
+      enabled: params.useModelRouter?.enabled ?? false,
+      useGemmaRouting: {
+        enabled: params.useModelRouter?.useGemmaRouting?.enabled ?? false,
+        model: params.useModelRouter?.useGemmaRouting?.model ?? 'gemma3n:e2b',
+        host:
+          params.useModelRouter?.useGemmaRouting?.host ??
+          'http://localhost:11434',
+        provider: params.useModelRouter?.useGemmaRouting?.provider ?? 'ollama',
+      },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
@@ -1889,6 +1912,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getUseModelRouter(): boolean {
+    return this.useModelRouter.enabled ?? false;
+  }
+
+  getUseGemmaRoutingSettings(): UseModelRouterSettings['useGemmaRouting'] {
+    return this.useModelRouter.useGemmaRouting;
   }
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {

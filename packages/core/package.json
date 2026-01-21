@@ -55,6 +55,7 @@
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
     "js-yaml": "^4.1.1",
+    "jsonrepair": "^3.6.0",
     "marked": "^15.0.12",
     "mime": "4.0.7",
     "mnemonist": "^0.40.3",
@@ -69,6 +70,7 @@
     "undici": "^7.10.0",
     "uuid": "^13.0.0",
     "web-tree-sitter": "^0.25.10",
+    "ollama": "^0.5.0",
     "zod": "^3.25.76"
   },
   "optionalDependencies": {
