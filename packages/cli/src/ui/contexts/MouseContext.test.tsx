@@ -139,63 +139,63 @@ describe('MouseContext', () => {
         sequence: '\x1b[<0;10;20M',
         expected: {
           name: 'left-press',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<0;10;20m',
         expected: {
           name: 'left-release',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<2;10;20M',
         expected: {
           name: 'right-press',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<1;10;20M',
         expected: {
           name: 'middle-press',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<64;10;20M',
         expected: {
           name: 'scroll-up',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<65;10;20M',
         expected: {
           name: 'scroll-down',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
         sequence: '\x1b[<32;10;20M',
         expected: {
           name: 'move',
+          shift: false,
           ctrl: false,
           meta: false,
-          shift: false,
         },
       },
       {
@@ -208,7 +208,7 @@ describe('MouseContext', () => {
       }, // Alt + left press
       {
         sequence: '\x1b[<20;10;20M',
-        expected: { name: 'left-press', ctrl: true, shift: true },
+        expected: { name: 'left-press', shift: true, ctrl: true },
       }, // Ctrl + Shift + left press
       {
         sequence: '\x1b[<68;10;20M',

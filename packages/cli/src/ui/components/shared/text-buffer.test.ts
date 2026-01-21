@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
-import { renderHook } from '../../../test-utils/render.js';
+import {
+  renderHook,
+  renderHookWithProviders,
+} from '../../../test-utils/render.js';
 import type {
   Viewport,
   TextBuffer,
@@ -55,6 +58,10 @@ const initialState: TextBufferState = {
 };
 
 describe('textBufferReducer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should return the initial state if state is undefined', () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
@@ -379,6 +386,10 @@ describe('useTextBuffer', () => {
 
   beforeEach(() => {
     viewport = { width: 10, height: 3 }; // Default viewport for tests
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('Initialization', () => {
@@ -1048,9 +1059,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'h',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: 'h',
         }),
@@ -1058,9 +1070,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'i',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: 'i',
         }),
@@ -1075,11 +1088,30 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
+        }),
+      );
+      expect(getBufferState(result).lines).toEqual(['', '']);
+    });
+
+    it('should handle Ctrl+J as newline', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'j',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+          insertable: false,
+          sequence: '\n',
         }),
       );
       expect(getBufferState(result).lines).toEqual(['', '']);
@@ -1092,9 +1124,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'tab',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\t',
         }),
@@ -1109,9 +1142,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'tab',
-          ctrl: false,
-          meta: false,
           shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\u001b[9;2u',
         }),
@@ -1131,9 +1165,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         }),
@@ -1155,25 +1190,28 @@ describe('useTextBuffer', () => {
       act(() => {
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
@@ -1230,24 +1268,26 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'left',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x1b[D',
         }),
-      ); // cursor [0,1]
+      );
       expect(getBufferState(result).cursor).toEqual([0, 1]);
       act(() =>
         result.current.handleInput({
           name: 'right',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x1b[C',
         }),
-      ); // cursor [0,2]
+      );
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
@@ -1260,9 +1300,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: textWithAnsi,
         }),
@@ -1277,9 +1318,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1481,13 +1523,13 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   describe('Input Sanitization', () => {
     const createInput = (sequence: string) => ({
       name: '',
-      ctrl: false,
-      meta: false,
       shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
       insertable: true,
       sequence,
     });
-
     it.each([
       {
         input: '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m',
@@ -1539,9 +1581,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: largeTextWithUnsafe,
         }),
@@ -1573,9 +1616,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: largeTextWithAnsi,
         }),
@@ -1597,9 +1641,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: emojis,
         }),
@@ -1788,9 +1833,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1809,9 +1855,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: 'f1',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\u001bOP',
         }),
@@ -2371,6 +2418,10 @@ describe('Unicode helper functions', () => {
 });
 
 describe('Transformation Utilities', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('getTransformedImagePath', () => {
     it('should transform a simple image path', () => {
       expect(getTransformedImagePath('@test.png')).toBe('[Image test.png]');
@@ -2545,6 +2596,127 @@ describe('Transformation Utilities', () => {
       const result = calculateTransformedLine('', 0, [0, 0], []);
       expect(result.transformedLine).toBe('');
       expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
+    });
+  });
+
+  describe('Layout Caching and Invalidation', () => {
+    it.each([
+      {
+        desc: 'via setText',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.setText('changed line'),
+        expected: 'changed line',
+      },
+      {
+        desc: 'via replaceRange',
+        actFn: (result: { current: TextBuffer }) =>
+          result.current.replaceRange(0, 0, 0, 13, 'changed line'),
+        expected: 'changed line',
+      },
+    ])(
+      'should invalidate cache when line content changes $desc',
+      ({ actFn, expected }) => {
+        const viewport = { width: 80, height: 24 };
+        const { result } = renderHookWithProviders(() =>
+          useTextBuffer({
+            initialText: 'original line',
+            viewport,
+            isValidPath: () => true,
+          }),
+        );
+
+        const originalLayout = result.current.visualLayout;
+
+        act(() => {
+          actFn(result);
+        });
+
+        expect(result.current.visualLayout).not.toBe(originalLayout);
+        expect(result.current.allVisualLines[0]).toBe(expected);
+      },
+    );
+
+    it('should invalidate cache when viewport width changes', () => {
+      const viewport = { width: 80, height: 24 };
+      const { result, rerender } = renderHookWithProviders(
+        ({ vp }) =>
+          useTextBuffer({
+            initialText:
+              'a very long line that will wrap when the viewport is small',
+            viewport: vp,
+            isValidPath: () => true,
+          }),
+        { initialProps: { vp: viewport } },
+      );
+
+      const originalLayout = result.current.visualLayout;
+
+      // Shrink viewport to force wrapping change
+      rerender({ vp: { width: 10, height: 24 } });
+
+      expect(result.current.visualLayout).not.toBe(originalLayout);
+      expect(result.current.allVisualLines.length).toBeGreaterThan(1);
+    });
+
+    it('should correctly handle cursor expansion/collapse in cached layout', () => {
+      const viewport = { width: 80, height: 24 };
+      const text = 'Check @image.png here';
+      const { result } = renderHookWithProviders(() =>
+        useTextBuffer({
+          initialText: text,
+          viewport,
+          isValidPath: () => true,
+        }),
+      );
+
+      // Cursor at start (collapsed)
+      act(() => {
+        result.current.moveToOffset(0);
+      });
+      expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
+
+      // Move cursor onto the @path (expanded)
+      act(() => {
+        result.current.moveToOffset(7); // onto @
+      });
+      expect(result.current.allVisualLines[0]).toContain('@image.png');
+      expect(result.current.allVisualLines[0]).not.toContain(
+        '[Image image.png]',
+      );
+
+      // Move cursor away (collapsed again)
+      act(() => {
+        result.current.moveToOffset(0);
+      });
+      expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
+    });
+
+    it('should reuse cache for unchanged lines during editing', () => {
+      const viewport = { width: 80, height: 24 };
+      const initialText = 'line 1\nline 2\nline 3';
+      const { result } = renderHookWithProviders(() =>
+        useTextBuffer({
+          initialText,
+          viewport,
+          isValidPath: () => true,
+        }),
+      );
+
+      const layout1 = result.current.visualLayout;
+
+      // Edit line 1
+      act(() => {
+        result.current.moveToOffset(0);
+        result.current.insert('X');
+      });
+
+      const layout2 = result.current.visualLayout;
+      expect(layout2).not.toBe(layout1);
+
+      // Verify that visual lines for line 2 and 3 (indices 1 and 2 in visualLines)
+      // are identical in content if not in object reference (the arrays are rebuilt, but contents are cached)
+      expect(result.current.allVisualLines[1]).toBe('line 2');
+      expect(result.current.allVisualLines[2]).toBe('line 3');
     });
   });
 });

@@ -166,6 +166,7 @@ const mockUIActions: UIActions = {
   handleFinalSubmit: vi.fn(),
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
+  handleValidationChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
@@ -173,6 +174,7 @@ const mockUIActions: UIActions = {
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (
