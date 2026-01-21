@@ -6,8 +6,6 @@
 
 import { z } from 'zod';
 
-// TODO(sid): change the whole context engineering etc.
-
 // TODO(sid): add error handling if the localhost env is not reachable.
 
 // TODO(sid): add tests.
@@ -19,7 +17,7 @@ import type {
   RoutingStrategy,
 } from '../routingStrategy.js';
 import { resolveClassifierModel } from '../../config/models.js';
-import { createUserContent } from '@google/genai';
+import { createUserContent, type Content, type Part } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
   isFunctionCall,
@@ -36,7 +34,7 @@ const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
 const LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT = `### Role
-You are the **Lead Orchestrator** for an AI system. You do not talk to users. Your sole responsibility is to analyze the **Chat History** and delegate the **User Request** to the most appropriate **Model** based on the request's complexity.
+You are the **Lead Orchestrator** for an AI system. You do not talk to users. Your sole responsibility is to analyze the **Chat History** and delegate the **Current Request** to the most appropriate **Model** based on the request's complexity.
 
 ### Models
 Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
@@ -121,7 +119,7 @@ When making your decision, the user's request should be weighted much more heavi
 `;
 
 const LITERT_GEMMA_CLASSIFIER_REMINDER = `### Reminder
-You are a Task Routing AI. Your sole task is to analyze the preceding **Chat History** and **User Request** and classify its complexity.
+You are a Task Routing AI. Your sole task is to analyze the preceding **Chat History** and **Current Request** and classify its complexity.
 
 ### Complexity Rubric
 A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
@@ -163,6 +161,33 @@ const ClassifierResponseSchema = z.object({
 export class GemmaClassifierStrategy implements RoutingStrategy {
   readonly name = 'gemma-classifier';
 
+  private flattenChatHistory(turns: Content[]): Content[] {
+    let formattedHistory = '';
+    for (const turn of turns.slice(0, -1)) {
+      let parts = '';
+      if (turn.parts) {
+        for (const part of turn.parts) {
+          parts += `${part.text}\n\n`;
+        }
+      }
+      formattedHistory += `${parts}\n`;
+    }
+
+    const lastTurn = turns.at(-1);
+    const userRequest =
+      lastTurn?.parts?.map((part: Part) => part.text).join('\n\n') ?? '';
+
+    const finalPrompt = `You are provided with a **Chat History** and the user's **Current Request** below.
+
+#### Chat History:
+${formattedHistory}
+
+#### Current Request:
+"${userRequest}"
+`;
+    return [createUserContent(finalPrompt)];
+  }
+
   async route(
     context: RoutingContext,
     config: Config,
@@ -188,10 +213,11 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
       debugLogger.log(`[Routing] About to call Gemma classifier.`);
 
       const history = [...finalHistory, createUserContent(context.request)];
+      const singleMessageHistory = this.flattenChatHistory(history);
 
       const client = new LocalGeminiClient(config);
       const jsonResponse = await client.generateJson(
-        history,
+        singleMessageHistory,
         LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT,
         LITERT_GEMMA_CLASSIFIER_REMINDER,
       );
