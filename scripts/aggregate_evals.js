@@ -32,11 +32,33 @@ function findReports(dir) {
   return reports;
 }
 
+function getModelFromPath(reportPath) {
+  const parts = reportPath.split(path.sep);
+  // Find the part that starts with 'eval-logs-'
+  const artifactDir = parts.find((p) => p.startsWith('eval-logs-'));
+  if (!artifactDir) return 'unknown';
+
+  const matchNew = artifactDir.match(/^eval-logs-(.+)-(\d+)$/);
+  if (matchNew) return matchNew[1];
+
+  const matchOld = artifactDir.match(/^eval-logs-(\d+)$/);
+  if (matchOld) return 'gemini-2.5-pro'; // Legacy default
+
+  return 'unknown';
+}
+
 function getStats(reports) {
-  const testStats = {};
+  // Structure: { [model]: { [testName]: { passed, failed, total } } }
+  const statsByModel = {};
 
   for (const reportPath of reports) {
     try {
+      const model = getModelFromPath(reportPath);
+      if (!statsByModel[model]) {
+        statsByModel[model] = {};
+      }
+      const testStats = statsByModel[model];
+
       const content = fs.readFileSync(reportPath, 'utf-8');
       const json = JSON.parse(content);
 
@@ -58,7 +80,7 @@ function getStats(reports) {
       console.error(`Error processing report at ${reportPath}:`, error);
     }
   }
-  return testStats;
+  return statsByModel;
 }
 
 function fetchHistoricalData() {
@@ -92,7 +114,7 @@ function fetchHistoricalData() {
       );
       try {
         // Download report.json files.
-        // The artifacts are named 'eval-logs-X'.
+        // The artifacts are named 'eval-logs-X' or 'eval-logs-MODEL-X'.
         // We use -p to match pattern.
         execSync(
           `gh run download ${run.databaseId} -p "eval-logs-*" -D "${tmpDir}"`,
@@ -103,7 +125,7 @@ function fetchHistoricalData() {
         if (runReports.length > 0) {
           history.push({
             run,
-            stats: getStats(runReports),
+            stats: getStats(runReports), // Now returns stats grouped by model
           });
         }
       } catch (error) {
@@ -122,23 +144,8 @@ function fetchHistoricalData() {
   return history;
 }
 
-function generateMarkdown(currentStats, history) {
-  const totalStats = Object.values(currentStats).reduce(
-    (acc, stats) => {
-      acc.passed += stats.passed;
-      acc.total += stats.total;
-      return acc;
-    },
-    { passed: 0, total: 0 },
-  );
-
-  const totalPassRate =
-    totalStats.total > 0
-      ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
-      : 'N/A';
-
-  console.log('### Evals Nightly Summary');
-  console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
+function generateMarkdown(currentStatsByModel, history) {
+  console.log('### Evals Nightly Summary\n');
   console.log(
     'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
   );
@@ -146,53 +153,80 @@ function generateMarkdown(currentStats, history) {
   // Reverse history to show oldest first
   const reversedHistory = [...history].reverse();
 
-  // Header
-  let header = '| Test Name |';
-  let separator = '| :--- |';
+  const models = Object.keys(currentStatsByModel).sort();
 
-  for (const item of reversedHistory) {
-    header += ` [${item.run.databaseId}](${item.run.url}) |`;
-    separator += ' :---: |';
-  }
+  for (const model of models) {
+    const currentStats = currentStatsByModel[model];
+    const totalStats = Object.values(currentStats).reduce(
+      (acc, stats) => {
+        acc.passed += stats.passed;
+        acc.total += stats.total;
+        return acc;
+      },
+      { passed: 0, total: 0 },
+    );
 
-  // Add Current column last
-  header += ' Current |';
-  separator += ' :---: |';
+    const totalPassRate =
+      totalStats.total > 0
+        ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
+        : 'N/A';
 
-  console.log(header);
-  console.log(separator);
+    console.log(`#### Model: ${model}`);
+    console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
 
-  // Collect all test names
-  const allTestNames = new Set(Object.keys(currentStats));
-  for (const item of reversedHistory) {
-    Object.keys(item.stats).forEach((name) => allTestNames.add(name));
-  }
+    // Header
+    let header = '| Test Name |';
+    let separator = '| :--- |';
 
-  for (const name of Array.from(allTestNames).sort()) {
-    const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
-    let row = `| [${name}](${searchUrl}) |`;
-
-    // History
     for (const item of reversedHistory) {
-      const stat = item.stats[name];
-      if (stat) {
-        const passRate = ((stat.passed / stat.total) * 100).toFixed(0) + '%';
+      header += ` [${item.run.databaseId}](${item.run.url}) |`;
+      separator += ' :---: |';
+    }
+
+    // Add Current column last
+    header += ' Current |';
+    separator += ' :---: |';
+
+    console.log(header);
+    console.log(separator);
+
+    // Collect all test names for this model
+    const allTestNames = new Set(Object.keys(currentStats));
+    for (const item of reversedHistory) {
+      if (item.stats[model]) {
+        Object.keys(item.stats[model]).forEach((name) =>
+          allTestNames.add(name),
+        );
+      }
+    }
+
+    for (const name of Array.from(allTestNames).sort()) {
+      const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
+      let row = `| [${name}](${searchUrl}) |`;
+
+      // History
+      for (const item of reversedHistory) {
+        const stat = item.stats[model] ? item.stats[model][name] : null;
+        if (stat) {
+          const passRate = ((stat.passed / stat.total) * 100).toFixed(0) + '%';
+          row += ` ${passRate} |`;
+        } else {
+          row += ' - |';
+        }
+      }
+
+      // Current
+      const curr = currentStats[name];
+      if (curr) {
+        const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
         row += ` ${passRate} |`;
       } else {
         row += ' - |';
       }
-    }
 
-    // Current
-    const curr = currentStats[name];
-    if (curr) {
-      const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
-      row += ` ${passRate} |`;
-    } else {
-      row += ' - |';
+      console.log(row);
     }
-
-    console.log(row);
+    console.log('\n');
   }
 }
 

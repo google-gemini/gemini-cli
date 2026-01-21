@@ -22,6 +22,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        model:
+          - 'gemini-3-pro-preview'
+          - 'gemini-3-flash-preview'
+          - 'gemini-2.5-pro'
+          - 'gemini-2.5-flash'
+          - 'gemini-2.5-flash-lite'
         run_attempt: [1, 2, 3]
     steps:
       - name: 'Checkout'
@@ -45,6 +51,7 @@ jobs:
       - name: 'Run Evals'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
         run: 'npm run test:all_evals'
 
@@ -52,7 +59,7 @@ jobs:
         if: 'always()'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'eval-logs-${{ matrix.run_attempt }}'
+          name: 'eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}'
           path: 'evals/logs'
           retention-days: 7
 
