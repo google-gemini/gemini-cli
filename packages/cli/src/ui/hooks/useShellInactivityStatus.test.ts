@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act } from 'react';
+import { renderHook } from '../../test-utils/render.js';
 import { useShellInactivityStatus } from './useShellInactivityStatus.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import { StreamingState } from '../types.js';
@@ -21,6 +22,11 @@ describe('useShellInactivityStatus', () => {
       operationStartTime: 1000,
       isRedirectionActive: false,
     });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   const defaultProps = {

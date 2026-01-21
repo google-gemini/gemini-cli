@@ -11,7 +11,6 @@ import { Text } from 'ink';
 import {
   usePhraseCycler,
   PHRASE_CHANGE_INTERVAL_MS,
-  INTERACTIVE_SHELL_WAITING_PHRASE,
 } from './usePhraseCycler.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
@@ -62,7 +61,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should show interactive shell waiting message immediately when isInteractiveShellWaiting is true', async () => {
@@ -79,7 +78,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should prioritize interactive shell waiting over normal waiting immediately', async () => {
@@ -89,7 +88,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
 
     rerender(
       <TestComponent
@@ -101,7 +100,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should not cycle phrases if isActive is false and not waiting', async () => {
@@ -320,7 +319,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
 
     // Go back to active cycling - should pick a phrase based on the logic (witty due to mock)
     rerender(<TestComponent isActive={true} isWaiting={false} />);

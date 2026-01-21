@@ -29,21 +29,22 @@ export const useTurnActivityMonitor = (
   // We consider an operation to have started when we enter Responding state,
   // OR when the active PTY changes (meaning a new command started within the turn).
   const prevPtyIdRef = useRef<number | string | null | undefined>(undefined);
+  const prevStreamingStateRef = useRef<StreamingState | undefined>(undefined);
+
   useEffect(() => {
     const isNowResponding = streamingState === StreamingState.Responding;
+    const wasResponding =
+      prevStreamingStateRef.current === StreamingState.Responding;
     const ptyChanged = activePtyId !== prevPtyIdRef.current;
 
-    if (isNowResponding) {
-      if (ptyChanged) {
-        setOperationStartTime(Date.now());
-      } else {
-        setOperationStartTime((prev) => (prev === 0 ? Date.now() : prev));
-      }
-    } else {
+    if (isNowResponding && (!wasResponding || ptyChanged)) {
+      setOperationStartTime(Date.now());
+    } else if (!isNowResponding && wasResponding) {
       setOperationStartTime(0);
     }
 
     prevPtyIdRef.current = activePtyId;
+    prevStreamingStateRef.current = streamingState;
   }, [streamingState, activePtyId]);
 
   // Detect redirection in the current query or tool calls.

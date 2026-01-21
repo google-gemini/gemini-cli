@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import { StreamingState } from '../types.js';
@@ -26,6 +26,11 @@ describe('useTurnActivityMonitor', () => {
     vi.mocked(hasRedirection).mockImplementation(
       (query: string) => query.includes('>') || query.includes('>>'),
     );
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it('should set operationStartTime when entering Responding state', () => {
