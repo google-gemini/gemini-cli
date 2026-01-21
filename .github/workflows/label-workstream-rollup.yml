@@ -154,4 +154,3 @@ jobs:
             } else {
               console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
               await processAllOpenIssues(context.repo.owner, context.repo.repo);
-
