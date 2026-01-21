@@ -73,7 +73,10 @@ describe('executeToolWithHooks', () => {
     vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
       shouldStopExecution: () => true,
       getEffectiveReason: () => 'Stop immediately',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
+      getBlockingError: () => ({
+        blocked: false,
+        reason: 'Should be ignored because continue is false',
+      }),
     } as unknown as DefaultHookOutput);
 
     const result = await executeToolWithHooks(
@@ -227,12 +230,16 @@ describe('executeToolWithHooks', () => {
     const toolName = 'test-tool';
     const abortSignal = new AbortController().signal;
 
-    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
-      shouldStopExecution: () => false,
-      getEffectiveReason: () => '',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
-      getModifiedToolInput: () => undefined,
-    } as unknown as DefaultHookOutput);
+    const mockBeforeOutput = new BeforeToolHookOutput({
+      continue: true,
+      hookSpecificOutput: {
+        hookEventName: 'BeforeTool',
+        // No tool_input
+      },
+    });
+    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue(
+      mockBeforeOutput,
+    );
 
     vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue(undefined);
 
