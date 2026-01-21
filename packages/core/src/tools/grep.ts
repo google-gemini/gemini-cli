@@ -75,47 +75,6 @@ class GrepToolInvocation extends BaseToolInvocation<
   }
 
   /**
-   * Checks if a path is within the root directory and resolves it.
-   * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
-   * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
-   */
-  private resolveAndValidatePath(relativePath?: string): string | null {
-    // If no path specified, return null to indicate searching all workspace directories
-    if (!relativePath) {
-      return null;
-    }
-
-    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
-
-    // Security Check: Ensure the resolved path is within workspace boundaries
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-      const directories = workspaceContext.getDirectories();
-      throw new Error(
-        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-      );
-    }
-
-    // Check existence and type after resolving
-    try {
-      const stats = fs.statSync(targetPath);
-      if (!stats.isDirectory()) {
-        throw new Error(`Path is not a directory: ${targetPath}`);
-      }
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code !== 'ENOENT') {
-        throw new Error(`Path does not exist: ${targetPath}`);
-      }
-      throw new Error(
-        `Failed to access path stats for ${targetPath}: ${error}`,
-      );
-    }
-
-    return targetPath;
-  }
-
-  /**
    * Parses a single line of grep-like output (git grep, system grep).
    * Expects format: filePath:lineNumber:lineContent
    * @param {string} line The line to parse.
@@ -159,8 +118,33 @@ class GrepToolInvocation extends BaseToolInvocation<
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
       const workspaceContext = this.config.getWorkspaceContext();
-      const searchDirAbs = this.resolveAndValidatePath(this.params.dir_path);
-      const searchDirDisplay = this.params.dir_path || '.';
+      const pathParam = this.params.dir_path;
+
+      let searchDirAbs: string | null = null;
+      if (pathParam) {
+        searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+        const validationError =
+          this.config.getValidationErrorForPath(searchDirAbs);
+        if (validationError) {
+          throw new Error(validationError);
+        }
+
+        try {
+          const stats = fs.statSync(searchDirAbs);
+          if (!stats.isDirectory()) {
+            throw new Error(`Path is not a directory: ${searchDirAbs}`);
+          }
+        } catch (error: unknown) {
+          if (isNodeError(error) && error.code === 'ENOENT') {
+            throw new Error(`Path does not exist: ${searchDirAbs}`);
+          }
+          throw new Error(
+            `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          );
+        }
+      }
+
+      const searchDirDisplay = pathParam || '.';
 
       // Determine which directories to search
       let searchDirectories: readonly string[];
@@ -256,7 +240,8 @@ class GrepToolInvocation extends BaseToolInvocation<
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
-        llmContent += `File: ${filePath}\n`;
+        llmContent += `File: ${filePath}
+`;
         matchesByFile[filePath].forEach((match) => {
           const trimmedLine = match.line.trim();
           llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
@@ -587,47 +572,6 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   }
 
   /**
-   * Checks if a path is within the root directory and resolves it.
-   * @param relativePath Path relative to the root directory (or undefined for root).
-   * @returns The absolute path if valid and exists, or null if no path specified (to search all directories).
-   * @throws {Error} If path is outside root, doesn't exist, or isn't a directory.
-   */
-  private resolveAndValidatePath(relativePath?: string): string | null {
-    // If no path specified, return null to indicate searching all workspace directories
-    if (!relativePath) {
-      return null;
-    }
-
-    const targetPath = path.resolve(this.config.getTargetDir(), relativePath);
-
-    // Security Check: Ensure the resolved path is within workspace boundaries
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-      const directories = workspaceContext.getDirectories();
-      throw new Error(
-        `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-      );
-    }
-
-    // Check existence and type after resolving
-    try {
-      const stats = fs.statSync(targetPath);
-      if (!stats.isDirectory()) {
-        throw new Error(`Path is not a directory: ${targetPath}`);
-      }
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code !== 'ENOENT') {
-        throw new Error(`Path does not exist: ${targetPath}`);
-      }
-      throw new Error(
-        `Failed to access path stats for ${targetPath}: ${error}`,
-      );
-    }
-
-    return targetPath;
-  }
-
-  /**
    * Validates the parameters for the tool
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
@@ -643,10 +587,27 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
 
     // Only validate dir_path if one is provided
     if (params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
+      );
+      const validationError =
+        this.config.getValidationErrorForPath(resolvedPath);
+      if (validationError) {
+        return validationError;
+      }
+
+      // We still want to check if it's a directory
       try {
-        this.resolveAndValidatePath(params.dir_path);
-      } catch (error) {
-        return getErrorMessage(error);
+        const stats = fs.statSync(resolvedPath);
+        if (!stats.isDirectory()) {
+          return `Path is not a directory: ${resolvedPath}`;
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return `Path does not exist: ${resolvedPath}`;
+        }
+        return `Failed to access path stats for ${resolvedPath}: ${getErrorMessage(error)}`;
       }
     }
 

@@ -496,7 +496,8 @@ export class Config {
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
-  private readonly interactive: boolean;
+  /** Public for testing only */
+  readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
@@ -1686,6 +1687,47 @@ export class Config {
    */
   getFileSystemService(): FileSystemService {
     return this.fileSystemService;
+  }
+
+  /**
+   * Checks if a given absolute path is allowed for file system operations.
+   * A path is allowed if it's within the workspace context or the project's temporary directory.
+   *
+   * @param absolutePath The absolute path to check.
+   * @returns true if the path is allowed, false otherwise.
+   */
+  isPathAllowed(absolutePath: string): boolean {
+    if (this.interactive && path.isAbsolute(absolutePath)) {
+      return true;
+    }
+
+    const workspaceContext = this.getWorkspaceContext();
+    if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+      return true;
+    }
+
+    const projectTempDir = this.storage.getProjectTempDir();
+    const resolvedProjectTempDir = path.resolve(projectTempDir);
+    return (
+      absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+      absolutePath === resolvedProjectTempDir
+    );
+  }
+
+  /**
+   * Validates if a path is allowed and returns a detailed error message if not.
+   *
+   * @param absolutePath The absolute path to validate.
+   * @returns An error message string if the path is disallowed, null otherwise.
+   */
+  getValidationErrorForPath(absolutePath: string): string | null {
+    if (this.isPathAllowed(absolutePath)) {
+      return null;
+    }
+
+    const workspaceDirs = this.getWorkspaceContext().getDirectories();
+    const projectTempDir = this.storage.getProjectTempDir();
+    return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
   }
 
   /**

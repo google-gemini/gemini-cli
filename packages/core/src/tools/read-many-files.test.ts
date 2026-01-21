@@ -90,7 +90,35 @@ describe('ReadManyFilesTool', () => {
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
       isInteractive: () => false,
-    } as Partial<Config> as Config;
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const wc = this.getWorkspaceContext();
+        if (wc.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      getValidationErrorForPath(
+        this: Config,
+        absolutePath: string,
+      ): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
     tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
     mockReadFileFn = mockControl.mockReadFile;
@@ -505,7 +533,35 @@ describe('ReadManyFilesTool', () => {
           getReadManyFilesExcludes: () => [],
         }),
         isInteractive: () => false,
-      } as Partial<Config> as Config;
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const wc = this.getWorkspaceContext();
+          if (wc.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          const resolvedProjectTempDir = path.resolve(projectTempDir);
+          return (
+            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+            absolutePath === resolvedProjectTempDir
+          );
+        },
+        getValidationErrorForPath(
+          this: Config,
+          absolutePath: string,
+        ): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
+      } as unknown as Config;
       tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
       fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');

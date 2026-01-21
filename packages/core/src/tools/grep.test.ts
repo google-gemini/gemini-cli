@@ -42,17 +42,47 @@ describe('GrepTool', () => {
   let tempRootDir: string;
   let grepTool: GrepTool;
   const abortSignal = new AbortController().signal;
-
-  const mockConfig = {
-    getTargetDir: () => tempRootDir,
-    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
-    getFileExclusions: () => ({
-      getGlobExcludes: () => [],
-    }),
-  } as unknown as Config;
+  let mockConfig: Config;
 
   beforeEach(async () => {
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
+
+    mockConfig = {
+      getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getFileExclusions: () => ({
+        getGlobExcludes: () => [],
+      }),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      getValidationErrorForPath(
+        this: Config,
+        absolutePath: string,
+      ): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
+
     grepTool = new GrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
@@ -120,7 +150,7 @@ describe('GrepTool', () => {
       };
       // Check for the core error message, as the full path might vary
       expect(grepTool.validateToolParams(params)).toContain(
-        'Failed to access path stats for',
+        'Path does not exist',
       );
       expect(grepTool.validateToolParams(params)).toContain('nonexistent');
     });
@@ -311,6 +341,34 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          const resolvedProjectTempDir = path.resolve(projectTempDir);
+          return (
+            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+            absolutePath === resolvedProjectTempDir
+          );
+        },
+        getValidationErrorForPath(
+          this: Config,
+          absolutePath: string,
+        ): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(
@@ -367,6 +425,34 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          const resolvedProjectTempDir = path.resolve(projectTempDir);
+          return (
+            absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+            absolutePath === resolvedProjectTempDir
+          );
+        },
+        getValidationErrorForPath(
+          this: Config,
+          absolutePath: string,
+        ): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(

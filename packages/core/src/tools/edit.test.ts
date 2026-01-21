@@ -122,6 +122,34 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const wc = this.getWorkspaceContext();
+        if (wc.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      getValidationErrorForPath(
+        this: Config,
+        absolutePath: string,
+      ): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
     (mockConfig.getApprovalMode as Mock).mockClear();
@@ -370,9 +398,7 @@ describe('EditTool', () => {
         old_string: 'old',
         new_string: 'new',
       };
-      expect(tool.validateToolParams(params)).toMatch(
-        /must be within one of the workspace directories/,
-      );
+      expect(tool.validateToolParams(params)).toMatch(/Path validation failed/);
     });
   });
 

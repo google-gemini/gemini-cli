@@ -453,12 +453,9 @@ export class WriteFileTool
 
     const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(
-        ', ',
-      )}`;
+    const validationError = this.config.getValidationErrorForPath(resolvedPath);
+    if (validationError) {
+      return validationError;
     }
 
     try {

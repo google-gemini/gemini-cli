@@ -123,13 +123,14 @@ class GlobToolInvocation extends BaseToolInvocation<
           this.config.getTargetDir(),
           this.params.dir_path,
         );
-        if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
-          const rawError = `Error: Path "${this.params.dir_path}" is not within any workspace directory`;
+        const validationError =
+          this.config.getValidationErrorForPath(searchDirAbsolute);
+        if (validationError) {
           return {
-            llmContent: rawError,
-            returnDisplay: `Path is not within workspace`,
+            llmContent: validationError,
+            returnDisplay: 'Path validation failed.',
             error: {
-              message: rawError,
+              message: validationError,
               type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
             },
           };
@@ -317,10 +318,10 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       params.dir_path || '.',
     );
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
-      const directories = workspaceContext.getDirectories();
-      return `Search path ("${searchDirAbsolute}") resolves outside the allowed workspace directories: ${directories.join(', ')}`;
+    const validationError =
+      this.config.getValidationErrorForPath(searchDirAbsolute);
+    if (validationError) {
+      return validationError;
     }
 
     const targetDir = searchDirAbsolute || this.config.getTargetDir();

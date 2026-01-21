@@ -142,6 +142,17 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       this.config.getTargetDir(),
       this.params.dir_path,
     );
+
+    const validationError =
+      this.config.getValidationErrorForPath(resolvedDirPath);
+    if (validationError) {
+      return this.errorResult(
+        validationError,
+        'Path validation failed.',
+        ToolErrorType.PATH_NOT_IN_WORKSPACE,
+      );
+    }
+
     try {
       const stats = await fs.stat(resolvedDirPath);
       if (!stats) {
@@ -318,14 +329,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       this.config.getTargetDir(),
       params.dir_path,
     );
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-      const directories = workspaceContext.getDirectories();
-      return `Path must be within one of the workspace directories: ${directories.join(
-        ', ',
-      )}`;
-    }
-    return null;
+    return this.config.getValidationErrorForPath(resolvedPath);
   }
 
   protected createInvocation(

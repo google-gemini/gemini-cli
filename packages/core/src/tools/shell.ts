@@ -183,6 +183,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
         : this.config.getTargetDir();
 
+      const validationError = this.config.getValidationErrorForPath(cwd);
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Path validation failed.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
+
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
@@ -485,10 +497,7 @@ export class ShellTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
-      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
-      }
+      return this.config.getValidationErrorForPath(resolvedPath);
     }
     return null;
   }

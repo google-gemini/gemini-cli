@@ -195,6 +195,7 @@ ${finalExclusionPatternsForDescription
       );
 
       const fileDiscovery = this.config.getFileService();
+
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
@@ -211,12 +212,12 @@ ${finalExclusionPatternsForDescription
         // Security check: ensure the glob library didn't return something outside the workspace.
 
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
-        if (
-          !this.config.getWorkspaceContext().isPathWithinWorkspace(fullPath)
-        ) {
+
+        const validationError = this.config.getValidationErrorForPath(fullPath);
+        if (validationError) {
           skippedFiles.push({
             path: fullPath,
-            reason: `Security: Glob library returned path outside workspace. Path: ${fullPath}`,
+            reason: validationError,
           });
           continue;
         }

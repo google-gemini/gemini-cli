@@ -9,6 +9,7 @@ import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 import type { PartUnion } from '@google/genai';
 import {
@@ -74,6 +75,20 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    const validationError = this.config.getValidationErrorForPath(
+      this.resolvedPath,
+    );
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Path validation failed.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -189,24 +204,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    const projectTempDir = this.config.storage.getProjectTempDir();
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.file_path,
     );
-    const resolvedProjectTempDir = path.resolve(projectTempDir);
-    const isWithinTempDir =
-      resolvedPath.startsWith(resolvedProjectTempDir + path.sep) ||
-      resolvedPath === resolvedProjectTempDir;
 
-    if (
-      !workspaceContext.isPathWithinWorkspace(resolvedPath) &&
-      !isWithinTempDir
-    ) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(', ')} or within the project temp directory: ${projectTempDir}`;
+    const validationError = this.config.getValidationErrorForPath(resolvedPath);
+    if (validationError) {
+      return validationError;
     }
+
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
     }

@@ -99,10 +99,38 @@ describe('ShellTool', () => {
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
-      getGeminiClient: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const wc = this.getWorkspaceContext();
+        if (wc.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      getValidationErrorForPath(
+        this: Config,
+        absolutePath: string,
+      ): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getGeminiClient: vi.fn().mockReturnValue({}),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
-      isInteractive: vi.fn().mockReturnValue(true),
-      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+      sanitizationConfig: {},
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -183,9 +211,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(
-        `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
-      );
+      ).toThrow(/Path validation failed/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {
@@ -235,7 +261,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -260,7 +286,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
     });
 
@@ -281,7 +307,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
     });
 
