@@ -872,6 +872,7 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
+        settings.hooksConfig.enabled = false;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
