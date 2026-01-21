@@ -101,9 +101,6 @@ export class LocalGeminiClient {
     }));
 
     if (reminder) {
-      debugLogger.log(
-        `[LocalGeminiClient] Appending reminder to last user content: ${reminder}`,
-      );
       const lastContent = geminiContents.at(-1);
       if (lastContent?.role === 'user' && lastContent.parts?.[0]?.text) {
         lastContent.parts[0].text += `\n\n${reminder}`;
