@@ -4,24 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay.js';
 import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  persistentStateMock,
+} from '../../test-utils/render.js';
 import type { Config } from '@google/gemini-cli-core';
-
-vi.mock('../../utils/persistentState.js', () => ({
-  persistentState: {
-    get: vi.fn().mockImplementation((key) => {
-      if (key === 'tipsShown') return 0;
-      if (key === 'defaultBannerShownCount') return {};
-      return undefined;
-    }),
-    set: vi.fn(),
-  },
-}));
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
@@ -108,6 +100,11 @@ const mockConfig = {
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    persistentStateMock.get.mockRestore();
+    persistentStateMock.set.mockRestore();
+  });
   const baseUIState = {
     terminalWidth: 80,
     mainAreaWidth: 80,
@@ -131,6 +128,9 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: mockPendingHistoryItems,
         },
         config: mockConfig,
+        persistentState: {
+          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
@@ -146,6 +146,9 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
+        persistentState: {
+          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('empty');
@@ -161,6 +164,9 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
+        persistentState: {
+          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
@@ -176,6 +182,9 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: mockPendingHistoryItems,
         },
         config: mockConfig,
+        persistentState: {
+          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
@@ -195,6 +204,9 @@ describe('AlternateBufferQuittingDisplay', () => {
           pendingHistoryItems: [],
         },
         config: mockConfig,
+        persistentState: {
+          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+        },
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');

@@ -7,16 +7,20 @@
 import { useEffect, useState } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
 
-export function useTips() {
+interface UseTipsResult {
+  showTips: boolean;
+}
+
+export function useTips(): UseTipsResult {
   const [tipsCount] = useState(() => persistentState.get('tipsShown') ?? 0);
 
-  const tipsHidden = tipsCount >= 10;
+  const showTips = tipsCount < 10;
 
   useEffect(() => {
-    if (!tipsHidden) {
+    if (showTips) {
       persistentState.set('tipsShown', tipsCount + 1);
     }
-  }, [tipsCount, tipsHidden]);
+  }, [tipsCount, showTips]);
 
-  return tipsHidden;
+  return { showTips };
 }

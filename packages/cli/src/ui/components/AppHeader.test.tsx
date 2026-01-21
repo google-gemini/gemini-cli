@@ -4,20 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  renderWithProviders,
+  persistentStateMock,
+} from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
-
-const persistentStateMock = vi.hoisted(() => ({
-  get: vi.fn(),
-  set: vi.fn(),
-}));
-
-vi.mock('../../utils/persistentState.js', () => ({
-  persistentState: persistentStateMock,
-}));
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
@@ -26,7 +20,8 @@ vi.mock('../utils/terminalSetup.js', () => ({
 describe('<AppHeader />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.get.mockReturnValue(undefined);
+    persistentStateMock.get.mockRestore();
+    persistentStateMock.set.mockRestore();
   });
 
   it('should render the banner with default text', () => {
@@ -42,7 +37,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).toContain('This is the default banner');
@@ -63,7 +68,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).toContain('There are capacity issues');
@@ -83,7 +98,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).not.toContain('Banner');
@@ -104,7 +129,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).toContain('This is the default banner');
@@ -124,7 +159,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).not.toContain('This is the default banner');
@@ -133,8 +178,6 @@ describe('<AppHeader />', () => {
   });
 
   it('should not render the default banner if shown count is 5 or more', () => {
-    persistentStateMock.get.mockReturnValue(5);
-
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -146,7 +189,18 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            if (key === 'defaultBannerShownCount') return 5;
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).not.toContain('This is the default banner');
@@ -155,7 +209,6 @@ describe('<AppHeader />', () => {
   });
 
   it('should increment the version count when default banner is displayed', () => {
-    persistentStateMock.get.mockReturnValue({});
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -168,6 +221,13 @@ describe('<AppHeader />', () => {
     const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       uiState,
+      persistentState: {
+        get: (key) => {
+          if (key === 'tipsShown') return 0;
+          if (key === 'defaultBannerShownCount') return {};
+          return undefined;
+        },
+      },
     });
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
@@ -195,7 +255,17 @@ describe('<AppHeader />', () => {
 
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 0;
+            if (key === 'defaultBannerShownCount') return {};
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).not.toContain('First line\\nSecond line');
@@ -203,11 +273,6 @@ describe('<AppHeader />', () => {
   });
 
   it('should render Tips when tipsShown is less than 10', () => {
-    persistentStateMock.get.mockImplementation((key) => {
-      if (key === 'tipsShown') return 5;
-      return undefined;
-    });
-
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -219,7 +284,16 @@ describe('<AppHeader />', () => {
     };
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig, uiState },
+      {
+        config: mockConfig,
+        uiState,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 5;
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).toContain('Tips');
@@ -228,15 +302,18 @@ describe('<AppHeader />', () => {
   });
 
   it('should NOT render Tips when tipsShown is 10 or more', () => {
-    persistentStateMock.get.mockImplementation((key) => {
-      if (key === 'tipsShown') return 10;
-      return undefined;
-    });
-
     const mockConfig = makeFakeConfig();
     const { lastFrame, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
-      { config: mockConfig },
+      {
+        config: mockConfig,
+        persistentState: {
+          get: (key) => {
+            if (key === 'tipsShown') return 10;
+            return undefined;
+          },
+        },
+      },
     );
 
     expect(lastFrame()).not.toContain('Tips');
@@ -247,11 +324,6 @@ describe('<AppHeader />', () => {
     const fakeStore: Record<string, number> = {
       tipsShown: 9,
     };
-
-    persistentStateMock.get.mockImplementation((key) => fakeStore[key]);
-    persistentStateMock.set.mockImplementation((key, val) => {
-      fakeStore[key] = val;
-    });
 
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -265,6 +337,12 @@ describe('<AppHeader />', () => {
     const session1 = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       uiState,
+      persistentState: {
+        get: (key) => fakeStore[key],
+        set: (key, val) => {
+          fakeStore[key] = val;
+        },
+      },
     });
 
     expect(session1.lastFrame()).toContain('Tips');
@@ -273,6 +351,12 @@ describe('<AppHeader />', () => {
 
     const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
+      persistentState: {
+        get: (key) => fakeStore[key],
+        set: (key, val) => {
+          fakeStore[key] = val;
+        },
+      },
     });
 
     expect(session2.lastFrame()).not.toContain('Tips');

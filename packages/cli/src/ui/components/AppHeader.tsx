@@ -24,7 +24,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
   const { bannerText } = useBanner(bannerData, config);
-  const tipsShown = useTips();
+  const { showTips } = useTips();
 
   return (
     <Box flexDirection="column">
@@ -41,7 +41,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
         </>
       )}
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
-        !tipsShown && <Tips config={config} />}
+        showTips && <Tips config={config} />}
     </Box>
   );
 };

@@ -28,6 +28,21 @@ import {
 
 import { type Config } from '@google/gemini-cli-core';
 
+export const persistentStateMock = {
+  get: vi.fn(),
+  set: vi.fn(),
+};
+
+persistentStateMock.get.mockImplementation((key) => {
+  if (key === 'tipsShown') return 0;
+  if (key === 'defaultBannerShownCount') return {};
+  return undefined;
+});
+
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
+
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (
   tree: React.ReactElement,
@@ -187,6 +202,7 @@ export const renderWithProviders = (
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
+    persistentState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -196,6 +212,10 @@ export const renderWithProviders = (
     config?: Config;
     useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
+    persistentState?: {
+      get?: typeof persistentStateMock.get;
+      set?: typeof persistentStateMock.set;
+    };
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -215,6 +235,13 @@ export const renderWithProviders = (
       },
     },
   ) as UIState;
+
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
 
   const terminalWidth = width ?? baseState.terminalWidth;
   let finalSettings = settings;

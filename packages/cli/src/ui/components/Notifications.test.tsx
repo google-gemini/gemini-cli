@@ -157,6 +157,8 @@ describe('Notifications', () => {
       'hasSeenScreenReaderNudge',
       true,
     );
+
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('migrates legacy screen reader nudge file', async () => {
