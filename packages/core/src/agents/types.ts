@@ -35,6 +35,11 @@ export interface OutputObject {
 }
 
 /**
+ * The default query string provided to an agent as input.
+ */
+export const DEFAULT_QUERY_STRING = 'Get Started!';
+
+/**
  * Represents the validated input parameters passed to an agent upon invocation.
  * Used primarily for templating the system prompt. (Replaces ContextState)
  */
@@ -138,7 +143,6 @@ export interface ToolConfig {
  * Configures the expected inputs (parameters) for the agent.
  */
 export interface InputConfig {
-  /** Standard JSON Schema for validation and tool generation */
   inputSchema: AnySchema;
 }
 
