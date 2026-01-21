@@ -10,6 +10,7 @@ export interface TerminalTitleOptions {
   streamingState: StreamingState;
   thoughtSubject?: string;
   isConfirming: boolean;
+  isSilentWorking: boolean;
   folderName: string;
   showThoughts: boolean;
   useDynamicTitle: boolean;
@@ -32,6 +33,7 @@ export function computeTerminalTitle({
   streamingState,
   thoughtSubject,
   isConfirming,
+  isSilentWorking,
   folderName,
   showThoughts,
   useDynamicTitle,
@@ -58,6 +60,12 @@ export function computeTerminalTitle({
     streamingState === StreamingState.WaitingForConfirmation
   ) {
     const base = '✋  Action Required';
+    // Max context length is 80 - base.length - 3 (for ' (' and ')')
+    const maxContextLen = MAX_LEN - base.length - 3;
+    const context = truncate(displayContext, maxContextLen);
+    title = `${base}${getSuffix(context)}`;
+  } else if (isSilentWorking) {
+    const base = '⏲  Working…';
     // Max context length is 80 - base.length - 3 (for ' (' and ')')
     const maxContextLen = MAX_LEN - base.length - 3;
     const context = truncate(displayContext, maxContextLen);
