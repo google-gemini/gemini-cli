@@ -8,7 +8,7 @@ import { GoogleGenAI } from '@google/genai';
 import { jsonrepair } from 'jsonrepair';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Content } from './ollamaChat.js';
+import type { Content } from '@google/genai';
 
 /**
  * A client for making single, non-streaming calls to a local Gemini-compatible API
@@ -71,7 +71,7 @@ export class LocalGeminiClient {
 
     const geminiContents = contents.map((c) => ({
       role: c.role === 'model' ? 'model' : 'user',
-      parts: c.parts.map((p) => ({ text: p.text })),
+      parts: c.parts ? c.parts.map((p) => ({ text: p.text })) : [],
     }));
 
     try {

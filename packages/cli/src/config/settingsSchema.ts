@@ -1643,10 +1643,7 @@ const SETTINGS_SCHEMA = {
                 default: 'ollama',
                 description: 'The provider for the Gemma model.',
                 showInDialog: false,
-                options: [
-                  { value: 'ollama', label: 'Ollama' },
-                  { value: 'litert-lm', label: 'LiteRT-LM' },
-                ],
+                options: [{ value: 'litert-lm', label: 'LiteRT-LM' }],
               },
             },
           },

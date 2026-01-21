@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GemmaClassifierStrategy } from './strategies/gemmaClassifierStrategy.js';
 import type { Config } from '../config/config.js';
 import type {
   RoutingContext,
   RoutingDecision,
+  RoutingStrategy,
   TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
@@ -34,16 +36,31 @@ export class ModelRouterService {
   }
 
   private initializeDefaultStrategy(): TerminalStrategy {
-    // Initialize the composite strategy with the desired priority order.
-    // The strategies are ordered in order of highest priority.
+    const strategies: RoutingStrategy[] = [];
+
+    // Order matters here. Fallback and override are checked first.
+    strategies.push(new FallbackStrategy());
+    strategies.push(new OverrideStrategy());
+
+    // Then, if enabled, the Gemma classifier is used.
+    if (
+      this.config.getUseModelRouter() &&
+      this.config.getUseGemmaRoutingSettings()?.enabled
+    ) {
+      strategies.push(new GemmaClassifierStrategy());
+    }
+
+    // The generic classifier is next.
+    strategies.push(new ClassifierStrategy());
+
+    // The numerical classifier is next.
+    strategies.push(new NumericalClassifierStrategy());
+
+    // The default strategy is the terminal strategy.
+    const terminalStrategy = new DefaultStrategy();
+
     return new CompositeStrategy(
-      [
-        new FallbackStrategy(),
-        new OverrideStrategy(),
-        new ClassifierStrategy(),
-        new NumericalClassifierStrategy(),
-        new DefaultStrategy(),
-      ],
+      [...strategies, terminalStrategy],
       'agent-router',
     );
   }

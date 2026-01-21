@@ -3,29 +3,24 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
 
 import { z } from 'zod';
 
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
   RoutingContext,
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
 import { resolveClassifierModel } from '../../config/models.js';
-import { createUserContent, Type } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { LocalGeminiClient } from '../../core/localGeminiClient.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -35,16 +30,28 @@ const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
 const CLASSIFIER_SYSTEM_PROMPT = `
-You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
-1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
-2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
+You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between 
+${FLASH_MODEL}
+ (SIMPLE) or 
+${PRO_MODEL}
+ (COMPLEX).
+1.  
+${FLASH_MODEL}
+: A fast, efficient model for simple, well-defined tasks.
+2.  
+${PRO_MODEL}
+: A powerful, advanced model for complex, open-ended, or multi-step tasks.
 <complexity_rubric>
-A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
+A task is COMPLEX (Choose 
+${PRO_MODEL}
+) if it meets ONE OR MORE of the following criteria:
 1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
 2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
 3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
 4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+A task is SIMPLE (Choose 
+${FLASH_MODEL}
+) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
 </complexity_rubric>
 **Output Format:**
 Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
@@ -62,7 +69,7 @@ Respond *only* in JSON format according to the following schema. Do not include 
   },
   "required": ["reasoning", "model_choice"]
 }
---- EXAMPLES ---
+---
 **Example 1 (Strategic Planning):**
 *User Prompt:* "How should I architect the data pipeline for this new analytics service?"
 *Your JSON Output:*
@@ -108,43 +115,27 @@ Respond *only* in JSON format according to the following schema. Do not include 
 }
 `;
 
-const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    reasoning: {
-      type: Type.STRING,
-      description:
-        'A brief, step-by-step explanation for the model choice, referencing the rubric.',
-    },
-    model_choice: {
-      type: Type.STRING,
-      enum: [FLASH_MODEL, PRO_MODEL],
-    },
-  },
-  required: ['reasoning', 'model_choice'],
-};
-
 const ClassifierResponseSchema = z.object({
   reasoning: z.string(),
   model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
 });
 
-export class ClassifierStrategy implements RoutingStrategy {
-  readonly name = 'classifier';
+export class GemmaClassifierStrategy implements RoutingStrategy {
+  readonly name = 'gemma-classifier';
 
   async route(
     context: RoutingContext,
     config: Config,
-    baseLlmClient: BaseLlmClient,
+    _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
+    if (
+      !config.getUseModelRouter() ||
+      !config.getUseGemmaRoutingSettings()?.enabled
+    ) {
+      return null;
+    }
     try {
-      if (await config.getNumericalRoutingEnabled()) {
-        return null;
-      }
-
-      const promptId = getPromptIdWithFallback('classifier-router');
-
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 
       // Filter out tool-related turns.
@@ -156,16 +147,24 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      debugLogger.log(`[Routing] About to call classifier.`);
+      debugLogger.log(`[Routing] About to call Gemma classifier.`);
 
-      const jsonResponse = await baseLlmClient.generateJson({
-        modelConfigKey: { model: 'classifier' },
-        contents: [...finalHistory, createUserContent(context.request)],
-        schema: RESPONSE_SCHEMA,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        abortSignal: context.signal,
-        promptId,
-      });
+      let jsonResponse: object;
+      const settings = config.getUseGemmaRoutingSettings();
+      const provider = settings?.provider ?? 'litert-lm';
+      debugLogger.log(`[Routing] Using ${provider} for classifier routing.`);
+
+      const history = [...finalHistory, createUserContent(context.request)];
+
+      if (provider === 'litert-lm') {
+        const client = new LocalGeminiClient(config);
+        jsonResponse = await client.generateJson(
+          history,
+          CLASSIFIER_SYSTEM_PROMPT,
+        );
+      } else {
+        throw new Error(`Unsupported provider for Gemma routing: ${provider}`);
+      }
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 
@@ -174,12 +173,13 @@ export class ClassifierStrategy implements RoutingStrategy {
       const selectedModel = resolveClassifierModel(
         context.requestedModel ?? config.getModel(),
         routerResponse.model_choice,
+        config.getPreviewFeatures(),
       );
 
       return {
         model: selectedModel,
         metadata: {
-          source: 'Classifier',
+          source: 'GemmaClassifier',
           latencyMs,
           reasoning,
         },
@@ -187,7 +187,7 @@ export class ClassifierStrategy implements RoutingStrategy {
     } catch (error) {
       // If the classifier fails for any reason (API error, parsing error, etc.),
       // we log it and return null to allow the composite strategy to proceed.
-      debugLogger.warn(`[Routing] ClassifierStrategy failed:`, error);
+      debugLogger.warn(`[Routing] GemmaClassifierStrategy failed:`, error);
       return null;
     }
   }
