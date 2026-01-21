@@ -96,11 +96,6 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.shellConfirmationRequest) {
-    return (
-      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
-    );
-  }
   if (uiState.renewSessionConfirmationRequest) {
     return (
       <RenewSessionDialog

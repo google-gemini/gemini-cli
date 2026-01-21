@@ -566,8 +566,6 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
-    const boundedTurns = Math.min(turns, MAX_TURNS);
     if (!boundedTurns) {
       return turn;
     }
