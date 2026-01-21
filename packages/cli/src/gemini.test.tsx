@@ -205,8 +205,12 @@ vi.mock('./config/sandboxConfig.js', () => ({
 vi.mock('./ui/utils/mouse.js', () => ({
   enableMouseEvents: vi.fn(),
   disableMouseEvents: vi.fn(),
-  parseMouseEvent: vi.fn(),
   isIncompleteMouseSequence: vi.fn(),
+}));
+
+const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
+vi.mock('./nonInteractiveCli.js', () => ({
+  runNonInteractive: runNonInteractiveSpy,
 }));
 
 describe('gemini.tsx main function', () => {
@@ -490,6 +494,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
+      isCommand: undefined,
     });
 
     await act(async () => {
@@ -559,6 +566,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getProjectRoot: () => '/',
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      refreshAuth: vi.fn(),
     } as unknown as Config;
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
@@ -571,10 +579,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       .spyOn(debugLogger, 'log')
       .mockImplementation(() => {});
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
 
     if (flag === 'listExtensions') {
@@ -654,10 +665,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       await fn();
     });
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(start_sandbox).toHaveBeenCalled();
@@ -735,10 +749,13 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.spyOn(themeManager, 'setActiveTheme').mockReturnValue(false);
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
@@ -988,14 +1005,6 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mock('./utils/readStdin.js', () => ({
       readStdin: vi.fn().mockResolvedValue('stdin-data'),
     }));
-    const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
-    vi.mock('./nonInteractiveCli.js', () => ({
-      runNonInteractive: runNonInteractiveSpy,
-    }));
-    runNonInteractiveSpy.mockClear();
-    vi.mock('./validateNonInterActiveAuth.js', () => ({
-      validateNonInteractiveAuth: vi.fn().mockResolvedValue({}),
-    }));
 
     // Mock stdin to be non-TTY
     Object.defineProperty(process.stdin, 'isTTY', {
@@ -1003,10 +1012,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       configurable: true,
     });
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(readStdin).toHaveBeenCalled();
@@ -1149,6 +1161,7 @@ describe('gemini.tsx main function exit codes', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
       },
+      refreshAuth: vi.fn(),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
@@ -1167,12 +1180,15 @@ describe('gemini.tsx main function exit codes', () => {
       })),
     }));
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
   });
 
@@ -1217,6 +1233,7 @@ describe('gemini.tsx main function exit codes', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
       },
+      refreshAuth: vi.fn(),
       getRemoteAdminSettings: () => undefined,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue(
@@ -1230,13 +1247,92 @@ describe('gemini.tsx main function exit codes', () => {
       configurable: true,
     });
 
+    process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
       expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
+  });
+
+  it('should validate and refresh auth in non-interactive mode when no auth type is selected but env var is present', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    const { AuthType } = await import('@google/gemini-cli-core');
+
+    const refreshAuthSpy = vi.fn();
+
+    vi.mocked(loadCliConfig).mockResolvedValue({
+      isInteractive: () => false,
+      getQuestion: () => 'test prompt',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      initialize: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => false,
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: () => false,
+      getHookSystem: () => undefined,
+      getToolRegistry: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-001',
+      getApprovalMode: () => 'default',
+      getCoreTools: () => [],
+      getTelemetryEnabled: () => false,
+      getTelemetryLogPromptsEnabled: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getExtensions: () => [],
+      getUsageStatisticsEnabled: () => false,
+      setTerminalBackground: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      },
+      refreshAuth: refreshAuthSpy,
+      getRemoteAdminSettings: () => undefined,
+    } as unknown as Config);
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: { selectedType: undefined } }, ui: {} },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+
+    runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+      processExitSpy.mockRestore();
+    }
+
+    expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
 });
 

@@ -154,6 +154,36 @@ describe('KeypressContext', () => {
         );
       },
     );
+
+    it('should recognize \n (LF) as ctrl+j', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => stdin.write('\n'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'j',
+          ctrl: true,
+          meta: false,
+          shift: false,
+        }),
+      );
+    });
+
+    it('should recognize \\x1b\\n as Alt+Enter (return with meta)', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => stdin.write('\x1b\n'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'return',
+          ctrl: false,
+          meta: true,
+          shift: false,
+        }),
+      );
+    });
   });
 
   describe('Fast return buffering', () => {
