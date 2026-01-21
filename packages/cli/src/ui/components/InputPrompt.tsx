@@ -138,7 +138,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId } = useUIState();
+  const { mainAreaWidth, activePtyId, history } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -495,7 +495,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
+<<<<<<< HEAD
         // Handle double ESC for clearing input
+=======
+        // Handle double ESC
+>>>>>>> e1fd5be42 (Add Esc-Esc to clear prompt when it's not empty (#17131))
         if (escPressCount.current === 0) {
           if (buffer.text === '') {
             return;
@@ -509,10 +513,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
+<<<<<<< HEAD
           // clear input and immediately reset state
           buffer.setText('');
           resetCompletionState();
           resetEscapeState();
+=======
+          // Second ESC
+          resetEscapeState();
+          if (buffer.text.length > 0) {
+            buffer.setText('');
+            resetCompletionState();
+          } else {
+            if (history.length > 0) {
+              onSubmit('/rewind');
+            }
+          }
+>>>>>>> e1fd5be42 (Add Esc-Esc to clear prompt when it's not empty (#17131))
         }
         return;
       }
@@ -883,6 +900,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setBannerVisible,
       activePtyId,
       setEmbeddedShellFocused,
+      history,
     ],
   );
 
