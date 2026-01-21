@@ -56,6 +56,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue('gemini-2.0-flash');
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
     });
@@ -84,6 +85,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserPromptEvent: MockedUserPromptEvent,
     parseAndFormatApiError: mockParseAndFormatApiError,
     tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
+    ValidationRequiredError: class {
+      userHandled = false;
+    },
   };
 });
 
