@@ -136,7 +136,7 @@ vi.mock('./hooks/useLoadingIndicator.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
-vi.mock('./hooks/useAutoAcceptIndicator.js');
+vi.mock('./hooks/useApprovalModeIndicator.js');
 vi.mock('./hooks/useGitBranchName.js');
 vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
@@ -164,7 +164,7 @@ import { useVim } from './hooks/vim.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -236,7 +236,7 @@ describe('AppContainer State Management', () => {
   const mockedUseFolderTrust = useFolderTrust as Mock;
   const mockedUseIdeTrustListener = useIdeTrustListener as Mock;
   const mockedUseMessageQueue = useMessageQueue as Mock;
-  const mockedUseAutoAcceptIndicator = useAutoAcceptIndicator as Mock;
+  const mockedUseApprovalModeIndicator = useApprovalModeIndicator as Mock;
   const mockedUseGitBranchName = useGitBranchName as Mock;
   const mockedUseVimMode = useVimMode as Mock;
   const mockedUseSessionStats = useSessionStats as Mock;
@@ -335,7 +335,7 @@ describe('AppContainer State Management', () => {
       clearQueue: vi.fn(),
       getQueuedMessagesText: vi.fn().mockReturnValue(''),
     });
-    mockedUseAutoAcceptIndicator.mockReturnValue(false);
+    mockedUseApprovalModeIndicator.mockReturnValue(false);
     mockedUseGitBranchName.mockReturnValue('main');
     mockedUseVimMode.mockReturnValue({
       isVimEnabled: false,
