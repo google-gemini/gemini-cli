@@ -1400,6 +1400,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enableEventDrivenScheduler": {
+          "title": "Event Driven Scheduler",
+          "description": "Enables event-driven scheduler within the CLI session.",
+          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1557,8 +1564,8 @@
       },
       "additionalProperties": false
     },
-    "hooks": {
-      "title": "Hooks",
+    "hooksConfig": {
+      "title": "HooksConfig",
       "description": "Hook configurations for intercepting and customizing agent behavior.",
       "markdownDescription": "Hook configurations for intercepting and customizing agent behavior.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
       "default": {},
@@ -1587,7 +1594,17 @@
           "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
-        },
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "title": "Hook Events",
+      "description": "Event-specific hook configurations.",
+      "markdownDescription": "Event-specific hook configurations.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
         "BeforeTool": {
           "title": "Before Tool Hooks",
           "description": "Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.",
@@ -1939,10 +1956,6 @@
         "enabled": {
           "type": "boolean",
           "description": "Whether to enable the agent."
-        },
-        "disabled": {
-          "type": "boolean",
-          "description": "Whether to disable the agent."
         }
       }
     },

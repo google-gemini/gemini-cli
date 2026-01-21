@@ -47,6 +47,7 @@ export interface UIActions {
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
+  handleValidationChoice: (choice: 'verify' | 'change_auth' | 'cancel') => void;
   openSessionBrowser: () => void;
   closeSessionBrowser: () => void;
   handleResumeSession: (session: SessionInfo) => Promise<void>;

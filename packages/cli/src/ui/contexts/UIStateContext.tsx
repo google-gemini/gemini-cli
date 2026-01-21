@@ -23,6 +23,7 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
+  ValidationIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -36,6 +37,13 @@ export interface ProQuotaDialogRequest {
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
   resolve: (intent: FallbackIntent) => void;
+}
+
+export interface ValidationDialogRequest {
+  validationLink?: string;
+  validationDescription?: string;
+  learnMoreUrl?: string;
+  resolve: (intent: ValidationIntent) => void;
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -99,10 +107,11 @@ export interface UIState {
   activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
-  showAutoAcceptIndicator: ApprovalMode;
+  showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

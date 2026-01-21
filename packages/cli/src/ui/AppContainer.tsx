@@ -102,7 +102,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import {
@@ -300,18 +300,18 @@ export const AppContainer = (props: AppContainerProps) => {
         .getHookSystem()
         ?.fireSessionStartEvent(sessionStartSource);
 
-      if (result?.finalOutput) {
-        if (result.finalOutput?.systemMessage) {
+      if (result) {
+        if (result.systemMessage) {
           historyManager.addItem(
             {
               type: MessageType.INFO,
-              text: result.finalOutput.systemMessage,
+              text: result.systemMessage,
             },
             Date.now(),
           );
         }
 
-        const additionalContext = result.finalOutput.getAdditionalContext();
+        const additionalContext = result.getAdditionalContext();
         const geminiClient = config.getGeminiClient();
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
@@ -495,7 +495,12 @@ export const AppContainer = (props: AppContainerProps) => {
     }
   }, [authState, authContext, setAuthState]);
 
-  const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
+  const {
+    proQuotaRequest,
+    handleProQuotaChoice,
+    validationRequest,
+    handleValidationChoice,
+  } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
@@ -870,7 +875,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   // Auto-accept indicator
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+  const showApprovalModeIndicator = useApprovalModeIndicator({
     config,
     addItem: historyManager.addItem,
     onApprovalModeChange: handleApprovalModeChange,
@@ -1492,6 +1497,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showPrivacyNotice ||
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
+    !!validationRequest ||
     isSessionBrowserOpen ||
     isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput;
@@ -1606,10 +1612,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
-      showAutoAcceptIndicator,
+      showApprovalModeIndicator,
       currentModel,
       userTier,
       proQuotaRequest,
+      validationRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1698,9 +1705,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
-      showAutoAcceptIndicator,
+      showApprovalModeIndicator,
       userTier,
       proQuotaRequest,
+      validationRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1771,6 +1779,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      handleValidationChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -1812,6 +1821,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
+      handleValidationChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,

@@ -9,6 +9,8 @@ import {
   type Config,
   type FallbackModelHandler,
   type FallbackIntent,
+  type ValidationHandler,
+  type ValidationIntent,
   TerminalQuotaError,
   ModelNotFoundError,
   type UserTierId,
@@ -19,7 +21,10 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
-import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
+import {
+  type ProQuotaDialogRequest,
+  type ValidationDialogRequest,
+} from '../contexts/UIStateContext.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
@@ -36,7 +41,10 @@ export function useQuotaAndFallback({
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
+  const [validationRequest, setValidationRequest] =
+    useState<ValidationDialogRequest | null>(null);
   const isDialogPending = useRef(false);
+  const isValidationPending = useRef(false);
 
   // Set up Flash fallback handler
   useEffect(() => {
@@ -120,6 +128,36 @@ export function useQuotaAndFallback({
     config.setFallbackModelHandler(fallbackHandler);
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
+  // Set up validation handler for 403 VALIDATION_REQUIRED errors
+  useEffect(() => {
+    const validationHandler: ValidationHandler = async (
+      validationLink,
+      validationDescription,
+      learnMoreUrl,
+    ): Promise<ValidationIntent> => {
+      if (isValidationPending.current) {
+        return 'cancel'; // A validation dialog is already active
+      }
+      isValidationPending.current = true;
+
+      const intent: ValidationIntent = await new Promise<ValidationIntent>(
+        (resolve) => {
+          // Call setValidationRequest directly - same pattern as proQuotaRequest
+          setValidationRequest({
+            validationLink,
+            validationDescription,
+            learnMoreUrl,
+            resolve,
+          });
+        },
+      );
+
+      return intent;
+    };
+
+    config.setValidationHandler(validationHandler);
+  }, [config]);
+
   const handleProQuotaChoice = useCallback(
     (choice: FallbackIntent) => {
       if (!proQuotaRequest) return;
@@ -135,10 +173,6 @@ export function useQuotaAndFallback({
         config.setQuotaErrorOccurred(false);
 
         if (choice === 'retry_always') {
-          // Set the model to the fallback model for the current session.
-          // This ensures the Footer updates and future turns use this model.
-          // The change is not persisted, so the original model is restored on restart.
-          config.activateFallbackMode(proQuotaRequest.fallbackModel);
           historyManager.addItem(
             {
               type: MessageType.INFO,
@@ -152,9 +186,35 @@ export function useQuotaAndFallback({
     [proQuotaRequest, historyManager, config, setModelSwitchedFromQuotaError],
   );
 
+  const handleValidationChoice = useCallback(
+    (choice: ValidationIntent) => {
+      // Guard against double-execution (e.g. rapid clicks) and stale requests
+      if (!isValidationPending.current || !validationRequest) return;
+
+      // Immediately clear the flag to prevent any subsequent calls from passing the guard
+      isValidationPending.current = false;
+
+      validationRequest.resolve(choice);
+      setValidationRequest(null);
+
+      if (choice === 'change_auth') {
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Use /auth to change authentication method.',
+          },
+          Date.now(),
+        );
+      }
+    },
+    [validationRequest, historyManager],
+  );
+
   return {
     proQuotaRequest,
     handleProQuotaChoice,
+    validationRequest,
+    handleValidationChoice,
   };
 }
 
