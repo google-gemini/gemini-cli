@@ -130,6 +130,7 @@ export class SchedulerStateManager {
     if (this.isTerminalCall(call)) {
       this._completedBatch.push(call);
       this.activeCalls.delete(callId);
+      this.emitUpdate();
     }
   }
 
@@ -160,15 +161,19 @@ export class SchedulerStateManager {
   }
 
   cancelAllQueued(reason: string): void {
+    let changed = false;
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
+      changed = true;
       if (queuedCall.status === 'error') {
         this._completedBatch.push(queuedCall);
         continue;
       }
       this._completedBatch.push(this.toCancelled(queuedCall, reason));
     }
-    this.emitUpdate();
+    if (changed) {
+      this.emitUpdate();
+    }
   }
 
   getSnapshot(): ToolCall[] {

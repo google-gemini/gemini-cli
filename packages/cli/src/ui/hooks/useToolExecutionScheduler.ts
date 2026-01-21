@@ -111,13 +111,18 @@ export function useToolExecutionScheduler(
       // Clear state for new run
       setToolCalls([]);
 
-      // 1. Await Core Scheduler directly
-      const results = await scheduler.schedule(request, signal);
+      try {
+        // 1. Await Core Scheduler directly
+        const results = await scheduler.schedule(request, signal);
 
-      // 2. Trigger legacy reinjection logic (useGeminiStream loop)
-      await onCompleteRef.current(results);
+        // 2. Trigger legacy reinjection logic (useGeminiStream loop)
+        await onCompleteRef.current(results);
 
-      return results;
+        return results;
+      } finally {
+        // Ensure state is cleared even if schedule() rejects (e.g. on abort)
+        setToolCalls([]);
+      }
     },
     [scheduler],
   );
