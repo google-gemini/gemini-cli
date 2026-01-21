@@ -17,11 +17,8 @@ import {
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import type {
-  inferInstallMetadata} from '../../config/extension-manager.js';
-import {
-  ExtensionManager
-} from '../../config/extension-manager.js';
+import type { inferInstallMetadata } from '../../config/extension-manager.js';
+import { ExtensionManager } from '../../config/extension-manager.js';
 import type { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import type * as fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
