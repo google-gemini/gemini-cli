@@ -316,7 +316,9 @@ export const AppContainer = (props: AppContainerProps) => {
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
             role: 'user',
-            parts: [{ text: `<hook_context>${additionalContext}</hook_context>` }],
+            parts: [
+              { text: `<hook_context>${additionalContext}</hook_context>` },
+            ],
           });
         }
       }
@@ -1053,9 +1055,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
   const shouldShowIdePrompt = Boolean(
     currentIDE &&
-      !config.getIdeMode() &&
-      !settings.merged.ide.hasSeenNudge &&
-      !idePromptAnswered,
+    !config.getIdeMode() &&
+    !settings.merged.ide.hasSeenNudge &&
+    !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);

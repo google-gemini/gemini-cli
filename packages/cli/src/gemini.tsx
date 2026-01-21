@@ -481,9 +481,8 @@ export async function main() {
     adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
-      );
+      const { registerActivityLogger } =
+        await import('./utils/activityLogger.js');
       registerActivityLogger(config);
     }
 
@@ -665,9 +664,7 @@ export async function main() {
         if (additionalContext) {
           // Prepend context to input (System Context -> Stdin -> Question)
           const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
-          input = input
-            ? `${wrappedContext}\n\n${input}`
-            : wrappedContext;
+          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
         }
       }
     }
