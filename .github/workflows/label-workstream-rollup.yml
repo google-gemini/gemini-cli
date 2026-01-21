@@ -86,11 +86,11 @@ jobs:
 
               while (depth < MAX_DEPTH) {
                 const parent = await getIssueParent(issue.owner, issue.repo, currentNumber);
-                
+
                 if (!parent) {
                   break;
                 }
-                
+
                 tracedParents.push(parent.url);
 
                 if (allowedParentUrls.includes(parent.url)) {
@@ -112,4 +112,4 @@ jobs:
               if (!matched && context.eventName === 'issues') {
                  console.log(`Issue #${issue.number} did not match any allowed workstreams after checking ${depth} levels. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
               }
-            }
+
