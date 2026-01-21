@@ -112,4 +112,4 @@ jobs:
               if (!matched && context.eventName === 'issues') {
                  console.log(`Issue #${issue.number} did not match any allowed workstreams after checking ${depth} levels. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
               }
-
+            }
