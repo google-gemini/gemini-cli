@@ -17,6 +17,7 @@ import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { ValidationDialog } from './ValidationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -65,6 +66,16 @@ export const DialogManager = ({
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
+      />
+    );
+  }
+  if (uiState.validationRequest) {
+    return (
+      <ValidationDialog
+        validationLink={uiState.validationRequest.validationLink}
+        validationDescription={uiState.validationRequest.validationDescription}
+        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        onChoice={uiActions.handleValidationChoice}
       />
     );
   }

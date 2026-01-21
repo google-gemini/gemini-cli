@@ -37,3 +37,21 @@ export type FallbackModelHandler = (
   fallbackModel: string,
   error?: unknown,
 ) => Promise<FallbackIntent | null>;
+
+/**
+ * Defines the intent returned by the UI layer during a validation required scenario.
+ */
+export type ValidationIntent =
+  | 'verify' // User chose to verify, wait for completion then retry.
+  | 'change_auth' // User chose to change authentication method.
+  | 'cancel'; // User cancelled the verification process.
+
+/**
+ * The interface for the handler provided by the UI layer (e.g., the CLI)
+ * to interact with the user when validation is required.
+ */
+export type ValidationHandler = (
+  validationLink?: string,
+  validationDescription?: string,
+  learnMoreUrl?: string,
+) => Promise<ValidationIntent>;
