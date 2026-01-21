@@ -400,14 +400,14 @@ export class TestRig {
     args?: string | string[];
     stdin?: string;
     stdinDoesNotEnd?: boolean;
-    yolo?: boolean;
+    approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
     timeout?: number;
     env?: Record<string, string | undefined>;
   }): Promise<string> {
-    const yolo = options.yolo !== false;
-    const { command, initialArgs } = this._getCommandAndArgs(
-      yolo ? ['--yolo'] : [],
-    );
+    const approvalMode = options.approvalMode ?? 'yolo';
+    const { command, initialArgs } = this._getCommandAndArgs([
+      `--approval-mode=${approvalMode}`,
+    ]);
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
@@ -469,7 +469,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -601,7 +601,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -1128,13 +1128,13 @@ export class TestRig {
 
   async runInteractive(options?: {
     args?: string | string[];
-    yolo?: boolean;
+    approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
     env?: Record<string, string | undefined>;
   }): Promise<InteractiveRun> {
-    const yolo = options?.yolo !== false;
-    const { command, initialArgs } = this._getCommandAndArgs(
-      yolo ? ['--yolo'] : [],
-    );
+    const approvalMode = options?.approvalMode ?? 'yolo';
+    const { command, initialArgs } = this._getCommandAndArgs([
+      `--approval-mode=${approvalMode}`,
+    ]);
     const commandArgs = [...initialArgs];
 
     const envVars = {

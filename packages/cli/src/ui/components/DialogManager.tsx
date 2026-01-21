@@ -8,7 +8,6 @@ import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
@@ -18,6 +17,7 @@ import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { ValidationDialog } from './ValidationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -30,6 +30,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
@@ -50,6 +51,9 @@ export const DialogManager = ({
   const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
     uiState;
 
+  if (uiState.adminSettingsChanged) {
+    return <AdminSettingsChangedDialog />;
+  }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
@@ -62,6 +66,16 @@ export const DialogManager = ({
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
+      />
+    );
+  }
+  if (uiState.validationRequest) {
+    return (
+      <ValidationDialog
+        validationLink={uiState.validationRequest.validationLink}
+        validationDescription={uiState.validationRequest.validationDescription}
+        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        onChoice={uiActions.handleValidationChoice}
       />
     );
   }
@@ -79,11 +93,6 @@ export const DialogManager = ({
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
       />
-    );
-  }
-  if (uiState.shellConfirmationRequest) {
-    return (
-      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
     );
   }
   if (uiState.loopDetectionConfirmationRequest) {
