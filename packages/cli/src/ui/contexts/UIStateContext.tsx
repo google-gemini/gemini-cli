@@ -9,7 +9,6 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConsoleMessageItem,
-  ShellConfirmationRequest,
   ConfirmationRequest,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
@@ -24,6 +23,7 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
+  ValidationIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -37,6 +37,13 @@ export interface ProQuotaDialogRequest {
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
   resolve: (intent: FallbackIntent) => void;
+}
+
+export interface ValidationDialogRequest {
+  validationLink?: string;
+  validationDescription?: string;
+  learnMoreUrl?: string;
+  resolve: (intent: ValidationIntent) => void;
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -68,7 +75,6 @@ export interface UIState {
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
@@ -100,10 +106,11 @@ export interface UIState {
   activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
-  showAutoAcceptIndicator: ApprovalMode;
+  showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
@@ -141,6 +148,7 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
+  adminSettingsChanged: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

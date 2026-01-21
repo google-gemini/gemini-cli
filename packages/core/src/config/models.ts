@@ -51,6 +51,7 @@ export function resolveModel(
     case DEFAULT_GEMINI_MODEL_AUTO: {
       return DEFAULT_GEMINI_MODEL;
     }
+    case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
       return previewFeaturesEnabled
         ? PREVIEW_GEMINI_MODEL
@@ -144,6 +145,20 @@ export function isPreviewModel(model: string): boolean {
  */
 export function isGemini2Model(model: string): boolean {
   return /^gemini-2(\.|$)/.test(model);
+}
+
+/**
+ * Checks if the model is an auto model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is an auto model.
+ */
+export function isAutoModel(model: string): boolean {
+  return (
+    model === GEMINI_MODEL_ALIAS_AUTO ||
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === DEFAULT_GEMINI_MODEL_AUTO
+  );
 }
 
 /**

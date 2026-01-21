@@ -8,7 +8,6 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   A2AClientManager,
   type SendMessageResult,
-  createAdapterFetch,
 } from './a2a-client-manager.js';
 import type { AgentCard, Task } from '@a2a-js/sdk';
 import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
@@ -162,6 +161,20 @@ describe('A2AClientManager', () => {
         "[A2AClientManager] Loaded agent 'TestAgent' from http://test.agent/card",
       );
     });
+
+    it('should clear the cache', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      expect(manager.getAgentCard('TestAgent')).toBeDefined();
+      expect(manager.getClient('TestAgent')).toBeDefined();
+
+      manager.clearCache();
+
+      expect(manager.getAgentCard('TestAgent')).toBeUndefined();
+      expect(manager.getClient('TestAgent')).toBeUndefined();
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        '[A2AClientManager] Cache cleared.',
+      );
+    });
   });
 
   describe('sendMessage', () => {
@@ -301,44 +314,6 @@ describe('A2AClientManager', () => {
       await expect(
         manager.cancelTask('NonExistentAgent', 'task123'),
       ).rejects.toThrow("Agent 'NonExistentAgent' not found.");
-    });
-  });
-
-  describe('createAdapterFetch', () => {
-    it('normalizes TASK_STATE_ enums to lower-case', async () => {
-      const baseFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ status: { state: 'TASK_STATE_WORKING' } }),
-          ),
-        );
-
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const response = await adapter('http://example.com', {
-        method: 'POST',
-        body: '{}',
-      });
-      const data = await response.json();
-
-      expect(data.status.state).toBe('working');
-    });
-
-    it('lowercases non-prefixed task states', async () => {
-      const baseFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ status: { state: 'WORKING' } })),
-        );
-
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const response = await adapter('http://example.com', {
-        method: 'POST',
-        body: '{}',
-      });
-      const data = await response.json();
-
-      expect(data.status.state).toBe('working');
     });
   });
 });

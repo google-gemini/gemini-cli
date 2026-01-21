@@ -59,9 +59,9 @@ describe('useSelectionList', () => {
           name,
           sequence,
           ctrl: options.ctrl ?? false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: options.shift ?? false,
-          paste: false,
           insertable: false,
         };
         activeKeypressHandler(key);
@@ -329,9 +329,9 @@ describe('useSelectionList', () => {
           name,
           sequence: name,
           ctrl: false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: false,
-          paste: false,
           insertable: true,
         };
         handler(key);
@@ -379,9 +379,9 @@ describe('useSelectionList', () => {
             name,
             sequence: name,
             ctrl: false,
-            meta: false,
+            cmd: false,
+            alt: false,
             shift: false,
-            paste: false,
             insertable: false,
           };
           handler(key);

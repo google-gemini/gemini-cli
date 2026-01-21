@@ -95,7 +95,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     isThisShellFocusable && (showFocusHint || userHasFocused);
 
   return (
-    <Box flexDirection="column" width={terminalWidth}>
+    // It is crucial we don't replace this <> with a Box because otherwise the
+    // sticky header inside it would be sticky to that box rather than to the
+    // parent component of this ToolMessage.
+    <>
       <StickyHeader
         width={terminalWidth}
         isFirst={isFirst}
@@ -112,7 +115,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {shouldShowFocusHint && (
           <Box marginLeft={1} flexShrink={0}>
             <Text color={theme.text.accent}>
-              {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
+              {isThisShellFocused ? '(Focused)' : '(tab to focus)'}
             </Text>
           </Box>
         )}
@@ -145,6 +148,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           </Box>
         )}
       </Box>
-    </Box>
+    </>
   );
 };

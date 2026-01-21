@@ -46,6 +46,7 @@ export interface UIActions {
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
+  handleValidationChoice: (choice: 'verify' | 'change_auth' | 'cancel') => void;
   openSessionBrowser: () => void;
   closeSessionBrowser: () => void;
   handleResumeSession: (session: SessionInfo) => Promise<void>;
@@ -56,6 +57,8 @@ export interface UIActions {
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  setAuthContext: (context: { requiresRestart?: boolean }) => void;
+  handleRestart: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

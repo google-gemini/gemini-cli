@@ -120,6 +120,7 @@ describe('EditTool', () => {
       setGeminiMdFileCount: vi.fn(),
       getToolRegistry: () => ({}) as any,
       isInteractive: () => false,
+      getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
     } as unknown as Config;
 
@@ -435,6 +436,10 @@ describe('EditTool', () => {
 
     it('should return error if old_string is not found in file', async () => {
       fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace non-existent text',
@@ -454,6 +459,10 @@ describe('EditTool', () => {
       const initialContent = 'This is some original text.';
       const finalContent = 'This is some brand new text.';
       fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace original with brand new',
@@ -514,6 +523,10 @@ describe('EditTool', () => {
     it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
       const initialContent = 'The price is $100.';
       fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Ensure the price is $100',
@@ -554,6 +567,9 @@ describe('EditTool', () => {
       const externallyModifiedContent =
         'This is the externally modified content.';
       fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      // Enable LLM correction for this test
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
 
       const params: EditToolParams = {
         file_path: filePath,
@@ -856,6 +872,49 @@ describe('EditTool', () => {
         0,
       );
       expect(totalActualRemoved).toBe(totalExpectedRemoved);
+    });
+  });
+
+  describe('disableLLMCorrection', () => {
+    it('should NOT call FixLLMEditWithInstruction when disableLLMCorrection is true', async () => {
+      const filePath = path.join(rootDir, 'disable_llm_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Enable the setting
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(true);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace non-existent text',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
+    });
+
+    it('should call FixLLMEditWithInstruction when disableLLMCorrection is false', async () => {
+      const filePath = path.join(rootDir, 'enable_llm_test.txt');
+      fs.writeFileSync(filePath, 'Some content.', 'utf8');
+
+      // Now explicit as it's not the default anymore
+      (mockConfig.getDisableLLMCorrection as Mock).mockReturnValue(false);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace non-existent text',
+        old_string: 'nonexistent',
+        new_string: 'replacement',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
     });
   });
 });

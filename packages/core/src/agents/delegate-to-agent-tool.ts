@@ -12,16 +12,17 @@ import {
   type ToolInvocation,
   type ToolResult,
   BaseToolInvocation,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 import type { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import type { AgentInputs } from './types.js';
 
-type DelegateParams = { agent_name: string } & Record<string, unknown>;
+export type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
 export class DelegateToAgentTool extends BaseDeclarativeTool<
   DelegateParams,
@@ -125,6 +126,14 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
     );
   }
 
+  override validateToolParams(_params: DelegateParams): string | null {
+    // We override the default schema validation because the generic JSON schema validation
+    // produces poor error messages for discriminated unions (anyOf).
+    // Instead, we perform detailed, agent-specific validation in the `execute` method
+    // to provide rich error messages that help the LLM self-heal.
+    return null;
+  }
+
   protected createInvocation(
     params: DelegateParams,
     messageBus: MessageBus,
@@ -166,33 +175,120 @@ class DelegateInvocation extends BaseToolInvocation<
     return `Delegating to agent '${this.params.agent_name}'`;
   }
 
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    const definition = this.registry.getDefinition(this.params.agent_name);
+    if (!definition || definition.kind !== 'remote') {
+      // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
+      return false;
+    }
+
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
+    const invocation = this.buildSubInvocation(
+      definition,
+      agentArgs as AgentInputs,
+    );
+    return invocation.shouldConfirmExecute(abortSignal);
+  }
+
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
     const definition = this.registry.getDefinition(this.params.agent_name);
     if (!definition) {
+      const availableAgents = this.registry
+        .getAllDefinitions()
+        .map((def) => `'${def.name}' (${def.description})`)
+        .join(', ');
+
       throw new Error(
-        `Agent '${this.params.agent_name}' exists in the tool definition but could not be found in the registry.`,
+        `Agent '${this.params.agent_name}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`,
       );
     }
 
-    // Extract arguments (everything except agent_name)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { agent_name, ...agentArgs } = this.params;
+    const { agent_name: _agent_name, ...agentArgs } = this.params;
 
-    // Delegate the creation of the specific invocation (Local or Remote) to the wrapper.
-    // This centralizes the logic and ensures consistent handling.
+    // Validate specific agent arguments here using Zod to generate helpful error messages.
+    const inputShape: Record<string, z.ZodTypeAny> = {};
+    for (const [key, inputDef] of Object.entries(
+      definition.inputConfig.inputs,
+    )) {
+      let validator: z.ZodTypeAny;
+
+      switch (inputDef.type) {
+        case 'string':
+          validator = z.string();
+          break;
+        case 'number':
+          validator = z.number();
+          break;
+        case 'boolean':
+          validator = z.boolean();
+          break;
+        case 'integer':
+          validator = z.number().int();
+          break;
+        case 'string[]':
+          validator = z.array(z.string());
+          break;
+        case 'number[]':
+          validator = z.array(z.number());
+          break;
+        default:
+          validator = z.unknown();
+      }
+
+      if (!inputDef.required) {
+        validator = validator.optional();
+      }
+
+      inputShape[key] = validator.describe(inputDef.description);
+    }
+
+    const agentSchema = z.object(inputShape);
+
+    try {
+      agentSchema.parse(agentArgs);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        const errorMessages = e.errors.map(
+          (err) => `${err.path.join('.')}: ${err.message}`,
+        );
+
+        const expectedInputs = Object.entries(definition.inputConfig.inputs)
+          .map(
+            ([key, input]) =>
+              `'${key}' (${input.required ? 'required' : 'optional'} ${input.type})`,
+          )
+          .join(', ');
+
+        throw new Error(
+          `${errorMessages.join(', ')}. Expected inputs: ${expectedInputs}.`,
+        );
+      }
+      throw e;
+    }
+
+    const invocation = this.buildSubInvocation(
+      definition,
+      agentArgs as AgentInputs,
+    );
+
+    return invocation.execute(signal, updateOutput);
+  }
+
+  private buildSubInvocation(
+    definition: AgentDefinition,
+    agentArgs: AgentInputs,
+  ): ToolInvocation<AgentInputs, ToolResult> {
     const wrapper = new SubagentToolWrapper(
       definition,
       this.config,
       this.messageBus,
     );
 
-    // We could skip extra validation here if we trust the Registry's schema,
-    // but build() will do a safety check anyway.
-    const invocation = wrapper.build(agentArgs as AgentInputs);
-
-    return invocation.execute(signal, updateOutput);
+    return wrapper.build(agentArgs);
   }
 }

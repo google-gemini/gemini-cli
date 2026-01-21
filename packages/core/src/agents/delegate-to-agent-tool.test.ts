@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { DelegateToAgentTool } from './delegate-to-agent-tool.js';
+import {
+  DelegateToAgentTool,
+  type DelegateParams,
+} from './delegate-to-agent-tool.js';
 import { AgentRegistry } from './registry.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
@@ -21,6 +24,7 @@ vi.mock('./local-invocation.js', () => ({
     execute: vi
       .fn()
       .mockResolvedValue({ content: [{ type: 'text', text: 'Success' }] }),
+    shouldConfirmExecute: vi.fn().mockResolvedValue(false),
   })),
 }));
 
@@ -29,7 +33,12 @@ vi.mock('./remote-invocation.js', () => ({
     execute: vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'Remote Success' }],
     }),
-    shouldConfirmExecute: vi.fn().mockResolvedValue(true),
+    shouldConfirmExecute: vi.fn().mockResolvedValue({
+      type: 'info',
+      title: 'Remote Confirmation',
+      prompt: 'Confirm remote call',
+      onConfirm: vi.fn(),
+    }),
   })),
 }));
 
@@ -44,14 +53,20 @@ describe('DelegateToAgentTool', () => {
     name: 'test_agent',
     description: 'A test agent',
     promptConfig: {},
-    modelConfig: { model: 'test-model', temp: 0, top_p: 0 },
+    modelConfig: {
+      model: 'test-model',
+      generateContentConfig: {
+        temperature: 0,
+        topP: 0,
+      },
+    },
     inputConfig: {
       inputs: {
         arg1: { type: 'string', description: 'Argument 1', required: true },
         arg2: { type: 'number', description: 'Argument 2', required: false },
       },
     },
-    runConfig: { max_turns: 1, max_time_minutes: 1 },
+    runConfig: { maxTurns: 1, maxTimeMinutes: 1 },
     toolConfig: { tools: [] },
   };
 
@@ -98,14 +113,17 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should validate agent_name exists in registry', async () => {
-    // Zod validation happens at build time now (or rather, build validates the schema)
-    // Since we use discriminated union, an invalid agent_name won't match any option.
-    expect(() =>
-      tool.build({
-        agent_name: 'non_existent_agent',
-      }),
-    ).toThrow();
+  it('should throw helpful error when agent_name does not exist', async () => {
+    // We allow validation to pass now, checking happens in execute.
+    const invocation = tool.build({
+      agent_name: 'non_existent_agent',
+    } as DelegateParams);
+
+    await expect(() =>
+      invocation.execute(new AbortController().signal),
+    ).rejects.toThrow(
+      "Agent 'non_existent_agent' not found. Available agents are: 'test_agent' (A test agent), 'remote_agent' (A remote agent). Please choose a valid agent_name.",
+    );
   });
 
   it('should validate correct arguments', async () => {
@@ -126,24 +144,30 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should throw error for missing required argument', async () => {
-    // Missing arg1 should fail Zod validation
-    expect(() =>
-      tool.build({
-        agent_name: 'test_agent',
-        arg2: 123,
-      }),
-    ).toThrow();
+  it('should throw helpful error for missing required argument', async () => {
+    const invocation = tool.build({
+      agent_name: 'test_agent',
+      arg2: 123,
+    } as DelegateParams);
+
+    await expect(() =>
+      invocation.execute(new AbortController().signal),
+    ).rejects.toThrow(
+      "arg1: Required. Expected inputs: 'arg1' (required string), 'arg2' (optional number).",
+    );
   });
 
-  it('should throw error for invalid argument type', async () => {
-    // arg1 should be string, passing number
-    expect(() =>
-      tool.build({
-        agent_name: 'test_agent',
-        arg1: 123,
-      }),
-    ).toThrow();
+  it('should throw helpful error for invalid argument type', async () => {
+    const invocation = tool.build({
+      agent_name: 'test_agent',
+      arg1: 123,
+    } as DelegateParams);
+
+    await expect(() =>
+      invocation.execute(new AbortController().signal),
+    ).rejects.toThrow(
+      "arg1: Expected string, received number. Expected inputs: 'arg1' (required string), 'arg2' (optional number).",
+    );
   });
 
   it('should allow optional arguments to be omitted', async () => {
@@ -181,24 +205,28 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should use correct tool name "delegate_to_agent" when requesting confirmation', async () => {
+  it('should execute local agents silently without requesting confirmation', async () => {
     const invocation = tool.build({
       agent_name: 'test_agent',
       arg1: 'valid',
     });
 
     // Trigger confirmation check
-    const p = invocation.shouldConfirmExecute(new AbortController().signal);
-    void p;
-
-    expect(messageBus.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall: expect.objectContaining({
-          name: DELEGATE_TO_AGENT_TOOL_NAME,
-        }),
-      }),
+    const result = await invocation.shouldConfirmExecute(
+      new AbortController().signal,
     );
+
+    expect(result).toBe(false);
+
+    // Verify it did NOT call messageBus.publish with 'delegate_to_agent'
+    const delegateToAgentPublish = vi
+      .mocked(messageBus.publish)
+      .mock.calls.find(
+        (call) =>
+          call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+          call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+      );
+    expect(delegateToAgentPublish).toBeUndefined();
   });
 
   it('should delegate to remote agent correctly', async () => {
@@ -218,5 +246,59 @@ describe('DelegateToAgentTool', () => {
       'remote_agent',
       'remote_agent',
     );
+  });
+
+  describe('Confirmation', () => {
+    it('should return false for local agents (silent execution)', async () => {
+      const invocation = tool.build({
+        agent_name: 'test_agent',
+        arg1: 'valid',
+      });
+
+      // Local agents should now return false directly, bypassing policy check
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(result).toBe(false);
+
+      const delegateToAgentPublish = vi
+        .mocked(messageBus.publish)
+        .mock.calls.find(
+          (call) =>
+            call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+            call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+        );
+      expect(delegateToAgentPublish).toBeUndefined();
+    });
+
+    it('should forward to remote agent confirmation logic', async () => {
+      const invocation = tool.build({
+        agent_name: 'remote_agent',
+        query: 'hello remote',
+      });
+
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Verify it returns the mock confirmation from RemoteAgentInvocation
+      expect(result).toMatchObject({
+        type: 'info',
+        title: 'Remote Confirmation',
+      });
+
+      // Verify it did NOT call messageBus.publish with 'delegate_to_agent'
+      // directly from DelegateInvocation, but instead went into RemoteAgentInvocation.
+      // RemoteAgentInvocation (the mock) doesn't call publish in its mock implementation.
+      const delegateToAgentPublish = vi
+        .mocked(messageBus.publish)
+        .mock.calls.find(
+          (call) =>
+            call[0].type === MessageBusType.TOOL_CONFIRMATION_REQUEST &&
+            call[0].toolCall.name === DELEGATE_TO_AGENT_TOOL_NAME,
+        );
+      expect(delegateToAgentPublish).toBeUndefined();
+    });
   });
 });

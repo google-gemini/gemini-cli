@@ -85,6 +85,7 @@ const KEY_INFO_MAP: Record<
   '[9u': { name: 'tab' },
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
+  '[32u': { name: 'space' },
   '[127u': { name: 'backspace' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
@@ -144,6 +145,30 @@ function nonKeyboardEventFilter(
 }
 
 /**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accommodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: 'return',
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
+  };
+}
+
+/**
  * Buffers "/" keys to see if they are followed return.
  * Will flush the buffer if no data is received for DRAG_COMPLETION_TIMEOUT_MS
  * or when a null key is received.
@@ -190,30 +215,6 @@ function bufferBackslashEnter(
 }
 
 /**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
- *
- * This is to accomodate older terminals that paste text without bracketing.
- */
-function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
-  let lastKeyTime = 0;
-  return (key: Key) => {
-    const now = Date.now();
-    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: '',
-        sequence: '\r',
-        insertable: true,
-      });
-    } else {
-      keypressHandler(key);
-    }
-    lastKeyTime = now;
-  };
-}
-
-/**
  * Buffers paste events between paste-start and paste-end sequences.
  * Will flush the buffer if no data is received for PASTE_TIMEOUT ms or
  * when a null key is received.
@@ -249,11 +250,11 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
 
       if (buffer.length > 0) {
         keypressHandler({
-          name: '',
-          ctrl: false,
-          meta: false,
+          name: 'paste',
           shift: false,
-          paste: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: buffer,
         });
@@ -300,9 +301,10 @@ function* emitKeys(
     let escaped = false;
 
     let name = undefined;
-    let ctrl = false;
-    let meta = false;
     let shift = false;
+    let alt = false;
+    let ctrl = false;
+    let cmd = false;
     let code = undefined;
     let insertable = false;
 
@@ -353,10 +355,10 @@ function* emitKeys(
             const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
             keypressHandler({
               name: 'paste',
-              ctrl: false,
-              meta: false,
               shift: false,
-              paste: true,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: decoded,
             });
@@ -491,9 +493,10 @@ function* emitKeys(
       }
 
       // Parse the key modifier
-      ctrl = !!(modifier & 4);
-      meta = !!(modifier & 10); // use 10 to catch both alt (2) and meta (8).
       shift = !!(modifier & 1);
+      alt = !!(modifier & 2);
+      ctrl = !!(modifier & 4);
+      cmd = !!(modifier & 8);
 
       const keyInfo = KEY_INFO_MAP[code];
       if (keyInfo) {
@@ -504,9 +507,16 @@ function* emitKeys(
         if (keyInfo.ctrl) {
           ctrl = true;
         }
+        if (name === 'space' && !ctrl && !cmd && !alt) {
+          sequence = ' ';
+          insertable = true;
+        }
       } else {
         name = 'undefined';
-        if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
+        if (
+          (ctrl || cmd || alt) &&
+          (code.endsWith('u') || code.endsWith('~'))
+        ) {
           // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
           const codeNumber = parseInt(code.slice(1, -1), 10);
           if (
@@ -520,26 +530,26 @@ function* emitKeys(
     } else if (ch === '\r') {
       // carriage return
       name = 'return';
-      meta = escaped;
-    } else if (ch === '\n') {
-      // Enter, should have been called linefeed
-      name = 'enter';
-      meta = escaped;
+      alt = escaped;
+    } else if (escaped && ch === '\n') {
+      // Alt+Enter (linefeed), should be consistent with carriage return
+      name = 'return';
+      alt = escaped;
     } else if (ch === '\t') {
       // tab
       name = 'tab';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === '\b' || ch === '\x7f') {
       // backspace or ctrl+h
       name = 'backspace';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === ESC) {
       // escape key
       name = 'escape';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === ' ') {
       name = 'space';
-      meta = escaped;
+      alt = escaped;
       insertable = true;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
@@ -549,30 +559,30 @@ function* emitKeys(
       // Letter, number, shift+letter
       name = ch.toLowerCase();
       shift = /^[A-Z]$/.exec(ch) !== null;
-      meta = escaped;
+      alt = escaped;
       insertable = true;
     } else if (MAC_ALT_KEY_CHARACTER_MAP[ch] && process.platform === 'darwin') {
       name = MAC_ALT_KEY_CHARACTER_MAP[ch];
-      meta = true;
+      alt = true;
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape
       name = 'escape';
-      meta = true;
+      alt = true;
 
       // Emit first escape key here, then continue processing
       keypressHandler({
         name: 'escape',
-        ctrl,
-        meta,
         shift,
-        paste: false,
+        alt,
+        ctrl,
+        cmd,
         insertable: false,
         sequence: ESC,
       });
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
-      meta = true;
+      alt = true;
     } else {
       // Any other character is considered printable.
       insertable = true;
@@ -584,10 +594,10 @@ function* emitKeys(
     ) {
       keypressHandler({
         name: name || '',
-        ctrl,
-        meta,
         shift,
-        paste: false,
+        alt,
+        ctrl,
+        cmd,
         insertable,
         sequence,
       });
@@ -598,10 +608,10 @@ function* emitKeys(
 
 export interface Key {
   name: string;
-  ctrl: boolean;
-  meta: boolean;
   shift: boolean;
-  paste: boolean;
+  alt: boolean;
+  ctrl: boolean;
+  cmd: boolean; // Command/Windows/Super key
   insertable: boolean;
   sequence: string;
 }
@@ -661,7 +671,7 @@ export function KeypressProvider({
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
-    if (!terminalCapabilityManager.isBracketedPasteEnabled()) {
+    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
       processor = bufferFastReturn(processor);
     }
     processor = bufferBackslashEnter(processor);

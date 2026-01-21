@@ -311,11 +311,18 @@ describe('editor utils', () => {
       });
     }
 
-    it('should return the correct command for emacs', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'emacs');
+    it('should return the correct command for emacs with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacs',
+      );
       expect(command).toEqual({
         command: 'emacs',
-        args: ['--eval', '(ediff "old.txt" "new.txt")'],
+        args: [
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
       });
     });
 
@@ -473,6 +480,7 @@ describe('editor utils', () => {
       });
 
       it(`should allow ${editor} when not in sandbox mode`, () => {
+        vi.stubEnv('SANDBOX', '');
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
       });
     }
@@ -493,6 +501,7 @@ describe('editor utils', () => {
 
     it('should return true for vscode when installed and not in sandbox mode', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+      vi.stubEnv('SANDBOX', '');
       expect(isEditorAvailable('vscode')).toBe(true);
     });
 

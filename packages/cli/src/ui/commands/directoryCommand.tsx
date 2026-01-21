@@ -17,23 +17,24 @@ import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
 import {
   expandHomeDir,
   getDirectorySuggestions,
+  batchAddDirectories,
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number,
   added: string[],
   errors: string[],
 ) {
   if (!config) {
-    addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     return;
   }
 
@@ -41,13 +42,10 @@ async function finishAddingDirectories(
     if (config.shouldLoadMemoryFromIncludeDirectories()) {
       await refreshServerHierarchicalMemory(config);
     }
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.INFO,
+      text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+    });
   } catch (error) {
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
@@ -57,17 +55,14 @@ async function finishAddingDirectories(
     if (gemini) {
       await gemini.addDirectoryContext();
     }
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: `Successfully added directories:\n- ${added.join('\n- ')}`,
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.INFO,
+      text: `Successfully added directories:\n- ${added.join('\n- ')}`,
+    });
   }
 
   if (errors.length > 0) {
-    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') });
   }
 }
 
@@ -112,13 +107,10 @@ export const directoryCommand: SlashCommand = {
         const [...rest] = args.split(' ');
 
         if (!config) {
-          addItem(
-            {
-              type: MessageType.ERROR,
-              text: 'Configuration is not available.',
-            },
-            Date.now(),
-          );
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Configuration is not available.',
+          });
           return;
         }
 
@@ -136,13 +128,10 @@ export const directoryCommand: SlashCommand = {
           .split(',')
           .filter((p) => p);
         if (pathsToAdd.length === 0) {
-          addItem(
-            {
-              type: MessageType.ERROR,
-              text: 'Please provide at least one path to add.',
-            },
-            Date.now(),
-          );
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Please provide at least one path to add.',
+          });
           return;
         }
 
@@ -164,15 +153,12 @@ export const directoryCommand: SlashCommand = {
         }
 
         if (alreadyAdded.length > 0) {
-          addItem(
-            {
-              type: MessageType.INFO,
-              text: `The following directories are already in the workspace:\n- ${alreadyAdded.join(
-                '\n- ',
-              )}`,
-            },
-            Date.now(),
-          );
+          addItem({
+            type: MessageType.INFO,
+            text: `The following directories are already in the workspace:\n- ${alreadyAdded.join(
+              '\n- ',
+            )}`,
+          });
         }
 
         if (pathsToProcess.length === 0) {
@@ -208,14 +194,10 @@ export const directoryCommand: SlashCommand = {
             );
           }
 
-          for (const pathToAdd of trustedDirs) {
-            try {
-              workspaceContext.addDirectory(expandHomeDir(pathToAdd));
-              added.push(pathToAdd);
-            } catch (e) {
-              const error = e as Error;
-              errors.push(`Error adding '${pathToAdd}': ${error.message}`);
-            }
+          if (trustedDirs.length > 0) {
+            const result = batchAddDirectories(workspaceContext, trustedDirs);
+            added.push(...result.added);
+            errors.push(...result.errors);
           }
 
           if (undefinedTrustDirs.length > 0) {
@@ -235,17 +217,9 @@ export const directoryCommand: SlashCommand = {
             };
           }
         } else {
-          for (const pathToAdd of pathsToProcess) {
-            try {
-              workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
-              added.push(pathToAdd.trim());
-            } catch (e) {
-              const error = e as Error;
-              errors.push(
-                `Error adding '${pathToAdd.trim()}': ${error.message}`,
-              );
-            }
-          }
+          const result = batchAddDirectories(workspaceContext, pathsToProcess);
+          added.push(...result.added);
+          errors.push(...result.errors);
         }
 
         await finishAddingDirectories(config, addItem, added, errors);
@@ -262,25 +236,19 @@ export const directoryCommand: SlashCommand = {
           services: { config },
         } = context;
         if (!config) {
-          addItem(
-            {
-              type: MessageType.ERROR,
-              text: 'Configuration is not available.',
-            },
-            Date.now(),
-          );
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Configuration is not available.',
+          });
           return;
         }
         const workspaceContext = config.getWorkspaceContext();
         const directories = workspaceContext.getDirectories();
         const directoryList = directories.map((dir) => `- ${dir}`).join('\n');
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Current workspace directories:\n${directoryList}`,
-          },
-          Date.now(),
-        );
+        addItem({
+          type: MessageType.INFO,
+          text: `Current workspace directories:\n${directoryList}`,
+        });
       },
     },
   ],
