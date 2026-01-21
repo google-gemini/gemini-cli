@@ -636,8 +636,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? false;
     this.planEnabled = params.plan ?? false;
-    this.enableEventDrivenScheduler =
-      params.enableEventDrivenScheduler ?? false;
+    this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
