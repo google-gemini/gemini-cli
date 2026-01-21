@@ -122,6 +122,7 @@ describe('MCPOAuthProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     authorizationUrl: 'https://auth.example.com/authorize',
+    issuer: 'https://auth.example.com',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',

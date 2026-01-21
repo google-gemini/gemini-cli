@@ -243,6 +243,7 @@ describe('OAuthUtils', () => {
 
       expect(config).toEqual({
         authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
@@ -277,6 +278,7 @@ describe('OAuthUtils', () => {
 
       expect(config).toEqual({
         authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
@@ -292,6 +294,19 @@ describe('OAuthUtils', () => {
       const config = OAuthUtils.metadataToOAuthConfig(metadata);
 
       expect(config.scopes).toEqual([]);
+    });
+
+    it('should use issuer from metadata', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        scopes_supported: ['read', 'write'],
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+
+      expect(config.issuer).toBe('https://auth.example.com');
     });
   });
 
