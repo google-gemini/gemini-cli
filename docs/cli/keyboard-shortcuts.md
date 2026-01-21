@@ -117,7 +117,8 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
-- `Esc` pressed twice quickly: Browse and rewind previous interactions.
+- `Esc` pressed twice quickly: Clear the input prompt if it is not empty,
+  otherwise browse and rewind previous interactions.
 - `Up Arrow` / `Down Arrow`: When the cursor is at the top or bottom of a
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
