@@ -1064,6 +1064,11 @@ export function SettingsDialog({
                                 ? theme.text.secondary
                                 : theme.text.primary
                           }
+                          terminalCursorFocus={
+                            focusSection === 'settings' &&
+                            editingKey === item.value
+                          }
+                          terminalCursorPosition={editCursorPos}
                         >
                           {displayValue}
                         </Text>

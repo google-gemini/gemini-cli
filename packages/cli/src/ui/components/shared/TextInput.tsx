@@ -63,7 +63,7 @@ export function TextInput({
     return (
       <Box>
         {focus ? (
-          <Text>
+          <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
             {chalk.inverse(placeholder[0] || ' ')}
             <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
           </Text>
@@ -95,7 +95,12 @@ export function TextInput({
 
         return (
           <Box key={idx} height={1}>
-            <Text>{lineDisplay}</Text>
+            <Text
+              terminalCursorFocus={isCursorLine}
+              terminalCursorPosition={cursorVisualColAbsolute}
+            >
+              {lineDisplay}
+            </Text>
           </Box>
         );
       })}
