@@ -164,8 +164,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const pathParam = this.params.dir_path || '.';
 
       const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
-      const validationError =
-        this.config.getValidationErrorForPath(searchDirAbs);
+      const validationError = this.config.validatePathAccess(searchDirAbs);
       if (validationError) {
         return {
           llmContent: validationError,
@@ -562,8 +561,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const validationError =
-        this.config.getValidationErrorForPath(resolvedPath);
+      const validationError = this.config.validatePathAccess(resolvedPath);
       if (validationError) {
         return validationError;
       }

@@ -75,9 +75,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
-    const validationError = this.config.getValidationErrorForPath(
-      this.resolvedPath,
-    );
+    const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {
         llmContent: validationError,
@@ -209,7 +207,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.file_path,
     );
 
-    const validationError = this.config.getValidationErrorForPath(resolvedPath);
+    const validationError = this.config.validatePathAccess(resolvedPath);
     if (validationError) {
       return validationError;
     }

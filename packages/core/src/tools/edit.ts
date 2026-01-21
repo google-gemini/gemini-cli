@@ -767,7 +767,7 @@ class EditToolInvocation
       this.config.getTargetDir(),
       this.params.file_path,
     );
-    const validationError = this.config.getValidationErrorForPath(resolvedPath);
+    const validationError = this.config.validatePathAccess(resolvedPath);
     if (validationError) {
       return {
         llmContent: validationError,
@@ -998,7 +998,7 @@ A good instruction should concisely answer:
     }
     params.file_path = filePath;
 
-    return this.config.getValidationErrorForPath(params.file_path);
+    return this.config.validatePathAccess(params.file_path);
   }
 
   protected createInvocation(

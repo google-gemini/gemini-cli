@@ -66,10 +66,7 @@ describe('GrepTool', () => {
         const projectTempDir = this.storage.getProjectTempDir();
         return isSubpath(path.resolve(projectTempDir), absolutePath);
       },
-      getValidationErrorForPath(
-        this: Config,
-        absolutePath: string,
-      ): string | null {
+      validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
           return null;
         }
@@ -350,10 +347,7 @@ describe('GrepTool', () => {
           const projectTempDir = this.storage.getProjectTempDir();
           return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
-        getValidationErrorForPath(
-          this: Config,
-          absolutePath: string,
-        ): string | null {
+        validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
             return null;
           }
@@ -430,10 +424,7 @@ describe('GrepTool', () => {
           const projectTempDir = this.storage.getProjectTempDir();
           return isSubpath(path.resolve(projectTempDir), absolutePath);
         },
-        getValidationErrorForPath(
-          this: Config,
-          absolutePath: string,
-        ): string | null {
+        validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
             return null;
           }

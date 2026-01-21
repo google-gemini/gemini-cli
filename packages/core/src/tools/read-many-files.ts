@@ -221,7 +221,7 @@ ${finalExclusionPatternsForDescription
 
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
 
-        const validationError = this.config.getValidationErrorForPath(fullPath);
+        const validationError = this.config.validatePathAccess(fullPath);
         if (validationError) {
           skippedFiles.push({
             path: fullPath,

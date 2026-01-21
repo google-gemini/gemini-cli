@@ -99,10 +99,7 @@ describe('handleAtCommand', () => {
           absolutePath === resolvedProjectTempDir
         );
       },
-      getValidationErrorForPath(
-        this: Config,
-        absolutePath: string,
-      ): string | null {
+      validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
           return null;
         }

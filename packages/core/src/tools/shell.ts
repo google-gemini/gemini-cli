@@ -183,7 +183,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
         : this.config.getTargetDir();
 
-      const validationError = this.config.getValidationErrorForPath(cwd);
+      const validationError = this.config.validatePathAccess(cwd);
       if (validationError) {
         return {
           llmContent: validationError,
@@ -504,7 +504,7 @@ export class ShellTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      return this.config.getValidationErrorForPath(resolvedPath);
+      return this.config.validatePathAccess(resolvedPath);
     }
     return null;
   }

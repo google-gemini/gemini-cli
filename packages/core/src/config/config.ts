@@ -1734,7 +1734,7 @@ export class Config {
    * @param absolutePath The absolute path to validate.
    * @returns An error message string if the path is disallowed, null otherwise.
    */
-  getValidationErrorForPath(absolutePath: string): string | null {
+  validatePathAccess(absolutePath: string): string | null {
     if (this.isPathAllowed(absolutePath)) {
       return null;
     }
