@@ -1126,7 +1126,7 @@ const SETTINGS_SCHEMA = {
         label: 'Disable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Disable LLM-based error correction for edit tools.
           When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
