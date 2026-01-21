@@ -76,7 +76,7 @@ export enum Command {
   TOGGLE_MARKDOWN = 'app.toggleMarkdown',
   TOGGLE_COPY_MODE = 'app.toggleCopyMode',
   TOGGLE_YOLO = 'app.toggleYolo',
-  TOGGLE_AUTO_EDIT = 'app.toggleAutoEdit',
+  CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
   FOCUS_SHELL_INPUT = 'app.focusShellInput',
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
@@ -117,8 +117,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
   // Cursor Movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
-  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
+  [Command.HOME]: [
+    { key: 'a', ctrl: true },
+    { key: 'home', ctrl: false, shift: false },
+  ],
+  [Command.END]: [
+    { key: 'e', ctrl: true },
+    { key: 'end', ctrl: false, shift: false },
+  ],
   [Command.MOVE_UP]: [{ key: 'up', ctrl: false, command: false }],
   [Command.MOVE_DOWN]: [{ key: 'down', ctrl: false, command: false }],
   [Command.MOVE_LEFT]: [
@@ -162,8 +168,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
   [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
-  [Command.SCROLL_HOME]: [{ key: 'home' }],
-  [Command.SCROLL_END]: [{ key: 'end' }],
+  [Command.SCROLL_HOME]: [
+    { key: 'home', ctrl: true },
+    { key: 'home', shift: true },
+  ],
+  [Command.SCROLL_END]: [
+    { key: 'end', ctrl: true },
+    { key: 'end', shift: true },
+  ],
   [Command.PAGE_UP]: [{ key: 'pageup' }],
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
@@ -234,7 +246,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
-  [Command.TOGGLE_AUTO_EDIT]: [{ key: 'tab', shift: true }],
+  [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
@@ -340,7 +352,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
       Command.TOGGLE_YOLO,
-      Command.TOGGLE_AUTO_EDIT,
+      Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
@@ -425,7 +437,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
-  [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
+  [Command.CYCLE_APPROVAL_MODE]:
+    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',

@@ -25,6 +25,7 @@ import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
@@ -58,6 +59,7 @@ import {
 import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
 
@@ -94,7 +96,13 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
+
+    coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
   }
+
+  private handleModelChanged = () => {
+    this.currentSequenceModel = null;
+  };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -253,11 +261,16 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
   }
 
+  dispose() {
+    coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+  }
+
   async resumeChat(
     history: Content[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
+    this.updateTelemetryTokenCount();
   }
 
   getChatRecordingService(): ChatRecordingService | undefined {
@@ -626,10 +639,10 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
-    this.currentSequenceModel = modelToUse;
-    if (!signal.aborted) {
+    if (!signal.aborted && !this.currentSequenceModel) {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
+    this.currentSequenceModel = modelToUse;
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     let isError = false;
     let isInvalidStream = false;
@@ -914,8 +927,29 @@ export class GeminiClient {
         // Pass the captured model to the centralized handler.
         handleFallback(this.config, currentAttemptModel, authType, error);
 
+      const onValidationRequiredCallback = async (
+        validationError: ValidationRequiredError,
+      ) => {
+        // Suppress validation dialog for background calls (e.g. prompt-completion)
+        // to prevent the dialog from appearing on startup or during typing.
+        if (modelConfigKey.model === 'prompt-completion') {
+          throw validationError;
+        }
+
+        const handler = this.config.getValidationHandler();
+        if (typeof handler !== 'function') {
+          throw validationError;
+        }
+        return handler(
+          validationError.validationLink,
+          validationError.validationDescription,
+          validationError.learnMoreUrl,
+        );
+      };
+
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
+        onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
         getAvailabilityContext,
