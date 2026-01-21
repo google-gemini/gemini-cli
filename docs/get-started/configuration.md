@@ -707,7 +707,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable LLM-based error correction for edit tools. When
     enabled, tools will fail immediately if exact string matches are not found,
     instead of attempting to self-correct.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
