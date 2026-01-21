@@ -626,7 +626,7 @@ console.log(JSON.stringify({
         },
       });
 
-      const run = await rig.runInteractive({ yolo: false });
+      const run = await rig.runInteractive({ approvalMode: 'default' });
 
       // Send prompt that will trigger a permission request
       await run.type('Run the command "echo test"');
