@@ -682,7 +682,7 @@ export class Config {
       ? false
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
-    this.enableHooks = params.enableHooks ?? false;
+    this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
