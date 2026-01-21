@@ -172,6 +172,7 @@ const listAction = async (
   context: CommandContext,
   showDescriptions = false,
   showSchema = false,
+  filterServerName?: string,
 ): Promise<void | MessageActionReturn> => {
   const { config } = context.services;
   if (!config) {
@@ -192,7 +193,27 @@ const listAction = async (
   }
 
   const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
-  const serverNames = Object.keys(mcpServers);
+  let serverNames = Object.keys(mcpServers);
+
+  if (filterServerName) {
+    const trimmedName = filterServerName.trim();
+    if (trimmedName) {
+      if (!serverNames.includes(trimmedName)) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `MCP server '${trimmedName}' not found.`,
+        };
+      }
+      serverNames = [trimmedName];
+    }
+  }
+
+  const displayedMcpServers: typeof mcpServers = {};
+  for (const name of serverNames) {
+    displayedMcpServers[name] = mcpServers[name];
+  }
+
   const blockedMcpServers =
     config.getMcpClientManager()?.getBlockedMcpServers() || [];
 
@@ -205,7 +226,10 @@ const listAction = async (
     connectingServers.length > 0;
 
   const allTools = toolRegistry.getAllTools();
-  const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
+  const mcpTools = allTools.filter(
+    (tool) =>
+      tool instanceof DiscoveredMCPTool && serverNames.includes(tool.serverName),
+  );
 
   const promptRegistry = config.getPromptRegistry();
   const mcpPrompts = promptRegistry
@@ -243,7 +267,7 @@ const listAction = async (
 
   const mcpStatusItem: HistoryItemMcpStatus = {
     type: MessageType.MCP_STATUS,
-    servers: mcpServers,
+    servers: displayedMcpServers,
     tools: mcpTools.map((tool) => ({
       serverName: tool.serverName,
       name: tool.name,
@@ -288,7 +312,16 @@ const descCommand: SlashCommand = {
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (context) => listAction(context, true),
+  action: (context, args) => listAction(context, true, false, args),
+  completion: async (context: CommandContext, partialArg: string) => {
+    const { config } = context.services;
+    if (!config) return [];
+
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
+    return Object.keys(mcpServers).filter((name) =>
+      name.startsWith(partialArg),
+    );
+  },
 };
 
 const schemaCommand: SlashCommand = {
