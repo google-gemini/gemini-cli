@@ -19,7 +19,10 @@ export const skillsCommand: CommandModule = {
   describe: 'Manage agent skills.',
   builder: (yargs) =>
     yargs
-      .middleware(() => initializeOutputListenersAndFlush())
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
       .command(defer(listCommand, 'skills'))
       .command(defer(enableCommand, 'skills'))
       .command(defer(disableCommand, 'skills'))

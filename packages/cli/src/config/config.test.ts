@@ -34,6 +34,10 @@ vi.mock('./sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(async () => undefined),
 }));
 
+vi.mock('../commands/utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
@@ -534,6 +538,42 @@ describe('parseArguments', () => {
       'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
     );
   });
+
+  it('should set isCommand to true for mcp command', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for extensions command', async () => {
+    process.argv = ['node', 'script.js', 'extensions', 'list'];
+    // Extensions command uses experimental settings
+    const settings = createTestMergedSettings({
+      experimental: { extensionManagement: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for skills command', async () => {
+    process.argv = ['node', 'script.js', 'skills', 'list'];
+    // Skills command enabled by default or via experimental
+    const settings = createTestMergedSettings({
+      experimental: { skills: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for hooks command', async () => {
+    process.argv = ['node', 'script.js', 'hooks', 'migrate'];
+    // Hooks command enabled via tools settings
+    const settings = createTestMergedSettings({
+      tools: { enableHooks: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -638,6 +678,20 @@ describe('loadCliConfig', () => {
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should be non-interactive when isCommand is set', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    argv.isCommand = true; // explicitly set it as if middleware ran (it does in parseArguments but we want to be sure for this isolated test if we were mocking argv)
+
+    // reset tty for this test
+    process.stdin.isTTY = true;
+
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.isInteractive()).toBe(false);
   });
 });
 
