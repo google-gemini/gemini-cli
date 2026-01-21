@@ -314,8 +314,8 @@ describe('useApprovalModeIndicator', () => {
     act(() => {
       capturedUseKeypressHandler({
         name: 'a',
-        ctrl: true,
         shift: true,
+        ctrl: true,
       } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();

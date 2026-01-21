@@ -59,7 +59,8 @@ describe('useSelectionList', () => {
           name,
           sequence,
           ctrl: options.ctrl ?? false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: options.shift ?? false,
           insertable: false,
         };
@@ -328,7 +329,8 @@ describe('useSelectionList', () => {
           name,
           sequence: name,
           ctrl: false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: false,
           insertable: true,
         };
@@ -377,7 +379,8 @@ describe('useSelectionList', () => {
             name,
             sequence: name,
             ctrl: false,
-            meta: false,
+            cmd: false,
+            alt: false,
             shift: false,
             insertable: false,
           };
