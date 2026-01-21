@@ -41,11 +41,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -72,11 +72,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -102,11 +102,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -133,11 +133,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -163,11 +163,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -193,12 +193,12 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             if (key === 'defaultBannerShownCount') return 5;
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -222,11 +222,11 @@ describe('<AppHeader />', () => {
       config: mockConfig,
       uiState,
       persistentState: {
-        get: (key) => {
+        get: vi.fn((key) => {
           if (key === 'tipsShown') return 0;
           if (key === 'defaultBannerShownCount') return {};
           return undefined;
-        },
+        }),
       },
     });
 
@@ -259,11 +259,11 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 0;
             if (key === 'defaultBannerShownCount') return {};
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -288,10 +288,10 @@ describe('<AppHeader />', () => {
         config: mockConfig,
         uiState,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 5;
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -308,10 +308,10 @@ describe('<AppHeader />', () => {
       {
         config: mockConfig,
         persistentState: {
-          get: (key) => {
+          get: vi.fn((key) => {
             if (key === 'tipsShown') return 10;
             return undefined;
-          },
+          }),
         },
       },
     );
@@ -338,10 +338,10 @@ describe('<AppHeader />', () => {
       config: mockConfig,
       uiState,
       persistentState: {
-        get: (key) => fakeStore[key],
-        set: (key, val) => {
+        get: vi.fn((key) => fakeStore[key]),
+        set: vi.fn((key, val) => {
           fakeStore[key] = val;
-        },
+        }),
       },
     });
 
@@ -352,10 +352,10 @@ describe('<AppHeader />', () => {
     const session2 = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       persistentState: {
-        get: (key) => fakeStore[key],
-        set: (key, val) => {
+        get: vi.fn((key) => fakeStore[key]),
+        set: vi.fn((key, val) => {
           fakeStore[key] = val;
-        },
+        }),
       },
     });
 

@@ -129,7 +129,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
         config: mockConfig,
         persistentState: {
-          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
         },
       },
     );
@@ -147,7 +147,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
         config: mockConfig,
         persistentState: {
-          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
         },
       },
     );
@@ -165,7 +165,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
         config: mockConfig,
         persistentState: {
-          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
         },
       },
     );
@@ -183,7 +183,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
         config: mockConfig,
         persistentState: {
-          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
         },
       },
     );
@@ -205,7 +205,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         },
         config: mockConfig,
         persistentState: {
-          get: (key) => (key === 'tipsShown' ? 0 : undefined),
+          get: vi.fn((key) => (key === 'tipsShown' ? 0 : undefined)),
         },
       },
     );
