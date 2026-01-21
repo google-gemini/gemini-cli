@@ -100,6 +100,7 @@ const mockConfig = {
   getIdeMode: () => false,
   getEnableInteractiveShell: () => true,
   getPreviewFeatures: () => false,
+  isEventDrivenSchedulerEnabled: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {

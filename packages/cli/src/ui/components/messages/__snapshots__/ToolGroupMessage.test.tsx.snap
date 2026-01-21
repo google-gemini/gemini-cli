@@ -81,6 +81,16 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`<ToolGroupMessage /> > Event-Driven Scheduler (Phase 4) > hides confirming tools when event-driven scheduler is enabled 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Event-Driven Scheduler (Phase 4) > shows only successful tools when mixed with confirming tools 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  success-tool A tool for testing                                           │
+│                                                                              │
+│ Test result                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `

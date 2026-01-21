@@ -98,6 +98,7 @@ const mockConfig = {
     experimentIds: [],
   }),
   getPreviewFeatures: () => false,
+  isEventDrivenSchedulerEnabled: () => false,
 } as unknown as Config;
 
 describe('AlternateBufferQuittingDisplay', () => {

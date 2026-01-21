@@ -13,6 +13,7 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
+import type { Config } from '@google/gemini-cli-core';
 
 describe('<ToolGroupMessage />', () => {
   const createToolCall = (
@@ -502,31 +503,95 @@ describe('<ToolGroupMessage />', () => {
     it('renders confirmation with permanent approval disabled', () => {
       const toolCalls = [
         createToolCall({
-          callId: 'tool-1',
+          callId: 'confirm-tool',
           name: 'confirm-tool',
           status: ToolCallStatus.Confirming,
           confirmationDetails: {
             type: 'info',
-            title: 'Confirm Tool',
+            title: 'Confirm tool',
             prompt: 'Do you want to proceed?',
             onConfirm: vi.fn(),
           },
         }),
       ];
-      const settings = createMockSettings({
-        security: { enablePermanentToolApproval: false },
-      });
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          settings,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
       );
       expect(lastFrame()).not.toContain('Allow for all future sessions');
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+  });
+
+  describe('Event-Driven Scheduler (Phase 4)', () => {
+    it('hides confirming tools when event-driven scheduler is enabled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'confirm-tool',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm tool',
+            prompt: 'Do you want to proceed?',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+
+      const mockConfig = {
+        isEventDrivenSchedulerEnabled: () => true,
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: mockConfig },
+      );
+
+      // Should render nothing because all tools in the group are confirming
+      expect(lastFrame()).toBe('');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('shows only successful tools when mixed with confirming tools', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'success-tool',
+          name: 'success-tool',
+          status: ToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'confirm-tool',
+          name: 'confirm-tool',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm tool',
+            prompt: 'Do you want to proceed?',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+
+      const mockConfig = {
+        isEventDrivenSchedulerEnabled: () => true,
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: mockConfig },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('success-tool');
+      expect(output).not.toContain('confirm-tool');
+      expect(output).not.toContain('Do you want to proceed?');
+      expect(output).toMatchSnapshot();
       unmount();
     });
   });

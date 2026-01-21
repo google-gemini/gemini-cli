@@ -5,16 +5,24 @@
  */
 
 import { describe, it, expect, vi, type Mock } from 'vitest';
+import type React from 'react';
 import { render } from '../test-utils/render.js';
-import { Text, useIsScreenReaderEnabled } from 'ink';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
-import { StreamingState } from './types.js';
+import {
+  type HistoryItemToolGroup,
+  StreamingState,
+  ToolCallStatus,
+} from './types.js';
 import { ConfigContext } from './contexts/ConfigContext.js';
-import { AppContext, type AppState } from './contexts/AppContext.js';
+import { AppContext } from './contexts/AppContext.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { LoadedSettings, type SettingsFile } from '../config/settings.js';
+
+import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { KeypressProvider } from './contexts/KeypressContext.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -57,8 +65,12 @@ describe('App', () => {
     streamingState: StreamingState.Idle,
     quittingMessages: null,
     dialogsVisible: false,
-    mainControlsRef: { current: null },
-    rootUiRef: { current: null },
+    mainControlsRef: {
+      current: null,
+    } as unknown as React.MutableRefObject<DOMElement | null>,
+    rootUiRef: {
+      current: null,
+    } as unknown as React.MutableRefObject<DOMElement | null>,
     historyManager: {
       addItem: vi.fn(),
       history: [],
@@ -68,6 +80,7 @@ describe('App', () => {
     },
     history: [],
     pendingHistoryItems: [],
+    pendingGeminiHistoryItems: [],
     bannerData: {
       defaultText: 'Mock Banner Text',
       warningText: '',
@@ -91,26 +104,41 @@ describe('App', () => {
     [],
   );
 
-  const mockAppState: AppState = {
+  const mockAppState = {
     version: '1.0.0',
     startupWarnings: [],
   };
 
-  const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
-    render(
+  const renderWithProviders = (
+    ui: React.ReactElement,
+    state: Partial<UIState>,
+    config: Config = mockConfig,
+  ) => {
+    const allToolCalls = (state.pendingHistoryItems || [])
+      .filter(
+        (item): item is HistoryItemToolGroup => item.type === 'tool_group',
+      )
+      .flatMap((item) => item.tools);
+
+    return render(
       <AppContext.Provider value={mockAppState}>
-        <ConfigContext.Provider value={mockConfig}>
+        <ConfigContext.Provider value={config}>
           <SettingsContext.Provider value={mockLoadedSettings}>
-            <UIStateContext.Provider value={state}>
-              {ui}
+            <UIStateContext.Provider value={state as UIState}>
+              <KeypressProvider>
+                <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+                  {ui}
+                </ToolActionsProvider>
+              </KeypressProvider>
             </UIStateContext.Provider>
           </SettingsContext.Provider>
         </ConfigContext.Provider>
       </AppContext.Provider>,
     );
+  };
 
   it('should render main content and composer when not quitting', () => {
-    const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
+    const { lastFrame } = renderWithProviders(<App />, mockUIState);
 
     expect(lastFrame()).toContain('MainContent');
     expect(lastFrame()).toContain('Notifications');
@@ -183,9 +211,10 @@ describe('App', () => {
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
-    expect(lastFrame()).toContain(
-      'Notifications\nFooter\nMainContent\nComposer',
-    );
+    expect(lastFrame()).toContain(`Notifications
+Footer
+MainContent
+Composer`);
   });
 
   it('should render DefaultAppLayout when screen reader is not enabled', () => {
@@ -193,7 +222,56 @@ describe('App', () => {
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
-    expect(lastFrame()).toContain('MainContent\nNotifications\nComposer');
+    expect(lastFrame()).toContain(`MainContent
+Notifications
+Composer`);
+  });
+
+  it('should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on', () => {
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
+
+    const toolCalls = [
+      {
+        callId: 'call-1',
+        name: 'ls',
+        description: 'list directory',
+        status: ToolCallStatus.Confirming,
+        resultDisplay: '',
+        confirmationDetails: {
+          type: 'exec' as const,
+          title: 'Confirm execution',
+          command: 'ls',
+          rootCommand: 'ls',
+          rootCommands: ['ls'],
+        },
+      },
+    ];
+
+    const stateWithConfirmingTool = {
+      ...mockUIState,
+      pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+      pendingGeminiHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+    } as UIState;
+
+    const configWithExperiment = {
+      ...mockConfig,
+      isEventDrivenSchedulerEnabled: () => true,
+      isTrustedFolder: () => true,
+      getIdeMode: () => false,
+    } as unknown as Config;
+
+    const { lastFrame } = renderWithProviders(
+      <App />,
+      stateWithConfirmingTool,
+      configWithExperiment,
+    );
+
+    expect(lastFrame()).toContain('MainContent');
+    expect(lastFrame()).toContain('Notifications');
+    expect(lastFrame()).toContain('Action Required'); // From ToolConfirmationQueue
+    expect(lastFrame()).toContain('1 of 1');
+    expect(lastFrame()).toContain('Composer');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   describe('Snapshots', () => {

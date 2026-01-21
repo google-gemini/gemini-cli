@@ -29,7 +29,7 @@ import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
-export const Composer = () => {
+export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -133,7 +133,7 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={true}
+          focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
