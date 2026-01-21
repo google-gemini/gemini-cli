@@ -22,11 +22,13 @@ const categorizeRulesByMode = (
     autoEdit: [],
     yolo: [],
   };
+  const ALL_MODES = Object.values(ApprovalMode);
   rules.forEach((rule) => {
-    const modes = rule.modes?.length ? rule.modes : Object.values(ApprovalMode);
-    if (modes.includes(ApprovalMode.DEFAULT)) result.normal.push(rule);
-    if (modes.includes(ApprovalMode.AUTO_EDIT)) result.autoEdit.push(rule);
-    if (modes.includes(ApprovalMode.YOLO)) result.yolo.push(rule);
+    const modes = rule.modes?.length ? rule.modes : ALL_MODES;
+    const modeSet = new Set(modes);
+    if (modeSet.has(ApprovalMode.DEFAULT)) result.normal.push(rule);
+    if (modeSet.has(ApprovalMode.AUTO_EDIT)) result.autoEdit.push(rule);
+    if (modeSet.has(ApprovalMode.YOLO)) result.yolo.push(rule);
   });
   return result;
 };
