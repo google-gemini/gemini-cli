@@ -177,7 +177,6 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
-  disabled?: boolean;
   enabled?: boolean;
 }
 
@@ -291,6 +290,7 @@ export interface SandboxConfig {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -379,10 +379,9 @@ export interface ConfigParameters {
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
-  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
-    disabled?: string[];
-  };
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
+  disabledHooks?: string[];
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -416,6 +415,7 @@ export class Config {
   private agentRegistry!: AgentRegistry;
   private skillManager!: SkillManager;
   private sessionId: string;
+  private clientVersion: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -554,6 +554,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.clientVersion = params.clientVersion ?? 'unknown';
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -678,10 +679,7 @@ export class Config {
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? false;
-    this.disabledHooks =
-      (params.hooks && 'disabled' in params.hooks
-        ? params.hooks.disabled
-        : undefined) ?? [];
+    this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
       enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
@@ -722,8 +720,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
 
     if (params.hooks) {
-      const { disabled: _, ...restOfHooks } = params.hooks;
-      this.hooks = restOfHooks;
+      this.hooks = params.hooks;
     }
     if (params.projectHooks) {
       this.projectHooks = params.projectHooks;
@@ -811,6 +808,7 @@ export class Config {
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
+      this.clientVersion,
       this.toolRegistry,
       this,
       this.eventEmitter,
@@ -1990,9 +1988,7 @@ export class Config {
   /**
    * Get project-specific hooks configuration
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.projectHooks;
   }
 
