@@ -1096,6 +1096,23 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
+    it('should handle Ctrl+J as newline', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      act(() =>
+        result.current.handleInput({
+          name: 'j',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          insertable: false,
+          sequence: '\n',
+        }),
+      );
+      expect(getBufferState(result).lines).toEqual(['', '']);
+    });
+
     it('should do nothing for a tab key press', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
