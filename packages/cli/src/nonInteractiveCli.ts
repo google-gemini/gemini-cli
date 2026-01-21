@@ -296,21 +296,21 @@ export async function runNonInteractive({
           }
 
           if (event.type === GeminiEventType.Content) {
+            const isRaw =
+              config.getRawOutput() || config.getAcceptRawOutputRisk();
+            const output = isRaw ? event.value : stripAnsi(event.value);
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.MESSAGE,
                 timestamp: new Date().toISOString(),
                 role: 'assistant',
-                content: event.value,
+                content: output,
                 delta: true,
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += event.value;
+              responseText += output;
             } else {
               if (event.value) {
-                const isRaw =
-                  config.getRawOutput() || config.getAcceptRawOutputRisk();
-                const output = isRaw ? event.value : stripAnsi(event.value);
                 textOutput.write(output);
               }
             }

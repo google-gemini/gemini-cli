@@ -1747,6 +1747,121 @@ describe('runNonInteractive', () => {
 
     // The key assertion: sendMessageStream should have been called ONLY ONCE (initial user input).
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+
+    expect(processStderrSpy).toHaveBeenCalledWith(
+      'Agent execution stopped: Stop reason from hook\n',
+    );
+  });
+
+  it('should write JSON output when a tool call returns STOP_EXECUTION error', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop-json',
+      },
+    };
+
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Partial content' },
+      toolCallEvent,
+    ];
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(firstCallEvents),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop-json',
+    });
+
+    expect(processStdoutSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: 'Partial content',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('should emit result event when a tool call returns STOP_EXECUTION error in streaming JSON mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop-stream',
+      },
+    };
+
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(firstCallEvents),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop-stream',
+    });
+
+    const output = getWrittenOutput();
+    expect(output).toContain('"type":"result"');
+    expect(output).toContain('"status":"success"');
   });
 
   describe('Agent Execution Events', () => {
