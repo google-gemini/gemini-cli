@@ -280,8 +280,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
         normalizedKey.name === 'return' &&
+        !normalizedKey.alt &&
         !normalizedKey.ctrl &&
-        !normalizedKey.meta
+        !normalizedKey.cmd
       ) {
         if (buffer.text.trim() && onSubmit) {
           // Handle command submission directly
@@ -309,9 +310,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     (key: Key): Key => ({
       name: key.name || '',
       sequence: key.sequence || '',
-      ctrl: key.ctrl || false,
-      meta: key.meta || false,
       shift: key.shift || false,
+      alt: key.alt || false,
+      ctrl: key.ctrl || false,
+      cmd: key.cmd || false,
       insertable: key.insertable || false,
     }),
     [],
