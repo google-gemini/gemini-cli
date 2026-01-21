@@ -41,8 +41,8 @@ vi.mock('./HookStatusDisplay.js', () => ({
   HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
 }));
 
-vi.mock('./AutoAcceptIndicator.js', () => ({
-  AutoAcceptIndicator: () => <Text>AutoAcceptIndicator</Text>,
+vi.mock('./ApprovalModeIndicator.js', () => ({
+  ApprovalModeIndicator: () => <Text>ApprovalModeIndicator</Text>,
 }));
 
 vi.mock('./ShellModeIndicator.js', () => ({
@@ -95,7 +95,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
   ({
     streamingState: null,
     contextFileNames: [],
-    showAutoAcceptIndicator: ApprovalMode.DEFAULT,
+    showApprovalModeIndicator: ApprovalMode.DEFAULT,
     messageQueue: [],
     showErrorDetails: false,
     constrainHeight: false,
@@ -419,15 +419,15 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('InputPrompt');
     });
 
-    it('shows AutoAcceptIndicator when approval mode is not default and shell mode is inactive', () => {
+    it('shows ApprovalModeIndicator when approval mode is not default and shell mode is inactive', () => {
       const uiState = createMockUIState({
-        showAutoAcceptIndicator: ApprovalMode.YOLO,
+        showApprovalModeIndicator: ApprovalMode.YOLO,
         shellModeActive: false,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('AutoAcceptIndicator');
+      expect(lastFrame()).toContain('ApprovalModeIndicator');
     });
 
     it('shows ShellModeIndicator when shell mode is active', () => {
