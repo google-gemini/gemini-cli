@@ -378,6 +378,8 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  rawOutput?: boolean;
+  acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
@@ -520,6 +522,8 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly rawOutput: boolean;
+  private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -722,6 +726,8 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.rawOutput = params.rawOutput ?? false;
+    this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
     if (params.hooks) {
       this.hooks = params.hooks;
@@ -1393,6 +1399,14 @@ export class Config {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getRawOutput(): boolean {
+    return this.rawOutput;
+  }
+
+  getAcceptRawOutputRisk(): boolean {
+    return this.acceptRawOutputRisk;
   }
 
   getPendingIncludeDirectories(): string[] {

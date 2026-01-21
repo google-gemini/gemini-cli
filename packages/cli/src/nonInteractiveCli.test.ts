@@ -173,6 +173,8 @@ describe('runNonInteractive', () => {
       getModel: vi.fn().mockReturnValue('test-model'),
       getFolderTrust: vi.fn().mockReturnValue(false),
       isTrustedFolder: vi.fn().mockReturnValue(false),
+      getRawOutput: vi.fn().mockReturnValue(false),
+      getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -1745,6 +1747,121 @@ describe('runNonInteractive', () => {
 
     // The key assertion: sendMessageStream should have been called ONLY ONCE (initial user input).
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+
+    expect(processStderrSpy).toHaveBeenCalledWith(
+      'Agent execution stopped: Stop reason from hook\n',
+    );
+  });
+
+  it('should write JSON output when a tool call returns STOP_EXECUTION error', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop-json',
+      },
+    };
+
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Partial content' },
+      toolCallEvent,
+    ];
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(firstCallEvents),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop-json',
+    });
+
+    expect(processStdoutSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: 'Partial content',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('should emit result event when a tool call returns STOP_EXECUTION error in streaming JSON mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'stop-call',
+        name: 'stopTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-stop-stream',
+      },
+    };
+
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'error',
+      request: toolCallEvent.value,
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        callId: 'stop-call',
+        responseParts: [{ text: 'error occurred' }],
+        errorType: ToolErrorType.STOP_EXECUTION,
+        error: new Error('Stop reason'),
+        resultDisplay: undefined,
+      },
+    });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(firstCallEvents),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Run stop tool',
+      prompt_id: 'prompt-id-stop-stream',
+    });
+
+    const output = getWrittenOutput();
+    expect(output).toContain('"type":"result"');
+    expect(output).toContain('"status":"success"');
   });
 
   describe('Agent Execution Events', () => {
@@ -1803,6 +1920,144 @@ describe('runNonInteractive', () => {
       // sendMessageStream is called once, recursion is internal to it and transparent to the caller
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
       expect(getWrittenOutput()).toBe('Final answer\n');
+    });
+  });
+
+  describe('Output Sanitization', () => {
+    const ANSI_SEQUENCE = '\u001B[31mRed Text\u001B[0m';
+    const OSC_HYPERLINK =
+      '\u001B]8;;http://example.com\u001B\\Link\u001B]8;;\u001B\\';
+    const PLAIN_TEXT_RED = 'Red Text';
+    const PLAIN_TEXT_LINK = 'Link';
+
+    it('should sanitize ANSI output by default', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: ANSI_SEQUENCE },
+        { type: GeminiEventType.Content, value: ' ' },
+        { type: GeminiEventType.Content, value: OSC_HYPERLINK },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getRawOutput).mockReturnValue(false);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-sanitization',
+      });
+
+      expect(getWrittenOutput()).toBe(`${PLAIN_TEXT_RED} ${PLAIN_TEXT_LINK}\n`);
+    });
+
+    it('should allow ANSI output when rawOutput is true', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: ANSI_SEQUENCE },
+        { type: GeminiEventType.Content, value: ' ' },
+        { type: GeminiEventType.Content, value: OSC_HYPERLINK },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getRawOutput).mockReturnValue(true);
+      vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-raw',
+      });
+
+      expect(getWrittenOutput()).toBe(`${ANSI_SEQUENCE} ${OSC_HYPERLINK}\n`);
+    });
+
+    it('should allow ANSI output when only acceptRawOutputRisk is true', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: ANSI_SEQUENCE },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getRawOutput).mockReturnValue(false);
+      vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-accept-only',
+      });
+
+      expect(getWrittenOutput()).toBe(`${ANSI_SEQUENCE}\n`);
+    });
+
+    it('should warn when rawOutput is true and acceptRisk is false', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getRawOutput).mockReturnValue(true);
+      vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(false);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-warn',
+      });
+
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WARNING] --raw-output is enabled'),
+      );
+    });
+
+    it('should not warn when rawOutput is true and acceptRisk is true', async () => {
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getRawOutput).mockReturnValue(true);
+      vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-no-warn',
+      });
+
+      expect(processStderrSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[WARNING] --raw-output is enabled'),
+      );
     });
   });
 });
