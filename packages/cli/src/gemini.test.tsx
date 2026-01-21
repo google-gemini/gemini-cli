@@ -490,6 +490,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       outputFormat: undefined,
       fakeResponses: undefined,
       recordResponses: undefined,
+      rawOutput: undefined,
+      acceptRawOutputRisk: undefined,
     });
 
     await act(async () => {
