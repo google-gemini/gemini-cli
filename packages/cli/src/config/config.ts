@@ -83,6 +83,9 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  rawOutput: boolean | undefined;
+  acceptRawOutputRisk: boolean | undefined;
+  isCommand: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -95,7 +98,6 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-
     .option('debug', {
       alias: 'd',
       type: 'boolean',
@@ -248,6 +250,15 @@ export async function parseArguments(
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('raw-output', {
+          type: 'boolean',
+          description:
+            'Disable sanitization of model output (e.g. allow ANSI escape sequences). WARNING: This can be a security risk if the model output is untrusted.',
+        })
+        .option('accept-raw-output-risk', {
+          type: 'boolean',
+          description: 'Suppress the security warning when using --raw-output.',
         }),
     )
     // Register MCP subcommands
@@ -465,7 +476,9 @@ export async function loadCliConfig(
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
-      [],
+      settings.context?.loadMemoryFromIncludeDirectories || false
+        ? includeDirectories
+        : [],
       debugMode,
       fileService,
       extensionManager,
@@ -564,7 +577,7 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !hasQuery && !argv.prompt);
+    (process.stdin.isTTY && !hasQuery && !argv.prompt && !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -759,6 +772,8 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    rawOutput: argv.rawOutput,
+    acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks:

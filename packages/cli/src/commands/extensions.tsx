@@ -24,7 +24,10 @@ export const extensionsCommand: CommandModule = {
   describe: 'Manage Gemini CLI extensions.',
   builder: (yargs) =>
     yargs
-      .middleware(() => initializeOutputListenersAndFlush())
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
       .command(defer(installCommand, 'extensions'))
       .command(defer(uninstallCommand, 'extensions'))
       .command(defer(listCommand, 'extensions'))

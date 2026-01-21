@@ -22,20 +22,62 @@ import type {
   BeforeModelHookOutput,
   AfterModelHookOutput,
   BeforeToolSelectionHookOutput,
+  McpToolContext,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
+  GenerateContentConfig,
+  ContentListUnion,
+  ToolConfig,
+  ToolListUnion,
 } from '@google/genai';
-import type {
-  AfterModelHookResult,
-  BeforeModelHookResult,
-  BeforeToolSelectionHookResult,
-} from '../core/geminiChatHookTriggers.js';
+
 /**
  * Main hook system that coordinates all hook-related functionality
  */
+
+export interface BeforeModelHookResult {
+  /** Whether the model call was blocked */
+  blocked: boolean;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
+  /** Reason for blocking (if blocked) */
+  reason?: string;
+  /** Synthetic response to return instead of calling the model (if blocked) */
+  syntheticResponse?: GenerateContentResponse;
+  /** Modified config (if not blocked) */
+  modifiedConfig?: GenerateContentConfig;
+  /** Modified contents (if not blocked) */
+  modifiedContents?: ContentListUnion;
+}
+
+/**
+ * Result from firing the BeforeToolSelection hook.
+ */
+export interface BeforeToolSelectionHookResult {
+  /** Modified tool config */
+  toolConfig?: ToolConfig;
+  /** Modified tools */
+  tools?: ToolListUnion;
+}
+
+/**
+ * Result from firing the AfterModel hook.
+ * Contains either a modified response or indicates to use the original chunk.
+ */
+export interface AfterModelHookResult {
+  /** The response to yield (either modified or original) */
+  response: GenerateContentResponse;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
+  /** Whether the model call was blocked */
+  blocked?: boolean;
+  /** Reason for blocking or stopping */
+  reason?: string;
+}
+
 export class HookSystem {
   private readonly hookRegistry: HookRegistry;
   private readonly hookRunner: HookRunner;
@@ -254,6 +296,48 @@ export class HookSystem {
     } catch (error) {
       debugLogger.debug(`BeforeToolSelectionEvent failed:`, error);
       return {};
+    }
+  }
+
+  async fireBeforeToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireBeforeToolEvent(
+        toolName,
+        toolInput,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
+      return undefined;
+    }
+  }
+
+  async fireAfterToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolResponse: {
+      llmContent: unknown;
+      returnDisplay: unknown;
+      error: unknown;
+    },
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireAfterToolEvent(
+        toolName,
+        toolInput,
+        toolResponse as Record<string, unknown>,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
+      return undefined;
     }
   }
 }
