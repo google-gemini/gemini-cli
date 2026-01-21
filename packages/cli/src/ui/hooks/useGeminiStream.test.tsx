@@ -205,58 +205,59 @@ describe('useGeminiStream', () => {
     getMcpServerCount: vi.fn().mockReturnValue(0),
   };
 
-    const contentGeneratorConfig = {
-      model: 'test-model',
-      apiKey: 'test-key',
-      vertexai: false,
-      authType: AuthType.USE_GEMINI,
-    };
+  const contentGeneratorConfig = {
+    model: 'test-model',
+    apiKey: 'test-key',
+    vertexai: false,
+    authType: AuthType.USE_GEMINI,
+  };
 
-    const mockConfig: Config ={
-      apiKey: 'test-api-key',
-      model: 'gemini-pro',
-      sandbox: false,
-      targetDir: '/test/dir',
-      debugMode: false,
-      question: undefined,
+  const mockConfig: Config = {
+    apiKey: 'test-api-key',
+    model: 'gemini-pro',
+    sandbox: false,
+    targetDir: '/test/dir',
+    debugMode: false,
+    question: undefined,
 
-      coreTools: [],
-      toolDiscoveryCommand: undefined,
-      toolCallCommand: undefined,
-      mcpServerCommand: undefined,
-      mcpServers: undefined,
-      userAgent: 'test-agent',
-      userMemory: '',
-      geminiMdFileCount: 0,
-      alwaysSkipModificationConfirmation: false,
-      vertexai: false,
-      showMemoryUsage: false,
-      contextFileName: undefined,
-      getToolRegistry: vi.fn(
-        () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
-      ),
-      getProjectRoot: vi.fn(() => '/test/dir'),
-      getCheckpointingEnabled: vi.fn(() => false),
-      getGeminiClient: mockGetGeminiClient,
-      getMcpClientManager: () => mockMcpClientManager as any,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      addHistory: vi.fn(),
-      getSessionId() {
-        return 'test-session-id';
-      },
-      setQuotaErrorOccurred: vi.fn(),
-      getQuotaErrorOccurred: vi.fn(() => false),
-      getModel: vi.fn(() => 'gemini-2.5-pro'),
-      getContentGeneratorConfig: vi
-        .fn()
-        .mockReturnValue(contentGeneratorConfig),
-      isInteractive: () => false,
-      getExperiments: () => {},
-    } as unknown as Config;
+    coreTools: [],
+    toolDiscoveryCommand: undefined,
+    toolCallCommand: undefined,
+    mcpServerCommand: undefined,
+    mcpServers: undefined,
+    userAgent: 'test-agent',
+    userMemory: '',
+    geminiMdFileCount: 0,
+    alwaysSkipModificationConfirmation: false,
+    vertexai: false,
+    showMemoryUsage: false,
+    contextFileName: undefined,
+    getToolRegistry: vi.fn(
+      () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
+    ),
+    getProjectRoot: vi.fn(() => '/test/dir'),
+    getCheckpointingEnabled: vi.fn(() => false),
+    getGeminiClient: mockGetGeminiClient,
+    getMcpClientManager: () => mockMcpClientManager as any,
+    getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+    getUsageStatisticsEnabled: () => true,
+    getDebugMode: () => false,
+    addHistory: vi.fn(),
+    getSessionId() {
+      return 'test-session-id';
+    },
+    setQuotaErrorOccurred: vi.fn(),
+    getQuotaErrorOccurred: vi.fn(() => false),
+    getModel: vi.fn(() => 'gemini-2.5-pro'),
+    getContentGeneratorConfig: vi.fn().mockReturnValue(contentGeneratorConfig),
+    isInteractive: () => false,
+    getExperiments: () => ({ flags: {}, experimentIds: [] }),
+    isEventDrivenSchedulerEnabled: vi.fn(() => false),
+    getMaxSessionTurns: vi.fn(() => -1),
+    storage: {} as any,
+  } as unknown as Config;
 
-    beforeEach(() => {
+  beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
     mockAddItem = vi.fn();
     mockOnDebugMessage = vi.fn();
