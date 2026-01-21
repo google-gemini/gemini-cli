@@ -765,7 +765,8 @@ export async function loadCliConfig(
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
-    useModelRouter: settings.experimental?.useModelRouter,
+    gemmaModelRouter: settings.experimental?.gemmaModelRouter,
+
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,

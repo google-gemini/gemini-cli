@@ -6,6 +6,12 @@
 
 import { z } from 'zod';
 
+// TODO(sid): change classifier prompt and add reminder support and change the whole context engineering etc.
+
+// TODO(sid): add error handling if the localhost env is not reachable.
+
+// TODO(sid): add tests.
+
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
   RoutingContext,
@@ -129,10 +135,8 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
-    if (
-      !config.getUseModelRouter() ||
-      !config.getUseGemmaRoutingSettings()?.enabled
-    ) {
+    const gemmaRouterSettings = config.getGemmaModelRouterSettings();
+    if (!gemmaRouterSettings?.enabled) {
       return null;
     }
     try {
@@ -149,22 +153,15 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
 
       debugLogger.log(`[Routing] About to call Gemma classifier.`);
 
-      let jsonResponse: object;
-      const settings = config.getUseGemmaRoutingSettings();
-      const provider = settings?.provider ?? 'litert-lm';
-      debugLogger.log(`[Routing] Using ${provider} for classifier routing.`);
+      const jsonResponse: object;
 
       const history = [...finalHistory, createUserContent(context.request)];
 
-      if (provider === 'litert-lm') {
-        const client = new LocalGeminiClient(config);
-        jsonResponse = await client.generateJson(
-          history,
-          CLASSIFIER_SYSTEM_PROMPT,
-        );
-      } else {
-        throw new Error(`Unsupported provider for Gemma routing: ${provider}`);
-      }
+      const client = new LocalGeminiClient(config);
+      jsonResponse = await client.generateJson(
+        history,
+        CLASSIFIER_SYSTEM_PROMPT,
+      );
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 
