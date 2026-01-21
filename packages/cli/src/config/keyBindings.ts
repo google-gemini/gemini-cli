@@ -117,8 +117,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
   // Cursor Movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
-  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
+  [Command.HOME]: [
+    { key: 'a', ctrl: true },
+    { key: 'home', ctrl: false, shift: false },
+  ],
+  [Command.END]: [
+    { key: 'e', ctrl: true },
+    { key: 'end', ctrl: false, shift: false },
+  ],
   [Command.MOVE_UP]: [{ key: 'up', ctrl: false, command: false }],
   [Command.MOVE_DOWN]: [{ key: 'down', ctrl: false, command: false }],
   [Command.MOVE_LEFT]: [
@@ -162,8 +168,14 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
   [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
-  [Command.SCROLL_HOME]: [{ key: 'home' }],
-  [Command.SCROLL_END]: [{ key: 'end' }],
+  [Command.SCROLL_HOME]: [
+    { key: 'home', ctrl: true },
+    { key: 'home', shift: true },
+  ],
+  [Command.SCROLL_END]: [
+    { key: 'end', ctrl: true },
+    { key: 'end', shift: true },
+  ],
   [Command.PAGE_UP]: [{ key: 'pageup' }],
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 

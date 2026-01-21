@@ -33,6 +33,7 @@ import {
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
+import stripAnsi from 'strip-ansi';
 
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -176,6 +177,16 @@ export async function runNonInteractive({
     try {
       consolePatcher.patch();
 
+      if (
+        config.getRawOutput() &&
+        !config.getAcceptRawOutputRisk() &&
+        config.getOutputFormat() === OutputFormat.TEXT
+      ) {
+        process.stderr.write(
+          '[WARNING] --raw-output is enabled. Model output is not sanitized and may contain harmful ANSI sequences (e.g. for phishing or command injection). Use --accept-raw-output-risk to suppress this warning.\n',
+        );
+      }
+
       // Setup stdin cancellation listener
       setupStdinCancellation();
 
@@ -285,19 +296,22 @@ export async function runNonInteractive({
           }
 
           if (event.type === GeminiEventType.Content) {
+            const isRaw =
+              config.getRawOutput() || config.getAcceptRawOutputRisk();
+            const output = isRaw ? event.value : stripAnsi(event.value);
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.MESSAGE,
                 timestamp: new Date().toISOString(),
                 role: 'assistant',
-                content: event.value,
+                content: output,
                 delta: true,
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += event.value;
+              responseText += output;
             } else {
               if (event.value) {
-                textOutput.write(event.value);
+                textOutput.write(output);
               }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
