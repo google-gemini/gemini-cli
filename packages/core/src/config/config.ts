@@ -634,7 +634,7 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
-    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler =
       params.enableEventDrivenScheduler ?? false;
@@ -800,6 +800,11 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
+
+    // Add pending directories to workspace context
+    for (const dir of this.pendingIncludeDirectories) {
+      this.workspaceContext.addDirectory(dir);
+    }
 
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
