@@ -15,6 +15,7 @@ import {
   type Config,
   ToolConfirmationOutcome,
   hasRedirection,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
@@ -58,8 +59,12 @@ export const ToolConfirmationMessage: React.FC<
     settings.merged.security.enablePermanentToolApproval;
 
   const handleConfirm = (outcome: ToolConfirmationOutcome) => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    confirm(callId, outcome);
+    void confirm(callId, outcome).catch((error) => {
+      debugLogger.error(
+        `Failed to handle tool confirmation for ${callId}:`,
+        error,
+      );
+    });
   };
 
   const isTrustedFolder = config.isTrustedFolder();

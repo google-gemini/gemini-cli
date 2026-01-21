@@ -57,9 +57,13 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   useEffect(() => {
     let isMounted = true;
     if (config.getIdeMode()) {
-      void IdeClient.getInstance().then((client) => {
-        if (isMounted) setIdeClient(client);
-      });
+      IdeClient.getInstance()
+        .then((client) => {
+          if (isMounted) setIdeClient(client);
+        })
+        .catch((error) => {
+          debugLogger.error('Failed to get IdeClient instance:', error);
+        });
     }
     return () => {
       isMounted = false;
