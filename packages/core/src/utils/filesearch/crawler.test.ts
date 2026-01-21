@@ -12,6 +12,7 @@ import { crawl } from './crawler.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import type { Ignore } from './ignore.js';
 import { loadIgnoreRules } from './ignore.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 
 describe('crawler', () => {
   let tmpDir: string;
@@ -24,7 +25,7 @@ describe('crawler', () => {
 
   it('should use .geminiignore rules', async () => {
     tmpDir = await createTmpDir({
-      '.geminiignore': 'dist/',
+      [GEMINI_IGNORE_FILE_NAME]: 'dist/',
       dist: ['ignored.js'],
       src: ['not-ignored.js'],
     });
@@ -48,7 +49,7 @@ describe('crawler', () => {
       expect.arrayContaining([
         '.',
         'src/',
-        '.geminiignore',
+        GEMINI_IGNORE_FILE_NAME,
         'src/not-ignored.js',
       ]),
     );
@@ -57,7 +58,7 @@ describe('crawler', () => {
   it('should combine .gitignore and .geminiignore rules', async () => {
     tmpDir = await createTmpDir({
       '.gitignore': 'dist/',
-      '.geminiignore': 'build/',
+      [GEMINI_IGNORE_FILE_NAME]: 'build/',
       dist: ['ignored-by-git.js'],
       build: ['ignored-by-gemini.js'],
       src: ['not-ignored.js'],
@@ -82,7 +83,7 @@ describe('crawler', () => {
       expect.arrayContaining([
         '.',
         'src/',
-        '.geminiignore',
+        GEMINI_IGNORE_FILE_NAME,
         '.gitignore',
         'src/not-ignored.js',
       ]),

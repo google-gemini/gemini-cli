@@ -18,6 +18,7 @@ import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -423,7 +424,7 @@ describe('ReadFileTool', () => {
     describe('with .geminiignore', () => {
       beforeEach(async () => {
         await fsp.writeFile(
-          path.join(tempRootDir, '.geminiignore'),
+          path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
           ['foo.*', 'ignored/'].join('\n'),
         );
         const mockConfigInstance = {

@@ -9,6 +9,7 @@ import type { IgnoreFileFilter } from '../utils/ignoreFileParser.js';
 import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
 import { IgnoreFileParser } from '../utils/ignoreFileParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import * as path from 'node:path';
 
 export interface FilterFilesOptions {
@@ -42,7 +43,7 @@ export class FileDiscoveryService {
     }
     this.geminiIgnoreFilter = new IgnoreFileParser(
       this.projectRoot,
-      '.geminiignore',
+      GEMINI_IGNORE_FILE_NAME,
     );
     if (this.defaultFilterFileOptions.customIgnoreFilePath) {
       this.customIgnoreFilter = new IgnoreFileParser(

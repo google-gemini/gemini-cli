@@ -17,6 +17,7 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('glob', { spy: true });
 
@@ -368,7 +369,10 @@ describe('GlobTool', () => {
       },
       {
         name: 'should respect .geminiignore files by default',
-        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
+        ignoreFile: {
+          name: GEMINI_IGNORE_FILE_NAME,
+          content: '*.geminiignored.txt',
+        },
         filesToCreate: ['a.geminiignored.txt', 'b.notignored.txt'],
         globToolParams: { pattern: '*.txt' },
         expectedCountMessage: 'Found 3 file(s)',
@@ -384,7 +388,10 @@ describe('GlobTool', () => {
       },
       {
         name: 'should not respect .geminiignore when respect_gemini_ignore is false',
-        ignoreFile: { name: '.geminiignore', content: '*.geminiignored.txt' },
+        ignoreFile: {
+          name: GEMINI_IGNORE_FILE_NAME,
+          content: '*.geminiignored.txt',
+        },
         filesToCreate: ['a.geminiignored.txt'],
         globToolParams: { pattern: '*.txt', respect_gemini_ignore: false },
         expectedCountMessage: 'Found 3 file(s)',

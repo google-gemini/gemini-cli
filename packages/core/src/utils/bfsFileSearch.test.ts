@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { bfsFileSearch, bfsFileSearchSync } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
 describe('bfsFileSearch', () => {
   let testRootDir: string;
@@ -139,7 +140,7 @@ describe('bfsFileSearch', () => {
     });
 
     it('should ignore geminiignored files', async () => {
-      await createTestFile('node_modules/', 'project', '.geminiignore');
+      await createTestFile('node_modules/', 'project', GEMINI_IGNORE_FILE_NAME);
       await createTestFile('content', 'project', 'node_modules', 'target.txt');
       const targetFilePath = await createTestFile(
         'content',

@@ -20,6 +20,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
@@ -1346,7 +1347,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithGeminiIgnore = {
         getTargetDir: () => tempRootDir,
@@ -1386,7 +1387,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = {
         getTargetDir: () => tempRootDir,

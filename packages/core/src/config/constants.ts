@@ -29,3 +29,6 @@ export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   searchTimeout: 5000,
   customIgnoreFilePath: undefined,
 };
+
+// Generic exclusion file name
+export const GEMINI_IGNORE_FILE_NAME = '.geminiignore';

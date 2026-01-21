@@ -7,6 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { Ignore, loadIgnoreRules } from './ignore.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
+import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 
 describe('Ignore', () => {
   describe('getDirectoryFilter', () => {
@@ -91,7 +92,7 @@ describe('loadIgnoreRules', () => {
 
   it('should load rules from .geminiignore', async () => {
     tmpDir = await createTmpDir({
-      '.geminiignore': '*.log',
+      [GEMINI_IGNORE_FILE_NAME]: '*.log',
     });
     const ignore = loadIgnoreRules({
       projectRoot: tmpDir,
@@ -107,7 +108,7 @@ describe('loadIgnoreRules', () => {
   it('should combine rules from .gitignore and .geminiignore', async () => {
     tmpDir = await createTmpDir({
       '.gitignore': '*.log',
-      '.geminiignore': '*.txt',
+      [GEMINI_IGNORE_FILE_NAME]: '*.txt',
     });
     const ignore = loadIgnoreRules({
       projectRoot: tmpDir,

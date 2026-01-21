@@ -9,6 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { FileDiscoveryService } from './fileDiscoveryService.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 describe('FileDiscoveryService', () => {
   let testRootDir: string;
@@ -54,7 +55,7 @@ describe('FileDiscoveryService', () => {
     });
 
     it('should load .geminiignore patterns even when not in a git repo', async () => {
-      await createTestFile('.geminiignore', 'secrets.txt');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'secrets.txt');
       const service = new FileDiscoveryService(projectRoot);
 
       expect(service.shouldIgnoreFile('secrets.txt')).toBe(true);
@@ -113,7 +114,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/\n.git/\ndist');
-      await createTestFile('.geminiignore', 'logs/');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'logs/');
     });
 
     it('should filter out git-ignored and gemini-ignored files by default', () => {
@@ -187,7 +188,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
-      await createTestFile('.geminiignore', '*.log');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '*.log');
     });
 
     it('should return filtered paths and correct ignored count', () => {
@@ -224,7 +225,7 @@ describe('FileDiscoveryService', () => {
     beforeEach(async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
-      await createTestFile('.geminiignore', '*.log');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '*.log');
     });
 
     it('should return true for git-ignored files', () => {
@@ -299,7 +300,7 @@ describe('FileDiscoveryService', () => {
 
     it('should un-ignore a file in .geminiignore that is ignored in .gitignore', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '!important.txt');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt'].map((f) =>
@@ -312,7 +313,7 @@ describe('FileDiscoveryService', () => {
 
     it('should un-ignore a directory in .geminiignore that is ignored in .gitignore', async () => {
       await createTestFile('.gitignore', 'logs/');
-      await createTestFile('.geminiignore', '!logs/');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '!logs/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['logs/app.log', 'other/app.log'].map((f) =>
@@ -325,7 +326,7 @@ describe('FileDiscoveryService', () => {
 
     it('should extend ignore rules in .geminiignore', async () => {
       await createTestFile('.gitignore', '*.log');
-      await createTestFile('.geminiignore', 'temp/');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'temp/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['app.log', 'temp/file.txt'].map((f) =>
@@ -338,7 +339,7 @@ describe('FileDiscoveryService', () => {
 
     it('should use .gitignore rules if respectGeminiIgnore is false', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '!important.txt');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt'].map((f) =>
@@ -355,7 +356,7 @@ describe('FileDiscoveryService', () => {
 
     it('should use .geminiignore rules if respectGitIgnore is false', async () => {
       await createTestFile('.gitignore', '*.txt');
-      await createTestFile('.geminiignore', '!important.txt\ntemp/');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '!important.txt\ntemp/');
 
       const service = new FileDiscoveryService(projectRoot);
       const files = ['file.txt', 'important.txt', 'temp/file.js'].map((f) =>
@@ -396,7 +397,7 @@ describe('FileDiscoveryService', () => {
     it('should prioritize custom ignore patterns over .geminiignore patterns in git repo', async () => {
       await fs.mkdir(path.join(projectRoot, '.git'));
       await createTestFile('.gitignore', 'node_modules/');
-      await createTestFile('.geminiignore', '*.log');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '*.log');
 
       const customIgnoreName = '.customignore';
       // .geminiignore ignores *.log, custom un-ignores debug.log

@@ -18,6 +18,7 @@ import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
@@ -546,7 +547,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     );
     this.geminiIgnoreParser = new IgnoreFileParser(
       config.getTargetDir(),
-      '.geminiignore',
+      GEMINI_IGNORE_FILE_NAME,
     );
   }
 

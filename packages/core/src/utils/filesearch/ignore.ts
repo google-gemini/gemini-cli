@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
+import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 
 const hasFileExtension = picomatch('**/*[*.]*');
 
@@ -28,7 +29,10 @@ export function loadIgnoreRules(options: LoadIgnoreRulesOptions): Ignore {
   }
 
   if (options.useGeminiignore) {
-    const geminiignorePath = path.join(options.projectRoot, '.geminiignore');
+    const geminiignorePath = path.join(
+      options.projectRoot,
+      GEMINI_IGNORE_FILE_NAME,
+    );
     if (fs.existsSync(geminiignorePath)) {
       ignorer.add(fs.readFileSync(geminiignorePath, 'utf8'));
     }
