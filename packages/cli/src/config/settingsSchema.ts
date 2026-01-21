@@ -1429,7 +1429,7 @@ const SETTINGS_SCHEMA = {
         label: 'Event Driven Scheduler',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enables event-driven scheduler within the CLI session.',
         showInDialog: false,
       },
