@@ -556,6 +556,15 @@ const SETTINGS_SCHEMA = {
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
+      showSpinner: {
+        type: 'boolean',
+        label: 'Show Spinner',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the spinner during operations.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

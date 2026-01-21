@@ -7,16 +7,23 @@
 import Spinner from 'ink-spinner';
 import { type ComponentProps, useEffect } from 'react';
 import { debugState } from '../debug.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 export type SpinnerProps = ComponentProps<typeof Spinner>;
 
 export const CliSpinner = (props: SpinnerProps) => {
+  const settings = useSettings();
+
   useEffect(() => {
     debugState.debugNumAnimatedComponents++;
     return () => {
       debugState.debugNumAnimatedComponents--;
     };
   }, []);
+
+  if (settings.merged.ui?.showSpinner === false) {
+    return null;
+  }
 
   return <Spinner {...props} />;
 };
