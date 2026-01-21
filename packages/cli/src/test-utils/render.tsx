@@ -166,6 +166,7 @@ const mockUIActions: UIActions = {
   handleFinalSubmit: vi.fn(),
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
+  handleValidationChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
