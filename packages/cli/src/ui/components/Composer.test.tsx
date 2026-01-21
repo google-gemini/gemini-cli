@@ -24,6 +24,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
+import { mergeSettings } from '../../config/settings.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -99,7 +100,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showErrorDetails: false,
     constrainHeight: false,
     isInputActive: true,
-    buffer: '',
+    buffer: { text: '' },
     inputWidth: 80,
     suggestionsWidth: 40,
     userMessages: [],
@@ -163,13 +164,20 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hideFooter: false,
-    showMemoryUsage: false,
-    ...merged,
-  },
-});
+const createMockSettings = (merged = {}) => {
+  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+  return {
+    merged: {
+      ...defaultMergedSettings,
+      ui: {
+        ...defaultMergedSettings.ui,
+        hideFooter: false,
+        showMemoryUsage: false,
+        ...merged,
+      },
+    },
+  };
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
@@ -275,7 +283,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const config = createMockConfig({
-        getAccessibility: vi.fn(() => ({ disableLoadingPhrases: true })),
+        getAccessibility: vi.fn(() => ({ enableLoadingPhrases: false })),
       });
 
       const { lastFrame } = renderComposer(uiState, undefined, config);
@@ -381,11 +389,12 @@ describe('Composer', () => {
     it('shows escape prompt when showEscapePrompt is true', () => {
       const uiState = createMockUIState({
         showEscapePrompt: true,
+        history: [{ id: 1, type: 'user', text: 'test' }],
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Esc again to clear');
+      expect(lastFrame()).toContain('Press Esc again to rewind');
     });
   });
 

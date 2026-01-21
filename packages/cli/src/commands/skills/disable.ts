@@ -31,7 +31,7 @@ export async function handleDisable(args: DisableArgs) {
 }
 
 export const disableCommand: CommandModule = {
-  command: 'disable <name>',
+  command: 'disable <name> [--scope]',
   describe: 'Disables an agent skill.',
   builder: (yargs) =>
     yargs
@@ -42,14 +42,16 @@ export const disableCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: 'The scope to disable the skill in (user or project).',
+        describe: 'The scope to disable the skill in (user or workspace).',
         type: 'string',
-        default: 'project',
-        choices: ['user', 'project'],
+        default: 'workspace',
+        choices: ['user', 'workspace'],
       }),
   handler: async (argv) => {
     const scope =
-      argv['scope'] === 'project' ? SettingScope.Workspace : SettingScope.User;
+      argv['scope'] === 'workspace'
+        ? SettingScope.Workspace
+        : SettingScope.User;
     await handleDisable({
       name: argv['name'] as string,
       scope,

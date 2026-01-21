@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.25.0-nightly.20260107.59a18e710",
+  "version": "0.27.0-nightly.20260121.97aac696f",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -26,10 +26,10 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.25.0-nightly.20260107.59a18e710"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-nightly.20260121.97aac696f"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^0.11.0",
+    "@agentclientprotocol/sdk": "^0.12.0",
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.30.0",
     "@iarna/toml": "^2.2.5",
@@ -37,6 +37,7 @@
     "@types/update-notifier": "^6.0.8",
     "ansi-regex": "^6.2.2",
     "clipboardy": "^5.0.0",
+    "color-convert": "^2.0.1",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
     "diff": "^7.0.0",

@@ -16,7 +16,6 @@ describe('keyMatchers', () => {
     ctrl: false,
     meta: false,
     shift: false,
-    paste: false,
     insertable: false,
     sequence: name,
     ...mods,
@@ -44,6 +43,7 @@ describe('keyMatchers', () => {
         createKey('a'),
         createKey('a', { shift: true }),
         createKey('b', { ctrl: true }),
+        createKey('home', { ctrl: true }),
       ],
     },
     {
@@ -53,6 +53,7 @@ describe('keyMatchers', () => {
         createKey('e'),
         createKey('e', { shift: true }),
         createKey('a', { ctrl: true }),
+        createKey('end', { ctrl: true }),
       ],
     },
     {
@@ -102,11 +103,7 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.DELETE_CHAR_LEFT,
-      positive: [
-        createKey('backspace'),
-        { ...createKey('\x7f'), sequence: '\x7f' },
-        createKey('h', { ctrl: true }),
-      ],
+      positive: [createKey('backspace'), createKey('h', { ctrl: true })],
       negative: [createKey('h'), createKey('x', { ctrl: true })],
     },
     {
@@ -119,8 +116,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('backspace', { ctrl: true }),
         createKey('backspace', { meta: true }),
-        { ...createKey('\x7f', { ctrl: true }), sequence: '\x7f' },
-        { ...createKey('\x7f', { meta: true }), sequence: '\x7f' },
         createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
@@ -164,13 +159,13 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SCROLL_HOME,
-      positive: [createKey('home')],
-      negative: [createKey('end')],
+      positive: [createKey('home', { ctrl: true })],
+      negative: [createKey('end'), createKey('home')],
     },
     {
       command: Command.SCROLL_END,
-      positive: [createKey('end')],
-      negative: [createKey('home')],
+      positive: [createKey('end', { ctrl: true })],
+      negative: [createKey('home'), createKey('end')],
     },
     {
       command: Command.PAGE_UP,
@@ -249,7 +244,6 @@ describe('keyMatchers', () => {
       negative: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
     },
     {
@@ -257,7 +251,6 @@ describe('keyMatchers', () => {
       positive: [
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
       negative: [createKey('return'), createKey('n')],
     },
@@ -265,10 +258,7 @@ describe('keyMatchers', () => {
     // External tools
     {
       command: Command.OPEN_EXTERNAL_EDITOR,
-      positive: [
-        createKey('x', { ctrl: true }),
-        { ...createKey('\x18'), sequence: '\x18', ctrl: true },
-      ],
+      positive: [createKey('x', { ctrl: true })],
       negative: [createKey('x'), createKey('c', { ctrl: true })],
     },
     {
@@ -289,7 +279,7 @@ describe('keyMatchers', () => {
       negative: [createKey('t'), createKey('e', { ctrl: true })],
     },
     {
-      command: Command.TOGGLE_IDE_CONTEXT_DETAIL,
+      command: Command.SHOW_IDE_CONTEXT_DETAIL,
       positive: [createKey('g', { ctrl: true })],
       negative: [createKey('g'), createKey('t', { ctrl: true })],
     },
@@ -336,7 +326,7 @@ describe('keyMatchers', () => {
       negative: [createKey('return'), createKey('space')],
     },
     {
-      command: Command.TOGGLE_SHELL_INPUT_FOCUS_IN,
+      command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
       negative: [createKey('f', { ctrl: true }), createKey('f')],
     },

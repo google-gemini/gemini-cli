@@ -14,6 +14,7 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  AgentOverride,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -108,6 +109,7 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  ignoreInDocs?: boolean;
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
@@ -190,22 +192,22 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      disableAutoUpdate: {
+      enableAutoUpdate: {
         type: 'boolean',
-        label: 'Disable Auto Update',
+        label: 'Enable Auto Update',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable automatic updates',
+        default: true,
+        description: 'Enable automatic updates.',
         showInDialog: true,
       },
-      disableUpdateNag: {
+      enableAutoUpdateNotification: {
         type: 'boolean',
-        label: 'Disable Update Nag',
+        label: 'Enable Auto Update Notification',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable update notification prompts.',
+        default: true,
+        description: 'Enable update notification prompts.',
         showInDialog: false,
       },
       checkpointing: {
@@ -576,13 +578,13 @@ const SETTINGS_SCHEMA = {
         description: 'Accessibility settings.',
         showInDialog: false,
         properties: {
-          disableLoadingPhrases: {
+          enableLoadingPhrases: {
             type: 'boolean',
-            label: 'Disable Loading Phrases',
+            label: 'Enable Loading Phrases',
             category: 'UI',
             requiresRestart: true,
-            default: false,
-            description: 'Disable loading phrases for accessibility',
+            default: true,
+            description: 'Enable loading phrases during operations.',
             showInDialog: true,
           },
           disableSpinner: {
@@ -794,6 +796,32 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  agents: {
+    type: 'object',
+    label: 'Agents',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for subagents.',
+    showInDialog: false,
+    properties: {
+      overrides: {
+        type: 'object',
+        label: 'Agent Overrides',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {} as Record<string, AgentOverride>,
+        description:
+          'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'AgentOverride',
+        },
+      },
+    },
+  },
+
   context: {
     type: 'object',
     label: 'Context',
@@ -896,13 +924,13 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          disableFuzzySearch: {
+          enableFuzzySearch: {
             type: 'boolean',
-            label: 'Disable Fuzzy Search',
+            label: 'Enable Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
-            default: false,
-            description: 'Disable fuzzy search when searching for files.',
+            default: true,
+            description: 'Enable fuzzy search when searching for files.',
             showInDialog: true,
           },
         },
@@ -1396,6 +1424,24 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension management features.',
         showInDialog: false,
       },
+      extensionConfig: {
+        type: 'boolean',
+        label: 'Extension Configuration',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable requesting and fetching of extension settings.',
+        showInDialog: false,
+      },
+      enableEventDrivenScheduler: {
+        type: 'boolean',
+        label: 'Event Driven Scheduler',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enables event-driven scheduler within the CLI session.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -1514,6 +1560,15 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plan: {
+        type: 'boolean',
+        label: 'Plan',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
+      },
     },
   },
 
@@ -1561,6 +1616,16 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for agent skills.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Agent Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Agent Skills.',
+        showInDialog: true,
+        ignoreInDocs: true,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Skills',
@@ -1575,9 +1640,9 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  hooks: {
+  hooksConfig: {
     type: 'object',
-    label: 'Hooks',
+    label: 'HooksConfig',
     category: 'Advanced',
     requiresRestart: false,
     default: {},
@@ -1619,6 +1684,18 @@ const SETTINGS_SCHEMA = {
         description: 'Show visual indicators when hooks are executing.',
         showInDialog: true,
       },
+    },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hook Events',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Event-specific hook configurations.',
+    showInDialog: false,
+    properties: {
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',
@@ -1825,6 +1902,28 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      skills: {
+        type: 'object',
+        label: 'Skills Settings',
+        category: 'Admin',
+        requiresRestart: false,
+        default: {},
+        description: 'Agent Skills-specific admin settings.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.REPLACE,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Skills Enabled',
+            category: 'Admin',
+            requiresRestart: false,
+            default: true,
+            description: 'If false, disallows agent skills from being used.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+          },
+        },
+      },
     },
   },
 } as const satisfies SettingsSchema;
@@ -2011,6 +2110,36 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       },
     },
   },
+  AgentOverride: {
+    type: 'object',
+    description: 'Override settings for a specific agent.',
+    additionalProperties: false,
+    properties: {
+      modelConfig: {
+        type: 'object',
+        additionalProperties: true,
+      },
+      runConfig: {
+        type: 'object',
+        description: 'Run configuration for an agent.',
+        additionalProperties: false,
+        properties: {
+          maxTimeMinutes: {
+            type: 'number',
+            description: 'The maximum execution time for the agent in minutes.',
+          },
+          maxTurns: {
+            type: 'number',
+            description: 'The maximum number of conversational turns.',
+          },
+        },
+      },
+      enabled: {
+        type: 'boolean',
+        description: 'Whether to enable the agent.',
+      },
+    },
+  },
   CustomTheme: {
     type: 'object',
     description:
@@ -2175,12 +2304,17 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default'];
 };
 
+type InferMergedSettings<T extends SettingsSchema> = {
+  -readonly [K in keyof T]-?: T[K] extends { properties: SettingsSchema }
+    ? InferMergedSettings<T[K]['properties']>
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
+};
+
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export function getEnableHooksUI(settings: Settings): boolean {
-  return settings.tools?.enableHooks ?? true;
-}
-
-export function getEnableHooks(settings: Settings): boolean {
-  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
-}
+export type MergedSettings = InferMergedSettings<SettingsSchemaType>;
