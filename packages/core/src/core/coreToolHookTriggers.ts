@@ -11,9 +11,7 @@ import {
   type HookExecutionResponse,
 } from '../confirmation-bus/types.js';
 import {
-  createHookOutput,
   NotificationType,
-  type DefaultHookOutput,
   type McpToolContext,
   BeforeToolHookOutput,
 } from '../hooks/types.js';
@@ -195,102 +193,11 @@ function extractMcpContext(
 }
 
 /**
- * Fires the BeforeTool hook and returns the hook output.
- *
- * @param messageBus The message bus to use for hook communication
- * @param toolName The name of the tool being executed
- * @param toolInput The input parameters for the tool
- * @param mcpContext Optional MCP context for MCP tools
- * @returns The hook output, or undefined if no hook was executed or on error
- */
-export async function fireBeforeToolHook(
-  messageBus: MessageBus,
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  mcpContext?: McpToolContext,
-): Promise<DefaultHookOutput | undefined> {
-  try {
-    const response = await messageBus.request<
-      HookExecutionRequest,
-      HookExecutionResponse
-    >(
-      {
-        type: MessageBusType.HOOK_EXECUTION_REQUEST,
-        eventName: 'BeforeTool',
-        input: {
-          tool_name: toolName,
-          tool_input: toolInput,
-          ...(mcpContext && { mcp_context: mcpContext }),
-        },
-      },
-      MessageBusType.HOOK_EXECUTION_RESPONSE,
-    );
-
-    return response.output
-      ? createHookOutput('BeforeTool', response.output)
-      : undefined;
-  } catch (error) {
-    debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
-    return undefined;
-  }
-}
-
-/**
- * Fires the AfterTool hook and returns the hook output.
- *
- * @param messageBus The message bus to use for hook communication
- * @param toolName The name of the tool that was executed
- * @param toolInput The input parameters for the tool
- * @param toolResponse The result from the tool execution
- * @param mcpContext Optional MCP context for MCP tools
- * @returns The hook output, or undefined if no hook was executed or on error
- */
-export async function fireAfterToolHook(
-  messageBus: MessageBus,
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  toolResponse: {
-    llmContent: ToolResult['llmContent'];
-    returnDisplay: ToolResult['returnDisplay'];
-    error: ToolResult['error'];
-  },
-  mcpContext?: McpToolContext,
-): Promise<DefaultHookOutput | undefined> {
-  try {
-    const response = await messageBus.request<
-      HookExecutionRequest,
-      HookExecutionResponse
-    >(
-      {
-        type: MessageBusType.HOOK_EXECUTION_REQUEST,
-        eventName: 'AfterTool',
-        input: {
-          tool_name: toolName,
-          tool_input: toolInput,
-          tool_response: toolResponse,
-          ...(mcpContext && { mcp_context: mcpContext }),
-        },
-      },
-      MessageBusType.HOOK_EXECUTION_RESPONSE,
-    );
-
-    return response.output
-      ? createHookOutput('AfterTool', response.output)
-      : undefined;
-  } catch (error) {
-    debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
-    return undefined;
-  }
-}
-
-/**
  * Execute a tool with BeforeTool and AfterTool hooks.
  *
  * @param invocation The tool invocation to execute
  * @param toolName The name of the tool
  * @param signal Abort signal for cancellation
- * @param messageBus Optional message bus for hook communication
- * @param hooksEnabled Whether hooks are enabled
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
  * @param setPidCallback Optional callback to set the PID for shell invocations
@@ -301,8 +208,6 @@ export async function executeToolWithHooks(
   invocation: ShellToolInvocation | AnyToolInvocation,
   toolName: string,
   signal: AbortSignal,
-  messageBus: MessageBus | undefined,
-  hooksEnabled: boolean,
   tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
@@ -316,10 +221,9 @@ export async function executeToolWithHooks(
   // Extract MCP context if this is an MCP tool (only if config is provided)
   const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
 
-  // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const beforeOutput = await fireBeforeToolHook(
-      messageBus,
+  const hookSystem = config?.getHookSystem();
+  if (hookSystem) {
+    const beforeOutput = await hookSystem.fireBeforeToolEvent(
       toolName,
       toolInput,
       mcpContext,
@@ -419,10 +323,8 @@ export async function executeToolWithHooks(
     }
   }
 
-  // Fire AfterTool hook through MessageBus (only if hooks are enabled)
-  if (hooksEnabled && messageBus) {
-    const afterOutput = await fireAfterToolHook(
-      messageBus,
+  if (hookSystem) {
+    const afterOutput = await hookSystem.fireAfterToolEvent(
       toolName,
       toolInput,
       {
