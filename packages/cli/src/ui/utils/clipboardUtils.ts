@@ -35,22 +35,21 @@ const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
 // Helper to check the user's display server and whether they have a compatible clipboard tool installed
-function isToolAvailable() {
+function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
   let toolName: 'wl-paste' | 'xclip' | null = null;
   const displayServer = process.env['XDG_SESSION_TYPE'];
 
   if (displayServer === 'wayland') toolName = 'wl-paste';
   else if (displayServer === 'x11') toolName = 'xclip';
-  else return false;
+  else return null;
 
   try {
     // output is piped to stdio: 'ignore' to suppress the path printing to console
     execSync(`command -v ${toolName}`, { stdio: 'ignore' });
-    linuxClipboardTool = toolName;
-    return true;
+    return toolName;
   } catch (e) {
     debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
-    return false;
+    return null;
   }
 }
 
@@ -122,53 +121,56 @@ async function saveFromCommand(
 }
 
 /**
+ * Checks if the Wayland clipboard contains an image using wl-paste.
+ */
+async function checkWlPasteForImage() {
+  try {
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    if (stdout.includes('image/')) {
+      linuxClipboardTool = 'wl-paste';
+      return true;
+    }
+  } catch (e) {
+    debugLogger.warn('Error checking wl-clipboard for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the X11 clipboard contains an image using xclip.
+ */
+async function checkXclipForImage() {
+  try {
+    const { stdout } = await spawnAsync('xclip', [
+      '-selection',
+      'clipboard',
+      '-t',
+      'TARGETS',
+      '-o',
+    ]);
+    if (stdout.includes('image/')) {
+      linuxClipboardTool = 'xclip';
+      return true;
+    }
+  } catch (e) {
+    debugLogger.warn('Error checking xclip for image:', e);
+  }
+  return false;
+}
+
+/**
  * Checks if the system clipboard contains an image (macOS, Windows, and Linux)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
   if (process.platform === 'linux') {
-    // Try Wayland first (wl-clipboard)
-    if (isToolAvailable()) {
-      const tryWlPaste = async () => {
-        try {
-          const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
-          if (stdout.includes('image/')) {
-            linuxClipboardTool = 'wl-paste';
-            return true;
-          }
-        } catch (e) {
-          debugLogger.warn('Error checking wl-clipboard for image:', e);
-        }
-        return false;
-      };
-
-      const tryXclip = async () => {
-        try {
-          const { stdout } = await spawnAsync('xclip', [
-            '-selection',
-            'clipboard',
-            '-t',
-            'TARGETS',
-            '-o',
-          ]);
-          if (stdout.includes('image/')) {
-            linuxClipboardTool = 'xclip';
-            return true;
-          }
-        } catch (e) {
-          debugLogger.warn('Error checking wl-clipboard for image:', e);
-        }
-        return false;
-      };
-
-      if (linuxClipboardTool === 'wl-paste') {
-        if (await tryWlPaste()) return true;
-      } else if (linuxClipboardTool === 'xclip') {
-        if (await tryXclip()) return true;
-      }
-
-      return false;
+    linuxClipboardTool = getUserLinuxClipboardTool();
+    if (linuxClipboardTool === 'wl-paste') {
+      if (await checkWlPasteForImage()) return true;
+    } else if (linuxClipboardTool === 'xclip') {
+      if (await checkXclipForImage()) return true;
     }
+    return false;
   }
 
   if (process.platform === 'win32') {
@@ -202,6 +204,48 @@ export async function clipboardHasImage(): Promise<boolean> {
 }
 
 /**
+ * Saves clipboard content to a file using wl-paste (Wayland).
+ */
+async function saveFileWithWlPaste(tempFilePath: string) {
+  const success = await saveFromCommand(
+    'wl-paste',
+    ['--no-newline', '--type', 'image/png'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Saves clipboard content to a file using xclip (X11).
+ */
+const saveFileWithXclip = async (tempFilePath: string) => {
+  const success = await saveFromCommand(
+    'xclip',
+    ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+};
+
+/**
  * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
@@ -222,52 +266,14 @@ export async function saveClipboardImage(
     if (process.platform === 'linux') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
 
-      const tryWlPaste = async () => {
-        const success = await saveFromCommand(
-          'wl-paste',
-          ['--no-newline', '--type', 'image/png'],
-          tempFilePath,
-        );
-        if (success) {
-          return true;
-        }
-        // Cleanup on failure
-        try {
-          await fs.unlink(tempFilePath);
-        } catch {
-          /* ignore */
-        }
-        return false;
-      };
-
-      const tryXclip = async () => {
-        const success = await saveFromCommand(
-          'xclip',
-          ['-selection', 'clipboard', '-t', 'image/png', '-o'],
-          tempFilePath,
-        );
-        if (success) {
-          return true;
-        }
-        // Cleanup on failure
-        try {
-          await fs.unlink(tempFilePath);
-        } catch {
-          /* ignore */
-        }
-        return false;
-      };
-
-      // If we know the tool, use it directly
       if (linuxClipboardTool === 'wl-paste') {
-        if (await tryWlPaste()) return tempFilePath;
+        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
         return null;
       }
       if (linuxClipboardTool === 'xclip') {
-        if (await tryXclip()) return tempFilePath;
+        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
         return null;
       }
-
       return null;
     }
 

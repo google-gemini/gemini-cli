@@ -54,11 +54,13 @@ describe('Linux Clipboard Integration', () => {
       let clipboardSet = false;
 
       // Try wl-copy (Wayland)
+      let sessionType = '';
       const wlCopy = spawnSync('wl-copy', ['--type', 'image/png'], {
         input: fs.readFileSync(dummyImagePath),
       });
       if (wlCopy.status === 0) {
         clipboardSet = true;
+        sessionType = 'wayland';
       } else {
         // Try xclip (X11)
         try {
@@ -67,6 +69,7 @@ describe('Linux Clipboard Integration', () => {
             { stdio: 'ignore' },
           );
           clipboardSet = true;
+          sessionType = 'x11';
         } catch {
           // Both failed
         }
@@ -94,6 +97,7 @@ describe('Linux Clipboard Integration', () => {
 
       const result = await rig.run({
         stdin: '\u0016\r', // Ctrl+V then Enter
+        env: { XDG_SESSION_TYPE: sessionType },
       });
 
       // 4. Verify Output
