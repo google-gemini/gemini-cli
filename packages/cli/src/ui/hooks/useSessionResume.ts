@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -35,6 +35,8 @@ export function useSessionResume({
   resumedSessionData,
   isAuthenticating,
 }: UseSessionResumeParams) {
+  const [isResuming, setIsResuming] = useState(false);
+
   // Use refs to avoid dependency chain that causes infinite loop
   const historyManagerRef = useRef(historyManager);
   const refreshStaticRef = useRef(refreshStatic);
@@ -45,7 +47,7 @@ export function useSessionResume({
   });
 
   const loadHistoryForResume = useCallback(
-    (
+    async (
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
       resumedData: ResumedSessionData,
@@ -55,17 +57,21 @@ export function useSessionResume({
         return;
       }
 
-      // Now that we have the client, load the history into the UI and the client.
-      setQuittingMessages(null);
-      historyManagerRef.current.clearItems();
-      uiHistory.forEach((item, index) => {
-        historyManagerRef.current.addItem(item, index, true);
-      });
-      refreshStaticRef.current(); // Force Static component to re-render with the updated history.
+      setIsResuming(true);
+      try {
+        // Now that we have the client, load the history into the UI and the client.
+        setQuittingMessages(null);
+        historyManagerRef.current.clearItems();
+        uiHistory.forEach((item, index) => {
+          historyManagerRef.current.addItem(item, index, true);
+        });
+        refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
-      // Give the history to the Gemini client.
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        // Give the history to the Gemini client.
+        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+      } finally {
+        setIsResuming(false);
+      }
     },
     [config, isGeminiClientInitialized, setQuittingMessages],
   );
@@ -84,6 +90,7 @@ export function useSessionResume({
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       loadHistoryForResume(
         historyData.uiHistory,
         historyData.clientHistory,
@@ -97,5 +104,5 @@ export function useSessionResume({
     loadHistoryForResume,
   ]);
 
-  return { loadHistoryForResume };
+  return { loadHistoryForResume, isResuming };
 }

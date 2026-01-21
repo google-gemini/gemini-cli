@@ -71,8 +71,12 @@ export const Composer = () => {
         />
       )}
 
-      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
-        <ConfigInitDisplay />
+      {(!uiState.slashCommands ||
+        !uiState.isConfigInitialized ||
+        uiState.isResuming) && (
+        <ConfigInitDisplay
+          message={uiState.isResuming ? 'Resuming session...' : undefined}
+        />
       )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
