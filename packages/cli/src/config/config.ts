@@ -451,6 +451,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
 
@@ -655,6 +656,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
+    clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
@@ -763,9 +765,10 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooks?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? false),
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
+    disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
