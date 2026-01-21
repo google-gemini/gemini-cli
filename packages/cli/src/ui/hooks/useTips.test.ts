@@ -26,7 +26,7 @@ describe('useTips()', () => {
 
     const { result } = renderHookWithProviders(() => useTips());
 
-    expect(result.current).toBe(false);
+    expect(result.current.showTips).toBe(true);
 
     expect(persistentState.set).toHaveBeenCalledWith('tipsShown', 1);
   });
@@ -36,7 +36,7 @@ describe('useTips()', () => {
 
     const { result } = renderHookWithProviders(() => useTips());
 
-    expect(result.current).toBe(false);
+    expect(result.current.showTips).toBe(true);
 
     expect(persistentState.set).toHaveBeenCalledWith('tipsShown', 6);
   });
@@ -46,7 +46,7 @@ describe('useTips()', () => {
 
     const { result } = renderHookWithProviders(() => useTips());
 
-    expect(result.current).toBe(true);
+    expect(result.current.showTips).toBe(false);
     expect(persistentState.set).not.toHaveBeenCalled();
   });
 });
