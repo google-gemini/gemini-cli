@@ -164,7 +164,7 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       args: [`--allowed-tools=run_shell_command(${tool})`],
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -207,7 +207,7 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       args: '--allowed-tools=run_shell_command',
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -231,8 +231,8 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should succeed with --yolo mode', async () => {
-    await rig.setup('should succeed with --yolo mode', {
+  it('should succeed in yolo mode', async () => {
+    await rig.setup('should succeed in yolo mode', {
       settings: { tools: { core: ['run_shell_command'] } },
     });
 
@@ -242,7 +242,7 @@ describe('run_shell_command', () => {
 
     const result = await rig.run({
       args: prompt,
-      yolo: true,
+      approvalMode: 'yolo',
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -276,7 +276,7 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       args: `--allowed-tools=ShellTool(${tool})`,
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -325,7 +325,7 @@ describe('run_shell_command', () => {
         '--allowed-tools=run_shell_command(ls)',
       ],
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     for (const expected in ['ls', tool]) {
@@ -377,7 +377,7 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       args: `--allowed-tools=run_shell_command(${allowedCommand})`,
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     if (!result.toLowerCase().includes('fail')) {
@@ -438,7 +438,7 @@ describe('run_shell_command', () => {
     await rig.run({
       args: `--allowed-tools=ShellTool(${chained.allowPattern})`,
       stdin: `${shellInjection}\n`,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     // CLI should refuse to execute the chained command without scheduling run_shell_command.
@@ -470,7 +470,7 @@ describe('run_shell_command', () => {
         '--allowed-tools=run_shell_command',
       ],
       stdin: prompt,
-      yolo: false,
+      approvalMode: 'default',
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);

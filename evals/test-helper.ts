@@ -59,7 +59,10 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const result = await rig.run({ args: evalCase.prompt });
+      const result = await rig.run({
+        args: evalCase.prompt,
+        approvalMode: evalCase.approvalMode ?? 'yolo',
+      });
 
       const unauthorizedErrorPrefix =
         createUnauthorizedToolError('').split("'")[0];
@@ -91,6 +94,7 @@ export interface EvalCase {
   params?: Record<string, any>;
   prompt: string;
   files?: Record<string, string>;
+  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
 }
 
