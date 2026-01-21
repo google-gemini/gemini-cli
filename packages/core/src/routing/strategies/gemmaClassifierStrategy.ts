@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 
-// TODO(sid): change classifier prompt and add reminder support and change the whole context engineering etc.
+// TODO(sid): change the whole context engineering etc.
 
 // TODO(sid): add error handling if the localhost env is not reachable.
 
@@ -35,38 +35,35 @@ const HISTORY_SEARCH_WINDOW = 20;
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
-const CLASSIFIER_SYSTEM_PROMPT = `
-You are a specialized Task Routing AI. Your sole function is to analyze the user's request and classify its complexity. Choose between 
-${FLASH_MODEL}
- (SIMPLE) or 
-${PRO_MODEL}
- (COMPLEX).
-1.  
-${FLASH_MODEL}
-: A fast, efficient model for simple, well-defined tasks.
-2.  
-${PRO_MODEL}
-: A powerful, advanced model for complex, open-ended, or multi-step tasks.
-<complexity_rubric>
-A task is COMPLEX (Choose 
-${PRO_MODEL}
-) if it meets ONE OR MORE of the following criteria:
+const LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT = `### Role
+You are the **Lead Orchestrator** for an AI system. You do not talk to users. Your sole responsibility is to analyze the **Chat History** and delegate the **User Request** to the most appropriate **Model** based on the request's complexity.
+
+### Models
+Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
+1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
+2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
+
+### Complexity Rubric
+A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
 1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
 2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
 3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
 4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose 
-${FLASH_MODEL}
-) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
-</complexity_rubric>
-**Output Format:**
-Respond *only* in JSON format according to the following schema. Do not include any text outside the JSON structure.
+A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+
+### Output Format
+Respond *only* in JSON format like this:
+{
+  "reasoning": Your reasoning...
+  "model_choice": Either ${FLASH_MODEL} or ${PRO_MODEL}
+}
+And you must follow the following JSON schema:
 {
   "type": "object",
   "properties": {
     "reasoning": {
       "type": "string",
-      "description": "A brief, step-by-step explanation for the model choice, referencing the rubric."
+      "description": "A brief summary of the user objective, followed by a step-by-step explanation for the model choice, referencing the rubric."
     },
     "model_choice": {
       "type": "string",
@@ -75,7 +72,10 @@ Respond *only* in JSON format according to the following schema. Do not include 
   },
   "required": ["reasoning", "model_choice"]
 }
----
+You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
+When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
+
+### Examples
 **Example 1 (Strategic Planning):**
 *User Prompt:* "How should I architect the data pipeline for this new analytics service?"
 *Your JSON Output:*
@@ -104,7 +104,6 @@ Respond *only* in JSON format according to the following schema. Do not include 
   "reasoning": "This is a direct command requiring a single read. It has Low Operational Complexity (1 step).",
   "model_choice": "${FLASH_MODEL}"
 }
-
 **Example 5 (Deep Debugging):**
 *User Prompt:* "I'm getting an error 'Cannot read property 'map' of undefined' when I click the save button. Can you fix it?"
 *Your JSON Output:*
@@ -119,6 +118,41 @@ Respond *only* in JSON format according to the following schema. Do not include 
   "reasoning": "Although the user uses strategic language ('best way'), the underlying task is a localized edit. The operational complexity is low (1-2 steps).",
   "model_choice": "${FLASH_MODEL}"
 }
+`;
+
+const LITERT_GEMMA_CLASSIFIER_REMINDER = `### Reminder
+You are a Task Routing AI. Your sole task is to analyze the preceding **Chat History** and **User Request** and classify its complexity.
+
+### Complexity Rubric
+A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
+1.  High Operational Complexity (Est. 4+ Steps/Tool Calls)
+2.  Strategic Planning & Conceptual Design
+3.  High Ambiguity or Large Scope (Extensive Investigation)
+4.  Deep Debugging & Root Cause Analysis
+A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+
+Respond *only* in JSON format like this:
+{
+  "reasoning": Your reasoning...
+  "model_choice": Either ${FLASH_MODEL} or ${PRO_MODEL}
+}
+And you must follow the following JSON schema:
+{
+  "type": "object",
+  "properties": {
+    "reasoning": {
+      "type": "string",
+      "description": "A brief summary of the user objective, followed by a step-by-step explanation for the model choice, referencing the rubric."
+    },
+    "model_choice": {
+      "type": "string",
+      "enum": ["${FLASH_MODEL}", "${PRO_MODEL}"]
+    }
+  },
+  "required": ["reasoning", "model_choice"]
+}
+You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
+When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
 `;
 
 const ClassifierResponseSchema = z.object({
@@ -153,14 +187,13 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
 
       debugLogger.log(`[Routing] About to call Gemma classifier.`);
 
-      const jsonResponse: object;
-
       const history = [...finalHistory, createUserContent(context.request)];
 
       const client = new LocalGeminiClient(config);
-      jsonResponse = await client.generateJson(
+      const jsonResponse = await client.generateJson(
         history,
-        CLASSIFIER_SYSTEM_PROMPT,
+        LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT,
+        LITERT_GEMMA_CLASSIFIER_REMINDER,
       );
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
