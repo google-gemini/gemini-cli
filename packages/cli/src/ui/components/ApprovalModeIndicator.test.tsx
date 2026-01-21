@@ -5,14 +5,14 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
+import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { describe, it, expect } from 'vitest';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
-describe('AutoAcceptIndicator', () => {
+describe('ApprovalModeIndicator', () => {
   it('renders correctly for AUTO_EDIT mode', () => {
     const { lastFrame } = render(
-      <AutoAcceptIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
     const output = lastFrame();
     expect(output).toContain('accepting edits');
@@ -21,7 +21,7 @@ describe('AutoAcceptIndicator', () => {
 
   it('renders correctly for PLAN mode', () => {
     const { lastFrame } = render(
-      <AutoAcceptIndicator approvalMode={ApprovalMode.PLAN} />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
     const output = lastFrame();
     expect(output).toContain('plan mode');
@@ -30,7 +30,7 @@ describe('AutoAcceptIndicator', () => {
 
   it('renders correctly for YOLO mode', () => {
     const { lastFrame } = render(
-      <AutoAcceptIndicator approvalMode={ApprovalMode.YOLO} />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
     );
     const output = lastFrame();
     expect(output).toContain('YOLO mode');
@@ -39,7 +39,7 @@ describe('AutoAcceptIndicator', () => {
 
   it('renders nothing for DEFAULT mode', () => {
     const { lastFrame } = render(
-      <AutoAcceptIndicator approvalMode={ApprovalMode.DEFAULT} />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
     const output = lastFrame();
     expect(output).not.toContain('accepting edits');
