@@ -363,6 +363,10 @@ export class LoadedSettings {
       admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
     }
 
+    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
+      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
+    }
+
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
   }
@@ -804,6 +808,8 @@ export function migrateDeprecatedSettings(
 
   processScope(SettingScope.User);
   processScope(SettingScope.Workspace);
+  processScope(SettingScope.System);
+  processScope(SettingScope.SystemDefaults);
 
   return anyModified;
 }
