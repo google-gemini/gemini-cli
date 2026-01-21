@@ -1,10 +1,22 @@
 /**
  * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { OllamaClient } from '../../core/ollamaClient.js';
+import { LocalGeminiClient } from '../../core/localGeminiClient.js';
+import type {
+  Content as OllamaContent,
+  Part as OllamaPart,
+} from '../../core/ollamaChat.js';
+/**
+ * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { z } from 'zod';
+
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { getPromptIdWithFallback } from '../../utils/promptIdContext.js';
 import type {
@@ -13,7 +25,11 @@ import type {
   RoutingStrategy,
 } from '../routingStrategy.js';
 import { resolveClassifierModel } from '../../config/models.js';
-import { createUserContent, Type } from '@google/genai';
+import {
+  createUserContent,
+  Type,
+  type Content as GeminiContent,
+} from '@google/genai';
 import type { Config } from '../../config/config.js';
 import {
   isFunctionCall,
@@ -123,6 +139,18 @@ const ClassifierResponseSchema = z.object({
   model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
 });
 
+function toOllamaContent(geminiContent: GeminiContent): OllamaContent | null {
+  if (geminiContent.role !== 'user' && geminiContent.role !== 'model') {
+    return null;
+  }
+  return {
+    role: geminiContent.role,
+    parts: (geminiContent.parts ?? [])
+      .map((part) => ('text' in part ? { text: part.text } : null))
+      .filter((part): part is OllamaPart => part !== null),
+  };
+}
+
 export class ClassifierStrategy implements RoutingStrategy {
   readonly name = 'classifier';
 
@@ -150,14 +178,50 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      const jsonResponse = await baseLlmClient.generateJson({
-        modelConfigKey: { model: 'classifier' },
-        contents: [...finalHistory, createUserContent(context.request)],
-        schema: RESPONSE_SCHEMA,
-        systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-        abortSignal: context.signal,
-        promptId,
-      });
+      debugLogger.log(`[Routing] About to call classifier.`);
+
+      let jsonResponse: object;
+      if (
+        config.getUseModelRouter() &&
+        config.getUseGemmaRoutingSettings()?.enabled
+      ) {
+        const settings = config.getUseGemmaRoutingSettings();
+        const provider = settings?.provider ?? 'ollama';
+        debugLogger.log(`[Routing] Using \${provider} for classifier routing.`);
+
+        const ollamaHistory = finalHistory
+          .map(toOllamaContent)
+          .filter((c): c is OllamaContent => c !== null);
+        const ollamaRequest = toOllamaContent(
+          createUserContent(context.request),
+        );
+        if (ollamaRequest) {
+          ollamaHistory.push(ollamaRequest);
+        }
+
+        if (provider === 'litert-lm') {
+          const client = new LocalGeminiClient(config);
+          jsonResponse = await client.generateJson(
+            ollamaHistory,
+            CLASSIFIER_SYSTEM_PROMPT,
+          );
+        } else {
+          const ollamaClient = new OllamaClient(config);
+          jsonResponse = await ollamaClient.generateJson(
+            ollamaHistory,
+            CLASSIFIER_SYSTEM_PROMPT,
+          );
+        }
+      } else {
+        jsonResponse = await baseLlmClient.generateJson({
+          modelConfigKey: { model: 'classifier' },
+          contents: [...finalHistory, createUserContent(context.request)],
+          schema: RESPONSE_SCHEMA,
+          systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
+          abortSignal: context.signal,
+          promptId,
+        });
+      }
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 

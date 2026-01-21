@@ -61,3 +61,7 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# Temporary files
+*.txt
+packages/core/inspiration/

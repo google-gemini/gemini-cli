@@ -155,6 +155,16 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
+export interface UseModelRouterSettings {
+  enabled?: boolean;
+  useGemmaRouting?: {
+    enabled?: boolean;
+    model?: string;
+    host?: string;
+    provider?: 'ollama' | 'litert-lm';
+  };
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -448,6 +458,7 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
+  useModelRouter?: UseModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -597,6 +608,9 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
+
+  private readonly useModelRouter: UseModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -813,6 +827,17 @@ export class Config {
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
+    };
+    this.useModelRouter = {
+      enabled: params.useModelRouter?.enabled ?? false,
+      useGemmaRouting: {
+        enabled: params.useModelRouter?.useGemmaRouting?.enabled ?? false,
+        model: params.useModelRouter?.useGemmaRouting?.model ?? 'gemma3n:e2b',
+        host:
+          params.useModelRouter?.useGemmaRouting?.host ??
+          'http://localhost:11434',
+        provider: params.useModelRouter?.useGemmaRouting?.provider ?? 'ollama',
+      },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
@@ -2120,6 +2145,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getUseModelRouter(): boolean {
+    return this.useModelRouter.enabled ?? false;
+  }
+
+  getUseGemmaRoutingSettings(): UseModelRouterSettings['useGemmaRouting'] {
+    return this.useModelRouter.useGemmaRouting;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

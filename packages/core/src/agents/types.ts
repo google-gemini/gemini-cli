@@ -151,6 +151,11 @@ export interface PromptConfig {
    * If not provided, a generic "Get Started!" message is used.
    */
   query?: string;
+
+  /**
+   * An optional reminder to be appended to the user's query.
+   */
+  reminder?: string;
 }
 
 /**
@@ -203,4 +208,11 @@ export interface RunConfig {
    * If not specified, defaults to DEFAULT_MAX_TURNS (15).
    */
   maxTurns?: number;
+}
+
+export interface OllamaModelConfig {
+  host: string;
+  model: string;
+  temp?: number;
+  top_p?: number;
 }
