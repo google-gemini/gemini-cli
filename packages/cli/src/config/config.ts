@@ -573,10 +573,9 @@ export async function loadCliConfig(
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
-    !argv.isCommand &&
-    (!!argv.promptInteractive ||
-      !!argv.experimentalAcp ||
-      (process.stdin.isTTY && !hasQuery && !argv.prompt));
+    !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
+    (process.stdin.isTTY && !hasQuery && !argv.prompt && !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
