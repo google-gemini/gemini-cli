@@ -480,6 +480,7 @@ describe('editor utils', () => {
       });
 
       it(`should allow ${editor} when not in sandbox mode`, () => {
+        vi.stubEnv('SANDBOX', '');
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
       });
     }
@@ -500,6 +501,7 @@ describe('editor utils', () => {
 
     it('should return true for vscode when installed and not in sandbox mode', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+      vi.stubEnv('SANDBOX', '');
       expect(isEditorAvailable('vscode')).toBe(true);
     });
 
