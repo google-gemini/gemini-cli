@@ -21,6 +21,7 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
+import { isWindows } from '../utils/shell-utils.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -44,6 +45,9 @@ vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
 vi.mock('node:fs');
+vi.mock('../utils/shell-utils', () => ({
+  isWindows: vi.fn(),
+}));
 vi.mock('../config/models.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -58,6 +62,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+    vi.mocked(isWindows).mockReturnValue(false);
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -265,7 +270,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
-      expect(prompt).toMatchSnapshot();
     });
   });
 

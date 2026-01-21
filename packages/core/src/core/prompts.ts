@@ -28,6 +28,7 @@ import { WriteTodosTool } from '../tools/write-todos.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import { ApprovalMode } from '../policy/types.js';
+import { isWindows } from '../utils/shell-utils.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -244,6 +245,13 @@ ${(function () {
 # Operational Guidelines
 ${(function () {
   if (config.getEnableShellOutputEfficiency()) {
+    const isWindowsPlatform = isWindows();
+    const redirectExample = isWindowsPlatform
+      ? `'command > <temp_dir>\\out.log 2> <temp_dir>\\err.log'`
+      : `'command > <temp_dir>/out.log 2> <temp_dir>/err.log'`;
+    const inspectCommands = isWindowsPlatform
+      ? `'Select-String', 'Get-Content -Tail', 'Get-Content -Head'`
+      : `'grep', 'tail', 'head'`;
     return `
 ## Shell tool output token efficiency:
 
@@ -253,8 +261,8 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - Aim to minimize tool output tokens while still capturing necessary information.
 - If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
 - Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
-- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
-- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.
+- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: ${redirectExample}.
+- After the command runs, inspect the temp files using commands like ${inspectCommands}, ... (or platform equivalents). Remove the temp files when done.
 `;
   }
   return '';
@@ -284,11 +292,19 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
 - **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.
 ${(function () {
+  const isWindowsPlatform = isWindows();
+  const backgroundExample = isWindowsPlatform
+    ? 'Start-Job { node server.js }'
+    : 'node server.js &';
+  const backgroundInstruction = isWindowsPlatform
+    ? 'Use background processes (via `Start-Job` or `Start-Process`) for commands that are unlikely to stop on their own'
+    : 'Use background processes (via `&`) for commands that are unlikely to stop on their own';
+
   if (interactiveMode) {
-    return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
+    return `- **Background Processes:** ${backgroundInstruction}, e.g. \`${backgroundExample}\`. If unsure, ask the user.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
   } else {
-    return `- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
+    return `- **Background Processes:** ${backgroundInstruction}, e.g. \`${backgroundExample}\`.
 - **Interactive Commands:** Only execute non-interactive commands. e.g.: use 'git --no-pager'`;
   }
 })()}
