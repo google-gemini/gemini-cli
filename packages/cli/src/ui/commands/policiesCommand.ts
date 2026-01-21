@@ -74,11 +74,12 @@ const listPoliciesCommand: SlashCommand = {
     }
 
     const categorized = categorizeRulesByMode(rules);
+    const normalRulesSet = new Set(categorized.normal);
     const uniqueAutoEdit = categorized.autoEdit.filter(
-      (rule) => !categorized.normal.includes(rule),
+      (rule) => !normalRulesSet.has(rule),
     );
     const uniqueYolo = categorized.yolo.filter(
-      (rule) => !categorized.normal.includes(rule),
+      (rule) => !normalRulesSet.has(rule),
     );
 
     let content = '**Active Policies**\n\n';
