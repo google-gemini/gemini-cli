@@ -855,6 +855,22 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Event Driven Scheduler Configuration', () => {
+    it('should default enableEventDrivenScheduler to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
+    });
+
+    it('should set enableEventDrivenScheduler to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableEventDrivenScheduler: false,
+      };
+      const config = new Config(params);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
+    });
+  });
+
   describe('Shell Tool Inactivity Timeout', () => {
     it('should default to 300000ms (300 seconds) when not provided', () => {
       const config = new Config(baseParams);
@@ -1825,7 +1841,7 @@ describe('Hooks configuration', () => {
     debugMode: false,
     model: 'test-model',
     cwd: '.',
-    hooks: { disabled: ['initial-hook'] },
+    disabledHooks: ['initial-hook'],
   };
 
   it('updateDisabledHooks should update the disabled list', () => {
