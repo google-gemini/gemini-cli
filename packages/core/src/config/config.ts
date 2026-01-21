@@ -155,13 +155,11 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
-export interface UseModelRouterSettings {
+export interface GemmaModelRouterSettings {
   enabled?: boolean;
-  useGemmaRouting?: {
-    enabled?: boolean;
-    model?: string;
+  classifier?: {
     host?: string;
-    provider?: 'litert-lm';
+    model?: string;
   };
 }
 
@@ -458,7 +456,7 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  useModelRouter?: UseModelRouterSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -609,7 +607,7 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
 
-  private readonly useModelRouter: UseModelRouterSettings;
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
 
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
@@ -828,16 +826,12 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
-    this.useModelRouter = {
-      enabled: params.useModelRouter?.enabled ?? false,
-      useGemmaRouting: {
-        enabled: params.useModelRouter?.useGemmaRouting?.enabled ?? false,
-        model: params.useModelRouter?.useGemmaRouting?.model ?? 'gemma3n:e2b',
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
         host:
-          params.useModelRouter?.useGemmaRouting?.host ??
-          'http://localhost:11434',
-        provider:
-          params.useModelRouter?.useGemmaRouting?.provider ?? 'litert-lm',
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:3000',
+        model: params.gemmaModelRouter?.classifier?.model ?? 'gemma3:1b',
       },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
@@ -2148,12 +2142,12 @@ export class Config {
     return this.enableHooksUI;
   }
 
-  getUseModelRouter(): boolean {
-    return this.useModelRouter.enabled ?? false;
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
   }
 
-  getUseGemmaRoutingSettings(): UseModelRouterSettings['useGemmaRouting'] {
-    return this.useModelRouter.useGemmaRouting;
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

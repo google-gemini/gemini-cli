@@ -43,10 +43,7 @@ export class ModelRouterService {
     strategies.push(new OverrideStrategy());
 
     // Then, if enabled, the Gemma classifier is used.
-    if (
-      this.config.getUseModelRouter() &&
-      this.config.getUseGemmaRoutingSettings()?.enabled
-    ) {
+    if (this.config.getGemmaModelRouterSettings()?.enabled) {
       strategies.push(new GemmaClassifierStrategy());
     }
 

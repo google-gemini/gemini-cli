@@ -4,13 +4,11 @@
       "enabled": true
     },
     "skills": true,
-    "useModelRouter": {
+    "gemmaModelRouter": {
       "enabled": true,
-      "useGemmaRouting": {
-        "enabled": true,
+      "classifier": {
         "host": "http://localhost:3000",
-        "model": "gemma3:1b",
-        "provider": "litert-lm"
+        "model": "gemma3:1b"
       }
     }
   }

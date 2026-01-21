@@ -20,9 +20,10 @@ export class LocalGeminiClient {
   private readonly client: GoogleGenAI;
 
   constructor(config: Config) {
-    const useGemmaRoutingSettings = config.getUseGemmaRoutingSettings();
-    this.host = useGemmaRoutingSettings?.host || 'http://localhost:8000';
-    this.model = useGemmaRoutingSettings?.model || 'Gemma3-1B-IT';
+    const gemmaModelRouterSettings = config.getGemmaModelRouterSettings();
+    this.host =
+      gemmaModelRouterSettings?.classifier?.host || 'http://localhost:3000';
+    this.model = gemmaModelRouterSettings?.classifier?.model || 'gemma3:1b';
 
     if (!this.model.toLowerCase().startsWith('gemma')) {
       throw new Error(

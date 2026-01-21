@@ -807,7 +807,7 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter: settings.experimental?.useModelRouter,
+    gemmaModelRouter: settings.experimental?.gemmaModelRouter,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
