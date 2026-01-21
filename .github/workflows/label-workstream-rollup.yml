@@ -56,10 +56,17 @@ jobs:
               `;
               try {
                 const result = await github.graphql(query, { owner, repo, number });
+
+                if (!result || !result.repository || !result.repository.issue) {
+                  console.log(`Issue #${number} not found or data missing.`);
+                  return;
+                }
+
                 const issue = result.repository.issue;
-                checkAndLabel(issue, owner, repo);
+                await checkAndLabel(issue, owner, repo);
               } catch (error) {
                 console.error(`Failed to process issue #${number}:`, error);
+                throw error; // Re-throw to be caught by main execution
               }
             }
 
@@ -102,7 +109,13 @@ jobs:
               while (hasNextPage) {
                 try {
                   const result = await github.graphql(query, { owner, repo, cursor });
-                  const issues = result.repository.issues.nodes;
+
+                  if (!result || !result.repository || !result.repository.issues) {
+                     console.error('Invalid response structure from GitHub API');
+                     break;
+                  }
+
+                  const issues = result.repository.issues.nodes || [];
 
                   console.log(`Processing batch of ${issues.length} issues...`);
                   for (const issue of issues) {
@@ -113,7 +126,7 @@ jobs:
                   cursor = result.repository.issues.pageInfo.endCursor;
                 } catch (error) {
                   console.error('Failed to fetch issues batch:', error);
-                  hasNextPage = false;
+                  throw error; // Re-throw to be caught by main execution
                 }
               }
             }
@@ -148,9 +161,14 @@ jobs:
             }
 
             // Main execution
-            if (context.eventName === 'issues') {
-              console.log(`Processing single issue #${context.payload.issue.number}...`);
-              await processSingleIssue(context.repo.owner, context.repo.repo, context.payload.issue.number);
-            } else {
-              console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
-              await processAllOpenIssues(context.repo.owner, context.repo.repo);
+            try {
+              if (context.eventName === 'issues') {
+                console.log(`Processing single issue #${context.payload.issue.number}...`);
+                await processSingleIssue(context.repo.owner, context.repo.repo, context.payload.issue.number);
+              } else {
+                console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
+                await processAllOpenIssues(context.repo.owner, context.repo.repo);
+              }
+            } catch (error) {
+              core.setFailed(`Workflow failed: ${error.message}`);
+            }
