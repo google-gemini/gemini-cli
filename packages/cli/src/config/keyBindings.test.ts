@@ -73,9 +73,27 @@ describe('keyBindings config', () => {
       expect(dialogNavDown).toContainEqual({ key: 'down', shift: false });
       expect(dialogNavDown).toContainEqual({ key: 'j', shift: false });
 
-      // Verify physical home/end keys
-      expect(defaultKeyBindings[Command.HOME]).toContainEqual({ key: 'home' });
-      expect(defaultKeyBindings[Command.END]).toContainEqual({ key: 'end' });
+      // Verify physical home/end keys for cursor movement
+      expect(defaultKeyBindings[Command.HOME]).toContainEqual({
+        key: 'home',
+        ctrl: false,
+        shift: false,
+      });
+      expect(defaultKeyBindings[Command.END]).toContainEqual({
+        key: 'end',
+        ctrl: false,
+        shift: false,
+      });
+
+      // Verify physical home/end keys for scrolling
+      expect(defaultKeyBindings[Command.SCROLL_HOME]).toContainEqual({
+        key: 'home',
+        ctrl: true,
+      });
+      expect(defaultKeyBindings[Command.SCROLL_END]).toContainEqual({
+        key: 'end',
+        ctrl: true,
+      });
     });
   });
 

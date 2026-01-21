@@ -2242,11 +2242,9 @@ export function useTextBuffer({
 
     if (!command) {
       command =
-        (process.env['VISUAL'] ??
+        process.env['VISUAL'] ??
         process.env['EDITOR'] ??
-        process.platform === 'win32')
-          ? 'notepad'
-          : 'vi';
+        (process.platform === 'win32' ? 'notepad' : 'vi');
     }
 
     dispatch({ type: 'create_undo_snapshot' });
@@ -2292,6 +2290,7 @@ export function useTextBuffer({
 
       if (key.name === 'paste') insert(input, { paste: true });
       else if (keyMatchers[Command.RETURN](key)) newline();
+      else if (keyMatchers[Command.NEWLINE](key)) newline();
       else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
       else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
       else if (keyMatchers[Command.MOVE_UP](key)) move('up');
