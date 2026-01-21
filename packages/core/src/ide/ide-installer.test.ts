@@ -49,7 +49,7 @@ describe('ide-installer', () => {
     it.each([
       { ide: IDE_DEFINITIONS.vscode },
       { ide: IDE_DEFINITIONS.firebasestudio },
-    ])('returns a VsCodeFamilyInstaller for "$ide.name"', ({ ide }) => {
+    ])('returns a VsCodeInstaller for "$ide.name"', ({ ide }) => {
       const installer = getIdeInstaller(ide);
 
       expect(installer).not.toBeNull();
@@ -202,6 +202,53 @@ describe('ide-installer', () => {
       );
     });
   });
+
+  describe('PositronInstaller', () => {
+    function setup({
+      execSync = () => '',
+      platform = 'linux' as NodeJS.Platform,
+      existsResult = false,
+    }: {
+      execSync?: () => string;
+      platform?: NodeJS.Platform;
+      existsResult?: boolean;
+    } = {}) {
+      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
+      const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
+
+      return { installer };
+    }
+
+    it('installs the extension', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({});
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        'positron',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('returns a failure message if the cli is not found', async () => {
+      const { installer } = setup({
+        execSync: () => {
+          throw new Error('Command not found');
+        },
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Positron CLI not found');
+    });
+  });
 });
 
 describe('AntigravityInstaller', () => {
@@ -257,50 +304,5 @@ describe('AntigravityInstaller', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('not-a-command not found');
-  });
-});
-
-describe('PositronInstaller', () => {
-  function setup({
-    execSync = () => '',
-    platform = 'linux' as NodeJS.Platform,
-  }: {
-    execSync?: () => string;
-    platform?: NodeJS.Platform;
-  } = {}) {
-    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
-    const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
-
-    return { installer };
-  }
-
-  it('installs the extension', async () => {
-    vi.stubEnv('POSITRON', '1');
-    const { installer } = setup({});
-    const result = await installer.install();
-
-    expect(result.success).toBe(true);
-    expect(child_process.spawnSync).toHaveBeenCalledWith(
-      'positron',
-      [
-        '--install-extension',
-        'google.gemini-cli-vscode-ide-companion',
-        '--force',
-      ],
-      { stdio: 'pipe', shell: false },
-    );
-  });
-
-  it('returns a failure message if the alias is not set', async () => {
-    vi.stubEnv('POSITRON', '');
-    const { installer } = setup({
-      execSync: () => {
-        throw new Error('Command not found');
-      },
-    });
-    const result = await installer.install();
-
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('Positron CLI not found');
   });
 });
