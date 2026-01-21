@@ -25,6 +25,7 @@ import { EnvHttpProxyAgent } from 'undici';
 import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getVersion } from '../utils/version.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -778,10 +779,10 @@ export class IdeClient {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
       logger.debug('Attempting to connect to IDE via HTTP SSE');
+      const version = await getVersion();
       this.client = new Client({
         name: 'streamable-http-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version,
       });
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
@@ -818,10 +819,10 @@ export class IdeClient {
     let transport: StdioClientTransport | undefined;
     try {
       logger.debug('Attempting to connect to IDE via stdio');
+      const version = await getVersion();
       this.client = new Client({
         name: 'stdio-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version,
       });
 
       transport = new StdioClientTransport({
