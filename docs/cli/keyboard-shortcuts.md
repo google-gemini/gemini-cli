@@ -19,14 +19,14 @@ available combinations.
 
 | Action                                      | Keys                                                         |
 | ------------------------------------------- | ------------------------------------------------------------ |
-| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home (no Ctrl, no Shift)`                   |
-| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Ctrl, no Shift)`                    |
-| Move the cursor up one line.                | `Up Arrow (no Ctrl, no Cmd)`                                 |
-| Move the cursor down one line.              | `Down Arrow (no Ctrl, no Cmd)`                               |
-| Move the cursor one character to the left.  | `Left Arrow (no Ctrl, no Cmd)`<br />`Ctrl + B`               |
-| Move the cursor one character to the right. | `Right Arrow (no Ctrl, no Cmd)`<br />`Ctrl + F`              |
-| Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Cmd + Left Arrow`<br />`Cmd + B`   |
-| Move the cursor one word to the right.      | `Ctrl + Right Arrow`<br />`Cmd + Right Arrow`<br />`Cmd + F` |
+| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home (no Shift, Ctrl)`                      |
+| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Shift, Ctrl)`                       |
+| Move the cursor up one line.                | `Up Arrow (no Shift, Alt, Ctrl, Cmd)`                        |
+| Move the cursor down one line.              | `Down Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
+| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + B`      |
+| Move the cursor one character to the right. | `Right Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + F`     |
+| Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Alt + Left Arrow`<br />`Alt + B`   |
+| Move the cursor one word to the right.      | `Ctrl + Right Arrow`<br />`Alt + Right Arrow`<br />`Alt + F` |
 
 #### Editing
 
@@ -35,12 +35,12 @@ available combinations.
 | Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
 | Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
 | Clear all text in the input field.               | `Ctrl + C`                                                |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Cmd + Backspace`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Cmd + Delete`                       |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Alt + Backspace`<br />`Ctrl + W` |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                       |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
 | Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
-| Redo the most recent undone text edit.           | `Ctrl + Shift + Z`                                        |
+| Redo the most recent undone text edit.           | `Shift + Ctrl + Z`                                        |
 
 #### Scrolling
 
@@ -84,12 +84,12 @@ available combinations.
 
 #### Text Input
 
-| Action                                         | Keys                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------- |
-| Submit the current prompt.                     | `Enter (no Ctrl, no Shift, no Cmd)`                                    |
-| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
-| Open the current prompt in an external editor. | `Ctrl + X`                                                             |
-| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`                                              |
+| Action                                         | Keys                                                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Submit the current prompt.                     | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
+| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Open the current prompt in an external editor. | `Ctrl + X`                                                                                |
+| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
 
 #### App Controls
 
@@ -98,7 +98,7 @@ available combinations.
 | Toggle detailed error information.                                                                    | `F12`            |
 | Toggle the full TODO list.                                                                            | `Ctrl + T`       |
 | Show IDE context details.                                                                             | `Ctrl + G`       |
-| Toggle Markdown rendering.                                                                            | `Cmd + M`        |
+| Toggle Markdown rendering.                                                                            | `Alt + M`        |
 | Toggle copy mode when in alternate buffer mode.                                                       | `Ctrl + S`       |
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`       |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`    |

@@ -33,14 +33,17 @@ describe('keyBindings config', () => {
           expect(binding.key.length).toBeGreaterThan(0);
 
           // Modifier properties should be boolean or undefined
-          if (binding.ctrl !== undefined) {
-            expect(typeof binding.ctrl).toBe('boolean');
-          }
           if (binding.shift !== undefined) {
             expect(typeof binding.shift).toBe('boolean');
           }
-          if (binding.command !== undefined) {
-            expect(typeof binding.command).toBe('boolean');
+          if (binding.alt !== undefined) {
+            expect(typeof binding.alt).toBe('boolean');
+          }
+          if (binding.ctrl !== undefined) {
+            expect(typeof binding.ctrl).toBe('boolean');
+          }
+          if (binding.cmd !== undefined) {
+            expect(typeof binding.cmd).toBe('boolean');
           }
         }
       }

@@ -1059,9 +1059,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'h',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: 'h',
         }),
@@ -1069,9 +1070,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'i',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: 'i',
         }),
@@ -1086,9 +1088,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1103,9 +1106,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'j',
-          ctrl: true,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
           insertable: false,
           sequence: '\n',
         }),
@@ -1120,9 +1124,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'tab',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\t',
         }),
@@ -1137,9 +1142,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'tab',
-          ctrl: false,
-          meta: false,
           shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\u001b[9;2u',
         }),
@@ -1159,9 +1165,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         }),
@@ -1183,25 +1190,28 @@ describe('useTextBuffer', () => {
       act(() => {
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
         result.current.handleInput({
           name: 'backspace',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x7f',
         });
@@ -1258,24 +1268,26 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'left',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x1b[D',
         }),
-      ); // cursor [0,1]
+      );
       expect(getBufferState(result).cursor).toEqual([0, 1]);
       act(() =>
         result.current.handleInput({
           name: 'right',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\x1b[C',
         }),
-      ); // cursor [0,2]
+      );
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
@@ -1288,9 +1300,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: textWithAnsi,
         }),
@@ -1305,9 +1318,10 @@ describe('useTextBuffer', () => {
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1509,13 +1523,13 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   describe('Input Sanitization', () => {
     const createInput = (sequence: string) => ({
       name: '',
-      ctrl: false,
-      meta: false,
       shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
       insertable: true,
       sequence,
     });
-
     it.each([
       {
         input: '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m',
@@ -1567,9 +1581,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: largeTextWithUnsafe,
         }),
@@ -1601,9 +1616,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: largeTextWithAnsi,
         }),
@@ -1625,9 +1641,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: '',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: emojis,
         }),
@@ -1816,9 +1833,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: '\r',
         }),
@@ -1837,9 +1855,10 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       act(() =>
         result.current.handleInput({
           name: 'f1',
-          ctrl: false,
-          meta: false,
           shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: false,
           sequence: '\u001bOP',
         }),
