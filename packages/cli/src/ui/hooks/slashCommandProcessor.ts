@@ -19,7 +19,9 @@ import type {
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
-
+  AgentDefinition,
+} from '@google/gemini-cli-core';
+import {
   GitService,
   Logger,
   logSlashCommand,
@@ -31,7 +33,7 @@ import type {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
-  type AgentDefinition} from '@google/gemini-cli-core';
+} from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
   Message,
