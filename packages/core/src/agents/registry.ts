@@ -43,11 +43,10 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
  * AgentDefinitions.
  */
 export class AgentRegistry {
-  private readonly agents = new Map<string, AgentDefinition<z.ZodTypeAny>>();
-  private readonly allDefinitions = new Map<
-    string,
-    AgentDefinition<z.ZodTypeAny>
-  >();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly agents = new Map<string, AgentDefinition<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
   constructor(private readonly config: Config) {}
 
@@ -427,7 +426,8 @@ export class AgentRegistry {
   /**
    * Retrieves an agent definition by name.
    */
-  getDefinition(name: string): AgentDefinition | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinition(name: string): AgentDefinition<any> | undefined {
     return this.agents.get(name);
   }
 
@@ -455,9 +455,7 @@ export class AgentRegistry {
   /**
    * Retrieves a discovered agent definition by name.
    */
-  getDiscoveredDefinition(
-    name: string,
-  ): AgentDefinition<z.ZodTypeAny> | undefined {
+  getDiscoveredDefinition(name: string): AgentDefinition | undefined {
     return this.allDefinitions.get(name);
   }
 
