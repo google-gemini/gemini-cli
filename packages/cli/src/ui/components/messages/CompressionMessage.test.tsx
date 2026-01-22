@@ -211,4 +211,36 @@ describe('<CompressionMessage />', () => {
       }
     });
   });
+
+  describe('failure states', () => {
+    it('renders failure message when model returns an empty summary', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY,
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).toContain('✦');
+      expect(output).toContain(
+        'Chat history compression failed: the model returned an empty summary.',
+      );
+      unmount();
+    });
+
+    it('renders failure message for token count errors', () => {
+      const props = createCompressionProps({
+        isPending: false,
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      });
+      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const output = lastFrame();
+
+      expect(output).toContain(
+        'Could not compress chat history due to a token counting error.',
+      );
+      unmount();
+    });
+  });
 });

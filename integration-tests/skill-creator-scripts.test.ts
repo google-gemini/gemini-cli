@@ -66,14 +66,15 @@ describe('skill-creator scripts e2e', () => {
 
     // 4. Fix SKILL.md (remove TODOs)
     let content = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
-    content = content.replace(/TODO: .+/g, 'Fixed');
-    content = content.replace(/\[TODO: .+/g, 'Fixed');
+    // More aggressive global replace for all TODO patterns
+    content = content.replace(/TODO:[^\n]*/g, 'Fixed');
+    content = content.replace(/\[TODO:[^\]]*\]/g, 'Fixed');
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
 
     // Also remove TODOs from example scripts
     const exampleScriptPath = path.join(skillDir, 'scripts/example_script.cjs');
     let scriptContent = fs.readFileSync(exampleScriptPath, 'utf8');
-    scriptContent = scriptContent.replace(/TODO: .+/g, 'Fixed');
+    scriptContent = scriptContent.replace(/TODO:[^\n]*/g, 'Fixed');
     fs.writeFileSync(exampleScriptPath, scriptContent);
 
     // 4. Validate again (should pass now)
@@ -90,7 +91,13 @@ describe('skill-creator scripts e2e', () => {
     expect(fs.existsSync(skillFile)).toBe(true);
 
     // 6. Verify zip content (should NOT have nested directory)
-    const zipList = execSync(`unzip -l "${skillFile}"`, { encoding: 'utf8' });
+    // Use unzip -l if available, otherwise fallback to tar -tf (common on Windows)
+    let zipList: string;
+    try {
+      zipList = execSync(`unzip -l "${skillFile}"`, { encoding: 'utf8' });
+    } catch {
+      zipList = execSync(`tar -tf "${skillFile}"`, { encoding: 'utf8' });
+    }
     expect(zipList).toContain('SKILL.md');
     expect(zipList).not.toContain(`${skillName}/SKILL.md`);
   });

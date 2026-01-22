@@ -1126,7 +1126,7 @@ const SETTINGS_SCHEMA = {
         label: 'Disable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Disable LLM-based error correction for edit tools.
           When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
@@ -1433,6 +1433,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
+      enableEventDrivenScheduler: {
+        type: 'boolean',
+        label: 'Event Driven Scheduler',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: true,
+        description: 'Enables event-driven scheduler within the CLI session.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -1631,9 +1640,9 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  hooks: {
+  hooksConfig: {
     type: 'object',
-    label: 'Hooks',
+    label: 'HooksConfig',
     category: 'Advanced',
     requiresRestart: false,
     default: {},
@@ -1646,7 +1655,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Hooks',
         category: 'Advanced',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
         showInDialog: false,
@@ -1675,6 +1684,18 @@ const SETTINGS_SCHEMA = {
         description: 'Show visual indicators when hooks are executing.',
         showInDialog: true,
       },
+    },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hook Events',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Event-specific hook configurations.',
+    showInDialog: false,
+    properties: {
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',
@@ -2116,10 +2137,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       enabled: {
         type: 'boolean',
         description: 'Whether to enable the agent.',
-      },
-      disabled: {
-        type: 'boolean',
-        description: 'Whether to disable the agent.',
       },
     },
   },

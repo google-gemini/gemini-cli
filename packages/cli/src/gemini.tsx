@@ -96,6 +96,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -372,12 +373,12 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-  if (
-    settings.merged.security.auth.selectedType &&
-    !settings.merged.security.auth.useExternal
-  ) {
+  if (!settings.merged.security.auth.useExternal) {
     try {
-      if (partialConfig.isInteractive()) {
+      if (
+        partialConfig.isInteractive() &&
+        settings.merged.security.auth.selectedType
+      ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
@@ -388,7 +389,7 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else {
+      } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,
           settings.merged.security.auth.useExternal,
@@ -409,6 +410,9 @@ export async function main() {
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
   }
+
+  // Run deferred command now that we have admin settings.
+  await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
@@ -648,18 +652,22 @@ export async function main() {
     const sessionStartSource = resumedSessionData
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
-    const result = await config
-      .getHookSystem()
-      ?.fireSessionStartEvent(sessionStartSource);
 
-    if (result?.finalOutput) {
-      if (result.finalOutput.systemMessage) {
-        writeToStderr(result.finalOutput.systemMessage + '\n');
-      }
-      const additionalContext = result.finalOutput.getAdditionalContext();
-      if (additionalContext) {
-        // Prepend context to input (System Context -> Stdin -> Question)
-        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+      if (result) {
+        if (result.systemMessage) {
+          writeToStderr(result.systemMessage + '\n');
+        }
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          // Prepend context to input (System Context -> Stdin -> Question)
+          input = input
+            ? `${additionalContext}\n\n${input}`
+            : additionalContext;
+        }
       }
     }
 
@@ -720,6 +728,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
