@@ -779,16 +779,29 @@ export function recordModelRoutingMetrics(
   )
     return;
 
-  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+  const attributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
-  });
+    'routing.failed': event.failed,
+  };
+
+  if (event.reasoning) {
+    attributes['routing.reasoning'] = event.reasoning;
+  }
+  if (event.enable_numerical_routing !== undefined) {
+    attributes['routing.enable_numerical_routing'] =
+      event.enable_numerical_routing;
+  }
+  if (event.classifier_threshold) {
+    attributes['routing.classifier_threshold'] = event.classifier_threshold;
+  }
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, attributes);
 
   if (event.failed) {
     modelRoutingFailureCounter.add(1, {
-      ...baseMetricDefinition.getCommonAttributes(config),
-      'routing.decision_source': event.decision_source,
+      ...attributes,
       'routing.error_message': event.error_message,
     });
   }
