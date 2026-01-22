@@ -27,7 +27,6 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -460,23 +459,6 @@ export class AgentRegistry {
   }
 
   /**
-   * Generates a description for the delegate_to_agent tool.
-   * Unlike getDirectoryContext() which is for system prompts,
-   * this is formatted for tool descriptions.
-   */
-  getToolDescription(): string {
-    if (this.agents.size === 0) {
-      return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
-    }
-
-    const agentDescriptions = Array.from(this.agents.entries())
-      .map(([name, def]) => `- **${name}**: ${def.description}`)
-      .join('\n');
-
-    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
-  }
-
-  /**
    * Generates a markdown "Phone Book" of available agents and their schemas.
    * This MUST be injected into the System Prompt of the parent agent.
    */
@@ -489,13 +471,15 @@ export class AgentRegistry {
     context += `Sub-agents are specialized expert agents that you can use to assist you in
       the completion of all or part of a task.
 
-      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
+      Each sub-agent is available as a specific tool.
+
+      ALWAYS use the specific tool for the subagent if one
       exists that has expertise relevant to your task.
 
       For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
+      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the 'test-fixer' tool.
+      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the 'license-agent' tool.
+      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the 'codebase-investigator' tool.
       - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
 
       The following are the available sub-agents:\n\n`;

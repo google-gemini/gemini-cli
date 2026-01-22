@@ -102,8 +102,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
-import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { SubAgentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -1968,8 +1967,7 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    // Register DelegateToAgentTool if agents are enabled
-    this.registerDelegateToAgentTool(registry);
+    this.registerSubAgentTools(registry);
 
     await registry.discoverAllTools();
     registry.sortTools();
@@ -1977,26 +1975,31 @@ export class Config {
   }
 
   /**
-   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   * Registers SubAgentTools for all available agents.
    */
-  private registerDelegateToAgentTool(registry: ToolRegistry): void {
+  private registerSubAgentTools(registry: ToolRegistry): void {
     if (
       this.isAgentsEnabled() ||
       this.getCodebaseInvestigatorSettings().enabled ||
       this.getCliHelpAgentSettings().enabled
     ) {
-      // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
-      const isAllowed =
-        !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
+      const definitions = this.agentRegistry.getAllDefinitions();
 
-      if (isAllowed) {
-        const delegateTool = new DelegateToAgentTool(
-          this.agentRegistry,
-          this,
-          this.getMessageBus(),
-        );
-        registry.registerTool(delegateTool);
+      for (const def of definitions) {
+        const isAllowed = !allowedTools || allowedTools.includes(def.name);
+
+        if (isAllowed) {
+          try {
+            const tool = new SubAgentTool(def, this, this.getMessageBus());
+            registry.registerTool(tool);
+          } catch (e) {
+            debugLogger.warn(
+              `Failed to register tool for agent ${def.name}:`,
+              e,
+            );
+          }
+        }
       }
     }
   }
@@ -2092,7 +2095,7 @@ export class Config {
 
   private onAgentsRefreshed = async () => {
     if (this.toolRegistry) {
-      this.registerDelegateToAgentTool(this.toolRegistry);
+      this.registerSubAgentTools(this.toolRegistry);
     }
     // Propagate updates to the active chat session
     const client = this.getGeminiClient();

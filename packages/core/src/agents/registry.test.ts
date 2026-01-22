@@ -914,10 +914,10 @@ describe('AgentRegistry', () => {
     });
   });
 
-  describe('getToolDescription', () => {
+  describe('getDirectoryContext', () => {
     it('should return default message when no agents are registered', () => {
-      expect(registry.getToolDescription()).toContain(
-        'No agents are currently available',
+      expect(registry.getDirectoryContext()).toContain(
+        'No sub-agents are currently available.',
       );
     });
 
@@ -929,12 +929,10 @@ describe('AgentRegistry', () => {
         description: 'Another agent description',
       });
 
-      const description = registry.getToolDescription();
+      const description = registry.getDirectoryContext();
 
-      expect(description).toContain(
-        'Delegates a task to a specialized sub-agent',
-      );
-      expect(description).toContain('Available agents:');
+      expect(description).toContain('Sub-agents are specialized expert agents');
+      expect(description).toContain('Available Sub-Agents');
       expect(description).toContain(
         `- **${MOCK_AGENT_V1.name}**: ${MOCK_AGENT_V1.description}`,
       );
