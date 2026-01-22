@@ -24,7 +24,7 @@ const COLOR_YELLOW = '\u001b[33m';
 const COLOR_RED = '\u001b[31m';
 const RESET_COLOR = '\u001b[0m';
 
-async function getMcpServersFromConfig(): Promise<
+export async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
 > {
   const settings = loadSettings();
