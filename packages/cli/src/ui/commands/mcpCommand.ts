@@ -193,26 +193,21 @@ const listAction = async (
   }
 
   const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
-  let serverNames = Object.keys(mcpServers);
-
+  let displayedMcpServers = mcpServers;
   if (filterServerName) {
     const trimmedName = filterServerName.trim();
     if (trimmedName) {
-      if (!serverNames.includes(trimmedName)) {
+      if (!(trimmedName in mcpServers)) {
         return {
           type: 'message',
           messageType: 'error',
           content: `MCP server '${trimmedName}' not found.`,
         };
       }
-      serverNames = [trimmedName];
+      displayedMcpServers = { [trimmedName]: mcpServers[trimmedName] };
     }
   }
-
-  const displayedMcpServers: typeof mcpServers = {};
-  for (const name of serverNames) {
-    displayedMcpServers[name] = mcpServers[name];
-  }
+  const serverNames = Object.keys(displayedMcpServers);
 
   const blockedMcpServers =
     config.getMcpClientManager()?.getBlockedMcpServers() || [];
