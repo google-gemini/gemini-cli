@@ -373,6 +373,7 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
+  let initialAuthFailed = false;
   if (!settings.merged.security.auth.useExternal) {
     try {
       if (
@@ -400,8 +401,7 @@ export async function main() {
       }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      initialAuthFailed = true;
     }
   }
 
@@ -427,6 +427,10 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
+      if (initialAuthFailed) {
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
