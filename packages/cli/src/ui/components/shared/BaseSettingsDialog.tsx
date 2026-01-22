@@ -54,7 +54,7 @@ export interface BaseSettingsDialogProps<T extends BaseSettingsItem> {
   staticExtraHeight?: number;
 
   // Custom key handling (e.g. for inline editing)
-  onKeypress?: (key: Key) => boolean; // Return true if handled
+  onKeypress?: (key: Key, activeItem: T | undefined) => boolean; // Return true if handled
   isEditing?: boolean;
 }
 
@@ -111,7 +111,7 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
   const TITLE_HEIGHT = 2;
   const SCROLL_ARROWS_HEIGHT = 2;
   const SPACING_HEIGHT = 1;
-  const SCOPE_HEIGHT = showScopeSelection ? 4 : 0;
+  const SCOPE_SELECTION_HEIGHT = 4;
   const HELP_TEXT_HEIGHT = 1;
   const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
   const SEARCH_HEIGHT = searchable ? 4 : 0;
@@ -121,15 +121,48 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
     : Number.MAX_SAFE_INTEGER;
   currentHeight -= 2; // Borders
 
-  const totalFixedHeight =
+  let effectiveShowScopeSelection = showScopeSelection;
+
+  // Calculate fixed height and max items *without* scope selection first.
+  const totalFixedHeightWithoutScope =
     DIALOG_PADDING +
     TITLE_HEIGHT +
     SCROLL_ARROWS_HEIGHT +
     SPACING_HEIGHT +
-    SCOPE_HEIGHT +
     HELP_TEXT_HEIGHT +
     RESTART_PROMPT_HEIGHT +
     SEARCH_HEIGHT;
+
+  const availableHeightWithoutScope = Math.max(
+    1,
+    currentHeight - totalFixedHeightWithoutScope,
+  );
+  const maxItemsWithoutScope = Math.max(
+    1,
+    Math.floor(availableHeightWithoutScope / 3),
+  );
+
+  // Now, check if it's worth showing the scope selection.
+  if (effectiveShowScopeSelection) {
+    const totalFixedHeightWithScope =
+      totalFixedHeightWithoutScope + SCOPE_SELECTION_HEIGHT;
+    const availableHeightWithScope = Math.max(
+      1,
+      currentHeight - totalFixedHeightWithScope,
+    );
+    const maxItemsWithScope = Math.max(
+      1,
+      Math.floor(availableHeightWithScope / 3),
+    );
+
+    // If hiding scope selection allows us to show significantly more items, do it.
+    if (maxItemsWithoutScope > maxItemsWithScope + 1) {
+      effectiveShowScopeSelection = false;
+    }
+  }
+
+  const SCOPE_HEIGHT = effectiveShowScopeSelection ? SCOPE_SELECTION_HEIGHT : 0;
+  const totalFixedHeight = totalFixedHeightWithoutScope + SCOPE_HEIGHT;
 
   const availableHeightForItems = Math.max(1, currentHeight - totalFixedHeight);
   const maxVisibleItems = Math.max(1, Math.floor(availableHeightForItems / 3));
@@ -137,6 +170,13 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
   const effectiveMaxItemsToShow = availableTerminalHeight
     ? Math.min(maxVisibleItems, items.length)
     : MAX_ITEMS_TO_SHOW;
+
+  // Ensure focus stays on settings when scope selection is hidden
+  useEffect(() => {
+    if (!effectiveShowScopeSelection && focusSection === 'scope') {
+      setFocusSection('settings');
+    }
+  }, [effectiveShowScopeSelection, focusSection]);
 
   const visibleItems = items.slice(
     scrollOffset,
@@ -162,7 +202,7 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
   useKeypress(
     (key) => {
       // Custom handler takes precedence
-      if (onKeypress?.(key)) {
+      if (onKeypress?.(key, items[activeItemIndex])) {
         return;
       }
 
@@ -171,7 +211,7 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
         return;
       }
 
-      if (key.name === 'tab' && showScopeSelection && !isEditing) {
+      if (key.name === 'tab' && effectiveShowScopeSelection && !isEditing) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
         return;
       }
@@ -333,7 +373,7 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
 
         <Box height={1} />
 
-        {showScopeSelection && (
+        {effectiveShowScopeSelection && (
           <Box marginX={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
               {focusSection === 'scope' ? '> ' : '  '}Apply To
@@ -358,7 +398,7 @@ export function BaseSettingsDialog<T extends BaseSettingsItem>({
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
             {helpText ||
-              `(Use Enter to select${showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)`}
+              `(Use Enter to select${effectiveShowScopeSelection ? ', Tab to change focus' : ''}, Esc to close)`}
           </Text>
         </Box>
 

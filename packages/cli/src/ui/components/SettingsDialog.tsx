@@ -451,7 +451,7 @@ export function SettingsDialog({
     }
   };
 
-  const handleKeypress = (key: Key): boolean => {
+  const handleKeypress = (key: Key, activeItem?: SettingItem): boolean => {
     const { name } = key;
 
     // If editing, capture input and control keys
@@ -545,10 +545,12 @@ export function SettingsDialog({
       return true;
     }
 
-    if (showRestartPrompt && name === 'r') {
-      saveRestartRequiredSettings();
-      setShowRestartPrompt(false);
-      if (onRestartRequest) onRestartRequest();
+    if (
+      activeItem &&
+      /^[0-9]$/.test(key.sequence || '') &&
+      activeItem.type === 'number'
+    ) {
+      startEditing(activeItem.value, key.sequence);
       return true;
     }
 
@@ -656,7 +658,7 @@ export function SettingsDialog({
       onScopeChange={setSelectedScope}
       showRestartPrompt={showRestartPrompt}
       onRestartRequest={() => {
-        saveRestartRequiredSettings();
+        setShowRestartPrompt(false);
         if (onRestartRequest) onRestartRequest();
       }}
       availableTerminalHeight={availableTerminalHeight}
