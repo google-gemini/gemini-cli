@@ -400,8 +400,6 @@ export async function main() {
       }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
     }
   }
 
