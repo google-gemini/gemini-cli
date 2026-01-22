@@ -188,4 +188,54 @@ describe('ThemeManager', () => {
       consoleWarnSpy.mockRestore();
     });
   });
+
+  describe('extension themes', () => {
+    it('should register and unregister themes from extensions with namespacing', () => {
+      const extTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'ExtensionTheme',
+      };
+      const extensionName = 'test-extension';
+      const namespacedName = `${extensionName}: ExtensionTheme`;
+
+      themeManager.registerExtensionThemes(extensionName, [extTheme]);
+      expect(themeManager.getCustomThemeNames()).toContain(namespacedName);
+      expect(themeManager.isCustomTheme(namespacedName)).toBe(true);
+
+      themeManager.unregisterExtensionThemes(extensionName, [extTheme]);
+      expect(themeManager.getCustomThemeNames()).not.toContain(namespacedName);
+      expect(themeManager.isCustomTheme(namespacedName)).toBe(false);
+    });
+
+    it('should not allow extension themes to overwrite built-in themes even with prefixing', () => {
+      // availableThemes has 'Ayu'.
+      // We verify that it DOES prefix, so it won't collide even if extension name is similar.
+      themeManager.registerExtensionThemes('Ext', [
+        { ...validCustomTheme, name: 'Theme' },
+      ]);
+      expect(themeManager.getCustomThemeNames()).toContain('Ext: Theme');
+    });
+
+    it('should allow extension themes and settings themes to coexist', () => {
+      const extTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'ExtensionTheme',
+      };
+      const settingsTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'SettingsTheme',
+      };
+
+      themeManager.registerExtensionThemes('Ext', [extTheme]);
+      themeManager.loadCustomThemes({ SettingsTheme: settingsTheme });
+
+      expect(themeManager.getCustomThemeNames()).toContain(
+        'Ext: ExtensionTheme',
+      );
+      expect(themeManager.getCustomThemeNames()).toContain('SettingsTheme');
+
+      expect(themeManager.isCustomTheme('Ext: ExtensionTheme')).toBe(true);
+      expect(themeManager.isCustomTheme('SettingsTheme')).toBe(true);
+    });
+  });
 });
