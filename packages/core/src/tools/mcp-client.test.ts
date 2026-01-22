@@ -1403,6 +1403,72 @@ describe('mcp-client', () => {
       });
     });
 
+    it('should redact sensitive environment variables for command transport', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        GEMINI_API_KEY: 'sensitive-key',
+        SAFE_VAR: 'safe-value',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
+        expect(callArgs.env!['GEMINI_API_KEY']).toBeUndefined();
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
+    it('should include extension settings in environment', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+          extension: {
+            name: 'test-ext',
+            resolvedSettings: [
+              {
+                envVar: 'EXT_VAR',
+                value: 'ext-value',
+                sensitive: false,
+                name: 'ext-setting',
+              },
+            ],
+            version: '',
+            isActive: false,
+            path: '',
+            contextFiles: [],
+            id: '',
+          },
+        },
+        false,
+        EMPTY_CONFIG,
+      );
+
+      const callArgs = mockedTransport.mock.calls[0][0];
+      expect(callArgs.env).toBeDefined();
+      expect(callArgs.env!['EXT_VAR']).toBe('ext-value');
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
