@@ -10,6 +10,7 @@ import os from 'node:os';
 import pathMod from 'node:path';
 import * as path from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
   CoreEvent,
@@ -31,6 +32,14 @@ import type { Key } from '../../contexts/KeypressContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
+
+const LARGE_PASTE_LINE_THRESHOLD = 5;
+const LARGE_PASTE_CHAR_THRESHOLD = 500;
+
+// Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
+export const PASTED_TEXT_PLACEHOLDER_REGEX =
+  /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
 
 export type Direction =
   | 'left'
@@ -576,6 +585,7 @@ interface UndoHistoryEntry {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  pastedContent: Record<string, string>;
 }
 
 function calculateInitialCursorPosition(
@@ -726,9 +736,18 @@ export function getTransformedImagePath(filePath: string): string {
   return `[Image ${truncatedBase}${extension}]`;
 }
 
+const transformationsCache = new LRUCache<string, Transformation[]>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
+
 export function calculateTransformationsForLine(
   line: string,
 ): Transformation[] {
+  const cached = transformationsCache.get(line);
+  if (cached) {
+    return cached;
+  }
+
   const transformations: Transformation[] = [];
   let match: RegExpExecArray | null;
 
@@ -747,6 +766,8 @@ export function calculateTransformationsForLine(
       collapsedText: getTransformedImagePath(logicalText),
     });
   }
+
+  transformationsCache.set(line, transformations);
 
   return transformations;
 }
@@ -768,6 +789,88 @@ export function getTransformUnderCursor(
     }
     if (col < span.logStart) break;
   }
+  return null;
+}
+
+/**
+ * Represents an atomic placeholder that should be deleted as a unit.
+ * Extensible to support future placeholder types.
+ */
+interface AtomicPlaceholder {
+  start: number; // Start position in logical text
+  end: number; // End position in logical text
+  type: 'paste' | 'image'; // Type for cleanup logic
+  id?: string; // For paste placeholders: the pastedContent key
+}
+
+/**
+ * Find atomic placeholder at cursor for backspace (cursor at end).
+ * Checks all placeholder types in priority order.
+ */
+function findAtomicPlaceholderForBackspace(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders (text-based)
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (cursorCol === end) {
+      return { start, end, type: 'paste', id: match[0] };
+    }
+  }
+
+  // 2. Check image transformations (logical bounds)
+  for (const transform of transformations) {
+    if (cursorCol === transform.logEnd) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find atomic placeholder at cursor for delete (cursor at start).
+ */
+function findAtomicPlaceholderForDelete(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    if (cursorCol === start) {
+      return {
+        start,
+        end: start + match[0].length,
+        type: 'paste',
+        id: match[0],
+      };
+    }
+  }
+
+  // 2. Check image transformations
+  for (const transform of transformations) {
+    if (cursorCol === transform.logStart) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
   return null;
 }
 
@@ -845,6 +948,7 @@ export function calculateTransformedLine(
 
   return { transformedLine, transformedToLogMap };
 }
+
 export interface VisualLayout {
   visualLines: string[];
   // For each logical line, an array of [visualLineIndex, startColInLogical]
@@ -856,6 +960,33 @@ export interface VisualLayout {
   transformedToLogicalMaps: number[][];
   // For each visual line, its [startColInTransformed]
   visualToTransformedMap: number[];
+}
+
+// Caches for layout calculation
+interface LineLayoutResult {
+  visualLines: string[];
+  logicalToVisualMap: Array<[number, number]>;
+  visualToLogicalMap: Array<[number, number]>;
+  transformedToLogMap: number[];
+  visualToTransformedMap: number[];
+}
+
+const lineLayoutCache = new LRUCache<string, LineLayoutResult>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
+
+function getLineLayoutCacheKey(
+  line: string,
+  viewportWidth: number,
+  isCursorOnLine: boolean,
+  cursorCol: number,
+): string {
+  // Most lines (99.9% in a large buffer) are not cursor lines.
+  // We use a simpler key for them to reduce string allocation overhead.
+  if (!isCursorOnLine) {
+    return `${viewportWidth}:N:${line}`;
+  }
+  return `${viewportWidth}:C:${cursorCol}:${line}`;
 }
 
 // Calculates the visual wrapping of lines and the mapping between logical and visual coordinates.
@@ -873,6 +1004,34 @@ function calculateLayout(
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
+
+    const isCursorOnLine = logIndex === logicalCursor[0];
+    const cacheKey = getLineLayoutCacheKey(
+      logLine,
+      viewportWidth,
+      isCursorOnLine,
+      logicalCursor[1],
+    );
+    const cached = lineLayoutCache.get(cacheKey);
+
+    if (cached) {
+      const visualLineOffset = visualLines.length;
+      visualLines.push(...cached.visualLines);
+      cached.logicalToVisualMap.forEach(([relVisualIdx, logCol]) => {
+        logicalToVisualMap[logIndex].push([
+          visualLineOffset + relVisualIdx,
+          logCol,
+        ]);
+      });
+      cached.visualToLogicalMap.forEach(([, logCol]) => {
+        visualToLogicalMap.push([logIndex, logCol]);
+      });
+      transformedToLogicalMaps[logIndex] = cached.transformedToLogMap;
+      visualToTransformedMap.push(...cached.visualToTransformedMap);
+      return;
+    }
+
+    // Not in cache, calculate
     const transformations = calculateTransformationsForLine(logLine);
     const { transformedLine, transformedToLogMap } = calculateTransformedLine(
       logLine,
@@ -880,13 +1039,18 @@ function calculateLayout(
       logicalCursor,
       transformations,
     );
-    transformedToLogicalMaps[logIndex] = transformedToLogMap;
+
+    const lineVisualLines: string[] = [];
+    const lineLogicalToVisualMap: Array<[number, number]> = [];
+    const lineVisualToLogicalMap: Array<[number, number]> = [];
+    const lineVisualToTransformedMap: number[] = [];
+
     if (transformedLine.length === 0) {
       // Handle empty logical line
-      logicalToVisualMap[logIndex].push([visualLines.length, 0]);
-      visualToLogicalMap.push([logIndex, 0]);
-      visualToTransformedMap.push(0);
-      visualLines.push('');
+      lineLogicalToVisualMap.push([0, 0]);
+      lineVisualToLogicalMap.push([logIndex, 0]);
+      lineVisualToTransformedMap.push(0);
+      lineVisualLines.push('');
     } else {
       // Non-empty logical line
       let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
@@ -929,15 +1093,6 @@ function calculateLayout(
                 // Single character is wider than viewport, take it anyway
                 currentChunk = char;
                 numCodePointsInChunk = 1;
-              } else if (
-                numCodePointsInChunk === 0 &&
-                charVisualWidth <= viewportWidth
-              ) {
-                // This case should ideally be caught by the next iteration if the char fits.
-                // If it doesn't fit (because currentChunkVisualWidth was already > 0 from a previous char that filled the line),
-                // then numCodePointsInChunk would not be 0.
-                // This branch means the current char *itself* doesn't fit an empty line, which is handled by the above.
-                // If we are here, it means the loop should break and the current chunk (which is empty) is finalized.
               }
             }
             break; // Break from inner loop to finalize this chunk
@@ -955,55 +1110,57 @@ function calculateLayout(
           }
         }
 
-        // If the inner loop completed without breaking (i.e., remaining text fits)
-        // or if the loop broke but numCodePointsInChunk is still 0 (e.g. first char too wide for empty line)
         if (
           numCodePointsInChunk === 0 &&
           currentPosInLogLine < codePointsInLogLine.length
         ) {
-          // This can happen if the very first character considered for a new visual line is wider than the viewport.
-          // In this case, we take that single character.
           const firstChar = codePointsInLogLine[currentPosInLogLine];
           currentChunk = firstChar;
-          numCodePointsInChunk = 1; // Ensure we advance
-        }
-
-        // If after everything, numCodePointsInChunk is still 0 but we haven't processed the whole logical line,
-        // it implies an issue, like viewportWidth being 0 or less. Avoid infinite loop.
-        if (
-          numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
-        ) {
-          // Force advance by one character to prevent infinite loop if something went wrong
-          currentChunk = codePointsInLogLine[currentPosInLogLine];
           numCodePointsInChunk = 1;
         }
 
         const logicalStartCol = transformedToLogMap[currentPosInLogLine] ?? 0;
-        logicalToVisualMap[logIndex].push([
-          visualLines.length,
-          logicalStartCol,
-        ]);
-        visualToLogicalMap.push([logIndex, logicalStartCol]);
-        visualToTransformedMap.push(currentPosInLogLine);
-        visualLines.push(currentChunk);
+        lineLogicalToVisualMap.push([lineVisualLines.length, logicalStartCol]);
+        lineVisualToLogicalMap.push([logIndex, logicalStartCol]);
+        lineVisualToTransformedMap.push(currentPosInLogLine);
+        lineVisualLines.push(currentChunk);
 
         const logicalStartOfThisChunk = currentPosInLogLine;
         currentPosInLogLine += numCodePointsInChunk;
 
-        // If the chunk processed did not consume the entire logical line,
-        // and the character immediately following the chunk is a space,
-        // advance past this space as it acted as a delimiter for word wrapping.
         if (
           logicalStartOfThisChunk + numCodePointsInChunk <
             codePointsInLogLine.length &&
-          currentPosInLogLine < codePointsInLogLine.length && // Redundant if previous is true, but safe
+          currentPosInLogLine < codePointsInLogLine.length &&
           codePointsInLogLine[currentPosInLogLine] === ' '
         ) {
           currentPosInLogLine++;
         }
       }
     }
+
+    // Cache the result for this line
+    lineLayoutCache.set(cacheKey, {
+      visualLines: lineVisualLines,
+      logicalToVisualMap: lineLogicalToVisualMap,
+      visualToLogicalMap: lineVisualToLogicalMap,
+      transformedToLogMap,
+      visualToTransformedMap: lineVisualToTransformedMap,
+    });
+
+    const visualLineOffset = visualLines.length;
+    visualLines.push(...lineVisualLines);
+    lineLogicalToVisualMap.forEach(([relVisualIdx, logCol]) => {
+      logicalToVisualMap[logIndex].push([
+        visualLineOffset + relVisualIdx,
+        logCol,
+      ]);
+    });
+    lineVisualToLogicalMap.forEach(([, logCol]) => {
+      visualToLogicalMap.push([logIndex, logCol]);
+    });
+    transformedToLogicalMaps[logIndex] = transformedToLogMap;
+    visualToTransformedMap.push(...lineVisualToTransformedMap);
   });
 
   // If the entire logical text was empty, ensure there's one empty visual line.
@@ -1117,6 +1274,7 @@ export interface TextBufferState {
   viewportWidth: number;
   viewportHeight: number;
   visualLayout: VisualLayout;
+  pastedContent: Record<string, string>;
 }
 
 const historyLimit = 100;
@@ -1126,6 +1284,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
+    pastedContent: { ...currentState.pastedContent },
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -1137,6 +1296,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -1241,6 +1401,7 @@ function textBufferReducerLogic(
         cursorRow: lastNewLineIndex,
         cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
         preferredCol: null,
+        pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
     }
 
@@ -1298,15 +1459,68 @@ function textBufferReducerLogic(
       };
     }
 
+    case 'add_pasted_content': {
+      const { id, text } = action.payload;
+      return {
+        ...state,
+        pastedContent: {
+          ...state.pastedContent,
+          [id]: text,
+        },
+      };
+    }
+
     case 'backspace': {
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Early return if at start of buffer
+      if (cursorCol === 0 && cursorRow === 0) return state;
+
+      // Check if cursor is at end of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForBackspace(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorCol: placeholder.start,
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard backspace logic
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
 
       const currentLine = (r: number) => newLines[r] ?? '';
-
-      if (newCursorCol === 0 && newCursorRow === 0) return state;
 
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
@@ -1517,7 +1731,47 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const { cursorRow, cursorCol, lines } = state;
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Check if cursor is at start of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForDelete(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          // cursorCol stays the same
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard delete logic
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
         const nextState = pushUndoLocal(state);
@@ -1667,6 +1921,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1684,6 +1939,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1859,6 +2115,7 @@ export function useTextBuffer({
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       visualLayout,
+      pastedContent: {},
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -1875,6 +2132,7 @@ export function useTextBuffer({
     selectionAnchor,
     visualLayout,
     transformationsByLine,
+    pastedContent,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -1928,20 +2186,64 @@ export function useTextBuffer({
     }
   }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
+  const addPastedContent = useCallback(
+    (content: string, lineCount: number): string => {
+      // content is already normalized by the caller
+      const base =
+        lineCount > LARGE_PASTE_LINE_THRESHOLD
+          ? `[Pasted Text: ${lineCount} lines]`
+          : `[Pasted Text: ${content.length} chars]`;
+
+      let id = base;
+      let suffix = 2;
+      while (pastedContent[id]) {
+        id = base.replace(']', ` #${suffix}]`);
+        suffix++;
+      }
+
+      dispatch({
+        type: 'add_pasted_content',
+        payload: { id, text: content },
+      });
+      return id;
+    },
+    [pastedContent],
+  );
+
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
-      if (!singleLine && /[\n\r]/.test(ch)) {
-        dispatch({ type: 'insert', payload: ch });
+      if (typeof ch !== 'string') {
         return;
       }
 
+      // Normalize line endings once at the entry point for pastes
+      const text = paste ? ch.replace(/\r\n|\r/g, '\n') : ch;
+
+      if (paste) {
+        const lineCount = text.split('\n').length;
+        if (
+          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          text.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          const id = addPastedContent(text, lineCount);
+          dispatch({ type: 'insert', payload: id });
+          return;
+        }
+      }
+
+      if (!singleLine && /[\n\r]/.test(text)) {
+        dispatch({ type: 'insert', payload: text });
+        return;
+      }
+
+      let textToInsert = text;
       const minLengthToInferAsDragDrop = 3;
       if (
-        ch.length >= minLengthToInferAsDragDrop &&
+        text.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
         paste
       ) {
-        let potentialPath = ch.trim();
+        let potentialPath = text.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
         if (quoteMatch) {
           potentialPath = quoteMatch[1];
@@ -1951,12 +2253,12 @@ export function useTextBuffer({
 
         const processed = parsePastedPaths(potentialPath, isValidPath);
         if (processed) {
-          ch = processed;
+          textToInsert = processed;
         }
       }
 
       let currentText = '';
-      for (const char of toCodePoints(ch)) {
+      for (const char of toCodePoints(textToInsert)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
             dispatch({ type: 'insert', payload: currentText });
@@ -1971,7 +2273,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive, singleLine],
+    [isValidPath, shellModeActive, singleLine, addPastedContent],
   );
 
   const newline = useCallback((): void => {
@@ -2175,11 +2477,9 @@ export function useTextBuffer({
 
     if (!command) {
       command =
-        (process.env['VISUAL'] ??
+        process.env['VISUAL'] ??
         process.env['EDITOR'] ??
-        process.platform === 'win32')
-          ? 'notepad'
-          : 'vi';
+        (process.platform === 'win32' ? 'notepad' : 'vi');
     }
 
     dispatch({ type: 'create_undo_snapshot' });
@@ -2225,6 +2525,7 @@ export function useTextBuffer({
 
       if (key.name === 'paste') insert(input, { paste: true });
       else if (keyMatchers[Command.RETURN](key)) newline();
+      else if (keyMatchers[Command.NEWLINE](key)) newline();
       else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
       else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
       else if (keyMatchers[Command.MOVE_UP](key)) move('up');
@@ -2369,6 +2670,7 @@ export function useTextBuffer({
       cursor: [cursorRow, cursorCol],
       preferredCol,
       selectionAnchor,
+      pastedContent,
 
       allVisualLines: visualLines,
       viewportVisualLines: renderedVisualLines,
@@ -2378,8 +2680,10 @@ export function useTextBuffer({
       transformedToLogicalMaps,
       visualToTransformedMap,
       transformationsByLine,
+      visualLayout,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2439,6 +2743,7 @@ export function useTextBuffer({
       cursorCol,
       preferredCol,
       selectionAnchor,
+      pastedContent,
       visualLines,
       renderedVisualLines,
       visualCursor,
@@ -2447,8 +2752,10 @@ export function useTextBuffer({
       transformedToLogicalMaps,
       visualToTransformedMap,
       transformationsByLine,
+      visualLayout,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2516,6 +2823,7 @@ export interface TextBuffer {
    */
   preferredCol: number | null; // Preferred visual column
   selectionAnchor: [number, number] | null; // Logical selection anchor
+  pastedContent: Record<string, string>;
 
   // Visual state (handles wrapping)
   allVisualLines: string[]; // All visual lines for the current text and viewport width.
@@ -2540,6 +2848,7 @@ export interface TextBuffer {
   visualToTransformedMap: number[];
   /** Cached transformations per logical line */
   transformationsByLine: Transformation[][];
+  visualLayout: VisualLayout;
 
   // Actions
 
@@ -2552,6 +2861,7 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string, opts?: { paste?: boolean }) => void;
+  addPastedContent: (text: string, lineCount: number) => string;
   newline: () => void;
   backspace: () => void;
   del: () => void;

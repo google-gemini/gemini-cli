@@ -20,6 +20,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
+import { ApprovalMode } from '../policy/types.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -54,6 +55,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
@@ -76,6 +78,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Config;
   });
 
@@ -247,6 +250,24 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     },
   );
+
+  describe('ApprovalMode in System Prompt', () => {
+    it('should include PLAN mode instructions', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Active Approval Mode: Plan');
+      expect(prompt).toMatchSnapshot();
+    });
+
+    it('should NOT include approval mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Active Approval Mode: Plan');
+      expect(prompt).toMatchSnapshot();
+    });
+  });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
     it.each(['false', '0'])(
