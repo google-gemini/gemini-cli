@@ -53,7 +53,14 @@ describe('ShellInputPrompt', () => {
     const handler = mockUseKeypress.mock.calls[0][0];
 
     // Simulate keypress
-    handler({ name, sequence, ctrl: false, shift: false, meta: false });
+    handler({
+      name,
+      shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence,
+    });
 
     expect(mockWriteToPty).toHaveBeenCalledWith(1, sequence);
   });
@@ -66,7 +73,7 @@ describe('ShellInputPrompt', () => {
 
     const handler = mockUseKeypress.mock.calls[0][0];
 
-    handler({ name: key, ctrl: true, shift: true, meta: false });
+    handler({ name: key, shift: true, alt: false, ctrl: true, cmd: false });
 
     expect(mockScrollPty).toHaveBeenCalledWith(1, direction);
   });
@@ -78,10 +85,11 @@ describe('ShellInputPrompt', () => {
 
     handler({
       name: 'a',
-      sequence: 'a',
-      ctrl: false,
       shift: false,
-      meta: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: 'a',
     });
 
     expect(mockWriteToPty).not.toHaveBeenCalled();
@@ -94,10 +102,11 @@ describe('ShellInputPrompt', () => {
 
     handler({
       name: 'a',
-      sequence: 'a',
-      ctrl: false,
       shift: false,
-      meta: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: 'a',
     });
 
     expect(mockWriteToPty).not.toHaveBeenCalled();

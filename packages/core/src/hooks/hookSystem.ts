@@ -19,13 +19,66 @@ import type {
   SessionEndReason,
   PreCompressTrigger,
   DefaultHookOutput,
+  BeforeModelHookOutput,
+  AfterModelHookOutput,
+  BeforeToolSelectionHookOutput,
+  McpToolContext,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+  GenerateContentConfig,
+  ContentListUnion,
+  ToolConfig,
+  ToolListUnion,
+} from '@google/genai';
+
 /**
  * Main hook system that coordinates all hook-related functionality
  */
+
+export interface BeforeModelHookResult {
+  /** Whether the model call was blocked */
+  blocked: boolean;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
+  /** Reason for blocking (if blocked) */
+  reason?: string;
+  /** Synthetic response to return instead of calling the model (if blocked) */
+  syntheticResponse?: GenerateContentResponse;
+  /** Modified config (if not blocked) */
+  modifiedConfig?: GenerateContentConfig;
+  /** Modified contents (if not blocked) */
+  modifiedContents?: ContentListUnion;
+}
+
+/**
+ * Result from firing the BeforeToolSelection hook.
+ */
+export interface BeforeToolSelectionHookResult {
+  /** Modified tool config */
+  toolConfig?: ToolConfig;
+  /** Modified tools */
+  tools?: ToolListUnion;
+}
+
+/**
+ * Result from firing the AfterModel hook.
+ * Contains either a modified response or indicates to use the original chunk.
+ */
+export interface AfterModelHookResult {
+  /** The response to yield (either modified or original) */
+  response: GenerateContentResponse;
+  /** Whether the execution should be stopped entirely */
+  stopped?: boolean;
+  /** Whether the model call was blocked */
+  blocked?: boolean;
+  /** Reason for blocking or stopping */
+  reason?: string;
+}
+
 export class HookSystem {
-  private readonly config: Config;
   private readonly hookRegistry: HookRegistry;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
@@ -33,7 +86,6 @@ export class HookSystem {
   private readonly hookEventHandler: HookEventHandler;
 
   constructor(config: Config) {
-    this.config = config;
     const logger: Logger = logs.getLogger(SERVICE_NAME);
     const messageBus = config.getMessageBus();
 
@@ -90,14 +142,10 @@ export class HookSystem {
 
   /**
    * Fire hook events directly
-   * Returns undefined if hooks are disabled
    */
   async fireSessionStartEvent(
     source: SessionStartSource,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireSessionStartEvent(source);
     return result.finalOutput;
   }
@@ -105,27 +153,18 @@ export class HookSystem {
   async fireSessionEndEvent(
     reason: SessionEndReason,
   ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     return this.hookEventHandler.fireSessionEndEvent(reason);
   }
 
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
   ): Promise<AggregatedHookResult | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     return this.hookEventHandler.firePreCompressEvent(trigger);
   }
 
   async fireBeforeAgentEvent(
     prompt: string,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireBeforeAgentEvent(prompt);
     return result.finalOutput;
   }
@@ -135,14 +174,170 @@ export class HookSystem {
     response: string,
     stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
-    if (!this.config.getEnableHooks()) {
-      return undefined;
-    }
     const result = await this.hookEventHandler.fireAfterAgentEvent(
       prompt,
       response,
       stopHookActive,
     );
     return result.finalOutput;
+  }
+
+  async fireBeforeModelEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<BeforeModelHookResult> {
+    try {
+      const result =
+        await this.hookEventHandler.fireBeforeModelEvent(llmRequest);
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput?.shouldStopExecution()) {
+        return {
+          blocked: true,
+          stopped: true,
+          reason: hookOutput.getEffectiveReason(),
+        };
+      }
+
+      const blockingError = hookOutput?.getBlockingError();
+      if (blockingError?.blocked) {
+        const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+        const syntheticResponse = beforeModelOutput.getSyntheticResponse();
+        return {
+          blocked: true,
+          reason:
+            hookOutput?.getEffectiveReason() || 'Model call blocked by hook',
+          syntheticResponse,
+        };
+      }
+
+      if (hookOutput) {
+        const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+        const modifiedRequest =
+          beforeModelOutput.applyLLMRequestModifications(llmRequest);
+        return {
+          blocked: false,
+          modifiedConfig: modifiedRequest?.config,
+          modifiedContents: modifiedRequest?.contents,
+        };
+      }
+
+      return { blocked: false };
+    } catch (error) {
+      debugLogger.debug(`BeforeModelHookEvent failed:`, error);
+      return { blocked: false };
+    }
+  }
+
+  async fireAfterModelEvent(
+    originalRequest: GenerateContentParameters,
+    chunk: GenerateContentResponse,
+  ): Promise<AfterModelHookResult> {
+    try {
+      const result = await this.hookEventHandler.fireAfterModelEvent(
+        originalRequest,
+        chunk,
+      );
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput?.shouldStopExecution()) {
+        return {
+          response: chunk,
+          stopped: true,
+          reason: hookOutput.getEffectiveReason(),
+        };
+      }
+
+      const blockingError = hookOutput?.getBlockingError();
+      if (blockingError?.blocked) {
+        return {
+          response: chunk,
+          blocked: true,
+          reason: hookOutput?.getEffectiveReason(),
+        };
+      }
+
+      if (hookOutput) {
+        const afterModelOutput = hookOutput as AfterModelHookOutput;
+        const modifiedResponse = afterModelOutput.getModifiedResponse();
+        if (modifiedResponse) {
+          return { response: modifiedResponse };
+        }
+      }
+
+      return { response: chunk };
+    } catch (error) {
+      debugLogger.debug(`AfterModelHookEvent failed:`, error);
+      return { response: chunk };
+    }
+  }
+
+  async fireBeforeToolSelectionEvent(
+    llmRequest: GenerateContentParameters,
+  ): Promise<BeforeToolSelectionHookResult> {
+    try {
+      const result =
+        await this.hookEventHandler.fireBeforeToolSelectionEvent(llmRequest);
+      const hookOutput = result.finalOutput;
+
+      if (hookOutput) {
+        const toolSelectionOutput = hookOutput as BeforeToolSelectionHookOutput;
+        const modifiedConfig = toolSelectionOutput.applyToolConfigModifications(
+          {
+            toolConfig: llmRequest.config?.toolConfig,
+            tools: llmRequest.config?.tools,
+          },
+        );
+        return {
+          toolConfig: modifiedConfig.toolConfig,
+          tools: modifiedConfig.tools,
+        };
+      }
+      return {};
+    } catch (error) {
+      debugLogger.debug(`BeforeToolSelectionEvent failed:`, error);
+      return {};
+    }
+  }
+
+  async fireBeforeToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireBeforeToolEvent(
+        toolName,
+        toolInput,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
+      return undefined;
+    }
+  }
+
+  async fireAfterToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolResponse: {
+      llmContent: unknown;
+      returnDisplay: unknown;
+      error: unknown;
+    },
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireAfterToolEvent(
+        toolName,
+        toolInput,
+        toolResponse as Record<string, unknown>,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
+      return undefined;
+    }
   }
 }

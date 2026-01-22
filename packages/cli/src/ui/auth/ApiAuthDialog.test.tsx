@@ -108,10 +108,10 @@ describe('ApiAuthDialog', () => {
 
       keypressHandler({
         name: keyName,
-        sequence,
-        ctrl: false,
-        meta: false,
         shift: false,
+        ctrl: false,
+        cmd: false,
+        sequence,
       });
 
       expect(expectedCall).toHaveBeenCalledWith(...args);
@@ -137,9 +137,9 @@ describe('ApiAuthDialog', () => {
 
     await keypressHandler({
       name: 'c',
-      ctrl: true,
-      meta: false,
       shift: false,
+      ctrl: true,
+      cmd: false,
     });
 
     expect(clearApiKey).toHaveBeenCalled();
