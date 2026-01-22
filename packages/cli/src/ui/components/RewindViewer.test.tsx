@@ -239,6 +239,7 @@ describe('RewindViewer', () => {
 
       // Select
       act(() => {
+        stdin.write('\x1b[A'); // Move up from 'Stay at current position'
         stdin.write('\r');
       });
       expect(lastFrame()).toMatchSnapshot('confirmation-dialog');
@@ -280,6 +281,7 @@ describe('RewindViewer', () => {
 
       // Select
       act(() => {
+        stdin.write('\x1b[A'); // Move up from 'Stay at current position'
         stdin.write('\r'); // Select
       });
 

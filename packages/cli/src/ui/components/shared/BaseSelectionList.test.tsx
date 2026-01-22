@@ -125,6 +125,7 @@ describe('BaseSelectionList', () => {
         onHighlight: mockOnHighlight,
         isFocused,
         showNumbers,
+        wrapAround: true,
       });
     });
 

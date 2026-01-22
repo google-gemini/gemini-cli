@@ -188,8 +188,10 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       <Box flexDirection="column" flexGrow={1}>
         <BaseSelectionList
           items={items}
+          initialIndex={items.length - 1}
           isFocused={true}
           showNumbers={false}
+          wrapAround={false}
           onSelect={(item: MessageRecord) => {
             const userPrompt = item;
             if (userPrompt && userPrompt.id) {
