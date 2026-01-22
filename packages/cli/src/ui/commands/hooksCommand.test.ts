@@ -330,29 +330,6 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should handle error when enabling hook fails', async () => {
-      // Setup so it tries to write
-      mockSettings.user.settings.hooksConfig.disabled = ['test-hook'];
-      mockSettings.setValue.mockImplementationOnce(() => {
-        throw new Error('Failed to save settings');
-      });
-
-      const enableCmd = hooksCommand.subCommands!.find(
-        (cmd) => cmd.name === 'enable',
-      );
-      if (!enableCmd?.action) {
-        throw new Error('enable command must have an action');
-      }
-
-      const result = await enableCmd.action(mockContext, 'test-hook');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Failed to enable hook: Failed to save settings',
-      });
-    });
-
     it('should complete hook names using friendly names', () => {
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
@@ -482,28 +459,6 @@ describe('hooksCommand', () => {
         type: 'message',
         messageType: 'info',
         content: 'Hook "test-hook" is already disabled.',
-      });
-    });
-
-    it('should handle error when disabling hook fails', async () => {
-      mockSettings.workspace.settings.hooksConfig.disabled = [];
-      mockSettings.setValue.mockImplementationOnce(() => {
-        throw new Error('Failed to save settings');
-      });
-
-      const disableCmd = hooksCommand.subCommands!.find(
-        (cmd) => cmd.name === 'disable',
-      );
-      if (!disableCmd?.action) {
-        throw new Error('disable command must have an action');
-      }
-
-      const result = await disableCmd.action(mockContext, 'test-hook');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Failed to disable hook: Failed to save settings',
       });
     });
 

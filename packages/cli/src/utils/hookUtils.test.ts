@@ -80,13 +80,6 @@ describe('hookUtils', () => {
         ],
       };
 
-      // Note: currently logic combines modified and already-in-state.
-      // So if modified=User and already=Workspace, it sees 2 scopes.
-      // Wait, let's verify logic in hookUtils.ts.
-      // const totalAffectedScopes = [...result.modifiedScopes, ...result.alreadyInStateScopes];
-      // if (totalAffectedScopes.length === 2) ...
-      // So yes, it will report both.
-
       const message = renderHookActionFeedback(result, mockFormatScope);
       expect(message).toBe(
         'Hook "test-hook" enabled by removing it from the disabled list in user (/path/user.json) and workspace (/path/workspace.json) settings.',

@@ -10,11 +10,7 @@ import {
   type LoadedSettings,
 } from '../config/settings.js';
 import { getErrorMessage } from '@google/gemini-cli-core';
-
-export interface ModifiedScope {
-  scope: SettingScope;
-  path: string;
-}
+import type { ModifiedScope } from './skillSettings.js';
 
 export type HookActionStatus = 'success' | 'no-op' | 'error';
 
@@ -151,19 +147,8 @@ export function disableHook(
     }
   }
 
-  try {
-    const newDisabled = [...currentScopeDisabled, hookName];
-    settings.setValue(scope, 'hooksConfig.disabled', newDisabled);
-  } catch (error) {
-    return {
-      status: 'error',
-      hookName,
-      action: 'disable',
-      modifiedScopes: [],
-      alreadyInStateScopes: alreadyDisabledInOther,
-      error: `Failed to disable hook: ${getErrorMessage(error)}`,
-    };
-  }
+  const newDisabled = [...currentScopeDisabled, hookName];
+  settings.setValue(scope, 'hooksConfig.disabled', newDisabled);
 
   return {
     status: 'success',
