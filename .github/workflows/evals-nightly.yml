@@ -9,6 +9,10 @@ on:
         description: 'Run all evaluations (including usually passing)'
         type: 'boolean'
         default: true
+      test_filter:
+        description: 'Regex to filter tests (passed to vitest -t)'
+        type: 'string'
+        required: false
 
 permissions:
   contents: 'read'
@@ -53,7 +57,12 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
-        run: 'npm run test:all_evals'
+        run: |
+          if [ -n "${{ inputs.test_filter }}" ]; then
+            npm run test:all_evals -- -t "${{ inputs.test_filter }}"
+          else
+            npm run test:all_evals
+          fi
 
       - name: 'Upload Logs'
         if: 'always()'
