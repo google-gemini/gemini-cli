@@ -40,7 +40,8 @@ describe('subagent eval test cases', () => {
         },
       },
     },
-    prompt: 'Please update README.md with a description of this library.',
+    prompt:
+      'Please update README.md with comprehensive documentation for this library.',
     files: {
       '.gemini/agents/test-agent.md': AGENT_DEFINITION,
       'index.ts': INDEX_TS,
