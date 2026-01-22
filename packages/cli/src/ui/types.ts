@@ -431,7 +431,9 @@ export interface ConfirmationRequest {
 }
 
 export interface LoopDetectionConfirmationRequest {
-  onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+  onComplete: (result: {
+    userSelection: 'disable' | 'keep';
+  }) => void | Promise<void>;
 }
 
 export interface ActiveHook {

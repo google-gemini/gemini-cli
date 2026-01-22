@@ -1065,7 +1065,7 @@ export const useGeminiStream = (
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
                 setLoopDetectionConfirmationRequest({
-                  onComplete: (result: {
+                  onComplete: async (result: {
                     userSelection: 'disable' | 'keep';
                   }) => {
                     setLoopDetectionConfirmationRequest(null);
@@ -1081,8 +1081,8 @@ export const useGeminiStream = (
                       });
 
                       if (lastQueryRef.current && lastPromptIdRef.current) {
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                        submitQuery(
+                        // Await to prevent race condition with user prompts
+                        await submitQuery(
                           lastQueryRef.current,
                           { isContinuation: true },
                           lastPromptIdRef.current,
