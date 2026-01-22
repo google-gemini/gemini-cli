@@ -26,6 +26,7 @@ describe('stdout-stderr-output', () => {
 
   function runWithStreams(
     args: string[],
+    options?: { signal?: AbortSignal },
   ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
     return new Promise((resolve, reject) => {
       const allArgs = rig.fakeResponsesPath
@@ -36,6 +37,7 @@ describe('stdout-stderr-output', () => {
         cwd: rig.testDir!,
         stdio: 'pipe',
         env: { ...process.env, GEMINI_CLI_HOME: rig.homeDir! },
+        signal: options?.signal,
       });
       let stdout = '';
       let stderr = '';
@@ -56,7 +58,9 @@ describe('stdout-stderr-output', () => {
     });
   }
 
-  it('should send model response to stdout and app messages to stderr', async () => {
+  it('should send model response to stdout and app messages to stderr', async ({
+    signal,
+  }) => {
     await rig.setup('prompt-output-test', {
       fakeResponsesPath: join(
         import.meta.dirname,
@@ -64,12 +68,10 @@ describe('stdout-stderr-output', () => {
       ),
     });
 
-    const { stdout, exitCode } = await runWithStreams([
-      '-p',
-      'Say hello',
-      '--approval-mode',
-      'yolo',
-    ]);
+    const { stdout, exitCode } = await runWithStreams(
+      ['-p', 'Say hello', '--approval-mode', 'yolo'],
+      { signal },
+    );
 
     expect(exitCode).toBe(0);
     expect(stdout.toLowerCase()).toContain('hello');
@@ -77,15 +79,18 @@ describe('stdout-stderr-output', () => {
     expect(stdout).not.toMatch(/^\[INFO\]/m);
   });
 
-  it('should send errors to stderr not stdout', async () => {
+  it('should send errors to stderr not stdout', async ({ signal }) => {
     await rig.setup('error-output-test');
 
-    const { stdout, stderr, exitCode } = await runWithStreams([
-      '-p',
-      '@nonexistent-file-that-does-not-exist.txt explain this',
-      '--approval-mode',
-      'yolo',
-    ]);
+    const { stdout, stderr, exitCode } = await runWithStreams(
+      [
+        '-p',
+        '@nonexistent-file-that-does-not-exist.txt explain this',
+        '--approval-mode',
+        'yolo',
+      ],
+      { signal },
+    );
 
     expect(exitCode).not.toBe(0);
     expect(stderr.toLowerCase()).toMatch(/error|not found|does not exist/);
