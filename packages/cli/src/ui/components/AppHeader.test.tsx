@@ -178,6 +178,10 @@ describe('<AppHeader />', () => {
       },
     };
 
+    // Set tipsShown to 10 or more to prevent Tips from incrementing its count
+    // and interfering with the expected persistentState.set call.
+    persistentStateMock.setData({ tipsShown: 10 });
+
     const { unmount } = renderWithProviders(<AppHeader version="1.0.0" />, {
       config: mockConfig,
       uiState,

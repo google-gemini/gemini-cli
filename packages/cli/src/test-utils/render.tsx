@@ -239,6 +239,8 @@ export const renderWithProviders = (
     persistentStateMock.set.mockImplementation(persistentState.set);
   }
 
+  persistentStateMock.mockClear();
+
   const terminalWidth = width ?? baseState.terminalWidth;
   let finalSettings = settings;
   if (useAlternateBuffer !== undefined) {

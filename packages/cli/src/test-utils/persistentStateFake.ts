@@ -29,6 +29,14 @@ export class FakePersistentState {
   }
 
   /**
+   * Helper to clear mock call history without wiping data.
+   */
+  mockClear() {
+    this.get.mockClear();
+    this.set.mockClear();
+  }
+
+  /**
    * Helper to set initial data for the fake.
    */
   setData(data: Record<string, unknown>) {

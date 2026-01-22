@@ -15,13 +15,11 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import './src/test-utils/customMatchers.js';
-import { persistentStateMock } from './src/test-utils/render.js';
 
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
-  persistentStateMock.reset();
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];
