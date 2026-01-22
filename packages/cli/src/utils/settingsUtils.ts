@@ -469,19 +469,6 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
-  // Check if value is different from default OR if it's in modified settings OR if there are pending changes
-  const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault = value !== defaultValue;
-  const isInModifiedSettings = modifiedSettings.has(key);
-
-  // Mark as modified if setting exists in current scope OR is in modified settings
-  if (settingExistsInScope(key, settings) || isInModifiedSettings) {
-    return `${valueString}*`; // * indicates setting is set in current scope
-  }
-  if (isChangedFromDefault || isInModifiedSettings) {
-    return `${valueString}*`; // * indicates changed from default value
-  }
-
   return valueString;
 }
 
