@@ -14,7 +14,7 @@ import {
 import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
@@ -47,7 +47,8 @@ export async function handleUpdate(args: UpdateArgs) {
       );
       if (!extension) {
         if (extensions.length === 0) {
-          debugLogger.log(
+          coreEvents.emitFeedback(
+            'error',
             `Extension "${args.name}" not found.\n\nNo extensions installed.`,
           );
           return;
@@ -56,7 +57,8 @@ export async function handleUpdate(args: UpdateArgs) {
         const installedExtensions = extensions
           .map((extension) => `${extension.name} (${extension.version})`)
           .join('\n');
-        debugLogger.log(
+        coreEvents.emitFeedback(
+          'error',
           `Extension "${args.name}" not found.\n\nInstalled extensions:\n${installedExtensions}\n\nRun "gemini extensions list" for details.`,
         );
         return;
