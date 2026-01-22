@@ -136,7 +136,7 @@ describe('modifyWithEditor', () => {
         'Proposed',
         expect.objectContaining({
           context: 3,
-          ignoreWhitespace: true,
+          ignoreWhitespace: false,
         }),
       );
 
@@ -205,7 +205,7 @@ describe('modifyWithEditor', () => {
       'Proposed',
       expect.objectContaining({
         context: 3,
-        ignoreWhitespace: true,
+        ignoreWhitespace: false,
       }),
     );
 
@@ -233,7 +233,7 @@ describe('modifyWithEditor', () => {
       'Proposed',
       expect.objectContaining({
         context: 3,
-        ignoreWhitespace: true,
+        ignoreWhitespace: false,
       }),
     );
 

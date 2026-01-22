@@ -9,7 +9,7 @@ import type { DiffStat } from './tools.js';
 
 export const DEFAULT_DIFF_OPTIONS: Diff.PatchOptions = {
   context: 3,
-  ignoreWhitespace: true,
+  ignoreWhitespace: false,
 };
 
 export function getDiffStat(

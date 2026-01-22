@@ -162,4 +162,21 @@ describe('getDiffStat', () => {
       user_removed_chars: 0,
     });
   });
+  it('should correctly report whitespace-only changes', () => {
+    const fileName = 'test.py';
+    const oldStr = 'def hello():\n print("world")';
+    const aiStr = 'def hello():\n    print("world")';
+    const userStr = aiStr;
+    const diffStat = getDiffStat(fileName, oldStr, aiStr, userStr);
+    expect(diffStat).toEqual({
+      model_added_lines: 1,
+      model_removed_lines: 1,
+      model_added_chars: 18,
+      model_removed_chars: 15,
+      user_added_lines: 0,
+      user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
+    });
+  });
 });
