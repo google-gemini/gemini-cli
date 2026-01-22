@@ -28,6 +28,7 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
+  type AgentDefinition,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents

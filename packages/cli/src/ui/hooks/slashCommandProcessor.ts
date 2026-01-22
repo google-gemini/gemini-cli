@@ -457,9 +457,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
-                        typeof props.name !== 'string' ||
-                        typeof props.displayName !== 'string' ||
-                        !props.definition
+                        typeof props['name'] !== 'string' ||
+                        typeof props['displayName'] !== 'string' ||
+                        !props['definition']
                       ) {
                         throw new Error(
                           'Received invalid properties for agentConfig dialog action.',
@@ -467,9 +467,9 @@ export const useSlashCommandProcessor = (
                       }
 
                       actions.openAgentConfigDialog(
-                        props.name,
-                        props.displayName,
-                        props.definition as AgentDefinition,
+                        props['name'],
+                        props['displayName'],
+                        props['definition'] as AgentDefinition,
                       );
                       return { type: 'handled' };
                     }
