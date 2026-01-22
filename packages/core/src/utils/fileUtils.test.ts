@@ -32,6 +32,8 @@ import {
   readFileWithEncoding,
   fileExists,
   readWasmBinaryFromDisk,
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -49,6 +51,7 @@ describe('fileUtils', () => {
   let testTextFilePath: string;
   let testImageFilePath: string;
   let testPdfFilePath: string;
+  let testAudioFilePath: string;
   let testBinaryFilePath: string;
   let nonexistentFilePath: string;
   let directoryPath: string;
@@ -64,6 +67,7 @@ describe('fileUtils', () => {
     testTextFilePath = path.join(tempRootDir, 'test.txt');
     testImageFilePath = path.join(tempRootDir, 'image.png');
     testPdfFilePath = path.join(tempRootDir, 'document.pdf');
+    testAudioFilePath = path.join(tempRootDir, 'audio.mp3');
     testBinaryFilePath = path.join(tempRootDir, 'app.exe');
     nonexistentFilePath = path.join(tempRootDir, 'nonexistent.txt');
     directoryPath = path.join(tempRootDir, 'subdir');
@@ -671,6 +675,8 @@ describe('fileUtils', () => {
         actualNodeFs.unlinkSync(testImageFilePath);
       if (actualNodeFs.existsSync(testPdfFilePath))
         actualNodeFs.unlinkSync(testPdfFilePath);
+      if (actualNodeFs.existsSync(testAudioFilePath))
+        actualNodeFs.unlinkSync(testAudioFilePath);
       if (actualNodeFs.existsSync(testBinaryFilePath))
         actualNodeFs.unlinkSync(testBinaryFilePath);
     });
@@ -769,6 +775,28 @@ describe('fileUtils', () => {
         (result.llmContent as { inlineData: { data: string } }).inlineData.data,
       ).toBe(fakePdfData.toString('base64'));
       expect(result.returnDisplay).toContain('Read pdf file: document.pdf');
+    });
+
+    it('should process an audio file', async () => {
+      const fakeMp3Data = Buffer.from('fake mp3 data');
+      actualNodeFs.writeFileSync(testAudioFilePath, fakeMp3Data);
+      mockMimeGetType.mockReturnValue('audio/mpeg');
+      const result = await processSingleFileContent(
+        testAudioFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(
+        (result.llmContent as { inlineData: unknown }).inlineData,
+      ).toBeDefined();
+      expect(
+        (result.llmContent as { inlineData: { mimeType: string } }).inlineData
+          .mimeType,
+      ).toBe('audio/mpeg');
+      expect(
+        (result.llmContent as { inlineData: { data: string } }).inlineData.data,
+      ).toBe(fakeMp3Data.toString('base64'));
+      expect(result.returnDisplay).toContain('Read audio file: audio.mp3');
     });
 
     it('should read an SVG file as text when under 1MB', async () => {
@@ -994,6 +1022,110 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+  });
+
+  describe('saveTruncatedToolOutput & formatTruncatedToolOutput', () => {
+    it('should save content to a file with safe name', async () => {
+      const content = 'some content';
+      const toolName = 'shell';
+      const id = '123';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      const expectedOutputFile = path.join(tempRootDir, 'shell_123.txt');
+      expect(result.outputFile).toBe(expectedOutputFile);
+      expect(result.totalLines).toBe(1);
+
+      const savedContent = await fsPromises.readFile(
+        expectedOutputFile,
+        'utf-8',
+      );
+      expect(savedContent).toBe(content);
+    });
+
+    it('should sanitize tool name in filename', async () => {
+      const content = 'content';
+      const toolName = '../../dangerous/tool';
+      const id = 1;
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../dangerous/tool -> ______dangerous_tool
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        '______dangerous_tool_1.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should sanitize id in filename', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '../../etc/passwd';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'shell_______etc_passwd.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should format multi-line output correctly', () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
+      const content = lines.join('\n');
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 10);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 10 of 50 lines.',
+      );
+      expect(formatted).toContain('For full output see: /tmp/out.txt');
+      expect(formatted).toContain('line 49');
+      expect(formatted).not.toContain('line 0');
+    });
+
+    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
+      const longLine = 'a'.repeat(2000);
+      const content = `line 1\n${longLine}\nline 3`;
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 3);
+
+      expect(formatted).toContain('(some long lines truncated)');
+      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
+      expect(formatted.length).toBeLessThan(longLine.length);
+    });
+
+    it('should handle massive single-line string with character-based truncation', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 4,000 characters',
+      );
+      expect(formatted.endsWith(content.slice(-4000))).toBe(true);
     });
   });
 });

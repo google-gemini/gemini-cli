@@ -33,7 +33,7 @@ describe('SettingsSchema', () => {
       ];
 
       expectedSettings.forEach((setting) => {
-        expect(getSettingsSchema()[setting as keyof Settings]).toBeDefined();
+        expect(getSettingsSchema()[setting]).toBeDefined();
       });
     });
 
@@ -66,9 +66,7 @@ describe('SettingsSchema', () => {
       ];
 
       nestedSettings.forEach((setting) => {
-        const definition = getSettingsSchema()[
-          setting as keyof Settings
-        ] as SettingDefinition;
+        const definition = getSettingsSchema()[setting] as SettingDefinition;
         expect(definition.type).toBe('object');
         expect(definition.properties).toBeDefined();
         expect(typeof definition.properties).toBe('object');
@@ -81,7 +79,7 @@ describe('SettingsSchema', () => {
       ).toBeDefined();
       expect(
         getSettingsSchema().ui?.properties?.accessibility.properties
-          ?.disableLoadingPhrases.type,
+          ?.enableLoadingPhrases.type,
       ).toBe('boolean');
     });
 
@@ -142,7 +140,7 @@ describe('SettingsSchema', () => {
     it('should have consistent default values for boolean settings', () => {
       const checkBooleanDefaults = (schema: SettingsSchema) => {
         Object.entries(schema).forEach(([, definition]) => {
-          const def = definition as SettingDefinition;
+          const def = definition;
           if (def.type === 'boolean') {
             // Boolean settings can have boolean or undefined defaults (for optional settings)
             expect(['boolean', 'undefined']).toContain(typeof def.default);
@@ -172,7 +170,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.disableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,
@@ -346,10 +344,8 @@ describe('SettingsSchema', () => {
       ).toBe('Enable preview features (e.g., preview models).');
     });
 
-    it('should have isModelAvailabilityServiceEnabled setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties
-          .isModelAvailabilityServiceEnabled;
+    it('should have enableAgents setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.enableAgents;
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
@@ -357,8 +353,67 @@ describe('SettingsSchema', () => {
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
       expect(setting.description).toBe(
-        'Enable model routing using new availability service.',
+        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
       );
+    });
+
+    it('should have skills setting enabled by default', () => {
+      const setting = getSettingsSchema().skills.properties.enabled;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe('Enable Agent Skills.');
+    });
+
+    it('should have plan setting in schema', () => {
+      const setting = getSettingsSchema().experimental.properties.plan;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+      expect(setting.description).toBe(
+        'Enable planning features (Plan Mode and tools).',
+      );
+    });
+
+    it('should have enableEventDrivenScheduler setting in schema', () => {
+      const setting =
+        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Experimental');
+      expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
+      expect(setting.showInDialog).toBe(false);
+      expect(setting.description).toBe(
+        'Enables event-driven scheduler within the CLI session.',
+      );
+    });
+
+    it('should have hooksConfig.notifications setting in schema', () => {
+      const setting = getSettingsSchema().hooksConfig?.properties.notifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('Advanced');
+      expect(setting.default).toBe(true);
+      expect(setting.showInDialog).toBe(true);
+    });
+
+    it('should have name and description in hook definitions', () => {
+      const hookDef = SETTINGS_SCHEMA_DEFINITIONS['HookDefinitionArray'];
+      expect(hookDef).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hookItemProperties = (hookDef as any).items.properties.hooks.items
+        .properties;
+      expect(hookItemProperties.name).toBeDefined();
+      expect(hookItemProperties.name.type).toBe('string');
+      expect(hookItemProperties.description).toBeDefined();
+      expect(hookItemProperties.description.type).toBe('string');
     });
   });
 

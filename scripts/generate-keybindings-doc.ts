@@ -27,6 +27,7 @@ const OUTPUT_RELATIVE_PATH = ['docs', 'cli', 'keyboard-shortcuts.md'];
 const KEY_NAME_OVERRIDES: Record<string, string> = {
   return: 'Enter',
   escape: 'Esc',
+  'double escape': 'Double Esc',
   tab: 'Tab',
   backspace: 'Backspace',
   delete: 'Delete',
@@ -154,17 +155,12 @@ function formatBindings(bindings: readonly KeyBinding[]): string[] {
 
 function formatBinding(binding: KeyBinding): string {
   const modifiers: string[] = [];
-  if (binding.ctrl) modifiers.push('Ctrl');
-  if (binding.command) modifiers.push('Cmd');
   if (binding.shift) modifiers.push('Shift');
-  if (binding.paste) modifiers.push('Paste');
+  if (binding.alt) modifiers.push('Alt');
+  if (binding.ctrl) modifiers.push('Ctrl');
+  if (binding.cmd) modifiers.push('Cmd');
 
-  const keyName = binding.key
-    ? formatKeyName(binding.key)
-    : binding.sequence
-      ? formatSequence(binding.sequence)
-      : '';
-
+  const keyName = formatKeyName(binding.key);
   if (!keyName) {
     return '';
   }
@@ -173,13 +169,13 @@ function formatBinding(binding: KeyBinding): string {
   let combo = segments.join(' + ');
 
   const restrictions: string[] = [];
-  if (binding.ctrl === false) restrictions.push('no Ctrl');
-  if (binding.shift === false) restrictions.push('no Shift');
-  if (binding.command === false) restrictions.push('no Cmd');
-  if (binding.paste === false) restrictions.push('not Paste');
+  if (binding.shift === false) restrictions.push('Shift');
+  if (binding.alt === false) restrictions.push('Alt');
+  if (binding.ctrl === false) restrictions.push('Ctrl');
+  if (binding.cmd === false) restrictions.push('Cmd');
 
   if (restrictions.length > 0) {
-    combo = `${combo} (${restrictions.join(', ')})`;
+    combo = `${combo} (no ${restrictions.join(', ')})`;
   }
 
   return combo ? `\`${combo}\`` : '';
@@ -190,26 +186,7 @@ function formatKeyName(key: string): string {
   if (KEY_NAME_OVERRIDES[normalized]) {
     return KEY_NAME_OVERRIDES[normalized];
   }
-  if (key.length === 1) {
-    return key.toUpperCase();
-  }
-  return key;
-}
-
-function formatSequence(sequence: string): string {
-  if (sequence.length === 1) {
-    const code = sequence.charCodeAt(0);
-    if (code >= 1 && code <= 26) {
-      return String.fromCharCode(code + 64);
-    }
-    if (code === 10 || code === 13) {
-      return 'Enter';
-    }
-    if (code === 9) {
-      return 'Tab';
-    }
-  }
-  return JSON.stringify(sequence);
+  return key.length === 1 ? key.toUpperCase() : key;
 }
 
 if (process.argv[1]) {

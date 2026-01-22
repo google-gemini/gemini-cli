@@ -5,26 +5,37 @@
  */
 
 import type React from 'react';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
-  Config,
+import {
+  type SerializableConfirmationDetails,
+  type ToolCallConfirmationDetails,
+  type Config,
+  ToolConfirmationOutcome,
+  hasRedirection,
+  debugLogger,
 } from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
-import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import {
+  REDIRECTION_WARNING_NOTE_LABEL,
+  REDIRECTION_WARNING_NOTE_TEXT,
+  REDIRECTION_WARNING_TIP_LABEL,
+  REDIRECTION_WARNING_TIP_TEXT,
+} from '../../textConstants.js';
 
 export interface ToolConfirmationMessageProps {
-  confirmationDetails: ToolCallConfirmationDetails;
+  callId: string;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
   config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -34,48 +45,26 @@ export interface ToolConfirmationMessageProps {
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
 > = ({
+  callId,
   confirmationDetails,
   config,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { onConfirm } = confirmationDetails;
+  const { confirm } = useToolActions();
 
-  const isAlternateBuffer = useAlternateBuffer();
+  const settings = useSettings();
+  const allowPermanentApproval =
+    settings.merged.security.enablePermanentToolApproval;
 
-  const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
-  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (config.getIdeMode()) {
-      const getIdeClient = async () => {
-        const client = await IdeClient.getInstance();
-        if (isMounted) {
-          setIdeClient(client);
-          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
-        }
-      };
-      getIdeClient();
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [config]);
-
-  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
-    if (confirmationDetails.type === 'edit') {
-      if (config.getIdeMode() && isDiffingEnabled) {
-        const cliOutcome =
-          outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient?.resolveDiffFromCli(
-          confirmationDetails.filePath,
-          cliOutcome,
-        );
-      }
-    }
-    onConfirm(outcome);
+  const handleConfirm = (outcome: ToolConfirmationOutcome) => {
+    void confirm(callId, outcome).catch((error) => {
+      debugLogger.error(
+        `Failed to handle tool confirmation for ${callId}:`,
+        error,
+      );
+    });
   };
 
   const isTrustedFolder = config.isTrustedFolder();
@@ -101,18 +90,27 @@ export const ToolConfirmationMessage: React.FC<
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
         options.push({
-          label: 'Yes, allow once',
+          label: 'Allow once',
           value: ToolConfirmationOutcome.ProceedOnce,
-          key: 'Yes, allow once',
+          key: 'Allow once',
         });
         if (isTrustedFolder) {
           options.push({
-            label: 'Yes, allow always',
+            label: 'Allow for this session',
             value: ToolConfirmationOutcome.ProceedAlways,
-            key: 'Yes, allow always',
+            key: 'Allow for this session',
           });
+          if (allowPermanentApproval) {
+            options.push({
+              label: 'Allow for all future sessions',
+              value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+              key: 'Allow for all future sessions',
+            });
+          }
         }
-        if (!config.getIdeMode() || !isDiffingEnabled) {
+        // We hide "Modify with external editor" if IDE mode is active, assuming
+        // the IDE provides a better interface (diff view) for this.
+        if (!config.getIdeMode()) {
           options.push({
             label: 'Modify with external editor',
             value: ToolConfirmationOutcome.ModifyWithEditor,
@@ -127,21 +125,31 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
 
-      question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      if (executionProps.commands && executionProps.commands.length > 1) {
+        question = `Allow execution of ${executionProps.commands.length} commands?`;
+      } else {
+        question = `Allow execution of: '${executionProps.rootCommand}'?`;
+      }
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, allow always ...`,
+          label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Yes, allow always ...`,
+          key: `Allow for this session`,
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: `Allow for all future sessions`,
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: `Allow for all future sessions`,
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -151,16 +159,23 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: 'Yes, allow always',
+          label: 'Allow for this session',
           value: ToolConfirmationOutcome.ProceedAlways,
-          key: 'Yes, allow always',
+          key: 'Allow for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -169,24 +184,31 @@ export const ToolConfirmationMessage: React.FC<
       });
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
       options.push({
-        label: 'Yes, allow once',
+        label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Yes, allow once',
+        key: 'Allow once',
       });
       if (isTrustedFolder) {
         options.push({
-          label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-          value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
-          key: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+          label: 'Allow tool for this session',
+          value: ToolConfirmationOutcome.ProceedAlwaysTool,
+          key: 'Allow tool for this session',
         });
         options.push({
-          label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          label: 'Allow all server tools for this session',
           value: ToolConfirmationOutcome.ProceedAlwaysServer,
-          key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+          key: 'Allow all server tools for this session',
         });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow tool for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow tool for all future sessions',
+          });
+        }
       }
       options.push({
         label: 'No, suggest changes (esc)',
@@ -235,28 +257,80 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     } else if (confirmationDetails.type === 'exec') {
-      const executionProps =
-        confirmationDetails as ToolExecuteConfirmationDetails;
+      const executionProps = confirmationDetails;
+
+      const commandsToDisplay =
+        executionProps.commands && executionProps.commands.length > 1
+          ? executionProps.commands
+          : [executionProps.command];
+      const containsRedirection = commandsToDisplay.some((cmd) =>
+        hasRedirection(cmd),
+      );
+
       let bodyContentHeight = availableBodyContentHeight();
+      let warnings: React.ReactNode = null;
+
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;
       }
 
-      const commandBox = (
-        <Box>
-          <Text color={theme.text.link}>{executionProps.command}</Text>
-        </Box>
-      );
+      if (containsRedirection) {
+        // Calculate lines needed for Note and Tip
+        const safeWidth = Math.max(terminalWidth, 1);
+        const noteLength =
+          REDIRECTION_WARNING_NOTE_LABEL.length +
+          REDIRECTION_WARNING_NOTE_TEXT.length;
+        const tipLength =
+          REDIRECTION_WARNING_TIP_LABEL.length +
+          REDIRECTION_WARNING_TIP_TEXT.length;
 
-      bodyContent = isAlternateBuffer ? (
-        commandBox
-      ) : (
-        <MaxSizedBox
-          maxHeight={bodyContentHeight}
-          maxWidth={Math.max(terminalWidth, 1)}
-        >
-          {commandBox}
-        </MaxSizedBox>
+        const noteLines = Math.ceil(noteLength / safeWidth);
+        const tipLines = Math.ceil(tipLength / safeWidth);
+        const spacerLines = 1;
+        const warningHeight = noteLines + tipLines + spacerLines;
+
+        if (bodyContentHeight !== undefined) {
+          bodyContentHeight = Math.max(
+            bodyContentHeight - warningHeight,
+            MINIMUM_MAX_HEIGHT,
+          );
+        }
+
+        warnings = (
+          <>
+            <Box height={1} />
+            <Box>
+              <Text color={theme.text.primary}>
+                <Text bold>{REDIRECTION_WARNING_NOTE_LABEL}</Text>
+                {REDIRECTION_WARNING_NOTE_TEXT}
+              </Text>
+            </Box>
+            <Box>
+              <Text color={theme.border.default}>
+                <Text bold>{REDIRECTION_WARNING_TIP_LABEL}</Text>
+                {REDIRECTION_WARNING_TIP_TEXT}
+              </Text>
+            </Box>
+          </>
+        );
+      }
+
+      bodyContent = (
+        <Box flexDirection="column">
+          <MaxSizedBox
+            maxHeight={bodyContentHeight}
+            maxWidth={Math.max(terminalWidth, 1)}
+          >
+            <Box flexDirection="column">
+              {commandsToDisplay.map((cmd, idx) => (
+                <Text key={idx} color={theme.text.link}>
+                  {cmd}
+                </Text>
+              ))}
+            </Box>
+          </MaxSizedBox>
+          {warnings}
+        </Box>
       );
     } else if (confirmationDetails.type === 'info') {
       const infoProps = confirmationDetails;
@@ -289,7 +363,7 @@ export const ToolConfirmationMessage: React.FC<
       );
     } else {
       // mcp tool confirmation
-      const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
+      const mcpProps = confirmationDetails;
 
       bodyContent = (
         <Box flexDirection="column">
@@ -304,10 +378,9 @@ export const ToolConfirmationMessage: React.FC<
     confirmationDetails,
     isTrustedFolder,
     config,
-    isDiffingEnabled,
     availableTerminalHeight,
     terminalWidth,
-    isAlternateBuffer,
+    allowPermanentApproval,
   ]);
 
   if (confirmationDetails.type === 'edit') {

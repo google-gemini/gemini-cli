@@ -11,6 +11,7 @@ import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
 import { HookEventName } from './types.js';
 import type {
+  HookConfig,
   HookInput,
   BeforeToolInput,
   AfterToolInput,
@@ -28,6 +29,7 @@ import type {
   SessionEndReason,
   PreCompressTrigger,
   HookExecutionResult,
+  McpToolContext,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -42,6 +44,7 @@ import {
   type HookExecutionRequest,
 } from '../confirmation-bus/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Validates that a value is a non-null object
@@ -56,9 +59,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function validateBeforeToolInput(input: Record<string, unknown>): {
   toolName: string;
   toolInput: Record<string, unknown>;
+  mcpContext?: McpToolContext;
 } {
   const toolName = input['tool_name'];
   const toolInput = input['tool_input'];
+  const mcpContext = input['mcp_context'];
   if (typeof toolName !== 'string') {
     throw new Error(
       'Invalid input for BeforeTool hook event: tool_name must be a string',
@@ -69,7 +74,16 @@ function validateBeforeToolInput(input: Record<string, unknown>): {
       'Invalid input for BeforeTool hook event: tool_input must be an object',
     );
   }
-  return { toolName, toolInput };
+  if (mcpContext !== undefined && !isObject(mcpContext)) {
+    throw new Error(
+      'Invalid input for BeforeTool hook event: mcp_context must be an object',
+    );
+  }
+  return {
+    toolName,
+    toolInput,
+    mcpContext: mcpContext as McpToolContext | undefined,
+  };
 }
 
 /**
@@ -79,10 +93,12 @@ function validateAfterToolInput(input: Record<string, unknown>): {
   toolName: string;
   toolInput: Record<string, unknown>;
   toolResponse: Record<string, unknown>;
+  mcpContext?: McpToolContext;
 } {
   const toolName = input['tool_name'];
   const toolInput = input['tool_input'];
   const toolResponse = input['tool_response'];
+  const mcpContext = input['mcp_context'];
   if (typeof toolName !== 'string') {
     throw new Error(
       'Invalid input for AfterTool hook event: tool_name must be a string',
@@ -98,7 +114,17 @@ function validateAfterToolInput(input: Record<string, unknown>): {
       'Invalid input for AfterTool hook event: tool_response must be an object',
     );
   }
-  return { toolName, toolInput, toolResponse };
+  if (mcpContext !== undefined && !isObject(mcpContext)) {
+    throw new Error(
+      'Invalid input for AfterTool hook event: mcp_context must be an object',
+    );
+  }
+  return {
+    toolName,
+    toolInput,
+    toolResponse,
+    mcpContext: mcpContext as McpToolContext | undefined,
+  };
 }
 
 /**
@@ -221,6 +247,57 @@ function validateNotificationInput(input: Record<string, unknown>): {
 }
 
 /**
+ * Validates SessionStart input fields
+ */
+function validateSessionStartInput(input: Record<string, unknown>): {
+  source: SessionStartSource;
+} {
+  const source = input['source'];
+  if (typeof source !== 'string') {
+    throw new Error(
+      'Invalid input for SessionStart hook event: source must be a string',
+    );
+  }
+  return {
+    source: source as SessionStartSource,
+  };
+}
+
+/**
+ * Validates SessionEnd input fields
+ */
+function validateSessionEndInput(input: Record<string, unknown>): {
+  reason: SessionEndReason;
+} {
+  const reason = input['reason'];
+  if (typeof reason !== 'string') {
+    throw new Error(
+      'Invalid input for SessionEnd hook event: reason must be a string',
+    );
+  }
+  return {
+    reason: reason as SessionEndReason,
+  };
+}
+
+/**
+ * Validates PreCompress input fields
+ */
+function validatePreCompressInput(input: Record<string, unknown>): {
+  trigger: PreCompressTrigger;
+} {
+  const trigger = input['trigger'];
+  if (typeof trigger !== 'string') {
+    throw new Error(
+      'Invalid input for PreCompress hook event: trigger must be a string',
+    );
+  }
+  return {
+    trigger: trigger as PreCompressTrigger,
+  };
+}
+
+/**
  * Hook event bus that coordinates hook execution across the system
  */
 export class HookEventHandler {
@@ -228,7 +305,7 @@ export class HookEventHandler {
   private readonly hookPlanner: HookPlanner;
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
-  private readonly messageBus?: MessageBus;
+  private readonly messageBus: MessageBus;
 
   constructor(
     config: Config,
@@ -236,7 +313,7 @@ export class HookEventHandler {
     hookPlanner: HookPlanner,
     hookRunner: HookRunner,
     hookAggregator: HookAggregator,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     this.config = config;
     this.hookPlanner = hookPlanner;
@@ -260,11 +337,13 @@ export class HookEventHandler {
   async fireBeforeToolEvent(
     toolName: string,
     toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
   ): Promise<AggregatedHookResult> {
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
       tool_input: toolInput,
+      ...(mcpContext && { mcp_context: mcpContext }),
     };
 
     const context: HookEventContext = { toolName };
@@ -279,12 +358,14 @@ export class HookEventHandler {
     toolName: string,
     toolInput: Record<string, unknown>,
     toolResponse: Record<string, unknown>,
+    mcpContext?: McpToolContext,
   ): Promise<AggregatedHookResult> {
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
       tool_name: toolName,
       tool_input: toolInput,
       tool_response: toolResponse,
+      ...(mcpContext && { mcp_context: mcpContext }),
     };
 
     const context: HookEventContext = { toolName };
@@ -455,17 +536,38 @@ export class HookEventHandler {
         };
       }
 
+      const onHookStart = (config: HookConfig, index: number) => {
+        coreEvents.emitHookStart({
+          hookName: this.getHookName(config),
+          eventName,
+          hookIndex: index + 1,
+          totalHooks: plan.hookConfigs.length,
+        });
+      };
+
+      const onHookEnd = (config: HookConfig, result: HookExecutionResult) => {
+        coreEvents.emitHookEnd({
+          hookName: this.getHookName(config),
+          eventName,
+          success: result.success,
+        });
+      };
+
       // Execute hooks according to the plan's strategy
       const results = plan.sequential
         ? await this.hookRunner.executeHooksSequential(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           )
         : await this.hookRunner.executeHooksParallel(
             plan.hookConfigs,
             eventName,
             input,
+            onHookStart,
+            onHookEnd,
           );
 
       // Aggregate results
@@ -497,9 +599,16 @@ export class HookEventHandler {
    * Create base hook input with common fields
    */
   private createBaseInput(eventName: HookEventName): HookInput {
+    // Get the transcript path from the ChatRecordingService if available
+    const transcriptPath =
+      this.config
+        .getGeminiClient()
+        ?.getChatRecordingService()
+        ?.getConversationFilePath() ?? '';
+
     return {
       session_id: this.config.getSessionId(),
-      transcript_path: '', // TODO: Implement transcript path when supported
+      transcript_path: transcriptPath,
       cwd: this.config.getWorkingDir(),
       hook_event_name: eventName,
       timestamp: new Date().toISOString(),
@@ -515,13 +624,23 @@ export class HookEventHandler {
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
   ): void {
-    const successCount = results.filter((r) => r.success).length;
-    const errorCount = results.length - successCount;
+    const failedHooks = results.filter((r) => !r.success);
+    const successCount = results.length - failedHooks.length;
+    const errorCount = failedHooks.length;
 
     if (errorCount > 0) {
+      const failedNames = failedHooks
+        .map((r) => this.getHookNameFromResult(r))
+        .join(', ');
+
       debugLogger.warn(
-        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed, ` +
+        `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
+      );
+
+      coreEvents.emitFeedback(
+        'warning',
+        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
       );
     } else {
       debugLogger.debug(
@@ -555,7 +674,7 @@ export class HookEventHandler {
 
     // Log individual errors
     for (const error of aggregated.errors) {
-      debugLogger.error(`Hook execution error: ${error.message}`);
+      debugLogger.warn(`Hook execution error: ${error.message}`);
     }
   }
 
@@ -591,10 +710,17 @@ export class HookEventHandler {
   }
 
   /**
+   * Get hook name from config for display or telemetry
+   */
+  private getHookName(config: HookConfig): string {
+    return config.name || config.command || 'unknown-command';
+  }
+
+  /**
    * Get hook name from execution result for telemetry
    */
   private getHookNameFromResult(result: HookExecutionResult): string {
-    return result.hookConfig.command || 'unknown-command';
+    return this.getHookName(result.hookConfig);
   }
 
   /**
@@ -627,18 +753,23 @@ export class HookEventHandler {
       // Route to appropriate event handler based on eventName
       switch (request.eventName) {
         case HookEventName.BeforeTool: {
-          const { toolName, toolInput } =
+          const { toolName, toolInput, mcpContext } =
             validateBeforeToolInput(enrichedInput);
-          result = await this.fireBeforeToolEvent(toolName, toolInput);
+          result = await this.fireBeforeToolEvent(
+            toolName,
+            toolInput,
+            mcpContext,
+          );
           break;
         }
         case HookEventName.AfterTool: {
-          const { toolName, toolInput, toolResponse } =
+          const { toolName, toolInput, toolResponse, mcpContext } =
             validateAfterToolInput(enrichedInput);
           result = await this.fireAfterToolEvent(
             toolName,
             toolInput,
             toolResponse,
+            mcpContext,
           );
           break;
         }
@@ -704,12 +835,28 @@ export class HookEventHandler {
           );
           break;
         }
+        case HookEventName.SessionStart: {
+          const { source } = validateSessionStartInput(enrichedInput);
+          result = await this.fireSessionStartEvent(source);
+          break;
+        }
+        case HookEventName.SessionEnd: {
+          const { reason } = validateSessionEndInput(enrichedInput);
+          result = await this.fireSessionEndEvent(reason);
+          break;
+        }
+        case HookEventName.PreCompress: {
+          const { trigger } = validatePreCompressInput(enrichedInput);
+          result = await this.firePreCompressEvent(trigger);
+          break;
+        }
         default:
           throw new Error(`Unsupported hook event: ${request.eventName}`);
       }
 
       // Publish response through MessageBus
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,
@@ -720,6 +867,7 @@ export class HookEventHandler {
     } catch (error) {
       // Publish error response
       if (this.messageBus) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         this.messageBus.publish({
           type: MessageBusType.HOOK_EXECUTION_RESPONSE,
           correlationId: request.correlationId,

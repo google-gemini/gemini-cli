@@ -94,7 +94,12 @@ describe('parseGoogleApiError', () => {
         },
       },
     };
-    expect(parseGoogleApiError(mockError)).toBeNull();
+
+    expect(parseGoogleApiError(mockError)).toEqual({
+      code: 400,
+      message: 'Bad Request',
+      details: [],
+    });
   });
 
   it('should return null if there are no valid details', () => {
@@ -115,7 +120,11 @@ describe('parseGoogleApiError', () => {
         },
       },
     };
-    expect(parseGoogleApiError(mockError)).toBeNull();
+    expect(parseGoogleApiError(mockError)).toEqual({
+      code: 400,
+      message: 'Bad Request',
+      details: [],
+    });
   });
 
   it('should parse a doubly nested error in the message', () => {

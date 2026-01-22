@@ -119,7 +119,7 @@ export const TodoTray: React.FC = () => {
         ) {
           continue;
         }
-        return tool.resultDisplay as TodoList;
+        return tool.resultDisplay;
       }
     }
     return null;

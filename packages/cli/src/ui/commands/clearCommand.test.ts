@@ -44,6 +44,12 @@ describe('clearCommand', () => {
               }),
             }) as unknown as GeminiClient,
           setSessionId: vi.fn(),
+          getEnableHooks: vi.fn().mockReturnValue(false),
+          getMessageBus: vi.fn().mockReturnValue(undefined),
+          getHookSystem: vi.fn().mockReturnValue({
+            fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+            fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+          }),
         },
       },
     });

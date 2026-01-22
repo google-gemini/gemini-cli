@@ -56,6 +56,7 @@ async function triggerPostAuthCallbacks(tokens: Credentials) {
     client_secret: OAUTH_CLIENT_SECRET,
     refresh_token: tokens.refresh_token ?? undefined, // Ensure null is not passed
     type: 'authorized_user',
+    client_email: userAccountManager.getCachedGoogleAccount() ?? undefined,
   };
 
   // Execute all registered post-authentication callbacks.
@@ -119,7 +120,7 @@ async function initOauthClient(
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
     });
-    const byoidClient = await auth.fromJSON({
+    const byoidClient = auth.fromJSON({
       ...credentials,
       refresh_token: credentials.refresh_token ?? undefined,
     });
@@ -255,6 +256,18 @@ async function initOauthClient(
         'Failed to authenticate with user code.',
       );
     }
+
+    // Retrieve and cache Google Account ID after successful user code auth
+    try {
+      await fetchAndCacheUserInfo(client);
+    } catch (error) {
+      debugLogger.warn(
+        'Failed to retrieve Google Account ID during authentication:',
+        getErrorMessage(error),
+      );
+    }
+
+    await triggerPostAuthCallbacks(client.credentials);
   } else {
     const webLogin = await authWithWeb(client);
 
@@ -312,12 +325,48 @@ async function initOauthClient(
       }, authTimeout);
     });
 
-    await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+    // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
+    // if the user chooses not to auth.
+    let sigIntHandler: (() => void) | undefined;
+    let stdinHandler: ((data: Buffer) => void) | undefined;
+    const cancellationPromise = new Promise<never>((_, reject) => {
+      sigIntHandler = () =>
+        reject(new FatalCancellationError('Authentication cancelled by user.'));
+      process.on('SIGINT', sigIntHandler);
+
+      // Note that SIGINT might not get raised on Ctrl+C in raw mode
+      // so we also need to look for Ctrl+C directly in stdin.
+      stdinHandler = (data: Buffer) => {
+        if (data.includes(0x03)) {
+          reject(
+            new FatalCancellationError('Authentication cancelled by user.'),
+          );
+        }
+      };
+      process.stdin.on('data', stdinHandler);
+    });
+
+    try {
+      await Promise.race([
+        webLogin.loginCompletePromise,
+        timeoutPromise,
+        cancellationPromise,
+      ]);
+    } finally {
+      if (sigIntHandler) {
+        process.removeListener('SIGINT', sigIntHandler);
+      }
+      if (stdinHandler) {
+        process.stdin.removeListener('data', stdinHandler);
+      }
+    }
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message: 'Authentication succeeded\n',
     });
+
+    await triggerPostAuthCallbacks(client.credentials);
   }
 
   return client;

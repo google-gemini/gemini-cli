@@ -24,7 +24,7 @@
         "slug": "docs/get-started"
       },
       {
-        "label": "Gemini 3 Pro on Gemini CLI",
+        "label": "Gemini 3 on Gemini CLI",
         "slug": "docs/get-started/gemini-3"
       },
       {
@@ -89,6 +89,10 @@
         "slug": "docs/cli/session-management"
       },
       {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
+      },
+      {
         "label": "Settings",
         "slug": "docs/cli/settings"
       },
@@ -115,6 +119,10 @@
       {
         "label": "Uninstall",
         "slug": "docs/cli/uninstall"
+      },
+      {
+        "label": "System prompt override",
+        "slug": "docs/cli/system-prompt"
       }
     ]
   },
@@ -194,6 +202,27 @@
     ]
   },
   {
+    "label": "Hooks (experimental)",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/hooks"
+      },
+      {
+        "label": "Writing hooks",
+        "slug": "docs/hooks/writing-hooks"
+      },
+      {
+        "label": "Hooks reference",
+        "slug": "docs/hooks/reference"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/hooks/best-practices"
+      }
+    ]
+  },
+  {
     "label": "IDE integration",
     "items": [
       {
@@ -218,16 +247,29 @@
         "slug": "docs/releases"
       },
       {
-        "label": "Changelog",
-        "slug": "docs/changelogs"
-      },
-      {
         "label": "Integration tests",
         "slug": "docs/integration-tests"
       },
       {
         "label": "Issue and PR automation",
         "slug": "docs/issue-and-pr-automation"
+      }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      {
+        "label": "Release notes",
+        "slug": "docs/changelogs/"
+      },
+      {
+        "label": "Latest release",
+        "slug": "docs/changelogs/latest"
+      },
+      {
+        "label": "Preview release",
+        "slug": "docs/changelogs/preview"
       }
     ]
   },

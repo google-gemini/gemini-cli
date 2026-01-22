@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { uiTelemetryService } from '@google/gemini-cli-core';
+import {
+  uiTelemetryService,
+  SessionEndReason,
+  SessionStartSource,
+  flushTelemetry,
+} from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
@@ -21,6 +27,12 @@ export const clearCommand: SlashCommand = {
       ?.getGeminiClient()
       ?.getChat()
       .getChatRecordingService();
+
+    // Fire SessionEnd hook before clearing
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
+    }
 
     if (geminiClient) {
       context.ui.setDebugMessage('Clearing terminal and resetting chat.');
@@ -38,7 +50,33 @@ export const clearCommand: SlashCommand = {
       chatRecordingService.initialize();
     }
 
+    // Fire SessionStart hook after clearing
+    let result;
+    if (hookSystem) {
+      result = await hookSystem.fireSessionStartEvent(SessionStartSource.Clear);
+    }
+
+    // Give the event loop a chance to process any pending telemetry operations
+    // This ensures logger.emit() calls have fully propagated to the BatchLogRecordProcessor
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Flush telemetry to ensure hooks are written to disk immediately
+    // This is critical for tests and environments with I/O latency
+    if (config) {
+      await flushTelemetry(config);
+    }
+
     uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
+
+    if (result?.systemMessage) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: result.systemMessage,
+        },
+        Date.now(),
+      );
+    }
   },
 };

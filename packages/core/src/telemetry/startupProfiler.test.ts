@@ -7,10 +7,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StartupProfiler } from './startupProfiler.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // Mock the metrics module
 vi.mock('./metrics.js', () => ({
   recordStartupPerformance: vi.fn(),
+}));
+
+// Mock loggers module
+vi.mock('./loggers.js', () => ({
+  logStartupStats: vi.fn(),
 }));
 
 // Mock os module
@@ -33,6 +39,7 @@ describe('StartupProfiler', () => {
   let profiler: StartupProfiler;
   let mockConfig: Config;
   let recordStartupPerformance: ReturnType<typeof vi.fn>;
+  let logStartupStats: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -41,6 +48,9 @@ describe('StartupProfiler', () => {
     const metricsModule = await import('./metrics.js');
     recordStartupPerformance =
       metricsModule.recordStartupPerformance as ReturnType<typeof vi.fn>;
+
+    const loggersModule = await import('./loggers.js');
+    logStartupStats = loggersModule.logStartupStats as ReturnType<typeof vi.fn>;
 
     // Create a fresh profiler instance
     profiler = StartupProfiler.getInstance();
@@ -246,6 +256,19 @@ describe('StartupProfiler', () => {
         }),
       );
     });
+
+    it('should use debug logging instead of standard logging', () => {
+      const logSpy = vi.spyOn(debugLogger, 'log');
+      const debugSpy = vi.spyOn(debugLogger, 'debug');
+
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalled();
+    });
   });
 
   describe('integration scenarios', () => {
@@ -282,8 +305,7 @@ describe('StartupProfiler', () => {
 
       profiler.flush(mockConfig);
 
-      const calls = (recordStartupPerformance as ReturnType<typeof vi.fn>).mock
-        .calls;
+      const calls = recordStartupPerformance.mock.calls;
       const outerCall = calls.find((call) => call[2].phase === 'outer');
       const innerCall = calls.find((call) => call[2].phase === 'inner');
 
@@ -341,6 +363,29 @@ describe('StartupProfiler', () => {
         mockConfig,
         expect.any(Number),
         expect.objectContaining({ phase: 'complete_phase' }),
+      );
+    });
+    it('should log startup stats event', () => {
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      expect(logStartupStats).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          phases: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'test_phase',
+              duration_ms: expect.any(Number),
+              start_time_usec: expect.any(Number),
+              end_time_usec: expect.any(Number),
+            }),
+          ]),
+          os_platform: 'darwin',
+          os_release: '22.6.0',
+          is_docker: false,
+        }),
       );
     });
   });

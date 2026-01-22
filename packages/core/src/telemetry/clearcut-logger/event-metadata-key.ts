@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 133
+  // Next ID: 144
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -93,11 +93,11 @@ export enum EventMetadataKey {
   // Replace Tool Call Event Keys
   // ===========================================================================
 
-  // Logs a smart edit tool strategy choice.
-  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+  // Logs a edit tool strategy choice.
+  GEMINI_CLI_EDIT_STRATEGY = 109,
 
-  // Logs a smart edit correction event.
-  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+  // Logs a edit correction event.
+  GEMINI_CLI_EDIT_CORRECTION = 110,
 
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
@@ -501,4 +501,45 @@ export enum EventMetadataKey {
 
   // Logs the model that confirmed the loop.
   GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
+
+  // ==========================================================================
+  // Hook Call Event Keys
+  // ==========================================================================
+
+  // Logs the name of the hook event (e.g., 'BeforeTool', 'AfterModel').
+  GEMINI_CLI_HOOK_EVENT_NAME = 133,
+
+  // Logs the duration of the hook execution in milliseconds.
+  GEMINI_CLI_HOOK_DURATION_MS = 134,
+
+  // Logs whether the hook execution was successful.
+  GEMINI_CLI_HOOK_SUCCESS = 135,
+
+  // Logs the exit code of the hook script (if applicable).
+  GEMINI_CLI_HOOK_EXIT_CODE = 136,
+
+  // Logs CPU information of user machine.
+  GEMINI_CLI_CPU_INFO = 137,
+
+  // Logs number of CPU cores of user machine.
+  GEMINI_CLI_CPU_CORES = 138,
+
+  // Logs GPU information of user machine.
+  GEMINI_CLI_GPU_INFO = 139,
+
+  // Logs total RAM in GB of user machine.
+  GEMINI_CLI_RAM_TOTAL_GB = 140,
+
+  // ==========================================================================
+  // Approval Mode Event Keys
+  // ==========================================================================
+
+  // Logs the active approval mode in the session.
+  GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
+
+  // Logs the new approval mode.
+  GEMINI_CLI_APPROVAL_MODE_TO = 142,
+
+  // Logs the duration spent in an approval mode in milliseconds.
+  GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
 }

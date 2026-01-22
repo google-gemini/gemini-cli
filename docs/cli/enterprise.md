@@ -159,6 +159,50 @@ This results in the following merged configuration:
 By using the system settings file, you can enforce the security and
 configuration patterns described below.
 
+### Enforcing system settings with a wrapper script
+
+While the `GEMINI_CLI_SYSTEM_SETTINGS_PATH` environment variable provides
+flexibility, a user could potentially override it to point to a different
+settings file, bypassing the centrally managed configuration. To mitigate this,
+enterprises can deploy a wrapper script or alias that ensures the environment
+variable is always set to the corporate-controlled path.
+
+This approach ensures that no matter how the user calls the `gemini` command,
+the enterprise settings are always loaded with the highest precedence.
+
+**Example wrapper script:**
+
+Administrators can create a script named `gemini` and place it in a directory
+that appears earlier in the user's `PATH` than the actual Gemini CLI binary
+(e.g., `/usr/local/bin/gemini`).
+
+```bash
+#!/bin/bash
+
+# Enforce the path to the corporate system settings file.
+# This ensures that the company's configuration is always applied.
+export GEMINI_CLI_SYSTEM_SETTINGS_PATH="/etc/gemini-cli/settings.json"
+
+# Find the original gemini executable.
+# This is a simple example; a more robust solution might be needed
+# depending on the installation method.
+REAL_GEMINI_PATH=$(type -aP gemini | grep -v "^$(type -P gemini)$" | head -n 1)
+
+if [ -z "$REAL_GEMINI_PATH" ]; then
+  echo "Error: The original 'gemini' executable was not found." >&2
+  exit 1
+fi
+
+# Pass all arguments to the real Gemini CLI executable.
+exec "$REAL_GEMINI_PATH" "$@"
+```
+
+By deploying this script, the `GEMINI_CLI_SYSTEM_SETTINGS_PATH` is set within
+the script's environment, and the `exec` command replaces the script process
+with the actual Gemini CLI process, which inherits the environment variable.
+This makes it significantly more difficult for a user to bypass the enforced
+settings.
+
 ## Restricting tool access
 
 You can significantly enhance security by controlling which tools the Gemini
@@ -434,7 +478,39 @@ prompted to switch to the enforced method. In non-interactive mode, the CLI will
 exit with an error if the configured authentication method does not match the
 enforced one.
 
-## Putting it all together: Example system `settings.json`
+### Restricting logins to corporate domains
+
+For enterprises using Google Workspace, you can enforce that users only
+authenticate with their corporate Google accounts. This is a network-level
+control that is configured on a proxy server, not within Gemini CLI itself. It
+works by intercepting authentication requests to Google and adding a special
+HTTP header.
+
+This policy prevents users from logging in with personal Gmail accounts or other
+non-corporate Google accounts.
+
+For detailed instructions, see the Google Workspace Admin Help article on
+[blocking access to consumer accounts](https://support.google.com/a/answer/1668854?hl=en#zippy=%2Cstep-choose-a-web-proxy-server%2Cstep-configure-the-network-to-block-certain-accounts).
+
+The general steps are as follows:
+
+1.  **Intercept Requests**: Configure your web proxy to intercept all requests
+    to `google.com`.
+2.  **Add HTTP Header**: For each intercepted request, add the
+    `X-GoogApps-Allowed-Domains` HTTP header.
+3.  **Specify Domains**: The value of the header should be a comma-separated
+    list of your approved Google Workspace domain names.
+
+**Example header:**
+
+```
+X-GoogApps-Allowed-Domains: my-corporate-domain.com, secondary-domain.com
+```
+
+When this header is present, Google's authentication service will only allow
+logins from accounts belonging to the specified domains.
+
+## Putting it all together: example system `settings.json`
 
 Here is an example of a system `settings.json` file that combines several of the
 patterns discussed above to create a secure, controlled environment for Gemini

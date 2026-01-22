@@ -56,6 +56,8 @@ This documentation is organized into the following sections:
   commands with `/model`.
 - **[Sandbox](./cli/sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
+- **[Agent Skills](./cli/skills.md):** (Experimental) Extend the CLI with
+  specialized expertise and procedural workflows.
 - **[Settings](./cli/settings.md):** Configure various aspects of the CLI's
   behavior and appearance with `/settings`.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
@@ -73,6 +75,9 @@ This documentation is organized into the following sections:
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and
   exposes tools.
+- **[System Prompt Override](./cli/system-prompt.md):** Replace built-in system
+  instructions using `GEMINI_SYSTEM_MD`.
+
 - **[Policy Engine](./core/policy-engine.md):** Use the Policy Engine for
   fine-grained control over tool execution.
 
@@ -101,6 +106,15 @@ This documentation is organized into the following sections:
   Learn how to build your own extension.
 - **[Extension releasing](./extensions/extension-releasing.md):** How to release
   Gemini CLI extensions.
+
+### Hooks
+
+- **[Hooks](./hooks/index.md):** Intercept and customize Gemini CLI behavior at
+  key lifecycle points.
+- **[Writing Hooks](./hooks/writing-hooks.md):** Learn how to create your first
+  hook with a comprehensive example.
+- **[Best Practices](./hooks/best-practices.md):** Security, performance, and
+  debugging guidelines for hooks.
 
 ### IDE integration
 

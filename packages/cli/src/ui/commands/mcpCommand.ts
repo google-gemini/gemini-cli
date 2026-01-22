@@ -8,10 +8,9 @@ import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
+import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -29,7 +28,7 @@ const authCommand: SlashCommand = {
   name: 'auth',
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
+  autoExecute: true,
   action: async (
     context: CommandContext,
     args: string,
@@ -92,19 +91,16 @@ const authCommand: SlashCommand = {
     // The authentication process will discover OAuth requirements automatically
 
     const displayListener = (message: string) => {
-      context.ui.addItem({ type: 'info', text: message }, Date.now());
+      context.ui.addItem({ type: 'info', text: message });
     };
 
     appEvents.on(AppEvent.OauthDisplayMessage, displayListener);
 
     try {
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `Starting OAuth authentication for MCP server '${serverName}'...`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `Starting OAuth authentication for MCP server '${serverName}'...`,
+      });
 
       // Import dynamically to avoid circular dependencies
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
@@ -123,24 +119,18 @@ const authCommand: SlashCommand = {
         appEvents,
       );
 
-      context.ui.addItem(
-        {
-          type: 'info',
-          text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: 'info',
+        text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
+      });
 
       // Trigger tool re-discovery to pick up authenticated server
       const mcpClientManager = config.getMcpClientManager();
       if (mcpClientManager) {
-        context.ui.addItem(
-          {
-            type: 'info',
-            text: `Restarting MCP server '${serverName}'...`,
-          },
-          Date.now(),
-        );
+        context.ui.addItem({
+          type: 'info',
+          text: `Restarting MCP server '${serverName}'...`,
+        });
         await mcpClientManager.restartServer(serverName);
       }
       // Update the client with the new tools
@@ -215,18 +205,20 @@ const listAction = async (
     connectingServers.length > 0;
 
   const allTools = toolRegistry.getAllTools();
-  const mcpTools = allTools.filter(
-    (tool) => tool instanceof DiscoveredMCPTool,
-  ) as DiscoveredMCPTool[];
+  const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
 
-  const promptRegistry = await config.getPromptRegistry();
+  const promptRegistry = config.getPromptRegistry();
   const mcpPrompts = promptRegistry
     .getAllPrompts()
     .filter(
       (prompt) =>
-        'serverName' in prompt &&
-        serverNames.includes(prompt.serverName as string),
-    ) as DiscoveredMCPPrompt[];
+        'serverName' in prompt && serverNames.includes(prompt.serverName),
+    );
+
+  const resourceRegistry = config.getResourceRegistry();
+  const mcpResources = resourceRegistry
+    .getAllResources()
+    .filter((entry) => serverNames.includes(entry.serverName));
 
   const authStatus: HistoryItemMcpStatus['authStatus'] = {};
   const tokenStorage = new MCPOAuthTokenStorage();
@@ -259,9 +251,16 @@ const listAction = async (
       schema: tool.schema,
     })),
     prompts: mcpPrompts.map((prompt) => ({
-      serverName: prompt.serverName as string,
+      serverName: prompt.serverName,
       name: prompt.name,
       description: prompt.description,
+    })),
+    resources: mcpResources.map((resource) => ({
+      serverName: resource.serverName,
+      name: resource.name,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      description: resource.description,
     })),
     authStatus,
     blockedServers: blockedMcpServers,
@@ -271,7 +270,7 @@ const listAction = async (
     showSchema,
   };
 
-  context.ui.addItem(mcpStatusItem, Date.now());
+  context.ui.addItem(mcpStatusItem);
 };
 
 const listCommand: SlashCommand = {
@@ -327,13 +326,10 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: 'Restarting MCP servers...',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: 'info',
+      text: 'Restarting MCP servers...',
+    });
 
     await mcpClientManager.restart();
 

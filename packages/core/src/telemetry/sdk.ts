@@ -80,11 +80,14 @@ class DiagLoggerAdapter {
 diag.setLogger(new DiagLoggerAdapter(), DiagLogLevel.INFO);
 
 let sdk: NodeSDK | undefined;
+let spanProcessor: BatchSpanProcessor | undefined;
+let logRecordProcessor: BatchLogRecordProcessor | undefined;
 let telemetryInitialized = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
+let activeTelemetryEmail: string | undefined;
 
 export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
@@ -92,6 +95,7 @@ export function isTelemetrySdkInitialized(): boolean {
 
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
   if (telemetryInitialized) {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fn();
   } else {
     telemetryBuffer.push(fn);
@@ -141,7 +145,19 @@ export async function initializeTelemetry(
   config: Config,
   credentials?: JWTInput,
 ): Promise<void> {
-  if (telemetryInitialized || !config.getTelemetryEnabled()) {
+  if (!config.getTelemetryEnabled()) {
+    return;
+  }
+
+  if (telemetryInitialized) {
+    if (
+      credentials?.client_email &&
+      activeTelemetryEmail &&
+      credentials.client_email !== activeTelemetryEmail
+    ) {
+      const message = `Telemetry credentials have changed (from ${activeTelemetryEmail} to ${credentials.client_email}), but telemetry cannot be re-initialized in this process. Please restart the CLI to use the new account for telemetry.`;
+      debugLogger.error(message);
+    }
     return;
   }
 
@@ -162,10 +178,7 @@ export async function initializeTelemetry(
       callbackRegistered = true;
       authListener = async (newCredentials: JWTInput) => {
         if (config.getTelemetryEnabled() && config.getTelemetryUseCliAuth()) {
-          debugLogger.log(
-            'Telemetry reinit with credentials: ',
-            newCredentials,
-          );
+          debugLogger.log('Telemetry reinit with credentials.');
           await initializeTelemetry(config, newCredentials);
         }
       };
@@ -273,35 +286,64 @@ export async function initializeTelemetry(
     });
   }
 
+  // Store processor references for manual flushing
+  spanProcessor = new BatchSpanProcessor(spanExporter);
+  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+
   sdk = new NodeSDK({
     resource,
-    spanProcessors: [new BatchSpanProcessor(spanExporter)],
-    logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
+    spanProcessors: [spanProcessor],
+    logRecordProcessors: [logRecordProcessor],
     metricReader,
     instrumentations: [new HttpInstrumentation()],
   });
 
   try {
-    await sdk.start();
+    sdk.start();
     if (config.getDebugMode()) {
       debugLogger.log('OpenTelemetry SDK started successfully.');
     }
     telemetryInitialized = true;
+    activeTelemetryEmail = credentials?.client_email;
     initializeMetrics(config);
     void flushTelemetryBuffer();
   } catch (error) {
-    console.error('Error starting OpenTelemetry SDK:', error);
+    debugLogger.error('Error starting OpenTelemetry SDK:', error);
   }
 
+  // Note: We don't use process.on('exit') here because that callback is synchronous
+  // and won't wait for the async shutdownTelemetry() to complete.
+  // Instead, telemetry shutdown is handled in runExitCleanup() in cleanup.ts
   process.on('SIGTERM', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
   process.on('SIGINT', () => {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     shutdownTelemetry(config);
   });
-  process.on('exit', () => {
-    shutdownTelemetry(config);
-  });
+}
+
+/**
+ * Force flush all pending telemetry data to disk.
+ * This is useful for ensuring telemetry is written before critical operations like /clear.
+ */
+export async function flushTelemetry(config: Config): Promise<void> {
+  if (!telemetryInitialized || !spanProcessor || !logRecordProcessor) {
+    return;
+  }
+  try {
+    // Force flush all pending telemetry to disk
+    await Promise.all([
+      spanProcessor.forceFlush(),
+      logRecordProcessor.forceFlush(),
+    ]);
+    if (config.getDebugMode()) {
+      debugLogger.log('OpenTelemetry SDK flushed successfully.');
+    }
+  } catch (error) {
+    debugLogger.error('Error flushing SDK:', error);
+  }
 }
 
 export async function shutdownTelemetry(
@@ -312,13 +354,13 @@ export async function shutdownTelemetry(
     return;
   }
   try {
-    await ClearcutLogger.getInstance()?.shutdown();
+    ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
     if (config.getDebugMode() && fromProcessExit) {
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
     }
   } catch (error) {
-    console.error('Error shutting down SDK:', error);
+    debugLogger.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
     sdk = undefined;
@@ -335,5 +377,6 @@ export async function shutdownTelemetry(
       authListener = undefined;
     }
     callbackRegistered = false;
+    activeTelemetryEmail = undefined;
   }
 }

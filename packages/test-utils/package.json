@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-test-utils",
-  "version": "0.21.0-nightly.20251202.2d935b379",
+  "version": "0.27.0-nightly.20260121.97aac696f",
   "private": true,
   "main": "src/index.ts",
   "license": "Apache-2.0",
@@ -8,6 +8,12 @@
   "scripts": {
     "build": "node ../../scripts/build_package.js",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/gemini-cli-core": "file:../core",
+    "@lydell/node-pty": "1.1.0",
+    "strip-ansi": "^7.1.2",
+    "vitest": "^3.2.4"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
