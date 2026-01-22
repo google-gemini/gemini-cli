@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
+import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
 export interface Suggestion {
@@ -85,7 +85,7 @@ export function SuggestionsDisplay({
         const textColor = isActive ? theme.text.accent : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
         const labelElement = (
-          <PrepareLabel
+          <ExpandableText
             label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
