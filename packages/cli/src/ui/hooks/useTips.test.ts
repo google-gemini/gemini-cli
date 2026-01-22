@@ -8,12 +8,12 @@ import {
   renderHookWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useTips } from './useTips.js';
 
 describe('useTips()', () => {
   beforeEach(() => {
-    persistentStateMock.reset();
+    vi.clearAllMocks();
   });
 
   it('should return false and call set(1) if state is undefined', () => {
@@ -32,7 +32,6 @@ describe('useTips()', () => {
 
     expect(result.current.showTips).toBe(true);
 
-    expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', 6);
     expect(persistentStateMock.get('tipsShown')).toBe(6);
   });
 

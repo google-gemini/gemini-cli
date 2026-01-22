@@ -102,7 +102,6 @@ const mockConfig = {
 describe('AlternateBufferQuittingDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    persistentStateMock.reset();
   });
   const baseUIState = {
     terminalWidth: 80,
