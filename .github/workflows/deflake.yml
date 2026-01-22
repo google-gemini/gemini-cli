@@ -9,7 +9,7 @@ on:
         default: 'main'
         type: 'string'
       test_name_pattern:
-        description: 'The test name pattern to use'
+        description: 'The test name substring OR test file name to use'
         required: false
         type: 'string'
       runs:
@@ -68,10 +68,20 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
+          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+          CMD="npm run deflake:test:integration:sandbox:none"
           if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+            CMD="npm run deflake:test:integration:sandbox:docker"
+          fi
+
+          if [[ -n "$PATTERN" ]]; then
+             if [[ "$PATTERN" =~ \.ts || "$PATTERN" =~ \.js || "$PATTERN" =~ / ]]; then
+               $CMD -- --runs="${{ env.RUNS }}" -- "$PATTERN"
+             else
+               $CMD -- --runs="${{ env.RUNS }}" -- --testNamePattern "$PATTERN"
+             fi
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+             $CMD -- --runs="${{ env.RUNS }}"
           fi
 
   deflake_e2e_mac:
@@ -109,7 +119,18 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+          CMD="npm run deflake:test:integration:sandbox:none"
+
+          if [[ -n "$PATTERN" ]]; then
+             if [[ "$PATTERN" =~ \.ts || "$PATTERN" =~ \.js || "$PATTERN" =~ / ]]; then
+               $CMD -- --runs="${{ env.RUNS }}" -- "$PATTERN"
+             else
+               $CMD -- --runs="${{ env.RUNS }}" -- --testNamePattern "$PATTERN"
+             fi
+          else
+             $CMD -- --runs="${{ env.RUNS }}"
+          fi
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -167,4 +188,16 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          $Pattern = $env:TEST_NAME_PATTERN
+          $Runs = $env:RUNS
+          $Cmd = "npm run deflake:test:integration:sandbox:none"
+
+          if (-not [string]::IsNullOrWhiteSpace($Pattern)) {
+             if ($Pattern -match "\.ts" -or $Pattern -match "\.js" -or $Pattern -match "[\\/]") {
+                 cmd /c "$Cmd -- --runs=`"$Runs`" -- `"$Pattern`""
+             } else {
+                 cmd /c "$Cmd -- --runs=`"$Runs`" -- --testNamePattern `"$Pattern`""
+             }
+          } else {
+              cmd /c "$Cmd -- --runs=`"$Runs`""
+          }
