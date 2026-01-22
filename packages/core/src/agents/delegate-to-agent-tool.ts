@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   BaseDeclarativeTool,
   Kind,
@@ -21,6 +19,9 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
+import { type AnySchema } from 'ajv';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
@@ -35,82 +36,76 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
   ) {
     const definitions = registry.getAllDefinitions();
 
-    let schema: z.ZodTypeAny;
+    let toolSchema: AnySchema;
 
     if (definitions.length === 0) {
       // Fallback if no agents are registered (mostly for testing/safety)
-      schema = z.object({
-        agent_name: z.string().describe('No agents are currently available.'),
-      });
+      toolSchema = {
+        type: 'object',
+        properties: {
+          agent_name: {
+            type: 'string',
+            description: 'No agents are currently available.',
+          },
+        },
+        required: ['agent_name'],
+      };
     } else {
       const agentSchemas = definitions.map((def) => {
-        const inputShape: Record<string, z.ZodTypeAny> = {
-          agent_name: z.literal(def.name).describe(def.description),
-        };
-
-        for (const [key, inputDef] of Object.entries(def.inputConfig.inputs)) {
-          if (key === 'agent_name') {
-            throw new Error(
-              `Agent '${def.name}' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.`,
-            );
-          }
-
-          let validator: z.ZodTypeAny;
-
-          // Map input types to Zod
-          switch (inputDef.type) {
-            case 'string':
-              validator = z.string();
-              break;
-            case 'number':
-              validator = z.number();
-              break;
-            case 'boolean':
-              validator = z.boolean();
-              break;
-            case 'integer':
-              validator = z.number().int();
-              break;
-            case 'string[]':
-              validator = z.array(z.string());
-              break;
-            case 'number[]':
-              validator = z.array(z.number());
-              break;
-            default: {
-              // This provides compile-time exhaustiveness checking.
-              const _exhaustiveCheck: never = inputDef.type;
-              void _exhaustiveCheck;
-              throw new Error(`Unhandled agent input type: '${inputDef.type}'`);
-            }
-          }
-
-          if (!inputDef.required) {
-            validator = validator.optional();
-          }
-
-          inputShape[key] = validator.describe(inputDef.description);
+        const schemaError = SchemaValidator.validateSchema(
+          def.inputConfig.inputSchema,
+        );
+        if (schemaError) {
+          throw new Error(`Invalid schema for ${def.name}: ${schemaError}`);
         }
 
-        // Cast required because Zod can't infer the discriminator from dynamic keys
-        return z.object(
-          inputShape,
-        ) as z.ZodDiscriminatedUnionOption<'agent_name'>;
+        const inputSchema = def.inputConfig.inputSchema;
+        if (typeof inputSchema !== 'object' || inputSchema === null) {
+          throw new Error(`Agent '${def.name}' must provide an object schema.`);
+        }
+
+        const schemaObj = inputSchema as Record<string, unknown>;
+        const properties = schemaObj['properties'] as
+          | Record<string, unknown>
+          | undefined;
+        if (properties && 'agent_name' in properties) {
+          throw new Error(
+            `Agent '${def.name}' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.`,
+          );
+        }
+
+        if (def.kind === 'remote') {
+          if (!properties || !properties['query']) {
+            debugLogger.log(
+              'INFO',
+              `Remote agent '${def.name}' does not define a 'query' property in its inputSchema. It will default to 'Get Started!' during invocation.`,
+            );
+          }
+        }
+
+        return {
+          type: 'object',
+          properties: {
+            agent_name: {
+              const: def.name,
+              description: def.description,
+            },
+            ...(properties || {}),
+          },
+          required: [
+            'agent_name',
+            ...((schemaObj['required'] as string[]) || []),
+          ],
+        } as AnySchema;
       });
 
-      // Create the discriminated union
-      // z.discriminatedUnion requires at least 2 options, so we handle the single agent case
+      // Create the anyOf schema
       if (agentSchemas.length === 1) {
-        schema = agentSchemas[0];
+        toolSchema = agentSchemas[0];
       } else {
-        schema = z.discriminatedUnion(
-          'agent_name',
-          agentSchemas as [
-            z.ZodDiscriminatedUnionOption<'agent_name'>,
-            z.ZodDiscriminatedUnionOption<'agent_name'>,
-            ...Array<z.ZodDiscriminatedUnionOption<'agent_name'>>,
-          ],
-        );
+        toolSchema = {
+          anyOf: agentSchemas,
+        };
       }
     }
 
@@ -119,7 +114,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
       'Delegate to Agent',
       registry.getToolDescription(),
       Kind.Think,
-      zodToJsonSchema(schema),
+      toolSchema,
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
@@ -210,65 +205,16 @@ class DelegateInvocation extends BaseToolInvocation<
 
     const { agent_name: _agent_name, ...agentArgs } = this.params;
 
-    // Validate specific agent arguments here using Zod to generate helpful error messages.
-    const inputShape: Record<string, z.ZodTypeAny> = {};
-    for (const [key, inputDef] of Object.entries(
-      definition.inputConfig.inputs,
-    )) {
-      let validator: z.ZodTypeAny;
+    // Validate specific agent arguments here using SchemaValidator to generate helpful error messages.
+    const validationError = SchemaValidator.validate(
+      definition.inputConfig.inputSchema,
+      agentArgs,
+    );
 
-      switch (inputDef.type) {
-        case 'string':
-          validator = z.string();
-          break;
-        case 'number':
-          validator = z.number();
-          break;
-        case 'boolean':
-          validator = z.boolean();
-          break;
-        case 'integer':
-          validator = z.number().int();
-          break;
-        case 'string[]':
-          validator = z.array(z.string());
-          break;
-        case 'number[]':
-          validator = z.array(z.number());
-          break;
-        default:
-          validator = z.unknown();
-      }
-
-      if (!inputDef.required) {
-        validator = validator.optional();
-      }
-
-      inputShape[key] = validator.describe(inputDef.description);
-    }
-
-    const agentSchema = z.object(inputShape);
-
-    try {
-      agentSchema.parse(agentArgs);
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        const errorMessages = e.errors.map(
-          (err) => `${err.path.join('.')}: ${err.message}`,
-        );
-
-        const expectedInputs = Object.entries(definition.inputConfig.inputs)
-          .map(
-            ([key, input]) =>
-              `'${key}' (${input.required ? 'required' : 'optional'} ${input.type})`,
-          )
-          .join(', ');
-
-        throw new Error(
-          `${errorMessages.join(', ')}. Expected inputs: ${expectedInputs}.`,
-        );
-      }
-      throw e;
+    if (validationError) {
+      throw new Error(
+        `Invalid arguments for agent '${definition.name}': ${validationError}. Input schema: ${JSON.stringify(definition.inputConfig.inputSchema)}.`,
+      );
     }
 
     const invocation = this.buildSubInvocation(

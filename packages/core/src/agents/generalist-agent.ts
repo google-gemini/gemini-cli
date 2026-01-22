@@ -28,12 +28,15 @@ export const GeneralistAgent = (
     "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
   experimental: true,
   inputConfig: {
-    inputs: {
-      request: {
-        description: 'The task or question for the generalist agent.',
-        type: 'string',
-        required: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        request: {
+          type: 'string',
+          description: 'The task or question for the generalist agent.',
+        },
       },
+      required: ['request'],
     },
   },
   outputConfig: {
