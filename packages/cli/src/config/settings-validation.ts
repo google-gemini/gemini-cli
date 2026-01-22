@@ -60,7 +60,11 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
     }
 
     if (def.additionalProperties === false) {
-      schema = schema.strict();
+      // Use passthrough instead of strict to allow unknown keys with warnings
+      // rather than failing validation entirely. This enables forward compatibility
+      // when users have deprecated keys or typos in their settings files.
+      // The CLI will continue to work while logging a warning about unknown keys.
+      schema = schema.passthrough();
     } else if (typeof def.additionalProperties === 'object') {
       schema = schema.catchall(
         buildZodSchemaFromJsonSchema(def.additionalProperties),

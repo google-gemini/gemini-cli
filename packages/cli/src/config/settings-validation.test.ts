@@ -430,6 +430,68 @@ describe('settings-validation', () => {
     });
   });
 
+  describe('unknown keys handling', () => {
+    it('should allow unknown keys in mcpServers config for forward compatibility (issue #16359)', () => {
+      // This tests that unknown keys don't cause validation failures,
+      // enabling forward compatibility when users have custom or deprecated keys.
+      // See: https://github.com/google-gemini/gemini-cli/issues/16359
+      const settingsWithUnknownKey = {
+        mcpServers: {
+          teleclaude: {
+            command: '/usr/bin/teleclaude',
+            args: ['--config', 'config.json'],
+            type: 'stdio', // Valid type
+            customField: 'some-value', // Unknown field - should be allowed
+            anotherUnknownKey: 123, // Another unknown field
+          },
+        },
+      };
+
+      const result = validateSettings(settingsWithUnknownKey);
+      // Unknown keys should pass through without validation errors
+      expect(result.success).toBe(true);
+    });
+
+    it('should allow unknown keys in customThemes config', () => {
+      const settingsWithUnknownKey = {
+        ui: {
+          customThemes: {
+            'my-theme': {
+              name: 'My Theme',
+              type: 'custom',
+              unknownColorProperty: '#ff0000', // Unknown field
+            },
+          },
+        },
+      };
+
+      const result = validateSettings(settingsWithUnknownKey);
+      expect(result.success).toBe(true);
+    });
+
+    it('should still reject invalid types even with unknown keys present', () => {
+      // Ensure that allowing unknown keys doesn't break type validation
+      const invalidSettings = {
+        mcpServers: {
+          'my-server': {
+            command: 123, // Should be string - this should still fail
+            unknownField: 'allowed',
+          },
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+      if (result.error) {
+        const issue = result.error.issues.find((i) =>
+          i.path.includes('command'),
+        );
+        expect(issue).toBeDefined();
+        expect(issue?.code).toBe('invalid_type');
+      }
+    });
+  });
+
   describe('settingsZodSchema', () => {
     it('should be a valid Zod object schema', () => {
       expect(settingsZodSchema).toBeInstanceOf(z.ZodObject);
