@@ -59,18 +59,18 @@ jobs:
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         run: |
-           CMD="npm run test:all_evals"
-           PATTERN="${{ env.TEST_NAME_PATTERN }}"
+          CMD="npm run test:all_evals"
+          PATTERN="${{ env.TEST_NAME_PATTERN }}"
 
-           if [[ -n "$PATTERN" ]]; then
-             if [[ "$PATTERN" =~ \.ts || "$PATTERN" =~ \.js || "$PATTERN" =~ / ]]; then
-               $CMD -- "$PATTERN"
-             else
-               $CMD -- -t "$PATTERN"
-             fi
-           else
-             $CMD
-           fi
+          if [[ -n "$PATTERN" ]]; then
+            if [[ "$PATTERN" == *.ts || "$PATTERN" == *.js || "$PATTERN" == */* ]]; then
+              $CMD -- "$PATTERN"
+            else
+              $CMD -- -t "$PATTERN"
+            fi
+          else
+            $CMD
+          fi
 
       - name: 'Upload Logs'
         if: 'always()'
