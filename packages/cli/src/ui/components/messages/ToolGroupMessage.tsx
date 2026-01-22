@@ -14,9 +14,8 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
-import { SHELL_TOOL_NAME, ApprovalMode } from '@google/gemini-cli-core';
+import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
-import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -50,16 +49,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
-  const uiState = useUIState();
   const isShellCommand = toolCalls.some(
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
-
-  const isPlanMode = uiState.showApprovalModeIndicator === ApprovalMode.PLAN;
-
-  const borderColor = isPlanMode
-    ? theme.status.success
-    : (isShellCommand && hasPending) || isEmbeddedShellFocused
+  const borderColor =
+    (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
       : hasPending
         ? theme.status.warning
