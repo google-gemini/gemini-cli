@@ -121,11 +121,33 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
     );
   }
 
-  override validateToolParams(_params: DelegateParams): string | null {
-    // We override the default schema validation because the generic JSON schema validation
-    // produces poor error messages for discriminated unions (anyOf).
-    // Instead, we perform detailed, agent-specific validation in the `execute` method
-    // to provide rich error messages that help the LLM self-heal.
+  override validateToolParams(params: DelegateParams): string | null {
+    if (!params.agent_name) {
+      return "Missing 'agent_name' parameter. Please specify the agent you want to delegate to.";
+    }
+
+    const definition = this.registry.getDefinition(params.agent_name);
+    if (!definition) {
+      const availableAgents = this.registry
+        .getAllDefinitions()
+        .map((def) => `'${def.name}' (${def.description})`)
+        .join(', ');
+
+      return `Agent '${params.agent_name}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`;
+    }
+
+    const { agent_name: _agent_name, ...agentArgs } = params;
+
+    // Validate specific agent arguments here using SchemaValidator to generate helpful error messages.
+    const validationError = SchemaValidator.validate(
+      definition.inputConfig.inputSchema,
+      agentArgs,
+    );
+
+    if (validationError) {
+      return `Invalid arguments for agent '${definition.name}': ${validationError}. Input schema: ${JSON.stringify(definition.inputConfig.inputSchema)}.`;
+    }
+
     return null;
   }
 
@@ -173,8 +195,8 @@ class DelegateInvocation extends BaseToolInvocation<
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const definition = this.registry.getDefinition(this.params.agent_name);
-    if (!definition || definition.kind !== 'remote') {
+    const definition = this.registry.getDefinition(this.params.agent_name)!;
+    if (definition.kind !== 'remote') {
       // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
       return false;
     }
@@ -191,31 +213,8 @@ class DelegateInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
-    const definition = this.registry.getDefinition(this.params.agent_name);
-    if (!definition) {
-      const availableAgents = this.registry
-        .getAllDefinitions()
-        .map((def) => `'${def.name}' (${def.description})`)
-        .join(', ');
-
-      throw new Error(
-        `Agent '${this.params.agent_name}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`,
-      );
-    }
-
+    const definition = this.registry.getDefinition(this.params.agent_name)!;
     const { agent_name: _agent_name, ...agentArgs } = this.params;
-
-    // Validate specific agent arguments here using SchemaValidator to generate helpful error messages.
-    const validationError = SchemaValidator.validate(
-      definition.inputConfig.inputSchema,
-      agentArgs,
-    );
-
-    if (validationError) {
-      throw new Error(
-        `Invalid arguments for agent '${definition.name}': ${validationError}. Input schema: ${JSON.stringify(definition.inputConfig.inputSchema)}.`,
-      );
-    }
 
     const invocation = this.buildSubInvocation(
       definition,

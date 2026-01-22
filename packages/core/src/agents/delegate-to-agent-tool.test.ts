@@ -121,16 +121,19 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should throw helpful error when agent_name does not exist', async () => {
-    // We allow validation to pass now, checking happens in execute.
-    const invocation = tool.build({
-      agent_name: 'non_existent_agent',
-    } as DelegateParams);
-
-    await expect(() =>
-      invocation.execute(new AbortController().signal),
-    ).rejects.toThrow(
+  it('should throw helpful error when agent_name does not exist', () => {
+    expect(() =>
+      tool.build({
+        agent_name: 'non_existent_agent',
+      } as DelegateParams),
+    ).toThrow(
       "Agent 'non_existent_agent' not found. Available agents are: 'test_agent' (A test agent), 'remote_agent' (A remote agent). Please choose a valid agent_name.",
+    );
+  });
+
+  it('should throw error when agent_name is missing', () => {
+    expect(() => tool.build({} as DelegateParams)).toThrow(
+      "Missing 'agent_name' parameter. Please specify the agent you want to delegate to.",
     );
   });
 
@@ -152,28 +155,24 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
-  it('should throw helpful error for missing required argument', async () => {
-    const invocation = tool.build({
-      agent_name: 'test_agent',
-      arg2: 123,
-    } as DelegateParams);
-
-    await expect(() =>
-      invocation.execute(new AbortController().signal),
-    ).rejects.toThrow(
+  it('should throw helpful error for missing required argument', () => {
+    expect(() =>
+      tool.build({
+        agent_name: 'test_agent',
+        arg2: 123,
+      } as DelegateParams),
+    ).toThrow(
       `Invalid arguments for agent 'test_agent': params must have required property 'arg1'. Input schema: ${JSON.stringify(mockAgentDef.inputConfig.inputSchema)}.`,
     );
   });
 
-  it('should throw helpful error for invalid argument type', async () => {
-    const invocation = tool.build({
-      agent_name: 'test_agent',
-      arg1: 123,
-    } as DelegateParams);
-
-    await expect(() =>
-      invocation.execute(new AbortController().signal),
-    ).rejects.toThrow(
+  it('should throw helpful error for invalid argument type', () => {
+    expect(() =>
+      tool.build({
+        agent_name: 'test_agent',
+        arg1: 123,
+      } as DelegateParams),
+    ).toThrow(
       `Invalid arguments for agent 'test_agent': params/arg1 must be string. Input schema: ${JSON.stringify(mockAgentDef.inputConfig.inputSchema)}.`,
     );
   });
