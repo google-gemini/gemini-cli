@@ -43,6 +43,7 @@ import {
   disableKittyKeyboardProtocol,
   enterAlternateScreen,
   exitAlternateScreen,
+  formatHyperlink,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -271,12 +272,22 @@ async function initOauthClient(
   } else {
     const webLogin = await authWithWeb(client);
 
+    // Format the URL as a clickable hyperlink for terminals that support OSC 8.
+    // This helps avoid the issue where long URLs wrap across lines and characters
+    // at line-break boundaries can be lost when copying.
+    const clickableUrl = formatHyperlink(
+      webLogin.authUrl,
+      '🔗 Click here to authenticate',
+    );
+
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message:
         `\n\nCode Assist login required.\n` +
         `Attempting to open authentication page in your browser.\n` +
-        `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
+        `Otherwise: ${clickableUrl}\n\n` +
+        `If clicking doesn't work, copy this URL (triple-click to select all):\n` +
+        `${webLogin.authUrl}\n\n\n`,
     });
     try {
       // Attempt to open the authentication URL in the default browser.
@@ -395,10 +406,13 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
       code_challenge: codeVerifier.codeChallenge,
       state,
     });
+    // Format the URL as a clickable hyperlink for terminals that support OSC 8.
+    const clickableUrl = formatHyperlink(authUrl, '🔗 Click here to authorize');
+
     writeToStdout(
       'Please visit the following URL to authorize the application:\n\n' +
-        authUrl +
-        '\n\n',
+        `${clickableUrl}\n\n` +
+        `Or copy this URL (triple-click to select all):\n${authUrl}\n\n`,
     );
 
     const code = await new Promise<string>((resolve, _) => {
