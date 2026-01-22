@@ -22,6 +22,7 @@ import type {
   BeforeModelHookOutput,
   AfterModelHookOutput,
   BeforeToolSelectionHookOutput,
+  McpToolContext,
 } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
@@ -295,6 +296,48 @@ export class HookSystem {
     } catch (error) {
       debugLogger.debug(`BeforeToolSelectionEvent failed:`, error);
       return {};
+    }
+  }
+
+  async fireBeforeToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireBeforeToolEvent(
+        toolName,
+        toolInput,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`BeforeTool hook failed for ${toolName}:`, error);
+      return undefined;
+    }
+  }
+
+  async fireAfterToolEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolResponse: {
+      llmContent: unknown;
+      returnDisplay: unknown;
+      error: unknown;
+    },
+    mcpContext?: McpToolContext,
+  ): Promise<DefaultHookOutput | undefined> {
+    try {
+      const result = await this.hookEventHandler.fireAfterToolEvent(
+        toolName,
+        toolInput,
+        toolResponse as Record<string, unknown>,
+        mcpContext,
+      );
+      return result.finalOutput;
+    } catch (error) {
+      debugLogger.debug(`AfterTool hook failed for ${toolName}:`, error);
+      return undefined;
     }
   }
 }

@@ -88,6 +88,7 @@ const mockConfig = {
   getModel: () => 'gemini-pro',
   getTargetDir: () => '/tmp',
   getDebugMode: () => false,
+  getIdeMode: () => false,
   getGeminiMdFileCount: () => 0,
   getExperiments: () => ({
     flags: {},
