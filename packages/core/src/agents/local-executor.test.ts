@@ -1369,9 +1369,13 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             await new Promise<void>((resolve) => {
               // This promise resolves when aborted, ending the generator.
-              signal?.addEventListener('abort', () => {
-                resolve();
-              });
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  resolve();
+                },
+                { once: true },
+              );
             });
           })(),
       );
@@ -1681,7 +1685,9 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             // This promise never resolves, it waits for abort.
             await new Promise<void>((resolve) => {
-              signal?.addEventListener('abort', () => resolve());
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
             });
           })(),
       );
@@ -1734,7 +1740,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1745,7 +1753,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
