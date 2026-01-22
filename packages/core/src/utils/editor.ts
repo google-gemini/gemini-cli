@@ -86,6 +86,17 @@ function commandExists(cmd: string): boolean {
 }
 
 /**
+ * Creates a consistent error message for missing editors.
+ */
+function createEditorNotFoundError(editor: EditorType, command: string): Error {
+  const editorName = getEditorDisplayName(editor);
+  return new Error(
+    `${editorName} command '${command}' not found. ` +
+    `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
+  );
+}
+
+/**
  * Editor command configurations for different platforms.
  * Each editor can have multiple possible command names, listed in order of preference.
  */
@@ -144,6 +155,7 @@ export function isEditorAvailable(editor: string | undefined): boolean {
 
 /**
  * Get the diff command for a specific editor.
+ * Uses -- separator to prevent argument injection attacks.
  */
 export function getDiffCommand(
   oldPath: string,
@@ -162,7 +174,7 @@ export function getDiffCommand(
     case 'cursor':
     case 'zed':
     case 'antigravity':
-      return { command, args: ['--wait', '--diff', oldPath, newPath] };
+      return { command, args: ['--wait', '--diff', '--', oldPath, newPath] };
     case 'vim':
     case 'neovim':
       return {
@@ -188,6 +200,7 @@ export function getDiffCommand(
           // Auto close all windows when one is closed
           '-c',
           'autocmd BufWritePost * wqa',
+          '--',
           oldPath,
           newPath,
         ],
@@ -226,16 +239,11 @@ export async function openDiff(
     return;
   }
 
-  // Check if the editor command exists before attempting to spawn
+  // Pre-flight check: verify the editor command exists before attempting to spawn
   if (!commandExists(diffCommand.command)) {
-    const editorName = getEditorDisplayName(editor);
-    debugLogger.error(
-      `${editorName} (${diffCommand.command}) is not installed or not in PATH. ` +
-      `Please install ${editorName} or set a different editor in your settings.`
-    );
-    throw new Error(
-      `${editorName} not found. Please install it or configure a different editor.`
-    );
+    const error = createEditorNotFoundError(editor, diffCommand.command);
+    debugLogger.error(error.message);
+    throw error;
   }
 
   if (isTerminalEditor(editor)) {
@@ -244,14 +252,6 @@ export async function openDiff(
         stdio: 'inherit',
       });
       if (result.error) {
-        // Provide a more helpful error message for ENOENT
-        if (result.error.message.includes('ENOENT')) {
-          const editorName = getEditorDisplayName(editor);
-          throw new Error(
-            `${editorName} command '${diffCommand.command}' not found. ` +
-            `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
-          );
-        }
         throw result.error;
       }
       if (result.status !== 0) {
@@ -263,10 +263,11 @@ export async function openDiff(
     return;
   }
 
+  // For GUI editors: spawn without shell to prevent command injection
   return new Promise<void>((resolve, reject) => {
     const childProcess = spawn(diffCommand.command, diffCommand.args, {
       stdio: 'inherit',
-      shell: process.platform === 'win32',
+      shell: false, // Explicitly disable shell to prevent command injection
     });
 
     childProcess.on('close', (code) => {
@@ -278,18 +279,7 @@ export async function openDiff(
     });
 
     childProcess.on('error', (error) => {
-      // Provide a more helpful error message for ENOENT
-      if (error.message.includes('ENOENT')) {
-        const editorName = getEditorDisplayName(editor);
-        reject(
-          new Error(
-            `${editorName} command '${diffCommand.command}' not found. ` +
-            `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
-          )
-        );
-      } else {
-        reject(error);
-      }
+      reject(error);
     });
   });
 }
