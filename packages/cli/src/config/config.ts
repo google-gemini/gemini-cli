@@ -763,7 +763,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? true),
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
