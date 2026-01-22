@@ -1,29 +1,33 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { theme } from '../../semantic-colors.js';
 
-export const MAX_WIDTH = 150; // Maximum width for the text that is shown
+export const MAX_WIDTH = 150;
 
-export interface PrepareLabelProps {
+export interface ExpandableTextProps {
   label: string;
   matchedIndex?: number;
-  userInput: string;
-  textColor: string;
+  userInput?: string;
+  textColor?: string;
   isExpanded?: boolean;
+  maxWidth?: number;
+  maxLines?: number;
 }
 
-const _PrepareLabel: React.FC<PrepareLabelProps> = ({
+const _ExpandableText: React.FC<ExpandableTextProps> = ({
   label,
   matchedIndex,
-  userInput,
-  textColor,
+  userInput = '',
+  textColor = theme.text.primary,
   isExpanded = false,
+  maxWidth = MAX_WIDTH,
+  maxLines,
 }) => {
   const hasMatch =
     matchedIndex !== undefined &&
@@ -33,11 +37,27 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
 
   // Render the plain label if there's no match
   if (!hasMatch) {
-    const display = isExpanded
-      ? label
-      : label.length > MAX_WIDTH
-        ? label.slice(0, MAX_WIDTH) + '...'
-        : label;
+    let display = label;
+
+    if (!isExpanded) {
+      if (maxLines !== undefined) {
+        const lines = label.split('\n');
+        // 1. Truncate by logical lines
+        let truncated = lines.slice(0, maxLines).join('\n');
+        const hasMoreLines = lines.length > maxLines;
+
+        // 2. Truncate by characters (visual approximation) to prevent massive wrapping
+        if (truncated.length > maxWidth) {
+          truncated = truncated.slice(0, maxWidth) + '...';
+        } else if (hasMoreLines) {
+          truncated += '...';
+        }
+        display = truncated;
+      } else if (label.length > maxWidth) {
+        display = label.slice(0, maxWidth) + '...';
+      }
+    }
+
     return (
       <Text wrap="wrap" color={textColor}>
         {display}
@@ -51,18 +71,18 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
   let after = '';
 
   // Case 1: Show the full string if it's expanded or already fits
-  if (isExpanded || label.length <= MAX_WIDTH) {
+  if (isExpanded || label.length <= maxWidth) {
     before = label.slice(0, matchedIndex);
     match = label.slice(matchedIndex, matchedIndex + matchLength);
     after = label.slice(matchedIndex + matchLength);
   }
   // Case 2: The match itself is too long, so we only show a truncated portion of the match
-  else if (matchLength >= MAX_WIDTH) {
-    match = label.slice(matchedIndex, matchedIndex + MAX_WIDTH - 1) + '...';
+  else if (matchLength >= maxWidth) {
+    match = label.slice(matchedIndex, matchedIndex + maxWidth - 1) + '...';
   }
   // Case 3: Truncate the string to create a window around the match
   else {
-    const contextSpace = MAX_WIDTH - matchLength;
+    const contextSpace = maxWidth - matchLength;
     const beforeSpace = Math.floor(contextSpace / 2);
     const afterSpace = Math.ceil(contextSpace / 2);
 
@@ -113,4 +133,4 @@ const _PrepareLabel: React.FC<PrepareLabelProps> = ({
   );
 };
 
-export const PrepareLabel = React.memo(_PrepareLabel);
+export const ExpandableText = React.memo(_ExpandableText);

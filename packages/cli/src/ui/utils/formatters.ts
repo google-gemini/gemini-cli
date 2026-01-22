@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
+} from '@google/gemini-cli-core';
+
 export const formatMemoryUsage = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
@@ -76,12 +81,9 @@ export const formatTimeAgo = (date: string | number | Date): string => {
   return `${formatDuration(diffMs)} ago`;
 };
 
-const REFERENCE_CONTENT_START = '--- Content from referenced files ---';
-const REFERENCE_CONTENT_END = '--- End of content ---';
-
 /**
  * Removes content bounded by reference content markers from the given text.
- * The markers are "--- Content from referenced files ---" and "--- End of content ---".
+ * The markers are "${REFERENCE_CONTENT_START}" and "${REFERENCE_CONTENT_END}".
  *
  * @param text The input text containing potential reference blocks.
  * @returns The text with reference blocks removed and trimmed.
