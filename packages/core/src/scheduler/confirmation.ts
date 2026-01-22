@@ -21,10 +21,11 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import type { EditorType } from '../utils/editor.js';
+import { resolveEditor, type EditorType } from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 export interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
@@ -151,7 +152,21 @@ export async function resolveConfirmation(
     outcome = response.outcome;
 
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
-      await handleExternalModification(deps, toolCall, signal);
+      const modResult = await handleExternalModification(
+        deps,
+        toolCall,
+        signal,
+      );
+      if (!modResult.success) {
+        // Editor is not available - emit error feedback and break the loop
+        // by cancelling the operation to prevent infinite loop
+        if (modResult.error) {
+          coreEvents.emitFeedback('error', modResult.error);
+        }
+        // Break the loop by changing outcome to Cancel
+        // This prevents the infinite loop issue reported in #7669
+        outcome = ToolConfirmationOutcome.Cancel;
+      }
     } else if (response.payload?.newContent) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
       outcome = ToolConfirmationOutcome.ProceedOnce;
@@ -179,7 +194,18 @@ async function notifyHooks(
 }
 
 /**
+ * Result of attempting external modification.
+ */
+interface ExternalModificationResult {
+  /** Whether the modification was successful (editor was opened) */
+  success: boolean;
+  /** Error message if the modification failed */
+  error?: string;
+}
+
+/**
  * Handles modification via an external editor (e.g. Vim).
+ * Returns a result indicating success or failure with an error message.
  */
 async function handleExternalModification(
   deps: {
@@ -189,14 +215,29 @@ async function handleExternalModification(
   },
   toolCall: ValidatingToolCall,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<ExternalModificationResult> {
   const { state, modifier, getPreferredEditor } = deps;
-  const editor = getPreferredEditor();
-  if (!editor) return;
+
+  // Use the new resolveEditor function which handles:
+  // 1. Checking if preferred editor is available
+  // 2. Auto-detecting an available editor if none is configured
+  // 3. Providing helpful error messages
+  const preferredEditor = getPreferredEditor();
+  const resolution = resolveEditor(preferredEditor);
+
+  if (!resolution.editor) {
+    // No editor available - return failure with error message
+    return {
+      success: false,
+      error:
+        resolution.error ||
+        'No external editor is available. Please run /editor to configure one.',
+    };
+  }
 
   const result = await modifier.handleModifyWithEditor(
     state.firstActiveCall as WaitingToolCall,
-    editor,
+    resolution.editor,
     signal,
   );
   if (result) {
@@ -207,6 +248,7 @@ async function handleExternalModification(
       newInvocation,
     );
   }
+  return { success: true };
 }
 
 /**

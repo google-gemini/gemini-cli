@@ -19,6 +19,8 @@ import {
   openDiff,
   allowEditorTypeInSandbox,
   isEditorAvailable,
+  detectFirstAvailableEditor,
+  resolveEditor,
   type EditorType,
 } from './editor.js';
 import { execSync, spawn, spawnSync } from 'node:child_process';
@@ -540,6 +542,132 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
+    });
+  });
+
+  describe('detectFirstAvailableEditor', () => {
+    it('should return undefined when no editors are installed', () => {
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      expect(detectFirstAvailableEditor()).toBeUndefined();
+    });
+
+    it('should prioritize terminal editors over GUI editors', () => {
+      // Mock vim as available
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('vim') && !cmd.includes('nvim')) {
+          return Buffer.from('/usr/bin/vim');
+        }
+        if (cmd.includes('code')) {
+          return Buffer.from('/usr/bin/code');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      expect(detectFirstAvailableEditor()).toBe('vim');
+    });
+
+    it('should return vim when vim is the only editor available in sandbox mode', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('vim') && !cmd.includes('nvim')) {
+          return Buffer.from('/usr/bin/vim');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(detectFirstAvailableEditor()).toBe('vim');
+    });
+
+    it('should skip GUI editors in sandbox mode', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('code')) {
+          return Buffer.from('/usr/bin/code');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', 'sandbox');
+      // vscode is installed but not allowed in sandbox
+      expect(detectFirstAvailableEditor()).toBeUndefined();
+    });
+
+    it('should return first available terminal editor (neovim)', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('nvim')) {
+          return Buffer.from('/usr/bin/nvim');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      expect(detectFirstAvailableEditor()).toBe('neovim');
+    });
+  });
+
+  describe('resolveEditor', () => {
+    it('should return the preferred editor when available', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+      vi.stubEnv('SANDBOX', '');
+      const result = resolveEditor('vim');
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error when preferred editor is not installed', () => {
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      const result = resolveEditor('vim');
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('Vim');
+      expect(result.error).toContain('not installed');
+    });
+
+    it('should return error when preferred GUI editor cannot be used in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      const result = resolveEditor('vscode');
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('VS Code');
+      expect(result.error).toContain('sandbox mode');
+    });
+
+    it('should auto-detect editor when no preference is set', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('vim') && !cmd.includes('nvim')) {
+          return Buffer.from('/usr/bin/vim');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      const result = resolveEditor(undefined);
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error when no preference is set and no editors are available', () => {
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', '');
+      const result = resolveEditor(undefined);
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('No external editor');
+      expect(result.error).toContain('/editor');
+    });
+
+    it('should work with terminal editors in sandbox mode when no preference is set', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('vim') && !cmd.includes('nvim')) {
+          return Buffer.from('/usr/bin/vim');
+        }
+        throw new Error('Command not found');
+      });
+      vi.stubEnv('SANDBOX', 'sandbox');
+      const result = resolveEditor(undefined);
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
     });
   });
 });

@@ -12,7 +12,8 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import type { EditorType } from '../utils/editor.js';
+import { resolveEditor, type EditorType } from '../utils/editor.js';
+import { coreEvents } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
@@ -758,8 +759,17 @@ export class CoreToolScheduler {
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
 
-      const editorType = this.getPreferredEditor();
-      if (!editorType) {
+      // Use resolveEditor to check availability and auto-detect if needed
+      const preferredEditor = this.getPreferredEditor();
+      const resolution = resolveEditor(preferredEditor);
+
+      if (!resolution.editor) {
+        // No editor available - emit error feedback and cancel the operation
+        // This fixes the infinite loop issue reported in #7669
+        if (resolution.error) {
+          coreEvents.emitFeedback('error', resolution.error);
+        }
+        this.cancelAll(signal);
         return;
       }
 
@@ -770,7 +780,7 @@ export class CoreToolScheduler {
 
       const result = await this.toolModifier.handleModifyWithEditor(
         waitingToolCall,
-        editorType,
+        resolution.editor,
         signal,
       );
 
