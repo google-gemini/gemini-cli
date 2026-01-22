@@ -49,6 +49,7 @@ export enum Command {
   REVERSE_SEARCH = 'history.search.start',
   SUBMIT_REVERSE_SEARCH = 'history.search.submit',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'history.search.accept',
+  REWIND = 'history.rewind',
 
   // Navigation
   NAVIGATION_UP = 'nav.up',
@@ -76,11 +77,12 @@ export enum Command {
   TOGGLE_MARKDOWN = 'app.toggleMarkdown',
   TOGGLE_COPY_MODE = 'app.toggleCopyMode',
   TOGGLE_YOLO = 'app.toggleYolo',
-  TOGGLE_AUTO_EDIT = 'app.toggleAutoEdit',
+  CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
   FOCUS_SHELL_INPUT = 'app.focusShellInput',
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
+  RESTART_APP = 'app.restart',
 }
 
 /**
@@ -89,12 +91,14 @@ export enum Command {
 export interface KeyBinding {
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
   key: string;
-  /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  ctrl?: boolean;
   /** Shift key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
   shift?: boolean;
-  /** Command/meta key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  command?: boolean;
+  /** Alt/Option key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
+  alt?: boolean;
+  /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
+  ctrl?: boolean;
+  /** Command/Windows/Super key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
+  cmd?: boolean;
 }
 
 /**
@@ -116,61 +120,76 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
   // Cursor Movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
-  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
-  [Command.MOVE_UP]: [{ key: 'up', ctrl: false, command: false }],
-  [Command.MOVE_DOWN]: [{ key: 'down', ctrl: false, command: false }],
+  [Command.HOME]: [
+    { key: 'a', ctrl: true },
+    { key: 'home', shift: false, ctrl: false },
+  ],
+  [Command.END]: [
+    { key: 'e', ctrl: true },
+    { key: 'end', shift: false, ctrl: false },
+  ],
+  [Command.MOVE_UP]: [
+    { key: 'up', shift: false, alt: false, ctrl: false, cmd: false },
+  ],
+  [Command.MOVE_DOWN]: [
+    { key: 'down', shift: false, alt: false, ctrl: false, cmd: false },
+  ],
   [Command.MOVE_LEFT]: [
-    { key: 'left', ctrl: false, command: false },
+    { key: 'left', shift: false, alt: false, ctrl: false, cmd: false },
     { key: 'b', ctrl: true },
   ],
   [Command.MOVE_RIGHT]: [
-    { key: 'right', ctrl: false, command: false },
+    { key: 'right', shift: false, alt: false, ctrl: false, cmd: false },
     { key: 'f', ctrl: true },
   ],
   [Command.MOVE_WORD_LEFT]: [
     { key: 'left', ctrl: true },
-    { key: 'left', command: true },
-    { key: 'b', command: true },
+    { key: 'left', alt: true },
+    { key: 'b', alt: true },
   ],
   [Command.MOVE_WORD_RIGHT]: [
     { key: 'right', ctrl: true },
-    { key: 'right', command: true },
-    { key: 'f', command: true },
+    { key: 'right', alt: true },
+    { key: 'f', alt: true },
   ],
 
   // Editing
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
   [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
   [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
-  // Added command (meta/alt/option) for mac compatibility
   [Command.DELETE_WORD_BACKWARD]: [
     { key: 'backspace', ctrl: true },
-    { key: 'backspace', command: true },
+    { key: 'backspace', alt: true },
     { key: 'w', ctrl: true },
   ],
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
-    { key: 'delete', command: true },
+    { key: 'delete', alt: true },
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
-  [Command.UNDO]: [{ key: 'z', ctrl: true, shift: false }],
-  [Command.REDO]: [{ key: 'z', ctrl: true, shift: true }],
+  [Command.UNDO]: [{ key: 'z', shift: false, ctrl: true }],
+  [Command.REDO]: [{ key: 'z', shift: true, ctrl: true }],
 
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
   [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
-  [Command.SCROLL_HOME]: [{ key: 'home' }],
-  [Command.SCROLL_END]: [{ key: 'end' }],
+  [Command.SCROLL_HOME]: [
+    { key: 'home', ctrl: true },
+    { key: 'home', shift: true },
+  ],
+  [Command.SCROLL_END]: [
+    { key: 'end', ctrl: true },
+    { key: 'end', shift: true },
+  ],
   [Command.PAGE_UP]: [{ key: 'pageup' }],
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
   // History & Search
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
-  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true, shift: false }],
+  [Command.HISTORY_UP]: [{ key: 'p', shift: false, ctrl: true }],
+  [Command.HISTORY_DOWN]: [{ key: 'n', shift: false, ctrl: true }],
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
-  // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
+  [Command.REWIND]: [{ key: 'double escape' }],
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
 
@@ -190,14 +209,13 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
-  // Completion navigation (arrow or Ctrl+P/N)
   [Command.COMPLETION_UP]: [
     { key: 'up', shift: false },
-    { key: 'p', ctrl: true, shift: false },
+    { key: 'p', shift: false, ctrl: true },
   ],
   [Command.COMPLETION_DOWN]: [
     { key: 'down', shift: false },
-    { key: 'n', ctrl: true, shift: false },
+    { key: 'n', shift: false, ctrl: true },
   ],
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
@@ -207,37 +225,39 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT]: [
     {
       key: 'return',
-      ctrl: false,
-      command: false,
       shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
     },
   ],
-  // Split into multiple data-driven bindings
-  // Now also includes shift+enter for multi-line input
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
-    { key: 'return', command: true },
+    { key: 'return', cmd: true },
+    { key: 'return', alt: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
   ],
   [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
-    { key: 'v', command: true },
+    { key: 'v', cmd: true },
+    { key: 'v', alt: true },
   ],
 
   // App Controls
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
   [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
   [Command.SHOW_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
-  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
+  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', alt: true }],
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
-  [Command.TOGGLE_AUTO_EDIT]: [{ key: 'tab', shift: true }],
+  [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
+  [Command.RESTART_APP]: [{ key: 'r' }],
 };
 
 interface CommandCategory {
@@ -299,6 +319,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+      Command.REWIND,
     ],
   },
   {
@@ -338,11 +359,12 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
       Command.TOGGLE_YOLO,
-      Command.TOGGLE_AUTO_EDIT,
+      Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
+      Command.RESTART_APP,
     ],
   },
 ];
@@ -394,6 +416,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
+  [Command.REWIND]: 'Browse and rewind previous interactions.',
 
   // Navigation
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
@@ -422,10 +445,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
-  [Command.TOGGLE_AUTO_EDIT]: 'Toggle Auto Edit (auto-accept edits) mode.',
+  [Command.CYCLE_APPROVAL_MODE]:
+    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.RESTART_APP]: 'Restart the application.',
 };

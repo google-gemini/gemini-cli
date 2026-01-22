@@ -14,7 +14,6 @@ import EventEmitter from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
-import { mergeSettings } from '../config/settings.js';
 
 vi.mock('./installationInfo.js', async () => {
   const actual = await vi.importActual('./installationInfo.js');
@@ -37,6 +36,8 @@ describe('handleAutoUpdate', () => {
   let mockChildProcess: ChildProcess;
 
   beforeEach(() => {
+    vi.stubEnv('GEMINI_SANDBOX', '');
+    vi.stubEnv('SANDBOX', '');
     mockSpawn = vi.fn();
     vi.clearAllMocks();
     vi.spyOn(updateEventEmitter, 'emit');
@@ -50,9 +51,16 @@ describe('handleAutoUpdate', () => {
       message: 'An update is available!',
     };
 
-    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
-      merged: defaultMergedSettings,
+      merged: {
+        general: {
+          enableAutoUpdate: true,
+          enableAutoUpdateNotification: true,
+        },
+        tools: {
+          sandbox: false,
+        },
+      },
     } as LoadedSettings;
 
     mockChildProcess = Object.assign(new EventEmitter(), {
@@ -69,6 +77,7 @@ describe('handleAutoUpdate', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -79,8 +88,8 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it('should do nothing if update nag is disabled', () => {
-    mockSettings.merged.general.disableUpdateNag = true;
+  it('should do nothing if update prompts are disabled', () => {
+    mockSettings.merged.general.enableAutoUpdateNotification = false;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
@@ -88,7 +97,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should emit "update-received" but not update if auto-updates are disabled', () => {
-    mockSettings.merged.general.disableAutoUpdate = true;
+    mockSettings.merged.general.enableAutoUpdate = false;
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'Please update manually.',
