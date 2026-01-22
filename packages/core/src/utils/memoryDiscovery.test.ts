@@ -436,7 +436,7 @@ Subdir memory
       {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
-        customIgnoreFilePath: undefined,
+        customIgnoreFilePaths: [],
       },
       200, // maxDirs parameter
     );
@@ -473,7 +473,7 @@ My code memory
       {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
-        customIgnoreFilePath: undefined,
+        customIgnoreFilePaths: [],
       },
       1, // maxDirs
     );

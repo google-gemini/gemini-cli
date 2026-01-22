@@ -626,18 +626,20 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
-  it('should set customIgnoreFilePath from params', () => {
+  it('should set customIgnoreFilePaths from params', () => {
     const params: ConfigParameters = {
       ...baseParams,
       fileFiltering: {
-        customIgnoreFilePath: '/path/to/ignore/file',
+        customIgnoreFilePaths: ['/path/to/ignore/file'],
       },
     };
     const config = new Config(params);
-    expect(config.getCustomIgnoreFilePath()).toBe('/path/to/ignore/file');
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([
+      '/path/to/ignore/file',
+    ]);
   });
 
-  it('should set customIgnoreFilePath to undefined if not provided', () => {
+  it('should set customIgnoreFilePaths to empty array if not provided', () => {
     const params: ConfigParameters = {
       ...baseParams,
       fileFiltering: {
@@ -645,7 +647,7 @@ describe('Server Config (config.ts)', () => {
       },
     };
     const config = new Config(params);
-    expect(config.getCustomIgnoreFilePath()).toBeUndefined();
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([]);
   });
 
   it('should initialize WorkspaceContext with includeDirectories', () => {
@@ -730,7 +732,7 @@ describe('Server Config (config.ts)', () => {
       fileFiltering: {
         respectGitIgnore: false,
         respectGeminiIgnore: false,
-        customIgnoreFilePath: '.myignore',
+        customIgnoreFilePaths: ['.myignore'],
       },
     };
 
@@ -742,7 +744,7 @@ describe('Server Config (config.ts)', () => {
       {
         respectGitIgnore: false,
         respectGeminiIgnore: false,
-        customIgnoreFilePath: '.myignore',
+        customIgnoreFilePaths: ['.myignore'],
       },
     );
   });

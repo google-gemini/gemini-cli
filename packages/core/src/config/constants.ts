@@ -9,7 +9,7 @@ export interface FileFilteringOptions {
   respectGeminiIgnore: boolean;
   maxFileCount?: number;
   searchTimeout?: number;
-  customIgnoreFilePath: string | undefined;
+  customIgnoreFilePaths: string[];
 }
 
 // For memory files
@@ -18,7 +18,7 @@ export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGeminiIgnore: true,
   maxFileCount: 20000,
   searchTimeout: 5000,
-  customIgnoreFilePath: undefined,
+  customIgnoreFilePaths: [],
 };
 
 // For all other files
@@ -27,7 +27,7 @@ export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGeminiIgnore: true,
   maxFileCount: 20000,
   searchTimeout: 5000,
-  customIgnoreFilePath: undefined,
+  customIgnoreFilePaths: [],
 };
 
 // Generic exclusion file name

@@ -15,7 +15,7 @@ import * as path from 'node:path';
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
   respectGeminiIgnore?: boolean;
-  customIgnoreFilePath?: string;
+  customIgnoreFilePaths?: string[];
 }
 
 export interface FilterReport {
@@ -31,7 +31,7 @@ export class FileDiscoveryService {
   private defaultFilterFileOptions: FilterFilesOptions = {
     respectGitIgnore: true,
     respectGeminiIgnore: true,
-    customIgnoreFilePath: undefined,
+    customIgnoreFilePaths: [],
   };
   private projectRoot: string;
 
@@ -45,10 +45,10 @@ export class FileDiscoveryService {
       this.projectRoot,
       GEMINI_IGNORE_FILE_NAME,
     );
-    if (this.defaultFilterFileOptions.customIgnoreFilePath) {
+    if (this.defaultFilterFileOptions.customIgnoreFilePaths) {
       this.customIgnoreFilter = new IgnoreFileParser(
         this.projectRoot,
-        this.defaultFilterFileOptions.customIgnoreFilePath,
+        this.defaultFilterFileOptions.customIgnoreFilePaths,
       );
     }
 
@@ -76,9 +76,9 @@ export class FileDiscoveryService {
       this.defaultFilterFileOptions.respectGeminiIgnore =
         options.respectGeminiIgnore;
     }
-    if (options.customIgnoreFilePath) {
-      this.defaultFilterFileOptions.customIgnoreFilePath =
-        options.customIgnoreFilePath;
+    if (options.customIgnoreFilePaths) {
+      this.defaultFilterFileOptions.customIgnoreFilePaths =
+        options.customIgnoreFilePaths;
     }
   }
 

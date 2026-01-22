@@ -51,27 +51,27 @@ describe('loadConfig', () => {
   });
 
   afterEach(() => {
-    delete process.env['CUSTOM_IGNORE_FILE_PATH'];
+    delete process.env['CUSTOM_IGNORE_FILE_PATHS'];
     delete process.env['GEMINI_API_KEY'];
   });
 
-  it('should set customIgnoreFilePath when CUSTOM_IGNORE_FILE_PATH env var is present', async () => {
+  it('should set customIgnoreFilePaths when CUSTOM_IGNORE_FILE_PATHS env var is present', async () => {
     const testPath = '/tmp/ignore';
-    process.env['CUSTOM_IGNORE_FILE_PATH'] = testPath;
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((config as any).fileFiltering.customIgnoreFilePath).toBe(testPath);
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toBe(testPath);
   });
 
-  it('should leave customIgnoreFilePath undefined when env var is missing', async () => {
+  it('should leave customIgnoreFilePaths undefined when env var is missing', async () => {
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((config as any).fileFiltering.customIgnoreFilePath).toBeUndefined();
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toBeUndefined();
   });
 
   it('should initialize FileDiscoveryService with correct options', async () => {
     const testPath = '/tmp/ignore';
-    process.env['CUSTOM_IGNORE_FILE_PATH'] = testPath;
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
     const settings: Settings = {
       fileFiltering: {
         respectGitIgnore: false,
@@ -83,7 +83,7 @@ describe('loadConfig', () => {
     expect(FileDiscoveryService).toHaveBeenCalledWith(expect.any(String), {
       respectGitIgnore: false,
       respectGeminiIgnore: undefined,
-      customIgnoreFilePath: testPath,
+      customIgnoreFilePaths: [testPath],
     });
   });
 });

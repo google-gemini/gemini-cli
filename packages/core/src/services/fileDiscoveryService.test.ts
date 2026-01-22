@@ -77,7 +77,7 @@ describe('FileDiscoveryService', () => {
       const options = {
         respectGitIgnore: false,
         respectGeminiIgnore: false,
-        customIgnoreFilePath: 'custom/.ignore',
+        customIgnoreFilePaths: ['custom/.ignore'],
       };
       const service = new FileDiscoveryService(projectRoot, options);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,7 +85,7 @@ describe('FileDiscoveryService', () => {
 
       expect(defaults.respectGitIgnore).toBe(false);
       expect(defaults.respectGeminiIgnore).toBe(false);
-      expect(defaults.customIgnoreFilePath).toBe('custom/.ignore');
+      expect(defaults.customIgnoreFilePaths).toStrictEqual(['custom/.ignore']);
     });
 
     it('should use defaults when options are not provided', () => {
@@ -95,7 +95,7 @@ describe('FileDiscoveryService', () => {
 
       expect(defaults.respectGitIgnore).toBe(true);
       expect(defaults.respectGeminiIgnore).toBe(true);
-      expect(defaults.customIgnoreFilePath).toBeUndefined();
+      expect(defaults.customIgnoreFilePaths).toStrictEqual([]);
     });
 
     it('should partially override defaults', () => {
@@ -383,7 +383,7 @@ describe('FileDiscoveryService', () => {
       await createTestFile(customIgnoreName, '*.secret');
 
       const service = new FileDiscoveryService(projectRoot, {
-        customIgnoreFilePath: customIgnoreName,
+        customIgnoreFilePaths: [customIgnoreName],
       });
 
       const files = ['file.txt', 'file.secret'].map((f) =>
@@ -404,7 +404,7 @@ describe('FileDiscoveryService', () => {
       await createTestFile(customIgnoreName, '!debug.log');
 
       const service = new FileDiscoveryService(projectRoot, {
-        customIgnoreFilePath: customIgnoreName,
+        customIgnoreFilePaths: [customIgnoreName],
       });
 
       const files = ['debug.log', 'error.log'].map((f) =>

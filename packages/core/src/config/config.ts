@@ -325,7 +325,7 @@ export interface ConfigParameters {
     enableFuzzySearch?: boolean;
     maxFileCount?: number;
     searchTimeout?: number;
-    customIgnoreFilePath?: string;
+    customIgnoreFilePaths?: string[];
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -462,7 +462,7 @@ export class Config {
     enableFuzzySearch: boolean;
     maxFileCount: number;
     searchTimeout: number;
-    customIgnoreFilePath: string | undefined;
+    customIgnoreFilePaths: string[];
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -627,8 +627,7 @@ export class Config {
         params.fileFiltering?.searchTimeout ??
         DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
         5000,
-      customIgnoreFilePath:
-        params.fileFiltering?.customIgnoreFilePath ?? undefined,
+      customIgnoreFilePaths: params.fileFiltering?.customIgnoreFilePaths ?? [],
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -1523,8 +1522,8 @@ export class Config {
     return this.fileFiltering.respectGeminiIgnore;
   }
 
-  getCustomIgnoreFilePath(): string | undefined {
-    return this.fileFiltering.customIgnoreFilePath;
+  getCustomIgnoreFilePaths(): string[] {
+    return this.fileFiltering.customIgnoreFilePaths;
   }
 
   getFileFilteringOptions(): FileFilteringOptions {
@@ -1533,7 +1532,7 @@ export class Config {
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
       maxFileCount: this.fileFiltering.maxFileCount,
       searchTimeout: this.fileFiltering.searchTimeout,
-      customIgnoreFilePath: this.fileFiltering.customIgnoreFilePath,
+      customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
     };
   }
 
@@ -1573,7 +1572,7 @@ export class Config {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
         respectGitIgnore: this.fileFiltering.respectGitIgnore,
         respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
-        customIgnoreFilePath: this.fileFiltering.customIgnoreFilePath,
+        customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
       });
     }
     return this.fileDiscoveryService;
