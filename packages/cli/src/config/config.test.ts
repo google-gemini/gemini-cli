@@ -34,6 +34,10 @@ vi.mock('./sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(async () => undefined),
 }));
 
+vi.mock('../commands/utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
@@ -134,7 +138,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-vi.mock('./extension-manager.js');
+vi.mock('./extension-manager.js', () => {
+  const ExtensionManager = vi.fn();
+  ExtensionManager.prototype.loadExtensions = vi.fn();
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  return { ExtensionManager };
+});
 
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
@@ -142,6 +151,11 @@ const originalGeminiModel = process.env['GEMINI_MODEL'];
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
+  // Restore ExtensionManager mocks by re-assigning them
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  ExtensionManager.prototype.loadExtensions = vi
+    .fn()
+    .mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -534,6 +548,42 @@ describe('parseArguments', () => {
       'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
     );
   });
+
+  it('should set isCommand to true for mcp command', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for extensions command', async () => {
+    process.argv = ['node', 'script.js', 'extensions', 'list'];
+    // Extensions command uses experimental settings
+    const settings = createTestMergedSettings({
+      experimental: { extensionManagement: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for skills command', async () => {
+    process.argv = ['node', 'script.js', 'skills', 'list'];
+    // Skills command enabled by default or via experimental
+    const settings = createTestMergedSettings({
+      experimental: { skills: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for hooks command', async () => {
+    process.argv = ['node', 'script.js', 'hooks', 'migrate'];
+    // Hooks command enabled via tools settings
+    const settings = createTestMergedSettings({
+      tools: { enableHooks: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -639,11 +689,31 @@ describe('loadCliConfig', () => {
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
+
+  it('should be non-interactive when isCommand is set', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    argv.isCommand = true; // explicitly set it as if middleware ran (it does in parseArguments but we want to be sure for this isolated test if we were mocking argv)
+
+    // reset tty for this test
+    process.stdin.isTTY = true;
+
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.isInteractive()).toBe(false);
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Restore ExtensionManager mocks that were reset
+    ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+    ExtensionManager.prototype.loadExtensions = vi
+      .fn()
+      .mockResolvedValue(undefined);
+
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     // Other common mocks would be reset here.
   });
@@ -699,6 +769,63 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200, // maxDirs
+    );
+  });
+
+  it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
+    const settings = createTestMergedSettings({
+      context: {
+        includeDirectories: [includeDir],
+        loadMemoryFromIncludeDirectories: true,
+      },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv);
+
+    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+      expect.any(String),
+      [includeDir],
+      false,
+      expect.any(Object),
+      expect.any(ExtensionManager),
+      true,
+      'tree',
+      expect.objectContaining({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      200,
+    );
+  });
+
+  it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      context: {
+        includeDirectories: ['/path/to/include'],
+        loadMemoryFromIncludeDirectories: false,
+      },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv);
+
+    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+      expect.any(String),
+      [],
+      false,
+      expect.any(Object),
+      expect.any(ExtensionManager),
+      true,
+      'tree',
+      expect.objectContaining({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      200,
     );
   });
 });

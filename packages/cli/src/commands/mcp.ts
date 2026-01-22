@@ -17,7 +17,10 @@ export const mcpCommand: CommandModule = {
   describe: 'Manage MCP servers',
   builder: (yargs: Argv) =>
     yargs
-      .middleware(() => initializeOutputListenersAndFlush())
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
       .command(defer(addCommand, 'mcp'))
       .command(defer(removeCommand, 'mcp'))
       .command(defer(listCommand, 'mcp'))

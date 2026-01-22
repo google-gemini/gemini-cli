@@ -373,12 +373,12 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-  if (
-    settings.merged.security.auth.selectedType &&
-    !settings.merged.security.auth.useExternal
-  ) {
+  if (!settings.merged.security.auth.useExternal) {
     try {
-      if (partialConfig.isInteractive()) {
+      if (
+        partialConfig.isInteractive() &&
+        settings.merged.security.auth.selectedType
+      ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
@@ -389,7 +389,7 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else {
+      } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,
           settings.merged.security.auth.useExternal,
@@ -664,9 +664,8 @@ export async function main() {
         const additionalContext = result.getAdditionalContext();
         if (additionalContext) {
           // Prepend context to input (System Context -> Stdin -> Question)
-          input = input
-            ? `${additionalContext}\n\n${input}`
-            : additionalContext;
+          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
+          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
         }
       }
     }
@@ -728,6 +727,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
