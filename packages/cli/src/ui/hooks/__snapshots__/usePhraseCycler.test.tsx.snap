@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`usePhraseCycler > should prioritize interactive shell waiting over normal waiting immediately 1`] = `"Waiting for user confirmation..."`;
+
+exports[`usePhraseCycler > should prioritize interactive shell waiting over normal waiting immediately 2`] = `"Interactive shell awaiting input... press tab to focus shell"`;
+
+exports[`usePhraseCycler > should reset phrase when transitioning from waiting to active 1`] = `"Waiting for user confirmation..."`;
+
+exports[`usePhraseCycler > should show "Waiting for user confirmation..." when isWaiting is true 1`] = `"Waiting for user confirmation..."`;
+
+exports[`usePhraseCycler > should show interactive shell waiting message immediately when isInteractiveShellWaiting is true 1`] = `"Interactive shell awaiting input... press tab to focus shell"`;

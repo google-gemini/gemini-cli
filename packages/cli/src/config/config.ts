@@ -476,7 +476,9 @@ export async function loadCliConfig(
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
-      [],
+      settings.context?.loadMemoryFromIncludeDirectories || false
+        ? includeDirectories
+        : [],
       debugMode,
       fileService,
       extensionManager,
@@ -776,7 +778,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? true),
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
