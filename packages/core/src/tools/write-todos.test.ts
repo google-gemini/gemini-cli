@@ -4,13 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { WriteTodosTool, type WriteTodosToolParams } from './write-todos.js';
-import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { resetTodoStateManager } from './todo-state-manager.js';
+import type { Config } from '../config/config.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 
 describe('WriteTodosTool', () => {
-  const tool = new WriteTodosTool(createMockMessageBus());
+  let tempDir: string;
+  let tool: WriteTodosTool;
   const signal = new AbortController().signal;
+
+  // Mock config for testing
+  const createMockConfig = (tempPath: string) =>
+    ({
+      storage: {
+        getProjectTempDir: () => tempPath,
+      },
+    }) as unknown as Config;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'write-todos-test-'));
+    tool = new WriteTodosTool(createMockConfig(tempDir));
+    resetTodoStateManager(); // Reset state between tests
+  });
+
+  afterEach(async () => {
+    resetTodoStateManager();
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
 
   describe('validation', () => {
     it('should not throw for valid parameters', async () => {
