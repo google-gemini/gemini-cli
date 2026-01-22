@@ -19,8 +19,7 @@ import type {
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
-} from '@google/gemini-cli-core';
-import {
+
   GitService,
   Logger,
   logSlashCommand,
@@ -32,7 +31,7 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
-} from '@google/gemini-cli-core';
+  type AgentDefinition} from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
   Message,
@@ -69,6 +68,11 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openAgentConfigDialog: (
+    name: string,
+    displayName: string,
+    definition: AgentDefinition,
+  ) => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
@@ -218,6 +222,7 @@ export const useSlashCommandProcessor = (
         toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         reloadCommands,
+        openAgentConfigDialog: actions.openAgentConfigDialog,
         extensionsUpdateState,
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
@@ -446,6 +451,19 @@ export const useSlashCommandProcessor = (
                     case 'model':
                       actions.openModelDialog();
                       return { type: 'handled' };
+                    case 'agentConfig': {
+                      const props = result.props as {
+                        name: string;
+                        displayName: string;
+                        definition: AgentDefinition;
+                      };
+                      actions.openAgentConfigDialog(
+                        props.name,
+                        props.displayName,
+                        props.definition,
+                      );
+                      return { type: 'handled' };
+                    }
                     case 'permissions':
                       actions.openPermissionsDialog(
                         result.props as { targetDirectory?: string },

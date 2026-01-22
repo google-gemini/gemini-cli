@@ -188,6 +188,7 @@ describe('useSlashCommandProcessor', () => {
             openSettingsDialog: vi.fn(),
             openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
+            openAgentConfigDialog: vi.fn(),
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
             setDebugMessage: vi.fn(),
@@ -519,6 +520,81 @@ describe('useSlashCommandProcessor', () => {
           expect(mockFn).toHaveBeenCalled();
         },
       );
+
+      it('should handle "dialog: agentConfig" action with props', async () => {
+        const mockOpenAgentConfigDialog = vi.fn();
+        const agentDefinition = { name: 'test-agent' };
+        const commandName = 'agentconfigcmd';
+        const command = createTestCommand({
+          name: commandName,
+          action: vi.fn().mockResolvedValue({
+            type: 'dialog',
+            dialog: 'agentConfig',
+            props: {
+              name: 'test-agent',
+              displayName: 'Test Agent',
+              definition: agentDefinition,
+            },
+          }),
+        });
+
+        // Re-setup the hook with the mock action that we can inspect
+        mockBuiltinLoadCommands.mockResolvedValue(Object.freeze([command]));
+        mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+        mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+        let result!: { current: ReturnType<typeof useSlashCommandProcessor> };
+        await act(async () => {
+          const hook = renderHook(() =>
+            useSlashCommandProcessor(
+              mockConfig,
+              mockSettings,
+              mockAddItem,
+              mockClearItems,
+              mockLoadHistory,
+              vi.fn(),
+              vi.fn(),
+              vi.fn(),
+              {
+                openAuthDialog: vi.fn(),
+                openThemeDialog: vi.fn(),
+                openEditorDialog: vi.fn(),
+                openPrivacyNotice: vi.fn(),
+                openSettingsDialog: vi.fn(),
+                openSessionBrowser: vi.fn(),
+                openModelDialog: vi.fn(),
+                openAgentConfigDialog: mockOpenAgentConfigDialog,
+                openPermissionsDialog: vi.fn(),
+                quit: vi.fn(),
+                setDebugMessage: vi.fn(),
+                toggleCorgiMode: vi.fn(),
+                toggleDebugProfiler: vi.fn(),
+                dispatchExtensionStateUpdate: vi.fn(),
+                addConfirmUpdateExtensionRequest: vi.fn(),
+              },
+              new Map(),
+              true,
+              vi.fn(),
+              vi.fn(),
+            ),
+          );
+          result = hook.result;
+        });
+
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        await act(async () => {
+          await result.current.handleSlashCommand(`/${commandName}`);
+        });
+
+        expect(mockOpenAgentConfigDialog).toHaveBeenCalledWith(
+          'test-agent',
+          'Test Agent',
+          agentDefinition,
+        );
+      });
     });
 
     it('should handle "load_history" action', async () => {
