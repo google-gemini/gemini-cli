@@ -31,7 +31,7 @@ describe('subagent eval test cases', () => {
    *
    * This tests the system prompt's subagent specific clauses.
    */
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: 'should delegate to user provided agent with relevant expertise',
     params: {
       settings: {
@@ -47,18 +47,7 @@ describe('subagent eval test cases', () => {
       'README.md': 'TODO: update the README.',
     },
     assert: async (rig, _result) => {
-      await rig.expectToolCallSuccess(
-        ['delegate_to_agent'],
-        undefined,
-        (args) => {
-          try {
-            const parsed = JSON.parse(args);
-            return parsed.agent_name === 'docs-agent';
-          } catch {
-            return false;
-          }
-        },
-      );
+      await rig.expectToolCallSuccess(['docs-agent']);
     },
   });
 });
