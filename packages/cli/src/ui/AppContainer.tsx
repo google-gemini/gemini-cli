@@ -62,9 +62,9 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
-
   type AgentDefinition,
-  type AgentsDiscoveredPayload} from '@google/gemini-cli-core';
+  type AgentsDiscoveredPayload,
+} from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';

@@ -18,12 +18,12 @@ vi.mock('./agentLoader.js', () => ({
 }));
 
 // Mock AcknowledgedAgentsService
-const mockAckService = {
+const mockAckService = vi.hoisted(() => ({
   load: vi.fn(),
   save: vi.fn(),
   isAcknowledged: vi.fn(),
   acknowledge: vi.fn(),
-};
+}));
 
 vi.mock('./acknowledgedAgents.js', () => ({
   AcknowledgedAgentsService: {
@@ -48,7 +48,7 @@ const MOCK_AGENT_WITH_HASH: AgentDefinition = {
   },
 };
 
-describe.skip('AgentRegistry Acknowledgement', () => {
+describe('AgentRegistry Acknowledgement', () => {
   let registry: AgentRegistry;
   let config: Config;
 
@@ -67,14 +67,21 @@ describe.skip('AgentRegistry Acknowledgement', () => {
     vi.spyOn(config.storage, 'getProjectAgentsDir').mockReturnValue(
       '/project/.gemini/agents',
     );
+    vi.spyOn(config, 'isAgentsEnabled').mockReturnValue(true);
 
     registry = new AgentRegistry(config);
 
-    // Reset mocks
-    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
-      agents: [],
-      errors: [],
-    });
+    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockImplementation(
+      async (dir) => {
+        if (dir === '/project/.gemini/agents') {
+          return {
+            agents: [MOCK_AGENT_WITH_HASH],
+            errors: [],
+          };
+        }
+        return { agents: [], errors: [] };
+      },
+    );
     mockAckService.isAcknowledged.mockReturnValue(false);
     vi.clearAllMocks();
   });
@@ -84,10 +91,6 @@ describe.skip('AgentRegistry Acknowledgement', () => {
   });
 
   it('should not register unacknowledged project agents and emit event', async () => {
-    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
-      agents: [MOCK_AGENT_WITH_HASH],
-      errors: [],
-    });
     mockAckService.isAcknowledged.mockReturnValue(false);
 
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
@@ -99,10 +102,17 @@ describe.skip('AgentRegistry Acknowledgement', () => {
   });
 
   it('should register acknowledged project agents', async () => {
-    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
-      agents: [MOCK_AGENT_WITH_HASH],
-      errors: [],
-    });
+    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockImplementation(
+      async (dir) => {
+        if (dir === '/project/.gemini/agents') {
+          return {
+            agents: [MOCK_AGENT_WITH_HASH],
+            errors: [],
+          };
+        }
+        return { agents: [], errors: [] };
+      },
+    );
     mockAckService.isAcknowledged.mockReturnValue(true);
 
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
@@ -116,10 +126,17 @@ describe.skip('AgentRegistry Acknowledgement', () => {
   it('should register agents without hash (legacy/safe?)', async () => {
     // Current logic: if no hash, allow it.
     const agentNoHash = { ...MOCK_AGENT_WITH_HASH, metadata: undefined };
-    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
-      agents: [agentNoHash],
-      errors: [],
-    });
+    vi.mocked(tomlLoader.loadAgentsFromDirectory).mockImplementation(
+      async (dir) => {
+        if (dir === '/project/.gemini/agents') {
+          return {
+            agents: [agentNoHash],
+            errors: [],
+          };
+        }
+        return { agents: [], errors: [] };
+      },
+    );
 
     await registry.initialize();
 
