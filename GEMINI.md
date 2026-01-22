@@ -65,8 +65,4 @@ powerful tool for developers.
 ## Documentation
 
 - Located in the `docs/` directory.
-- Architecture overview: `docs/architecture.md`.
-- Contribution guide: `CONTRIBUTING.md`.
-- Documentation is organized via `docs/sidebar.json`.
-- Follows the
-  [Google Developer Documentation Style Guide](https://developers.google.com/style).
+- Use the `docs-writer` skill.
