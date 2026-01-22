@@ -213,6 +213,7 @@ export const useSlashCommandProcessor = (
         },
         loadHistory: (history, postLoadInput) => {
           loadHistory(history);
+          refreshStatic();
           if (postLoadInput !== undefined) {
             actions.setText(postLoadInput);
           }
