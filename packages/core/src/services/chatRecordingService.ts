@@ -118,6 +118,13 @@ export class ChatRecordingService {
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
 
+  /**
+   * When true, recording is disabled due to an unrecoverable error (e.g., disk full).
+   * All recording methods will return early without throwing.
+   */
+  private recordingDisabled = false;
+  private disabledReason: string | null = null;
+
   constructor(config: Config) {
     this.config = config;
     this.sessionId = config.getSessionId();
@@ -173,6 +180,21 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow CLI to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.recordingDisabled = true;
+        this.disabledReason = 'No space left on device (ENOSPC)';
+        debugLogger.warn(
+          'Chat recording disabled: No space left on device. ' +
+            'The conversation will continue but will not be saved to disk. ' +
+            'Free up disk space to enable recording in future sessions.',
+        );
+        return; // Don't throw - allow the CLI to continue
+      }
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
@@ -204,7 +226,7 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
   }): void {
-    if (!this.conversationFile) return;
+    if (!this.conversationFile || this.recordingDisabled) return;
 
     try {
       this.updateConversation((conversation) => {
@@ -234,7 +256,7 @@ export class ChatRecordingService {
    * Records a thought from the assistant's reasoning process.
    */
   recordThought(thought: ThoughtSummary): void {
-    if (!this.conversationFile) return;
+    if (!this.conversationFile || this.recordingDisabled) return;
 
     try {
       this.queuedThoughts.push({
@@ -253,7 +275,7 @@ export class ChatRecordingService {
   recordMessageTokens(
     respUsageMetadata: GenerateContentResponseUsageMetadata,
   ): void {
-    if (!this.conversationFile) return;
+    if (!this.conversationFile || this.recordingDisabled) return;
 
     try {
       const tokens = {
@@ -289,7 +311,7 @@ export class ChatRecordingService {
    * This method enriches tool calls with metadata from the ToolRegistry.
    */
   recordToolCalls(model: string, toolCalls: ToolCallRecord[]): void {
-    if (!this.conversationFile) return;
+    if (!this.conversationFile || this.recordingDisabled) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
     const toolRegistry = this.config.getToolRegistry();
@@ -413,7 +435,7 @@ export class ChatRecordingService {
     { allowEmpty = false }: { allowEmpty?: boolean } = {},
   ): void {
     try {
-      if (!this.conversationFile) return;
+      if (!this.conversationFile || this.recordingDisabled) return;
       // Don't write the file yet until there's at least one message.
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
@@ -425,6 +447,21 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.recordingDisabled = true;
+        this.disabledReason = 'No space left on device (ENOSPC)';
+        debugLogger.warn(
+          'Chat recording disabled: No space left on device. ' +
+            'The conversation will continue but will not be saved to disk. ' +
+            'Free up disk space to enable recording in future sessions.',
+        );
+        return; // Don't throw - allow the conversation to continue
+      }
       debugLogger.error('Error writing conversation file.', error);
       throw error;
     }
@@ -446,7 +483,7 @@ export class ChatRecordingService {
    * Saves a summary for the current session.
    */
   saveSummary(summary: string): void {
-    if (!this.conversationFile) return;
+    if (!this.conversationFile || this.recordingDisabled) return;
 
     try {
       this.updateConversation((conversation) => {
@@ -462,7 +499,7 @@ export class ChatRecordingService {
    * Gets the current conversation data (for summary generation).
    */
   getConversation(): ConversationRecord | null {
-    if (!this.conversationFile) return null;
+    if (!this.conversationFile || this.recordingDisabled) return null;
 
     try {
       return this.readConversation();
@@ -474,10 +511,25 @@ export class ChatRecordingService {
 
   /**
    * Gets the path to the current conversation file.
-   * Returns null if the service hasn't been initialized yet.
+   * Returns null if the service hasn't been initialized yet or recording is disabled.
    */
   getConversationFilePath(): string | null {
+    if (this.recordingDisabled) return null;
     return this.conversationFile;
+  }
+
+  /**
+   * Checks if recording has been disabled due to an error (e.g., disk full).
+   */
+  isRecordingDisabled(): boolean {
+    return this.recordingDisabled;
+  }
+
+  /**
+   * Gets the reason why recording was disabled, or null if recording is enabled.
+   */
+  getDisabledReason(): string | null {
+    return this.disabledReason;
   }
 
   /**
