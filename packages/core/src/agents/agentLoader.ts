@@ -8,6 +8,7 @@ import yaml from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { z } from 'zod';
 import type { AgentDefinition } from './types.js';
 import {
@@ -241,10 +242,12 @@ export async function parseAgentMarkdown(
  * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
  * @param markdown The parsed Markdown/Frontmatter definition.
+ * @param metadata Optional metadata including hash and file path.
  * @returns The internal AgentDefinition.
  */
 export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
+  metadata?: { hash?: string; filePath?: string },
 ): AgentDefinition {
   const inputConfig = {
     inputSchema: {
@@ -268,6 +271,7 @@ export function markdownToAgentDefinition(
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       inputConfig,
+      metadata,
     };
   }
 
@@ -300,6 +304,7 @@ export function markdownToAgentDefinition(
         }
       : undefined,
     inputConfig,
+    metadata,
   };
 }
 
@@ -346,9 +351,11 @@ export async function loadAgentsFromDirectory(
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath);
       for (const def of agentDefs) {
-        const agent = markdownToAgentDefinition(def);
+        const agent = markdownToAgentDefinition(def, { hash, filePath });
         result.agents.push(agent);
       }
     } catch (error) {

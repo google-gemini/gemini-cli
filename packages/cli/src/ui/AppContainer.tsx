@@ -62,7 +62,9 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
-} from '@google/gemini-cli-core';
+
+  type AgentDefinition,
+  type AgentsDiscoveredPayload} from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -130,6 +132,10 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import {
+  NewAgentsNotification,
+  NewAgentsChoice,
+} from './components/NewAgentsNotification.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -203,6 +209,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
     null,
   );
+
+  const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -370,14 +378,20 @@ export const AppContainer = (props: AppContainerProps) => {
       setAdminSettingsChanged(true);
     };
 
+    const handleAgentsDiscovered = (payload: AgentsDiscoveredPayload) => {
+      setNewAgents(payload.agents);
+    };
+
     coreEvents.on(CoreEvent.SettingsChanged, handleSettingsChanged);
     coreEvents.on(CoreEvent.AdminSettingsChanged, handleAdminSettingsChanged);
+    coreEvents.on(CoreEvent.AgentsDiscovered, handleAgentsDiscovered);
     return () => {
       coreEvents.off(CoreEvent.SettingsChanged, handleSettingsChanged);
       coreEvents.off(
         CoreEvent.AdminSettingsChanged,
         handleAdminSettingsChanged,
       );
+      coreEvents.off(CoreEvent.AgentsDiscovered, handleAgentsDiscovered);
     };
   }, []);
 
@@ -1832,6 +1846,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
           setAuthContext({});
           setAuthState(AuthState.Updating);
         }}
+      />
+    );
+  }
+
+  if (newAgents) {
+    const handleNewAgentsSelect = (choice: NewAgentsChoice) => {
+      if (choice === NewAgentsChoice.ACKNOWLEDGE) {
+        const registry = config.getAgentRegistry();
+        newAgents.forEach((agent) => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          registry.acknowledgeAgent(agent);
+        });
+      }
+      setNewAgents(null);
+    };
+
+    return (
+      <NewAgentsNotification
+        agents={newAgents}
+        onSelect={handleNewAgentsSelect}
       />
     );
   }

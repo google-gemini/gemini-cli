@@ -5,10 +5,11 @@
  */
 
 import { Storage } from '../config/storage.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
+import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
@@ -81,6 +82,19 @@ export class AgentRegistry {
   }
 
   /**
+   * Acknowledges and registers a previously unacknowledged agent.
+   */
+  async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
+    const ackService = AcknowledgedAgentsService.getInstance();
+    const projectRoot = this.config.getProjectRoot();
+    if (agent.metadata?.hash) {
+      ackService.acknowledge(projectRoot, agent.name, agent.metadata.hash);
+      await this.registerAgent(agent);
+      coreEvents.emitAgentsRefreshed();
+    }
+  }
+
+  /**
    * Disposes of resources and removes event listeners.
    */
   dispose(): void {
@@ -122,8 +136,42 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
+
+      const ackService = AcknowledgedAgentsService.getInstance();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+
+      const agentsToRegister = projectAgents.agents.filter((agent) => {
+        // If it's a remote agent, we might not have a hash, or we handle it differently.
+        // For now, assuming project agents are primarily local .md files with hashes.
+        // If metadata or hash is missing, we default to "safe" (allow) or "unsafe" (block)?
+        // Existing behavior was allow all. To be safe, if we can't identify it, maybe we should block?
+        // But for backward compatibility with existing agents without hash (if any), maybe allow?
+        // Our loader ensures hash is there.
+        if (!agent.metadata?.hash) {
+          return true;
+        }
+
+        if (
+          ackService.isAcknowledged(
+            projectRoot,
+            agent.name,
+            agent.metadata.hash,
+          )
+        ) {
+          return true;
+        } else {
+          unacknowledgedAgents.push(agent);
+          return false;
+        }
+      });
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
       await Promise.allSettled(
-        projectAgents.agents.map((agent) => this.registerAgent(agent)),
+        agentsToRegister.map((agent) => this.registerAgent(agent)),
       );
     } else {
       coreEvents.emitFeedback(

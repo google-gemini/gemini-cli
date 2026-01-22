@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import type { AgentDefinition } from '../agents/types.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -108,6 +109,13 @@ export interface RetryAttemptPayload {
   model: string;
 }
 
+/**
+ * Payload for the 'agents-discovered' event.
+ */
+export interface AgentsDiscoveredPayload {
+  agents: AgentDefinition[];
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -121,6 +129,7 @@ export enum CoreEvent {
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
+  AgentsDiscovered = 'agents-discovered',
 }
 
 export interface CoreEvents {
@@ -136,6 +145,7 @@ export interface CoreEvents {
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
 }
 
 type EventBacklogItem = {
@@ -256,6 +266,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitRetryAttempt(payload: RetryAttemptPayload): void {
     this.emit(CoreEvent.RetryAttempt, payload);
+  }
+
+  /**
+   * Notifies subscribers that new unacknowledged agents have been discovered.
+   */
+  emitAgentsDiscovered(agents: AgentDefinition[]): void {
+    const payload: AgentsDiscoveredPayload = { agents };
+    this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
   }
 
   /**
