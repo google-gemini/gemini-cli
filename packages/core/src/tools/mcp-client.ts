@@ -604,6 +604,7 @@ async function handleAutomaticOAuth(
     const oauthAuthConfig = {
       enabled: true,
       authorizationUrl: oauthConfig.authorizationUrl,
+      issuer: oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
       scopes: oauthConfig.scopes || [],
     };
@@ -1606,6 +1607,7 @@ export async function connectToMcpServer(
             const oauthAuthConfig = {
               enabled: true,
               authorizationUrl: oauthConfig.authorizationUrl,
+              issuer: oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
               scopes: oauthConfig.scopes || [],
             };
