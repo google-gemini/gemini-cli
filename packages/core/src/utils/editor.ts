@@ -226,12 +226,32 @@ export async function openDiff(
     return;
   }
 
+  // Check if the editor command exists before attempting to spawn
+  if (!commandExists(diffCommand.command)) {
+    const editorName = getEditorDisplayName(editor);
+    debugLogger.error(
+      `${editorName} (${diffCommand.command}) is not installed or not in PATH. ` +
+      `Please install ${editorName} or set a different editor in your settings.`
+    );
+    throw new Error(
+      `${editorName} not found. Please install it or configure a different editor.`
+    );
+  }
+
   if (isTerminalEditor(editor)) {
     try {
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });
       if (result.error) {
+        // Provide a more helpful error message for ENOENT
+        if (result.error.message.includes('ENOENT')) {
+          const editorName = getEditorDisplayName(editor);
+          throw new Error(
+            `${editorName} command '${diffCommand.command}' not found. ` +
+            `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
+          );
+        }
         throw result.error;
       }
       if (result.status !== 0) {
@@ -258,7 +278,18 @@ export async function openDiff(
     });
 
     childProcess.on('error', (error) => {
-      reject(error);
+      // Provide a more helpful error message for ENOENT
+      if (error.message.includes('ENOENT')) {
+        const editorName = getEditorDisplayName(editor);
+        reject(
+          new Error(
+            `${editorName} command '${diffCommand.command}' not found. ` +
+            `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
+          )
+        );
+      } else {
+        reject(error);
+      }
     });
   });
 }
