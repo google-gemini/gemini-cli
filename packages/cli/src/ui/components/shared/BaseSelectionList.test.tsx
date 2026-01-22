@@ -199,6 +199,21 @@ describe('BaseSelectionList', () => {
         }),
       );
     });
+
+    it('should apply custom selectedColor to selected item when provided', () => {
+      const customColor = 'CUSTOM_SELECTED_COLOR';
+      renderComponent({ selectedColor: customColor }, 0); // Item A selected
+
+      // Check renderItem context colors for Item A with custom color
+      expect(mockRenderItem).toHaveBeenCalledWith(
+        items[0],
+        expect.objectContaining({
+          titleColor: customColor,
+          numberColor: customColor,
+          isSelected: true,
+        }),
+      );
+    });
   });
 
   describe('Numbering (showNumbers)', () => {
