@@ -87,7 +87,8 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
           type: 'object',
           properties: {
             agent_name: {
-              const: def.name,
+              type: 'string',
+              enum: [def.name],
               description: def.description,
             },
             ...(properties || {}),

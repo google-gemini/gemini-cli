@@ -473,7 +473,7 @@ export class AgentRegistry {
       .map(([name, def]) => `- **${name}**: ${def.description}`)
       .join('\n');
 
-    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
+    return `Delegates a task to a specialized sub-agent. You MUST use this tool to delegate. Using text to describe delegation is not sufficient.\n\nAvailable agents:\n${agentDescriptions}`;
   }
 
   /**
@@ -486,19 +486,16 @@ export class AgentRegistry {
     }
 
     let context = '## Available Sub-Agents\n';
-    context += `Sub-agents are specialized expert agents that you can use to assist you in
-      the completion of all or part of a task.
+    context += `You have access to specialized sub-agents.
+**MANDATE**: You MUST delegate tasks to a sub-agent if their expertise matches the user's request.
+**DO NOT** perform the task yourself if a sub-agent is available.
 
-      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
-      exists that has expertise relevant to your task.
+**HOW TO DELEGATE**:
+Use the \`${DELEGATE_TO_AGENT_TOOL_NAME}\` tool.
+Argument \`agent_name\`: The exact name of the sub-agent.
 
-      For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
-      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
-
-      The following are the available sub-agents:\n\n`;
+**Available Sub-Agents**:
+`;
 
     for (const [name, def] of this.agents) {
       context += `- **${name}**: ${def.description}\n`;
