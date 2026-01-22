@@ -45,6 +45,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
 export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly agents = new Map<string, AgentDefinition<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
   constructor(private readonly config: Config) {}
 
@@ -73,6 +75,7 @@ export class AgentRegistry {
     A2AClientManager.getInstance().clearCache();
     await this.config.reloadAgents();
     this.agents.clear();
+    this.allDefinitions.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
   }
@@ -85,6 +88,8 @@ export class AgentRegistry {
   }
 
   private async loadAgents(): Promise<void> {
+    this.agents.clear();
+    this.allDefinitions.clear();
     this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
@@ -152,7 +157,7 @@ export class AgentRegistry {
     // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
     if (
       investigatorSettings?.enabled &&
-      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
+      agentsOverrides[CodebaseInvestigatorAgent.name]?.enabled !== false
     ) {
       let model;
       const settingsModel = investigatorSettings.model;
@@ -200,7 +205,7 @@ export class AgentRegistry {
     // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
     if (
       cliHelpSettings.enabled &&
-      !agentsOverrides[CliHelpAgent.name]?.disabled
+      agentsOverrides[CliHelpAgent.name]?.enabled !== false
     ) {
       this.registerLocalAgent(CliHelpAgent(this.config));
     }
@@ -251,6 +256,8 @@ export class AgentRegistry {
       return;
     }
 
+    this.allDefinitions.set(definition.name, definition);
+
     const settingsOverrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
 
@@ -280,12 +287,8 @@ export class AgentRegistry {
     const isExperimental = definition.experimental === true;
     let isEnabled = !isExperimental;
 
-    if (overrides) {
-      if (overrides.disabled !== undefined) {
-        isEnabled = !overrides.disabled;
-      } else if (overrides.enabled !== undefined) {
-        isEnabled = overrides.enabled;
-      }
+    if (overrides && overrides.enabled !== undefined) {
+      isEnabled = overrides.enabled;
     }
 
     return isEnabled;
@@ -308,6 +311,8 @@ export class AgentRegistry {
       );
       return;
     }
+
+    this.allDefinitions.set(definition.name, definition);
 
     const overrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
@@ -421,7 +426,8 @@ export class AgentRegistry {
   /**
    * Retrieves an agent definition by name.
    */
-  getDefinition(name: string): AgentDefinition | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinition(name: string): AgentDefinition<any> | undefined {
     return this.agents.get(name);
   }
 
@@ -437,6 +443,20 @@ export class AgentRegistry {
    */
   getAllAgentNames(): string[] {
     return Array.from(this.agents.keys());
+  }
+
+  /**
+   * Returns a list of all discovered agent names, regardless of whether they are enabled.
+   */
+  getAllDiscoveredAgentNames(): string[] {
+    return Array.from(this.allDefinitions.keys());
+  }
+
+  /**
+   * Retrieves a discovered agent definition by name.
+   */
+  getDiscoveredDefinition(name: string): AgentDefinition | undefined {
+    return this.allDefinitions.get(name);
   }
 
   /**

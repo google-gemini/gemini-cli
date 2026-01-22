@@ -13,28 +13,17 @@ import { Command, defaultKeyBindings } from '../config/keyBindings.js';
  * Pure data-driven matching logic
  */
 function matchKeyBinding(keyBinding: KeyBinding, key: Key): boolean {
-  if (keyBinding.key !== key.name) {
-    return false;
-  }
-
   // Check modifiers - follow original logic:
   // undefined = ignore this modifier (original behavior)
   // true = modifier must be pressed
   // false = modifier must NOT be pressed
-
-  if (keyBinding.ctrl !== undefined && key.ctrl !== keyBinding.ctrl) {
-    return false;
-  }
-
-  if (keyBinding.shift !== undefined && key.shift !== keyBinding.shift) {
-    return false;
-  }
-
-  if (keyBinding.command !== undefined && key.meta !== keyBinding.command) {
-    return false;
-  }
-
-  return true;
+  return (
+    keyBinding.key === key.name &&
+    (keyBinding.shift === undefined || key.shift === keyBinding.shift) &&
+    (keyBinding.alt === undefined || key.alt === keyBinding.alt) &&
+    (keyBinding.ctrl === undefined || key.ctrl === keyBinding.ctrl) &&
+    (keyBinding.cmd === undefined || key.cmd === keyBinding.cmd)
+  );
 }
 
 /**

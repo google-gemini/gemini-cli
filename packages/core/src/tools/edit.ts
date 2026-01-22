@@ -328,7 +328,7 @@ export function getErrorReplaceResult(
   if (occurrences === 0) {
     error = {
       display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string (${finalOldString}). Original old_string was (${params.old_string}) in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
+      raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
   } else if (occurrences !== expectedReplacements) {
