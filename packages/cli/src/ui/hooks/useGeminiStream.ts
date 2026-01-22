@@ -1194,6 +1194,17 @@ export const useGeminiStream = (
           (
             tc: TrackedToolCall,
           ): tc is TrackedCompletedToolCall | TrackedCancelledToolCall => {
+            // Check if we've already submitted this tool call.
+            // We need to look up the tracked version because the incoming 'tc'
+            // comes directly from the scheduler core and lacks the
+            // 'responseSubmittedToGemini' flag.
+            const trackedToolCall = toolCalls.find(
+              (t) => t.request.callId === tc.request.callId,
+            );
+            if (trackedToolCall?.responseSubmittedToGemini) {
+              return false;
+            }
+
             const isTerminalState =
               tc.status === 'success' ||
               tc.status === 'error' ||
@@ -1285,8 +1296,7 @@ export const useGeminiStream = (
           const combinedParts = geminiTools.flatMap(
             (toolCall) => toolCall.response.responseParts,
           );
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          geminiClient.addHistory({
+          await geminiClient.addHistory({
             role: 'user',
             parts: combinedParts,
           });
@@ -1310,10 +1320,9 @@ export const useGeminiStream = (
         (toolCall) => toolCall.request.prompt_id,
       );
 
-      markToolsAsSubmitted(callIdsToMarkAsSubmitted);
-
       // Don't continue if model was switched due to quota error
       if (modelSwitchedFromQuotaError) {
+        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
         return;
       }
 
@@ -1324,6 +1333,8 @@ export const useGeminiStream = (
         },
         prompt_ids[0],
       );
+
+      markToolsAsSubmitted(callIdsToMarkAsSubmitted);
     },
     [
       submitQuery,
@@ -1332,6 +1343,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      toolCalls,
     ],
   );
 

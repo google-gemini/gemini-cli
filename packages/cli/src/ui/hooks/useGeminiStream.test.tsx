@@ -226,6 +226,11 @@ describe('useGeminiStream', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       addHistory: vi.fn(),
+      getContentGenerator: vi.fn().mockReturnValue({
+        generateContent: vi.fn(),
+        generateContentStream: vi.fn(),
+        countTokens: vi.fn(),
+      }),
       getSessionId() {
         return 'test-session-id';
       },
@@ -3248,5 +3253,226 @@ describe('useGeminiStream', () => {
       expect(mockSendMessageStream).toHaveBeenCalled();
       expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
+  });
+
+  it('should not resubmit tool responses that have already been submitted to Gemini', async () => {
+    // This tests the fix for the unrecoverable 400 error where already-submitted
+    // tools were being resubmitted due to stale closure in handleCompletedTools.
+
+    const alreadySubmittedTool = {
+      request: {
+        callId: 'already-submitted-call',
+        name: 'tool1',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: true, // KEY: Already submitted
+      response: {
+        callId: 'already-submitted-call',
+        responseParts: [{ text: 'already sent' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool1' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    const newTool = {
+      request: {
+        callId: 'new-call',
+        name: 'tool2',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false, // Not yet submitted
+      response: {
+        callId: 'new-call',
+        responseParts: [{ text: 'new response' }],
+        errorType: undefined,
+      },
+      tool: { displayName: 'Tool2' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [alreadySubmittedTool, newTool], // Current tracked state with flags
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Simulate scheduler calling onComplete
+    const fromScheduler = [
+      { ...alreadySubmittedTool, responseSubmittedToGemini: undefined },
+      { ...newTool, responseSubmittedToGemini: undefined },
+    ];
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(fromScheduler as TrackedToolCall[]);
+      }
+    });
+
+    // Only the NEW tool should be marked as submitted
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['new-call']);
+      // Should NOT be called with already-submitted-call
+      expect(mockMarkToolsAsSubmitted).not.toHaveBeenCalledWith([
+        'already-submitted-call',
+      ]);
+    });
+  });
+
+  it('should await submitQuery before marking tools as submitted (race condition fix)', async () => {
+    // This tests the fix for the race condition where markToolsAsSubmitted was
+    // called BEFORE submitQuery completed, allowing user prompts to race ahead
+    // of tool responses.
+
+    const toolCallResponseParts: Part[] = [{ text: 'tool response' }];
+
+    const completedTool = {
+      request: {
+        callId: 'race-test-call',
+        name: 'test_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-race-test',
+      },
+      status: 'success',
+      responseSubmittedToGemini: false,
+      response: {
+        callId: 'race-test-call',
+        responseParts: toolCallResponseParts,
+        errorType: undefined,
+      },
+      tool: { displayName: 'TestTool' },
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as unknown as AnyToolInvocation,
+    } as TrackedCompletedToolCall;
+
+    // Track the order of operations
+    const callOrder: string[] = [];
+    let resolveStreamPromise: () => void;
+    const streamPromise = new Promise<void>((resolve) => {
+      resolveStreamPromise = resolve;
+    });
+
+    // Mock sendMessageStream to be a slow async operation
+    mockSendMessageStream.mockImplementation(() => {
+      callOrder.push('sendMessageStream:start');
+      return (async function* () {
+        await streamPromise; // Wait until we explicitly resolve
+        callOrder.push('sendMessageStream:end');
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { finishReason: 'STOP' },
+        };
+      })();
+    });
+
+    // Track when markToolsAsSubmitted is called
+    mockMarkToolsAsSubmitted.mockImplementation((callIds: string[]) => {
+      callOrder.push(`markToolsAsSubmitted:${callIds.join(',')}`);
+    });
+
+    let capturedOnComplete:
+      | ((tools: TrackedToolCall[]) => Promise<void>)
+      | null = null;
+
+    mockUseReactToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        [completedTool],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+      ];
+    });
+
+    renderHook(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => 'vscode' as EditorType,
+        () => {},
+        () => Promise.resolve(),
+        false,
+        () => {},
+        () => {},
+        () => {},
+        80,
+        24,
+      ),
+    );
+
+    // Start tool completion
+    const completionPromise = act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete([completedTool] as TrackedToolCall[]);
+      }
+    });
+
+    // Give time for sendMessageStream to start
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(callOrder).toContain('sendMessageStream:start');
+    expect(callOrder).not.toContain('markToolsAsSubmitted:race-test-call');
+
+    // Now resolve the stream
+    resolveStreamPromise!();
+    await completionPromise;
+
+    // After stream completes, markToolsAsSubmitted should be called
+    await waitFor(() => {
+      expect(callOrder).toContain('markToolsAsSubmitted:race-test-call');
+    });
+
+    // Verify the correct order
+    const streamEndIndex = callOrder.indexOf('sendMessageStream:end');
+    const markIndex = callOrder.indexOf('markToolsAsSubmitted:race-test-call');
+    expect(streamEndIndex).toBeLessThan(markIndex);
   });
 });
