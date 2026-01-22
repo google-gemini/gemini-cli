@@ -364,18 +364,19 @@ export async function executeToolWithHooks(
     // Add additional context from hooks to the tool result
     const additionalContext = afterOutput?.getAdditionalContext();
     if (additionalContext) {
+      const wrappedContext = `\n\n<hook_context>${additionalContext}</hook_context>`;
       if (typeof toolResult.llmContent === 'string') {
-        toolResult.llmContent += '\n\n' + additionalContext;
+        toolResult.llmContent += wrappedContext;
       } else if (Array.isArray(toolResult.llmContent)) {
-        toolResult.llmContent.push({ text: '\n\n' + additionalContext });
+        toolResult.llmContent.push({ text: wrappedContext });
       } else if (toolResult.llmContent) {
         // Handle single Part case by converting to an array
         toolResult.llmContent = [
           toolResult.llmContent,
-          { text: '\n\n' + additionalContext },
+          { text: wrappedContext },
         ];
       } else {
-        toolResult.llmContent = additionalContext;
+        toolResult.llmContent = wrappedContext;
       }
     }
   }
