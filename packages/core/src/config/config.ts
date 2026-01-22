@@ -217,6 +217,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+import { getErrorMessage } from 'src/utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -1967,17 +1968,21 @@ export class Config {
       const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();
 
-      for (const def of definitions) {
-        const isAllowed = !allowedTools || allowedTools.includes(def.name);
+      for (const definition of definitions) {
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
 
         if (isAllowed) {
           try {
-            const tool = new SubAgentTool(def, this, this.getMessageBus());
+            const tool = new SubAgentTool(
+              definition,
+              this,
+              this.getMessageBus(),
+            );
             registry.registerTool(tool);
-          } catch (e) {
+          } catch (e: unknown) {
             debugLogger.warn(
-              `Failed to register tool for agent ${def.name}:`,
-              e,
+              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
             );
           }
         }

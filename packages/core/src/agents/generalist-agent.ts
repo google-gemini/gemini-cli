@@ -48,11 +48,11 @@ export const GeneralistAgent = (
   },
   get toolConfig() {
     // TODO(15179): Support recursive agent invocation.
-    const agentNames = config.getAgentRegistry().getAllAgentNames();
+    const agentNames = new Set(config.getAgentRegistry().getAllAgentNames());
     const tools = config
       .getToolRegistry()
       .getAllToolNames()
-      .filter((name) => !agentNames.includes(name));
+      .filter((name) => !agentNames.has(name));
     return {
       tools,
     };
