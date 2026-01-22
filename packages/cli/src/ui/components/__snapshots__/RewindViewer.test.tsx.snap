@@ -72,13 +72,13 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 │   Q1                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Q2                                                                                                                 │
+│ ● Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Stay at current position                                                                                           │
+│   Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -95,13 +95,13 @@ exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 │   Q1                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Q2                                                                                                                 │
+│   Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -115,13 +115,13 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│   Q1                                                                                                                 │
+│ ● Q1                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Q3                                                                                                                 │
+│   Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Stay at current position                                                                                           │
@@ -141,13 +141,13 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] =
 │   Q1                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Q2                                                                                                                 │
+│   Q2                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Q3                                                                                                                 │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Stay at current position                                                                                           │
+│ ● Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -210,10 +210,10 @@ exports[`RewindViewer > updates content when conversation changes (background up
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│   Message 1                                                                                                          │
+│ ● Message 1                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Message 2                                                                                                          │
+│   Message 2                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
 │   Stay at current position                                                                                           │
@@ -251,11 +251,11 @@ exports[`RewindViewer > updates selection and expansion on navigation > after-do
 │   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│   Line 1                                                                                                             │
+│ ● Line 1                                                                                                             │
 │   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Stay at current position                                                                                           │
+│   Stay at current position                                                                                           │
 │   Cancel rewind and stay here                                                                                        │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -269,11 +269,11 @@ exports[`RewindViewer > updates selection and expansion on navigation > initial-
 │                                                                                                                      │
 │ > Rewind                                                                                                             │
 │                                                                                                                      │
-│   Line A                                                                                                             │
+│ ● Line A                                                                                                             │
 │   Line B...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
-│ ● Line 1                                                                                                             │
+│   Line 1                                                                                                             │
 │   Line 2...                                                                                                          │
 │   No files have been changed                                                                                         │
 │                                                                                                                      │
