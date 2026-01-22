@@ -10,9 +10,11 @@ import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  LS_TOOL_NAME,
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
@@ -138,10 +140,50 @@ export function getCoreSystemPrompt(
   if (approvalMode === ApprovalMode.PLAN) {
     approvalModePrompt = `
 # Active Approval Mode: Plan
-- You are currently operating in a strictly research and planning capacity.
-- You may use read-only tools only.
-- You MUST NOT use non-read-only tools that modify the system state (e.g. edit files).
-- If the user requests a modification, you must refuse the tool execution (do not attempt to call the tool), and explain you are in "Plan" mode with access to read-only tools.`;
+
+You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
+
+## Available Tools
+The following read-only tools are available in Plan Mode:
+- \`${GLOB_TOOL_NAME}\` - Find files by pattern
+- \`${GREP_TOOL_NAME}\` - Search file contents
+- \`${READ_FILE_TOOL_NAME}\` - Read file contents
+- \`${LS_TOOL_NAME}\` - List directory contents
+- \`${WEB_SEARCH_TOOL_NAME}\` - Search the web
+
+## Workflow Phases
+
+**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase.**
+
+### Phase 1: Requirements Understanding
+- Analyze the user's request to identify core requirements and constraints
+- If critical information is missing or ambiguous, ask ONE clarifying question at a time
+- Wait for the user's response before asking the next question
+- **STOP and wait for user's responses to all questions before proceeding to Phase 2**
+- Do NOT explore the codebase or create a plan yet
+
+### Phase 2: Codebase Exploration
+- Only begin this phase after requirements are clear
+- Use the available read-only tools to explore the codebase
+- Identify existing patterns, conventions, and architectural decisions
+- **STOP and summarize findings before proceeding to Phase 3**
+
+### Phase 3: Design & Planning
+- Only begin this phase after exploration is complete
+- Create a detailed implementation plan with clear steps
+- Include file paths, function signatures, and code snippets where helpful
+- **STOP and present the plan for review**
+
+### Phase 4: Review & Approval
+- Ask the user if they approve the plan, want revisions, or want to reject it
+- Address feedback and iterate as needed
+- **When the user approves the plan**, prompt them to switch out of Plan Mode to begin implementation by pressing Shift+Tab to cycle to a different approval mode
+
+## Constraints
+- You may ONLY use the read-only tools listed above
+- You MUST NOT modify source code, configs, or any files
+- If asked to modify code, explain you are in Plan Mode and offer to create a plan instead
+`;
   }
 
   const skills = config.getSkillManager().getSkills();
@@ -367,17 +409,21 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
       'hookContext',
     ];
 
-    if (enableCodebaseInvestigator && enableWriteTodosTool) {
-      orderedPrompts.push('primaryWorkflows_prefix_ci_todo');
-    } else if (enableCodebaseInvestigator) {
-      orderedPrompts.push('primaryWorkflows_prefix_ci');
-    } else if (enableWriteTodosTool) {
-      orderedPrompts.push('primaryWorkflows_todo');
-    } else {
-      orderedPrompts.push('primaryWorkflows_prefix');
+    // Skip Primary Workflows in Plan Mode - Plan Mode has its own workflow guidance
+    if (approvalMode !== ApprovalMode.PLAN) {
+      if (enableCodebaseInvestigator && enableWriteTodosTool) {
+        orderedPrompts.push('primaryWorkflows_prefix_ci_todo');
+      } else if (enableCodebaseInvestigator) {
+        orderedPrompts.push('primaryWorkflows_prefix_ci');
+      } else if (enableWriteTodosTool) {
+        orderedPrompts.push('primaryWorkflows_todo');
+      } else {
+        orderedPrompts.push('primaryWorkflows_prefix');
+      }
+      orderedPrompts.push('primaryWorkflows_suffix');
     }
+
     orderedPrompts.push(
-      'primaryWorkflows_suffix',
       'operationalGuidelines',
       'sandbox',
       'git',
