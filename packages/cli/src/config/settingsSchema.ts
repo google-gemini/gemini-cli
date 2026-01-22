@@ -1023,6 +1023,25 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
+      approvalMode: {
+        type: 'enum',
+        label: 'Approval Mode',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          'yolo' auto-approves all tools, and 'plan' is read-only mode.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'yolo', label: 'YOLO' },
+          { value: 'plan', label: 'Plan' },
+        ],
+      },
       core: {
         type: 'array',
         label: 'Core Tools',

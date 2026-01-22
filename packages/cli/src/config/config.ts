@@ -496,9 +496,13 @@ export async function loadCliConfig(
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
-  if (argv.approvalMode) {
-    // New --approval-mode flag takes precedence
-    switch (argv.approvalMode) {
+  const rawApprovalMode =
+    argv.approvalMode ||
+    (argv.yolo ? 'yolo' : undefined) ||
+    settings.tools?.approvalMode;
+
+  if (rawApprovalMode) {
+    switch (rawApprovalMode) {
       case 'yolo':
         approvalMode = ApprovalMode.YOLO;
         break;
@@ -518,13 +522,11 @@ export async function loadCliConfig(
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, plan, default`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
         );
     }
   } else {
-    // Fallback to legacy --yolo flag behavior
-    approvalMode =
-      argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+    approvalMode = ApprovalMode.DEFAULT;
   }
 
   // Override approval mode if disableYoloMode is set.
