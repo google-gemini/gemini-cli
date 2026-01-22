@@ -1,4 +1,4 @@
-# Hooks on Gemini CLI: Best practices
+# Hooks Best Practices
 
 This guide covers security considerations, performance optimization, debugging
 techniques, and privacy considerations for developing and deploying hooks in
@@ -15,21 +15,20 @@ using parallel operations:
 // Sequential operations are slower
 const data1 = await fetch(url1).then((r) => r.json());
 const data2 = await fetch(url2).then((r) => r.json());
-const data3 = await fetch(url3).then((r) => r.json());
 
 // Prefer parallel operations for better performance
 // Start requests concurrently
 const p1 = fetch(url1).then((r) => r.json());
 const p2 = fetch(url2).then((r) => r.json());
-const p3 = fetch(url3).then((r) => r.json());
 
 // Wait for all results
-const [data1, data2, data3] = await Promise.all([p1, p2, p3]);
+const [data1, data2] = await Promise.all([p1, p2]);
 ```
 
 ### Cache expensive operations
 
-Store results between invocations to avoid repeated computation:
+Store results between invocations to avoid repeated computation, especially for
+hooks that run frequently (like `BeforeTool` or `AfterModel`).
 
 ```javascript
 const fs = require('fs');
@@ -54,6 +53,7 @@ async function main() {
   const cacheKey = `tool-list-${(Date.now() / 3600000) | 0}`; // Hourly cache
 
   if (cache[cacheKey]) {
+    // Write JSON to stdout
     console.log(JSON.stringify(cache[cacheKey]));
     return;
   }
@@ -70,32 +70,20 @@ async function main() {
 ### Use appropriate events
 
 Choose hook events that match your use case to avoid unnecessary execution.
-`AfterAgent` fires once per agent loop completion, while `AfterModel` fires
-after every LLM call (potentially multiple times per loop):
 
-```json
-// If checking final completion, use AfterAgent instead of AfterModel
-{
-  "hooks": {
-    "AfterAgent": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "final-checker",
-            "command": "./check-completion.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+- **`AfterAgent`**: Fires **once** per turn after the model finishes its final
+  response. Use this for quality validation (Retries) or final logging.
+- **`AfterModel`**: Fires after **every chunk** of LLM output. Use this for
+  real-time redaction, PII filtering, or monitoring output as it streams.
+
+If you only need to check the final completion, use `AfterAgent` to save
+performance.
 
 ### Filter with matchers
 
 Use specific matchers to avoid unnecessary hook execution. Instead of matching
-all tools with `*`, specify only the tools you need:
+all tools with `*`, specify only the tools you need. This saves the overhead of
+spawning a process for irrelevant events.
 
 ```json
 {
@@ -111,30 +99,32 @@ all tools with `*`, specify only the tools you need:
 
 ### Optimize JSON parsing
 
-For large inputs, use streaming JSON parsers to avoid loading everything into
-memory:
-
-```javascript
-// Standard approach: parse entire input
-const input = JSON.parse(await readStdin());
-const content = input.tool_input.content;
-
-// For very large inputs: stream and extract only needed fields
-const { createReadStream } = require('fs');
-const JSONStream = require('JSONStream');
-
-const stream = createReadStream(0).pipe(JSONStream.parse('tool_input.content'));
-let content = '';
-stream.on('data', (chunk) => {
-  content += chunk;
-});
-```
+For large inputs (like `AfterModel` receiving a large context), standard JSON
+parsing can be slow. If you only need one field, consider streaming parsers or
+lightweight extraction logic, though for most shell scripts `jq` is sufficient.
 
 ## Debugging
 
+### The "Strict JSON" rule
+
+The most common cause of hook failure is "polluting" the standard output.
+
+- **stdout** is for **JSON only**.
+- **stderr** is for **logs and text**.
+
+**Good:**
+
+```bash
+#!/bin/bash
+echo "Starting check..." >&2  # <--- Redirect to stderr
+echo '{"decision": "allow"}'
+
+```
+
 ### Log to files
 
-Write debug information to dedicated log files:
+Since hooks run in the background, writing to a dedicated log file is often the
+easiest way to debug complex logic.
 
 ```bash
 #!/usr/bin/env bash
@@ -151,6 +141,9 @@ log "Received input: ${input:0:100}..."
 # Hook logic here
 
 log "Hook completed successfully"
+# Always output valid JSON to stdout at the end, even if just empty
+echo "{}"
+
 ```
 
 ### Use stderr for errors
@@ -162,6 +155,7 @@ try {
   const result = dangerousOperation();
   console.log(JSON.stringify({ result }));
 } catch (error) {
+  // Write the error description to stderr so the user/agent sees it
   console.error(`Hook error: ${error.message}`);
   process.exit(2); // Blocking error
 }
@@ -169,7 +163,8 @@ try {
 
 ### Test hooks independently
 
-Run hook scripts manually with sample JSON input:
+Run hook scripts manually with sample JSON input to verify they behave as
+expected before hooking them up to the CLI.
 
 ```bash
 # Create test input
@@ -191,33 +186,46 @@ cat test-input.json | .gemini/hooks/my-hook.sh
 
 # Check exit code
 echo "Exit code: $?"
+
 ```
 
 ### Check exit codes
 
-Ensure your script returns the correct exit code:
+Gemini CLI uses exit codes for high-level flow control:
+
+- **Exit 0 (Success)**: The hook ran successfully. The CLI parses `stdout` for
+  JSON decisions.
+- **Exit 2 (System Block)**: A critical block occurred. `stderr` is used as the
+  reason.
+  - For **Agent/Model** events, this aborts the turn.
+  - For **Tool** events, this blocks the tool but allows the agent to continue.
+  - For **AfterAgent**, this triggers an automatic retry turn.
+
+> **TIP**
+>
+> **Blocking vs. Stopping**: Use `decision: "deny"` (or Exit Code 2) to block a
+> **specific action**. Use `{"continue": false}` in your JSON output to **kill
+> the entire agent loop** immediately.
 
 ```bash
 #!/usr/bin/env bash
-set -e  # Exit on error
+set -e
 
 # Hook logic
-process_input() {
-  # ...
-}
-
 if process_input; then
-  echo "Success message"
+  echo '{"decision": "allow"}'
   exit 0
 else
-  echo "Error message" >&2
+  echo "Critical validation failure" >&2
   exit 2
 fi
+
 ```
 
 ### Enable telemetry
 
-Hook execution is logged when `telemetry.logPrompts` is enabled:
+Hook execution is logged when `telemetry.logPrompts` is enabled. You can view
+these logs to debug execution flow.
 
 ```json
 {
@@ -227,11 +235,10 @@ Hook execution is logged when `telemetry.logPrompts` is enabled:
 }
 ```
 
-View hook telemetry in logs to debug execution issues.
-
 ### Use hook panel
 
-The `/hooks panel` command shows execution status and recent output:
+The `/hooks panel` command inside the CLI shows execution status and recent
+output:
 
 ```bash
 /hooks panel
@@ -255,18 +262,64 @@ Begin with basic logging hooks before implementing complex logic:
 # Simple logging hook to understand input structure
 input=$(cat)
 echo "$input" >> .gemini/hook-inputs.log
-echo "Logged input"
+# Always return valid JSON
+echo "{}"
+
+```
+
+### Documenting your hooks
+
+Maintainability is critical for complex hook systems. Use descriptions and
+comments to help yourself and others understand why a hook exists.
+
+**Use the `description` field**: This text is displayed in the `/hooks panel` UI
+and helps diagnose issues.
+
+```json
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "write_file|replace",
+        "hooks": [
+          {
+            "name": "secret-scanner",
+            "type": "command",
+            "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/block-secrets.sh",
+            "description": "Scans code changes for API keys and secrets before writing"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Add comments in hook scripts**: Explain performance expectations and
+dependencies.
+
+```javascript
+#!/usr/bin/env node
+/**
+ * RAG Tool Filter Hook
+ *
+ * Reduces the tool space by extracting keywords from the user's request.
+ *
+ * Performance: ~500ms average
+ * Dependencies: @google/generative-ai
+ */
 ```
 
 ### Use JSON libraries
 
-Parse JSON with proper libraries instead of text processing:
+Parse JSON with proper libraries instead of text processing.
 
 **Bad:**
 
 ```bash
 # Fragile text parsing
 tool_name=$(echo "$input" | grep -oP '"tool_name":\s*"\K[^"]+')
+
 ```
 
 **Good:**
@@ -274,6 +327,7 @@ tool_name=$(echo "$input" | grep -oP '"tool_name":\s*"\K[^"]+')
 ```bash
 # Robust JSON parsing
 tool_name=$(echo "$input" | jq -r '.tool_name')
+
 ```
 
 ### Make scripts executable
@@ -283,6 +337,7 @@ Always make hook scripts executable:
 ```bash
 chmod +x .gemini/hooks/*.sh
 chmod +x .gemini/hooks/*.js
+
 ```
 
 ### Version control
@@ -292,7 +347,7 @@ Commit hooks to share with your team:
 ```bash
 git add .gemini/hooks/
 git add .gemini/settings.json
-git commit -m "Add project hooks for security and testing"
+
 ```
 
 **`.gitignore` considerations:**
@@ -306,295 +361,10 @@ git commit -m "Add project hooks for security and testing"
 # Keep hook scripts
 !.gemini/hooks/*.sh
 !.gemini/hooks/*.js
+
 ```
 
-### Document behavior
-
-Add descriptions to help others understand your hooks:
-
-```json
-{
-  "hooks": {
-    "BeforeTool": [
-      {
-        "matcher": "write_file|replace",
-        "hooks": [
-          {
-            "name": "secret-scanner",
-            "type": "command",
-            "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/block-secrets.sh",
-            "description": "Scans code changes for API keys, passwords, and other secrets before writing"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Add comments in hook scripts:
-
-```javascript
-#!/usr/bin/env node
-/**
- * RAG Tool Filter Hook
- *
- * This hook reduces the tool space from 100+ tools to ~15 relevant ones
- * by extracting keywords from the user's request and filtering tools
- * based on semantic similarity.
- *
- * Performance: ~500ms average, cached tool embeddings
- * Dependencies: @google/generative-ai
- */
-```
-
-## Troubleshooting
-
-### Hook not executing
-
-**Check hook name in `/hooks panel`:**
-
-```bash
-/hooks panel
-```
-
-Verify the hook appears in the list and is enabled.
-
-**Verify matcher pattern:**
-
-```bash
-# Test regex pattern
-echo "write_file|replace" | grep -E "write_.*|replace"
-```
-
-**Check disabled list:**
-
-```json
-{
-  "hooks": {
-    "disabled": ["my-hook-name"]
-  }
-}
-```
-
-**Ensure script is executable:**
-
-```bash
-ls -la .gemini/hooks/my-hook.sh
-chmod +x .gemini/hooks/my-hook.sh
-```
-
-**Verify script path:**
-
-```bash
-# Check path expansion
-echo "$GEMINI_PROJECT_DIR/.gemini/hooks/my-hook.sh"
-
-# Verify file exists
-test -f "$GEMINI_PROJECT_DIR/.gemini/hooks/my-hook.sh" && echo "File exists"
-```
-
-### Hook timing out
-
-**Check configured timeout:**
-
-```json
-{
-  "name": "slow-hook",
-  "timeout": 60000
-}
-```
-
-**Optimize slow operations:**
-
-```javascript
-// Before: Sequential operations (slow)
-for (const item of items) {
-  await processItem(item);
-}
-
-// After: Parallel operations (fast)
-await Promise.all(items.map((item) => processItem(item)));
-```
-
-**Use caching:**
-
-```javascript
-const cache = new Map();
-
-async function getCachedData(key) {
-  if (cache.has(key)) {
-    return cache.get(key);
-  }
-  const data = await fetchData(key);
-  cache.set(key, data);
-  return data;
-}
-```
-
-**Consider splitting into multiple faster hooks:**
-
-```json
-{
-  "hooks": {
-    "BeforeTool": [
-      {
-        "matcher": "write_file",
-        "hooks": [
-          {
-            "name": "quick-check",
-            "command": "./quick-validation.sh",
-            "timeout": 1000
-          }
-        ]
-      },
-      {
-        "matcher": "write_file",
-        "hooks": [
-          {
-            "name": "deep-check",
-            "command": "./deep-analysis.sh",
-            "timeout": 30000
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Invalid JSON output
-
-**Validate JSON before outputting:**
-
-```bash
-#!/usr/bin/env bash
-output='{"decision": "allow"}'
-
-# Validate JSON
-if echo "$output" | jq empty 2>/dev/null; then
-  echo "$output"
-else
-  echo "Invalid JSON generated" >&2
-  exit 1
-fi
-```
-
-**Ensure proper quoting and escaping:**
-
-```javascript
-// Bad: Unescaped string interpolation
-const message = `User said: ${userInput}`;
-console.log(JSON.stringify({ message }));
-
-// Good: Automatic escaping
-console.log(JSON.stringify({ message: `User said: ${userInput}` }));
-```
-
-**Check for binary data or control characters:**
-
-```javascript
-function sanitizeForJSON(str) {
-  return str.replace(/[\x00-\x1F\x7F-\x9F]/g, ''); // Remove control chars
-}
-
-const cleanContent = sanitizeForJSON(content);
-console.log(JSON.stringify({ content: cleanContent }));
-```
-
-### Exit code issues
-
-**Verify script returns correct codes:**
-
-```bash
-#!/usr/bin/env bash
-set -e  # Exit on error
-
-# Processing logic
-if validate_input; then
-  echo "Success"
-  exit 0
-else
-  echo "Validation failed" >&2
-  exit 2
-fi
-```
-
-**Check for unintended errors:**
-
-```bash
-#!/usr/bin/env bash
-# Don't use 'set -e' if you want to handle errors explicitly
-# set -e
-
-if ! command_that_might_fail; then
-  # Handle error
-  echo "Command failed but continuing" >&2
-fi
-
-# Always exit explicitly
-exit 0
-```
-
-**Use trap for cleanup:**
-
-```bash
-#!/usr/bin/env bash
-
-cleanup() {
-  # Cleanup logic
-  rm -f /tmp/hook-temp-*
-}
-
-trap cleanup EXIT
-
-# Hook logic here
-```
-
-### Environment variables not available
-
-**Check if variable is set:**
-
-```bash
-#!/usr/bin/env bash
-
-if [ -z "$GEMINI_PROJECT_DIR" ]; then
-  echo "GEMINI_PROJECT_DIR not set" >&2
-  exit 1
-fi
-
-if [ -z "$CUSTOM_VAR" ]; then
-  echo "Warning: CUSTOM_VAR not set, using default" >&2
-  CUSTOM_VAR="default-value"
-fi
-```
-
-**Debug available variables:**
-
-```bash
-#!/usr/bin/env bash
-
-# List all environment variables
-env > .gemini/hook-env.log
-
-# Check specific variables
-echo "GEMINI_PROJECT_DIR: $GEMINI_PROJECT_DIR" >> .gemini/hook-env.log
-echo "GEMINI_SESSION_ID: $GEMINI_SESSION_ID" >> .gemini/hook-env.log
-echo "GEMINI_API_KEY: ${GEMINI_API_KEY:+<set>}" >> .gemini/hook-env.log
-```
-
-**Use .env files:**
-
-```bash
-#!/usr/bin/env bash
-
-# Load .env file if it exists
-if [ -f "$GEMINI_PROJECT_DIR/.env" ]; then
-  source "$GEMINI_PROJECT_DIR/.env"
-fi
-```
-
-## Using Hooks Securely
+## Hook security
 
 ### Threat Model
 
@@ -621,11 +391,10 @@ When you open a project with hooks defined in `.gemini/settings.json`:
    it).
 5. **Trust**: The hook is marked as "trusted" for this project.
 
-> [!IMPORTANT] **Modification Detection**: If the `command` string of a project
-> hook is changed (e.g., by a `git pull`), its identity changes. Gemini CLI will
-> treat it as a **new, untrusted hook** and warn you again. This prevents
-> malicious actors from silently swapping a verified command for a malicious
-> one.
+> **Modification detection**: If the `command` string of a project hook is
+> changed (e.g., by a `git pull`), its identity changes. Gemini CLI will treat
+> it as a **new, untrusted hook** and warn you again. This prevents malicious
+> actors from silently swapping a verified command for a malicious one.
 
 ### Risks
 
@@ -646,32 +415,134 @@ When you open a project with hooks defined in `.gemini/settings.json`:
   publishers, well-known community members).
 - Be cautious with obfuscated scripts or compiled binaries from unknown sources.
 
-#### Sanitize Environment
+#### Sanitize environment
 
 Hooks inherit the environment of the Gemini CLI process, which may include
-sensitive API keys. Gemini CLI attempts to sanitize sensitive variables, but you
-should be cautious.
+sensitive API keys. Gemini CLI provides a
+[redaction system](/docs/get-started/configuration#environment-variable-redaction)
+that automatically filters variables matching sensitive patterns (e.g., `KEY`,
+`TOKEN`).
 
-- **Avoid printing environment variables** to stdout/stderr unless necessary.
-- **Use `.env` files** to securely manage sensitive variables, ensuring they are
-  excluded from version control.
+> **Disabled by Default**: Environment redaction is currently **OFF by
+> default**. We strongly recommend enabling it if you are running third-party
+> hooks or working in sensitive environments.
 
-**System Administrators:** You can enforce environment variable redaction by
-default in the system configuration (e.g., `/etc/gemini-cli/settings.json`):
+**Impact on hooks:**
+
+- **Security**: Prevents your hook scripts from accidentally leaking secrets.
+- **Troubleshooting**: If your hook depends on a specific environment variable
+  that is being blocked, you must explicitly allow it in `settings.json`.
 
 ```json
 {
   "security": {
     "environmentVariableRedaction": {
       "enabled": true,
-      "blocked": ["MY_SECRET_KEY"],
-      "allowed": ["SAFE_VAR"]
+      "allowed": ["MY_REQUIRED_TOOL_KEY"]
     }
   }
 }
 ```
 
-## Authoring Secure Hooks
+**System administrators:** You can enforce redaction for all users in the system
+configuration.
+
+## Troubleshooting
+
+### Hook not executing
+
+**Check hook name in `/hooks panel`:** Verify the hook appears in the list and
+is enabled.
+
+**Verify matcher pattern:**
+
+```bash
+# Test regex pattern
+echo "write_file|replace" | grep -E "write_.*|replace"
+
+```
+
+**Check disabled list:** Verify the hook is not listed in your `settings.json`:
+
+```json
+{
+  "hooks": {
+    "disabled": ["my-hook-name"]
+  }
+}
+```
+
+**Ensure script is executable**: For macOS and Linux users, verify the script
+has execution permissions:
+
+```bash
+ls -la .gemini/hooks/my-hook.sh
+chmod +x .gemini/hooks/my-hook.sh
+```
+
+**Verify script path:** Ensure the path in `settings.json` resolves correctly.
+
+```bash
+# Check path expansion
+echo "$GEMINI_PROJECT_DIR/.gemini/hooks/my-hook.sh"
+
+# Verify file exists
+test -f "$GEMINI_PROJECT_DIR/.gemini/hooks/my-hook.sh" && echo "File exists"
+```
+
+### Hook timing out
+
+**Check configured timeout:** The default is 60000ms (1 minute). You can
+increase this in `settings.json`:
+
+```json
+{
+  "name": "slow-hook",
+  "timeout": 120000
+}
+```
+
+**Optimize slow operations:** Move heavy processing to background tasks or use
+caching.
+
+### Invalid JSON output
+
+**Validate JSON before outputting:**
+
+```bash
+#!/usr/bin/env bash
+output='{"decision": "allow"}'
+
+# Validate JSON
+if echo "$output" | jq empty 2>/dev/null; then
+  echo "$output"
+else
+  echo "Invalid JSON generated" >&2
+  exit 1
+fi
+
+```
+
+### Environment variables not available
+
+**Check if variable is set:**
+
+```bash
+#!/usr/bin/env bash
+if [ -z "$GEMINI_PROJECT_DIR" ]; then
+  echo "GEMINI_PROJECT_DIR not set" >&2
+  exit 1
+fi
+
+```
+
+**Debug available variables:**
+
+```bash
+env > .gemini/hook-env.log
+```
+
+## Authoring secure hooks
 
 When writing your own hooks, follow these practices to ensure they are robust
 and secure.
@@ -766,40 +637,17 @@ function containsSecret(content) {
 
 ## Privacy considerations
 
-Hook inputs and outputs may contain sensitive information. Gemini CLI respects
-the `telemetry.logPrompts` setting for hook data logging.
+Hook inputs and outputs may contain sensitive information.
 
 ### What data is collected
 
-Hook telemetry may include:
-
-- **Hook inputs:** User prompts, tool arguments, file contents
-- **Hook outputs:** Hook responses, decision reasons, added context
-- **Standard streams:** stdout and stderr from hook processes
-- **Execution metadata:** Hook name, event type, duration, success/failure
+Hook telemetry may include inputs (prompts, code) and outputs (decisions,
+reasons) unless disabled.
 
 ### Privacy settings
 
-**Enabled (default):**
-
-Full hook I/O is logged to telemetry. Use this when:
-
-- Developing and debugging hooks
-- Telemetry is redirected to a trusted enterprise system
-- You understand and accept the privacy implications
-
-**Disabled:**
-
-Only metadata is logged (event name, duration, success/failure). Hook inputs and
-outputs are excluded. Use this when:
-
-- Sending telemetry to third-party systems
-- Working with sensitive data
-- Privacy regulations require minimizing data collection
-
-### Configuration
-
-**Disable PII logging in settings:**
+**Disable PII logging:** If you are working with sensitive data, disable prompt
+logging in your settings:
 
 ```json
 {
@@ -809,48 +657,19 @@ outputs are excluded. Use this when:
 }
 ```
 
-**Disable via environment variable:**
+**Suppress Output:** Individual hooks can request their metadata be hidden from
+logs and telemetry by returning `"suppressOutput": true` in their JSON response.
 
-```bash
-export GEMINI_TELEMETRY_LOG_PROMPTS=false
-```
+> **Note**
+
+> `suppressOutput` only affects background logging. Any `systemMessage` or
+> `reason` included in the JSON will still be displayed to the user in the
+> terminal.
 
 ### Sensitive data in hooks
 
 If your hooks process sensitive data:
 
-1. **Minimize logging:** Don't write sensitive data to log files
-2. **Sanitize outputs:** Remove sensitive data before outputting
-3. **Use secure storage:** Encrypt sensitive data at rest
-4. **Limit access:** Restrict hook script permissions
-
-**Example sanitization:**
-
-```javascript
-function sanitizeOutput(data) {
-  const sanitized = { ...data };
-
-  // Remove sensitive fields
-  delete sanitized.apiKey;
-  delete sanitized.password;
-
-  // Redact sensitive strings
-  if (sanitized.content) {
-    sanitized.content = sanitized.content.replace(
-      /api[_-]?key\s*[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/gi,
-      '[REDACTED]',
-    );
-  }
-
-  return sanitized;
-}
-
-console.log(JSON.stringify(sanitizeOutput(hookOutput)));
-```
-
-## Learn more
-
-- [Hooks Reference](index.md) - Complete API reference
-- [Writing Hooks](writing-hooks.md) - Tutorial and examples
-- [Configuration](../get-started/configuration.md) - Gemini CLI settings
-- [Hooks Design Document](../hooks-design.md) - Technical architecture
+1. **Minimize logging:** Don't write sensitive data to log files.
+2. **Sanitize outputs:** Remove sensitive data before outputting JSON or writing
+   to stderr.
