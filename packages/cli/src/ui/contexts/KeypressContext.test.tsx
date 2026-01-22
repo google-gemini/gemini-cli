@@ -212,6 +212,9 @@ describe('KeypressContext', () => {
           name: 'return',
           sequence: '\r',
           insertable: true,
+          shift: true,
+          meta: false,
+          ctrl: false,
         }),
       );
     });
