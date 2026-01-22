@@ -504,7 +504,7 @@ on GitHub.
   ([docs](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/telemetry.md#configuration),
   [pr](https://github.com/google-gemini/gemini-cli/pull/9113) by
   [@jerop](https://github.com/jerop))
-- **​​Experimental todos:** Track and display progress on complex tasks with a
+- **Experimental todos:** Track and display progress on complex tasks with a
   managed checklist. Off by default but can be enabled via
   `"useWriteTodos": true`
   ([pr](https://github.com/google-gemini/gemini-cli/pull/8761) by
