@@ -363,15 +363,11 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-<<<<<<< HEAD
+  let initialAuthFailed = false;
   if (
     settings.merged.security?.auth?.selectedType &&
     !settings.merged.security?.auth?.useExternal
   ) {
-=======
-  let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
->>>>>>> 87a0db20d (fix(auth): don't crash when initial auth fails (#17308))
     try {
       if (partialConfig.isInteractive()) {
         const err = validateAuthMethod(
