@@ -200,6 +200,47 @@ async function disableAction(
   };
 }
 
+async function configAction(
+  context: CommandContext,
+  args: string,
+): Promise<SlashCommandActionReturn | void> {
+  const { config } = context.services;
+  if (!config) return;
+
+  const agentName = args.trim();
+  if (!agentName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Usage: /agents config <agent-name>',
+    };
+  }
+
+  const agentRegistry = config.getAgentRegistry();
+  if (!agentRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Agent registry not found.',
+    };
+  }
+
+  const definition = agentRegistry.getDiscoveredDefinition(agentName);
+  if (!definition) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Agent '${agentName}' not found.`,
+    };
+  }
+
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `Configuration for '${agentName}' will be available in the next update.`,
+  };
+}
+
 function completeAgentsToEnable(context: CommandContext, partialArg: string) {
   const { config, settings } = context.services;
   if (!config) return [];
@@ -221,6 +262,17 @@ function completeAgentsToDisable(context: CommandContext, partialArg: string) {
   return allAgents.filter((name: string) => name.startsWith(partialArg));
 }
 
+function completeAllAgents(context: CommandContext, partialArg: string) {
+  const { config } = context.services;
+  if (!config) return [];
+
+  const agentRegistry = config.getAgentRegistry();
+  const allAgents = agentRegistry
+    ? agentRegistry.getAllDiscoveredAgentNames()
+    : [];
+  return allAgents.filter((name: string) => name.startsWith(partialArg));
+}
+
 const enableCommand: SlashCommand = {
   name: 'enable',
   description: 'Enable a disabled agent',
@@ -237,6 +289,15 @@ const disableCommand: SlashCommand = {
   autoExecute: false,
   action: disableAction,
   completion: completeAgentsToDisable,
+};
+
+const configCommand: SlashCommand = {
+  name: 'config',
+  description: 'Configure an agent',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: configAction,
+  completion: completeAllAgents,
 };
 
 const agentsRefreshCommand: SlashCommand = {
@@ -278,6 +339,7 @@ export const agentsCommand: SlashCommand = {
     agentsRefreshCommand,
     enableCommand,
     disableCommand,
+    configCommand,
   ],
   action: async (context: CommandContext, args) =>
     // Default to list if no subcommand is provided
