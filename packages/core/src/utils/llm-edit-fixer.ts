@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
-import { promptIdContext } from './promptIdContext.js';
+import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
 
 const MAX_CACHE_SIZE = 50;
@@ -108,7 +108,11 @@ async function generateJsonWithTimeout<T>(
       ]),
     });
     return result as T;
-  } catch (_err) {
+  } catch (err) {
+    debugLogger.debug(
+      '[LLM Edit Fixer] Timeout or error during generateJson',
+      err,
+    );
     // An AbortError will be thrown on timeout.
     // We catch it and return null to signal that the operation timed out.
     return null;
