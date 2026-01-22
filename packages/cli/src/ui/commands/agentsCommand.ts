@@ -62,7 +62,13 @@ async function enableAction(
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const { config, settings } = context.services;
-  if (!config) return;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
 
   const agentName = args.trim();
   if (!agentName) {
@@ -132,7 +138,13 @@ async function disableAction(
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const { config, settings } = context.services;
-  if (!config) return;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
 
   const agentName = args.trim();
   if (!agentName) {
@@ -205,7 +217,13 @@ async function configAction(
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const { config } = context.services;
-  if (!config) return;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
 
   const agentName = args.trim();
   if (!agentName) {
@@ -267,9 +285,7 @@ function completeAllAgents(context: CommandContext, partialArg: string) {
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
-  const allAgents = agentRegistry
-    ? agentRegistry.getAllDiscoveredAgentNames()
-    : [];
+  const allAgents = agentRegistry?.getAllDiscoveredAgentNames() ?? [];
   return allAgents.filter((name: string) => name.startsWith(partialArg));
 }
 

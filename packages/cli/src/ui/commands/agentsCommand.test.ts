@@ -218,6 +218,21 @@ describe('agentsCommand', () => {
     });
   });
 
+  it('should show an error if config is not available for enable', async () => {
+    const contextWithoutConfig = createMockCommandContext({
+      services: { config: null },
+    });
+    const enableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'enable',
+    );
+    const result = await enableCommand!.action!(contextWithoutConfig, 'test');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    });
+  });
+
   it('should disable an agent successfully', async () => {
     const reloadSpy = vi.fn().mockResolvedValue(undefined);
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
@@ -309,6 +324,21 @@ describe('agentsCommand', () => {
     });
   });
 
+  it('should show an error if config is not available for disable', async () => {
+    const contextWithoutConfig = createMockCommandContext({
+      services: { config: null },
+    });
+    const disableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'disable',
+    );
+    const result = await disableCommand!.action!(contextWithoutConfig, 'test');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    });
+  });
+
   describe('config sub-command', () => {
     it('should open agent config dialog for a valid agent', async () => {
       const mockDefinition = {
@@ -385,6 +415,21 @@ describe('agentsCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Usage: /agents config <agent-name>',
+      });
+    });
+
+    it('should show an error if config is not available', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: { config: null },
+      });
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      const result = await configCommand!.action!(contextWithoutConfig, 'test');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
       });
     });
 
