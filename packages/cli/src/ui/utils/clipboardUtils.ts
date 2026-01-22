@@ -163,10 +163,10 @@ async function checkXclipForImage() {
  */
 export async function clipboardHasImage(): Promise<boolean> {
   if (process.platform === 'linux') {
-    linuxClipboardTool = getUserLinuxClipboardTool();
-    if (linuxClipboardTool === 'wl-paste') {
+    const tool = getUserLinuxClipboardTool();
+    if (tool === 'wl-paste') {
       if (await checkWlPasteForImage()) return true;
-    } else if (linuxClipboardTool === 'xclip') {
+    } else if (tool === 'xclip') {
       if (await checkXclipForImage()) return true;
     }
     return false;
@@ -264,12 +264,13 @@ export async function saveClipboardImage(
 
     if (process.platform === 'linux') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      const tool = getUserLinuxClipboardTool();
 
-      if (linuxClipboardTool === 'wl-paste') {
+      if (tool === 'wl-paste') {
         if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
         return null;
       }
-      if (linuxClipboardTool === 'xclip') {
+      if (tool === 'xclip') {
         if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
         return null;
       }
