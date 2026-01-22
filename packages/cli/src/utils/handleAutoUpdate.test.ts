@@ -36,6 +36,8 @@ describe('handleAutoUpdate', () => {
   let mockChildProcess: ChildProcess;
 
   beforeEach(() => {
+    vi.stubEnv('GEMINI_SANDBOX', '');
+    vi.stubEnv('SANDBOX', '');
     mockSpawn = vi.fn();
     vi.clearAllMocks();
     vi.spyOn(updateEventEmitter, 'emit');
@@ -75,6 +77,7 @@ describe('handleAutoUpdate', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
