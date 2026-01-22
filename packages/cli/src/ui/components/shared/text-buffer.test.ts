@@ -16,6 +16,7 @@ import type {
   TextBuffer,
   TextBufferState,
   TextBufferAction,
+  Transformation,
   VisualLayout,
   TextBufferOptions,
 } from './text-buffer.js';
@@ -57,6 +58,21 @@ const initialState: TextBufferState = {
   visualLayout: defaultVisualLayout,
   pastedContent: {},
 };
+
+/**
+ * Helper to create a TextBufferState with properly calculated transformations.
+ */
+function createStateWithTransformations(
+  partial: Partial<TextBufferState>,
+): TextBufferState {
+  const state = { ...initialState, ...partial };
+  return {
+    ...state,
+    transformationsByLine: state.lines.map((l) =>
+      calculateTransformationsForLine(l),
+    ),
+  };
+}
 
 describe('textBufferReducer', () => {
   afterEach(() => {
@@ -202,15 +218,14 @@ describe('textBufferReducer', () => {
     describe('paste placeholders', () => {
       it('backspace at end of paste placeholder removes entire placeholder', () => {
         const placeholder = '[Pasted Text: 6 lines]';
-        const stateWithPlaceholder: TextBufferState = {
-          ...initialState,
+        const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
           cursorRow: 0,
           cursorCol: placeholder.length, // cursor at end
           pastedContent: {
             [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
           },
-        };
+        });
         const action: TextBufferAction = { type: 'backspace' };
         const state = textBufferReducer(stateWithPlaceholder, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -222,15 +237,14 @@ describe('textBufferReducer', () => {
 
       it('delete at start of paste placeholder removes entire placeholder', () => {
         const placeholder = '[Pasted Text: 6 lines]';
-        const stateWithPlaceholder: TextBufferState = {
-          ...initialState,
+        const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
           cursorRow: 0,
           cursorCol: 0, // cursor at start
           pastedContent: {
             [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
           },
-        };
+        });
         const action: TextBufferAction = { type: 'delete' };
         const state = textBufferReducer(stateWithPlaceholder, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -242,15 +256,14 @@ describe('textBufferReducer', () => {
 
       it('backspace inside paste placeholder does normal deletion', () => {
         const placeholder = '[Pasted Text: 6 lines]';
-        const stateWithPlaceholder: TextBufferState = {
-          ...initialState,
+        const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
           cursorRow: 0,
           cursorCol: 10, // cursor in middle
           pastedContent: {
             [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
           },
-        };
+        });
         const action: TextBufferAction = { type: 'backspace' };
         const state = textBufferReducer(stateWithPlaceholder, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -265,14 +278,11 @@ describe('textBufferReducer', () => {
     describe('image placeholders', () => {
       it('backspace at end of image path removes entire path', () => {
         const imagePath = '@test.png';
-        const transformations = calculateTransformationsForLine(imagePath);
-        const stateWithImage: TextBufferState = {
-          ...initialState,
+        const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
           cursorRow: 0,
           cursorCol: imagePath.length, // cursor at end
-          transformationsByLine: [transformations],
-        };
+        });
         const action: TextBufferAction = { type: 'backspace' };
         const state = textBufferReducer(stateWithImage, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -282,14 +292,11 @@ describe('textBufferReducer', () => {
 
       it('delete at start of image path removes entire path', () => {
         const imagePath = '@test.png';
-        const transformations = calculateTransformationsForLine(imagePath);
-        const stateWithImage: TextBufferState = {
-          ...initialState,
+        const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
           cursorRow: 0,
           cursorCol: 0, // cursor at start
-          transformationsByLine: [transformations],
-        };
+        });
         const action: TextBufferAction = { type: 'delete' };
         const state = textBufferReducer(stateWithImage, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -299,14 +306,11 @@ describe('textBufferReducer', () => {
 
       it('backspace inside image path does normal deletion', () => {
         const imagePath = '@test.png';
-        const transformations = calculateTransformationsForLine(imagePath);
-        const stateWithImage: TextBufferState = {
-          ...initialState,
+        const stateWithImage = createStateWithTransformations({
           lines: [imagePath],
           cursorRow: 0,
           cursorCol: 5, // cursor in middle
-          transformationsByLine: [transformations],
-        };
+        });
         const action: TextBufferAction = { type: 'backspace' };
         const state = textBufferReducer(stateWithImage, action);
         expect(state).toHaveOnlyValidCharacters();
@@ -320,13 +324,12 @@ describe('textBufferReducer', () => {
       it('undo after placeholder deletion restores everything', () => {
         const placeholder = '[Pasted Text: 6 lines]';
         const pasteContent = 'line1\nline2\nline3\nline4\nline5\nline6';
-        const stateWithPlaceholder: TextBufferState = {
-          ...initialState,
+        const stateWithPlaceholder = createStateWithTransformations({
           lines: [placeholder],
           cursorRow: 0,
           cursorCol: placeholder.length,
           pastedContent: { [placeholder]: pasteContent },
-        };
+        });
 
         // Delete the placeholder
         const deleteAction: TextBufferAction = { type: 'backspace' };
@@ -1571,13 +1574,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       });
 
       const state = getBufferState(result);
-      // Check that the text is the result of three concatenations of placeholders.
-      // All three use the same placeholder because React batches the state updates
-      // within the same act() block, so pastedContent isn't updated between inserts.
+      // Check that the text is the result of three concatenations of unique placeholders.
+      // Now that ID generation is in the reducer, they are correctly unique even when batched.
       expect(state.lines).toStrictEqual([
-        '[Pasted Text: 8 lines][Pasted Text: 8 lines][Pasted Text: 8 lines]',
+        '[Pasted Text: 8 lines][Pasted Text: 8 lines #2][Pasted Text: 8 lines #3]',
       ]);
       expect(result.current.pastedContent['[Pasted Text: 8 lines]']).toBe(
+        longText,
+      );
+      expect(result.current.pastedContent['[Pasted Text: 8 lines #2]']).toBe(
+        longText,
+      );
+      expect(result.current.pastedContent['[Pasted Text: 8 lines #3]']).toBe(
         longText,
       );
       const expectedCursorPos = offsetToLogicalPos(
@@ -2734,18 +2742,20 @@ describe('Transformation Utilities', () => {
   });
 
   describe('getTransformUnderCursor', () => {
-    const transformations = [
+    const transformations: Transformation[] = [
       {
         logStart: 5,
         logEnd: 14,
         logicalText: '@test.png',
         collapsedText: '[Image @test.png]',
+        type: 'image',
       },
       {
         logStart: 20,
         logEnd: 31,
         logicalText: '@another.jpg',
         collapsedText: '[Image @another.jpg]',
+        type: 'image',
       },
     ];
 

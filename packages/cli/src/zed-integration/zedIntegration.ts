@@ -27,6 +27,7 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
   resolveModel,
   createWorkingStdio,
   startupProfiler,
@@ -817,7 +818,7 @@ export class Session {
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
           processedQueryParts.push({
-            text: '\n--- Content from referenced files ---',
+            text: `\n${REFERENCE_CONTENT_START}`,
           });
           for (const part of result.llmContent) {
             if (typeof part === 'string') {
