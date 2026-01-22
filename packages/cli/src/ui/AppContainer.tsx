@@ -888,7 +888,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         clearQueue();
       }
 
-      if (textToSet || !shouldRestorePrompt) {
+      if (textToSet || (!shouldRestorePrompt && buffer.text.length === 0)) {
         buffer.setText(textToSet);
       }
     },
