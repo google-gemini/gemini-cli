@@ -217,7 +217,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
-import { getErrorMessage } from 'src/utils/errors.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
