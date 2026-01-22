@@ -27,7 +27,7 @@ describe('stdout-stderr-output', () => {
   function runWithStreams(
     args: string[],
   ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const allArgs = rig.fakeResponsesPath
         ? [...args, '--fake-responses', rig.fakeResponsesPath]
         : args;
@@ -39,6 +39,8 @@ describe('stdout-stderr-output', () => {
       });
       let stdout = '';
       let stderr = '';
+
+      child.on('error', reject);
 
       child.stdout!.on('data', (chunk) => {
         stdout += chunk;
@@ -87,6 +89,6 @@ describe('stdout-stderr-output', () => {
 
     expect(exitCode).not.toBe(0);
     expect(stderr.toLowerCase()).toMatch(/error|not found|does not exist/);
-    expect(stdout).not.toMatch(/error/i);
+    expect(stdout).toBe('');
   });
 });
