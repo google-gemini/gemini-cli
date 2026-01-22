@@ -707,7 +707,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable LLM-based error correction for edit tools. When
     enabled, tools will fail immediately if exact string matches are not found,
     instead of attempting to self-correct.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -837,7 +837,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.enableEventDrivenScheduler`** (boolean):
   - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
@@ -909,7 +909,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`hooksConfig.enabled`** (boolean):
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
