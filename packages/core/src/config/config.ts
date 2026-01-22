@@ -49,7 +49,6 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -143,14 +142,6 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
-export interface CodebaseInvestigatorSettings {
-  enabled?: boolean;
-  maxNumTurns?: number;
-  maxTimeMinutes?: number;
-  thinkingBudget?: number;
-  model?: string;
-}
-
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -165,10 +156,6 @@ export interface ResolvedExtensionSetting {
   sensitive: boolean;
   scope?: 'user' | 'workspace';
   source?: string;
-}
-
-export interface CliHelpAgentSettings {
-  enabled?: boolean;
 }
 
 export interface AgentRunConfig {
@@ -367,8 +354,6 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
-  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -512,8 +497,6 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -687,18 +670,6 @@ export class Config {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
-      thinkingBudget:
-        params.codebaseInvestigatorSettings?.thinkingBudget ??
-        DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model,
-    };
-    this.cliHelpAgentSettings = {
-      enabled: params.cliHelpAgentSettings?.enabled ?? true,
-    };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -1686,6 +1657,23 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getNumericalRoutingEnabled(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+
+    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
+      ?.boolValue;
+  }
+
+  async getClassifierThreshold(): Promise<number | undefined> {
+    await this.ensureExperimentsLoaded();
+
+    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    if (flag?.intValue !== undefined) {
+      return parseInt(flag.intValue, 10);
+    }
+    return flag?.floatValue;
+  }
+
   async getBannerTextNoCapacityIssues(): Promise<string> {
     await this.ensureExperimentsLoaded();
     return (
@@ -1894,14 +1882,6 @@ export class Config {
     return this.enableHooksUI;
   }
 
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
-    return this.codebaseInvestigatorSettings;
-  }
-
-  getCliHelpAgentSettings(): CliHelpAgentSettings {
-    return this.cliHelpAgentSettings;
-  }
-
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 
@@ -1978,10 +1958,11 @@ export class Config {
    * Registers SubAgentTools for all available agents.
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
+    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled ||
-      this.getCliHelpAgentSettings().enabled
+      agentsOverrides['codebase_investigator']?.enabled !== false ||
+      agentsOverrides['cli_help']?.enabled !== false
     ) {
       const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();

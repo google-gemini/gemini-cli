@@ -20,7 +20,6 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
-  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1461,66 +1460,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Agent Skills (experimental).',
         showInDialog: true,
       },
-      codebaseInvestigatorSettings: {
-        type: 'object',
-        label: 'Codebase Investigator Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for Codebase Investigator.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Codebase Investigator',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxNumTurns: {
-            type: 'number',
-            label: 'Codebase Investigator Max Num Turns',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 10,
-            description:
-              'Maximum number of turns for the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxTimeMinutes: {
-            type: 'number',
-            label: 'Max Time (Minutes)',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 3,
-            description:
-              'Maximum time for the Codebase Investigator agent (in minutes).',
-            showInDialog: false,
-          },
-          thinkingBudget: {
-            type: 'number',
-            label: 'Thinking Budget',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 8192,
-            description:
-              'The thinking budget for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-          model: {
-            type: 'string',
-            label: 'Model',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: GEMINI_MODEL_ALIAS_AUTO,
-            description:
-              'The model to use for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-        },
-      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',
@@ -1530,26 +1469,6 @@ const SETTINGS_SCHEMA = {
         description:
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
-      },
-      cliHelpAgentSettings: {
-        type: 'object',
-        label: 'CLI Help Agent Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for CLI Help Agent.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable CLI Help Agent',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the CLI Help Agent.',
-            showInDialog: true,
-          },
-        },
       },
       plan: {
         type: 'boolean',
