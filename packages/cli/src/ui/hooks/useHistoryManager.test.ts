@@ -8,7 +8,12 @@ import { describe, it, expect } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useHistory } from './useHistoryManager.js';
-import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+  HistoryItemToolGroup,
+} from '../types.js';
 
 describe('useHistoryManager', () => {
   it('should initialize with an empty history', () => {
@@ -240,5 +245,46 @@ describe('useHistoryManager', () => {
         text: 'Hidden detail',
       }),
     );
+  });
+
+  it('should merge consecutive tool_group items', () => {
+    const { result } = renderHook(() => useHistory());
+    const timestamp = Date.now();
+    const toolGroup1: HistoryItemWithoutId = {
+      type: 'tool_group',
+      tools: [{ callId: '1', name: 'tool-a' } as IndividualToolCallDisplay],
+    };
+    const toolGroup2: HistoryItemWithoutId = {
+      type: 'tool_group',
+      tools: [{ callId: '2', name: 'tool-b' } as IndividualToolCallDisplay],
+    };
+    const userMessage: HistoryItemWithoutId = {
+      type: 'user',
+      text: 'hello',
+    };
+    const toolGroup3: HistoryItemWithoutId = {
+      type: 'tool_group',
+      tools: [{ callId: '3', name: 'tool-c' } as IndividualToolCallDisplay],
+    };
+
+    act(() => {
+      result.current.addItem(toolGroup1, timestamp);
+      result.current.addItem(toolGroup2, timestamp + 1);
+      result.current.addItem(userMessage, timestamp + 2);
+      result.current.addItem(toolGroup3, timestamp + 3);
+    });
+
+    expect(result.current.history).toHaveLength(3);
+    expect(result.current.history[0].type).toBe('tool_group');
+    const firstItem = result.current.history[0] as HistoryItemToolGroup;
+    expect(firstItem.tools).toHaveLength(2);
+    expect(firstItem.tools[0].name).toBe('tool-a');
+    expect(firstItem.tools[1].name).toBe('tool-b');
+
+    expect(result.current.history[1].type).toBe('user');
+
+    const thirdItem = result.current.history[2] as HistoryItemToolGroup;
+    expect(thirdItem.type).toBe('tool_group');
+    expect(thirdItem.tools).toHaveLength(1);
   });
 });

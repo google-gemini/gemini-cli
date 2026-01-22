@@ -63,16 +63,30 @@ export function useHistory({
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
       setHistory((prevHistory) => {
-        if (prevHistory.length > 0) {
-          const lastItem = prevHistory[prevHistory.length - 1];
-          // Prevent adding duplicate consecutive user messages
-          if (
-            lastItem.type === 'user' &&
-            newItem.type === 'user' &&
-            lastItem.text === newItem.text
-          ) {
-            return prevHistory; // Don't add the duplicate
-          }
+        const lastItem =
+          prevHistory.length > 0 ? prevHistory[prevHistory.length - 1] : null;
+
+        // If the last item and the new item are both tool groups, merge them.
+        if (
+          lastItem &&
+          lastItem.type === 'tool_group' &&
+          newItem.type === 'tool_group'
+        ) {
+          const updatedLastItem: HistoryItem = {
+            ...lastItem,
+            tools: [...lastItem.tools, ...newItem.tools],
+          };
+          return [...prevHistory.slice(0, -1), updatedLastItem];
+        }
+
+        // Prevent adding duplicate consecutive user messages
+        if (
+          lastItem &&
+          lastItem.type === 'user' &&
+          newItem.type === 'user' &&
+          lastItem.text === newItem.text
+        ) {
+          return prevHistory; // Don't add the duplicate
         }
         return [...prevHistory, newItem];
       });

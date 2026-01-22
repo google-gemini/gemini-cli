@@ -54,7 +54,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = ({
   }
 
   return (
-    <Box marginLeft={2} flexDirection="row">
+    <Box marginLeft={3} flexDirection="row">
       <ToolStatusIndicator status={status} name={name} />
       <Box marginLeft={1}>
         <Text color={theme.text.primary} bold>
