@@ -85,8 +85,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     ];
   }, [interactions]);
 
-  const initialIndex = useMemo(() => Math.max(0, items.length - 2), [items]);
-
   useKeypress(
     (key) => {
       if (!selectedMessageId) {
@@ -190,7 +188,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       <Box flexDirection="column" flexGrow={1}>
         <BaseSelectionList
           items={items}
-          initialIndex={initialIndex}
           isFocused={true}
           showNumbers={false}
           onSelect={(item: MessageRecord) => {

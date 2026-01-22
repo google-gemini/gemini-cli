@@ -18,8 +18,6 @@ import {
   ToolErrorType,
   GeminiEventType,
   OutputFormat,
-  REFERENCE_CONTENT_START,
-  REFERENCE_CONTENT_END,
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
@@ -570,9 +568,9 @@ describe('runNonInteractive', () => {
     const rawInput = 'Summarize @file.txt';
     const processedParts: Part[] = [
       { text: 'Summarize @file.txt' },
-      { text: `\n${REFERENCE_CONTENT_START}\n` },
+      { text: '\n--- Content from referenced files ---\n' },
       { text: 'This is the content of the file.' },
-      { text: `\n${REFERENCE_CONTENT_END}` },
+      { text: '\n--- End of content ---' },
     ];
 
     // 3. Setup the mock to return the processed parts

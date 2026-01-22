@@ -190,7 +190,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.HISTORY_DOWN]: [{ key: 'n', shift: false, ctrl: true }],
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
   [Command.REWIND]: [{ key: 'double escape' }],
-  // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
 
