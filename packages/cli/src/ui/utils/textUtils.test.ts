@@ -23,6 +23,11 @@ describe('textUtils', () => {
       expect(sanitizeForListDisplay(input)).toBe('Line 1 Line 2 Tabbed End');
     });
 
+    it('should collapse multiple consecutive whitespace characters into a single space', () => {
+      const input = 'Multiple \n\n newlines and \t\t tabs';
+      expect(sanitizeForListDisplay(input)).toBe('Multiple newlines and tabs');
+    });
+
     it('should truncate long strings', () => {
       const longInput = 'a'.repeat(50);
       expect(sanitizeForListDisplay(longInput, 20)).toBe(

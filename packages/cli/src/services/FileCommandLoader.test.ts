@@ -1350,8 +1350,8 @@ describe('FileCommandLoader', () => {
       const loader = new FileCommandLoader(null);
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(1);
-      // \t becomes \t (literal backslash and t), \n becomes \n
-      expect(commands[0].name).toBe('test\\twith\\nnewlines');
+      // Non-alphanumeric characters (except - and .) become underscores
+      expect(commands[0].name).toBe('test_with_newlines');
     });
 
     it('truncates excessively long filenames', async () => {

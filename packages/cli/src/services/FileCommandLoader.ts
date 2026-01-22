@@ -231,15 +231,10 @@ export class FileCommandLoader implements ICommandLoader {
     );
     const baseCommandName = relativePath
       .split(path.sep)
-      // Sanitize each path segment to prevent ambiguity. Since ':' is our
-      // namespace separator, we replace any literal colons in filenames
-      // with underscores to avoid naming conflicts.
+      // Sanitize each path segment to prevent ambiguity, replacing non-allowlisted characters with underscores.
+      // Since ':' is our namespace separator, this ensures that colons do not cause naming conflicts.
       .map((segment) => {
-        let sanitized = segment
-          .replaceAll(':', '_')
-          .replaceAll('\t', '\\t')
-          .replaceAll('\n', '\\n')
-          .replaceAll('\r', '\\r');
+        let sanitized = segment.replace(/[^a-zA-Z0-9_\-.]/g, '_');
 
         // Truncate excessively long segments to prevent UI overflow
         if (sanitized.length > 50) {
@@ -253,7 +248,6 @@ export class FileCommandLoader implements ICommandLoader {
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
     let description = validDef.description || defaultDescription;
 
-    // Sanitize description: strip ANSI codes, replace newlines with spaces, and truncate
     description = sanitizeForListDisplay(description, 100);
 
     if (extensionName) {

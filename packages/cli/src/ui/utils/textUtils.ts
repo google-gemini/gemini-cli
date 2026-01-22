@@ -125,7 +125,7 @@ export function stripUnsafeCharacters(str: string): string {
 
 /**
  * Sanitize a string for display in list-like UI components (e.g. Help, Suggestions).
- * Removes ANSI codes, replaces newlines/tabs with spaces, and optionally truncates.
+ * Removes ANSI codes, collapses whitespace characters into a single space, and optionally truncates.
  */
 export function sanitizeForListDisplay(
   str: string,
@@ -135,7 +135,7 @@ export function sanitizeForListDisplay(
     return '';
   }
 
-  let sanitized = stripAnsi(str).replace(/\r?\n/g, ' ').replaceAll('\t', ' ');
+  let sanitized = stripAnsi(str).replace(/\s+/g, ' ');
 
   if (maxLength && sanitized.length > maxLength) {
     sanitized = sanitized.substring(0, maxLength - 3) + '...';
