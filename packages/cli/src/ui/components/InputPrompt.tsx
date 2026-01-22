@@ -12,7 +12,10 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
+import {
+  logicalPosToOffset,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -221,13 +224,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      let processedValue = submittedValue;
+      if (buffer.pastedContent) {
+        // Replace placeholders like [Pasted Text: 6 lines] with actual content
+        processedValue = processedValue.replace(
+          PASTED_TEXT_PLACEHOLDER_REGEX,
+          (match) => buffer.pastedContent[match] || match,
+        );
+      }
+
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(processedValue);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -360,8 +372,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        const offset = buffer.getOffset();
-        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+        buffer.insert(textToInsert, { paste: true });
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
@@ -851,8 +862,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         completion.promptCompletion.text &&
         key.sequence &&
         key.sequence.length === 1 &&
+        !key.alt &&
         !key.ctrl &&
-        !key.meta
+        !key.cmd
       ) {
         completion.promptCompletion.clear();
         setExpandedSuggestionIndex(-1);
@@ -1190,7 +1202,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'paste'
                       ? theme.text.accent
                       : theme.text.primary;
 
