@@ -1801,14 +1801,17 @@ export async function createTransport(
     const transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, {
+      env: sanitizeEnvironment(
+        {
+          ...process.env,
+          ...getExtensionEnvironment(mcpServerConfig.extension),
+          ...(mcpServerConfig.env || {}),
+        },
+        {
           ...sanitizationConfig,
           enableEnvironmentVariableRedaction: true,
-        }),
-        ...getExtensionEnvironment(mcpServerConfig.extension),
-        ...(mcpServerConfig.env || {}),
-      } as Record<string, string>,
+        },
+      ) as Record<string, string>,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
@@ -1866,7 +1869,9 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      env[setting.envVar] = setting.value;
+      if (!setting.sensitive) {
+        env[setting.envVar] = setting.value;
+      }
     }
   }
   return env;

@@ -1414,6 +1414,9 @@ describe('mcp-client', () => {
         GEMINI_API_KEY: 'sensitive-key',
         SAFE_VAR: 'safe-value',
       };
+      // Ensure strict sanitization is not triggered for this test
+      delete process.env['GITHUB_SHA'];
+      delete process.env['SURFACE'];
 
       try {
         await createTransport(
