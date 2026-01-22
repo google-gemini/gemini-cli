@@ -346,7 +346,9 @@ export const AppContainer = (props: AppContainerProps) => {
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
             role: 'user',
-            parts: [{ text: additionalContext }],
+            parts: [
+              { text: `<hook_context>${additionalContext}</hook_context>` },
+            ],
           });
         }
       }
@@ -720,6 +722,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
+      setText: (text: string) => buffer.setText(text),
     }),
     [
       setAuthState,
@@ -737,6 +740,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      buffer,
     ],
   );
 
