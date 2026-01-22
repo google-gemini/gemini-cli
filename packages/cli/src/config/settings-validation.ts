@@ -37,9 +37,8 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   }
 
   if (def.type === 'object') {
-    let schema;
+    const shape: Record<string, z.ZodTypeAny> = {};
     if (def.properties) {
-      const shape: Record<string, z.ZodTypeAny> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const [key, propDef] of Object.entries(def.properties) as any) {
         let propSchema = buildZodSchemaFromJsonSchema(propDef);
@@ -54,24 +53,23 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
         }
         shape[key] = propSchema;
       }
-      schema = z.object(shape).passthrough();
-    } else {
-      schema = z.object({}).passthrough();
     }
 
-    if (def.additionalProperties === false) {
-      // Use passthrough instead of strict to allow unknown keys with warnings
-      // rather than failing validation entirely. This enables forward compatibility
-      // when users have deprecated keys or typos in their settings files.
-      // The CLI will continue to work while logging a warning about unknown keys.
-      schema = schema.passthrough();
-    } else if (typeof def.additionalProperties === 'object') {
-      schema = schema.catchall(
+    // Build object schema and apply the appropriate additional properties handling.
+    // These methods are mutually exclusive, so we apply exactly one.
+    const baseSchema = z.object(shape);
+
+    if (typeof def.additionalProperties === 'object') {
+      // additionalProperties is a schema - use catchall to validate additional props
+      return baseSchema.catchall(
         buildZodSchemaFromJsonSchema(def.additionalProperties),
       );
     }
 
-    return schema;
+    // For both additionalProperties: false and additionalProperties: undefined,
+    // use passthrough to allow unknown keys silently. This enables forward
+    // compatibility when users have deprecated keys or typos in their settings.
+    return baseSchema.passthrough();
   }
 
   return z.unknown();
