@@ -176,6 +176,8 @@ describe('InputPrompt', () => {
       visualToTransformedMap: [0],
       transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
+      pastedContent: {},
+      addPastedContent: vi.fn().mockReturnValue('[Pasted Text: 6 lines]'),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -247,6 +249,8 @@ describe('InputPrompt', () => {
       enabled: false,
       checking: false,
     });
+
+    vi.mocked(clipboardy.read).mockResolvedValue('');
 
     props = {
       buffer: mockBuffer,
@@ -632,10 +636,9 @@ describe('InputPrompt', () => {
 
       await waitFor(() => {
         expect(clipboardy.read).toHaveBeenCalled();
-        expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
-          expect.any(Number),
-          expect.any(Number),
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
           'pasted text',
+          expect.objectContaining({ paste: true }),
         );
       });
       unmount();
@@ -1712,6 +1715,99 @@ describe('InputPrompt', () => {
             sequence: pastedText,
           }),
         );
+      });
+
+      unmount();
+    });
+  });
+
+  describe('large paste placeholder', () => {
+    it('should handle large clipboard paste (lines > 5) by calling buffer.insert', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const largeText = '1\n2\n3\n4\n5\n6';
+      vi.mocked(clipboardy.read).mockResolvedValue(largeText);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
+          largeText,
+          expect.objectContaining({ paste: true }),
+        );
+      });
+
+      unmount();
+    });
+
+    it('should handle large clipboard paste (chars > 500) by calling buffer.insert', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const largeText = 'a'.repeat(501);
+      vi.mocked(clipboardy.read).mockResolvedValue(largeText);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
+          largeText,
+          expect.objectContaining({ paste: true }),
+        );
+      });
+
+      unmount();
+    });
+
+    it('should handle normal clipboard paste by calling buffer.insert', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      const smallText = 'hello world';
+      vi.mocked(clipboardy.read).mockResolvedValue(smallText);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x16'); // Ctrl+V
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.insert).toHaveBeenCalledWith(
+          smallText,
+          expect.objectContaining({ paste: true }),
+        );
+      });
+
+      unmount();
+    });
+
+    it('should replace placeholder with actual content on submit', async () => {
+      // Setup buffer to have the placeholder
+      const largeText = '1\n2\n3\n4\n5\n6';
+      const id = '[Pasted Text: 6 lines]';
+      mockBuffer.text = `Check this: ${id}`;
+      mockBuffer.pastedContent = { [id]: largeText };
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\r'); // Enter
+      });
+
+      await waitFor(() => {
+        expect(props.onSubmit).toHaveBeenCalledWith(`Check this: ${largeText}`);
       });
 
       unmount();

@@ -34,6 +34,13 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
+const LARGE_PASTE_LINE_THRESHOLD = 5;
+const LARGE_PASTE_CHAR_THRESHOLD = 500;
+
+// Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
+export const PASTED_TEXT_PLACEHOLDER_REGEX =
+  /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
 export type Direction =
   | 'left'
   | 'right'
@@ -578,6 +585,7 @@ interface UndoHistoryEntry {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  pastedContent: Record<string, string>;
 }
 
 function calculateInitialCursorPosition(
@@ -781,6 +789,88 @@ export function getTransformUnderCursor(
     }
     if (col < span.logStart) break;
   }
+  return null;
+}
+
+/**
+ * Represents an atomic placeholder that should be deleted as a unit.
+ * Extensible to support future placeholder types.
+ */
+interface AtomicPlaceholder {
+  start: number; // Start position in logical text
+  end: number; // End position in logical text
+  type: 'paste' | 'image'; // Type for cleanup logic
+  id?: string; // For paste placeholders: the pastedContent key
+}
+
+/**
+ * Find atomic placeholder at cursor for backspace (cursor at end).
+ * Checks all placeholder types in priority order.
+ */
+function findAtomicPlaceholderForBackspace(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders (text-based)
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (cursorCol === end) {
+      return { start, end, type: 'paste', id: match[0] };
+    }
+  }
+
+  // 2. Check image transformations (logical bounds)
+  for (const transform of transformations) {
+    if (cursorCol === transform.logEnd) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find atomic placeholder at cursor for delete (cursor at start).
+ */
+function findAtomicPlaceholderForDelete(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  // 1. Check paste placeholders
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  let match;
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const start = match.index;
+    if (cursorCol === start) {
+      return {
+        start,
+        end: start + match[0].length,
+        type: 'paste',
+        id: match[0],
+      };
+    }
+  }
+
+  // 2. Check image transformations
+  for (const transform of transformations) {
+    if (cursorCol === transform.logStart) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: 'image',
+      };
+    }
+  }
+
   return null;
 }
 
@@ -1184,6 +1274,7 @@ export interface TextBufferState {
   viewportWidth: number;
   viewportHeight: number;
   visualLayout: VisualLayout;
+  pastedContent: Record<string, string>;
 }
 
 const historyLimit = 100;
@@ -1193,6 +1284,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
+    pastedContent: { ...currentState.pastedContent },
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -1204,6 +1296,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -1308,6 +1401,7 @@ function textBufferReducerLogic(
         cursorRow: lastNewLineIndex,
         cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
         preferredCol: null,
+        pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
     }
 
@@ -1365,15 +1459,68 @@ function textBufferReducerLogic(
       };
     }
 
+    case 'add_pasted_content': {
+      const { id, text } = action.payload;
+      return {
+        ...state,
+        pastedContent: {
+          ...state.pastedContent,
+          [id]: text,
+        },
+      };
+    }
+
     case 'backspace': {
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Early return if at start of buffer
+      if (cursorCol === 0 && cursorRow === 0) return state;
+
+      // Check if cursor is at end of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForBackspace(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorCol: placeholder.start,
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard backspace logic
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
 
       const currentLine = (r: number) => newLines[r] ?? '';
-
-      if (newCursorCol === 0 && newCursorRow === 0) return state;
 
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
@@ -1584,7 +1731,47 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const { cursorRow, cursorCol, lines } = state;
+      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+
+      // Check if cursor is at start of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForDelete(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = pushUndoLocal(state);
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          // cursorCol stays the same
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard delete logic
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
         const nextState = pushUndoLocal(state);
@@ -1734,6 +1921,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1751,6 +1939,7 @@ function textBufferReducerLogic(
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
       };
       return {
         ...state,
@@ -1926,6 +2115,7 @@ export function useTextBuffer({
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       visualLayout,
+      pastedContent: {},
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -1942,6 +2132,7 @@ export function useTextBuffer({
     selectionAnchor,
     visualLayout,
     transformationsByLine,
+    pastedContent,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -1995,20 +2186,64 @@ export function useTextBuffer({
     }
   }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
+  const addPastedContent = useCallback(
+    (content: string, lineCount: number): string => {
+      // content is already normalized by the caller
+      const base =
+        lineCount > LARGE_PASTE_LINE_THRESHOLD
+          ? `[Pasted Text: ${lineCount} lines]`
+          : `[Pasted Text: ${content.length} chars]`;
+
+      let id = base;
+      let suffix = 2;
+      while (pastedContent[id]) {
+        id = base.replace(']', ` #${suffix}]`);
+        suffix++;
+      }
+
+      dispatch({
+        type: 'add_pasted_content',
+        payload: { id, text: content },
+      });
+      return id;
+    },
+    [pastedContent],
+  );
+
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
-      if (!singleLine && /[\n\r]/.test(ch)) {
-        dispatch({ type: 'insert', payload: ch });
+      if (typeof ch !== 'string') {
         return;
       }
 
+      // Normalize line endings once at the entry point for pastes
+      const text = paste ? ch.replace(/\r\n|\r/g, '\n') : ch;
+
+      if (paste) {
+        const lineCount = text.split('\n').length;
+        if (
+          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          text.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          const id = addPastedContent(text, lineCount);
+          dispatch({ type: 'insert', payload: id });
+          return;
+        }
+      }
+
+      if (!singleLine && /[\n\r]/.test(text)) {
+        dispatch({ type: 'insert', payload: text });
+        return;
+      }
+
+      let textToInsert = text;
       const minLengthToInferAsDragDrop = 3;
       if (
-        ch.length >= minLengthToInferAsDragDrop &&
+        text.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
         paste
       ) {
-        let potentialPath = ch.trim();
+        let potentialPath = text.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
         if (quoteMatch) {
           potentialPath = quoteMatch[1];
@@ -2018,12 +2253,12 @@ export function useTextBuffer({
 
         const processed = parsePastedPaths(potentialPath, isValidPath);
         if (processed) {
-          ch = processed;
+          textToInsert = processed;
         }
       }
 
       let currentText = '';
-      for (const char of toCodePoints(ch)) {
+      for (const char of toCodePoints(textToInsert)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
             dispatch({ type: 'insert', payload: currentText });
@@ -2038,7 +2273,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive, singleLine],
+    [isValidPath, shellModeActive, singleLine, addPastedContent],
   );
 
   const newline = useCallback((): void => {
@@ -2435,6 +2670,7 @@ export function useTextBuffer({
       cursor: [cursorRow, cursorCol],
       preferredCol,
       selectionAnchor,
+      pastedContent,
 
       allVisualLines: visualLines,
       viewportVisualLines: renderedVisualLines,
@@ -2447,6 +2683,7 @@ export function useTextBuffer({
       visualLayout,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2506,6 +2743,7 @@ export function useTextBuffer({
       cursorCol,
       preferredCol,
       selectionAnchor,
+      pastedContent,
       visualLines,
       renderedVisualLines,
       visualCursor,
@@ -2517,6 +2755,7 @@ export function useTextBuffer({
       visualLayout,
       setText,
       insert,
+      addPastedContent,
       newline,
       backspace,
       del,
@@ -2584,6 +2823,7 @@ export interface TextBuffer {
    */
   preferredCol: number | null; // Preferred visual column
   selectionAnchor: [number, number] | null; // Logical selection anchor
+  pastedContent: Record<string, string>;
 
   // Visual state (handles wrapping)
   allVisualLines: string[]; // All visual lines for the current text and viewport width.
@@ -2621,6 +2861,7 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string, opts?: { paste?: boolean }) => void;
+  addPastedContent: (text: string, lineCount: number) => string;
   newline: () => void;
   backspace: () => void;
   del: () => void;
