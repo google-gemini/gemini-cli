@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
+
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
   ideVersion?: string;
@@ -255,6 +257,13 @@ export enum ActionStatus {
   ACTION_STATUS_EMPTY = 4,
 }
 
+export enum InitiationMethod {
+  INITIATION_METHOD_UNSPECIFIED = 0,
+  TAB = 1,
+  COMMAND = 2,
+  AGENT = 3,
+}
+
 export interface ConversationOffered {
   citationCount?: string;
   includedCode?: boolean;
@@ -262,6 +271,7 @@ export interface ConversationOffered {
   traceId?: string;
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface StreamingLatency {
@@ -277,3 +287,31 @@ export interface ConversationInteraction {
   language?: string;
   isAgentic?: boolean;
 }
+
+export interface FetchAdminControlsRequest {
+  project: string;
+}
+
+export type FetchAdminControlsResponse = z.infer<
+  typeof FetchAdminControlsResponseSchema
+>;
+
+const ExtensionsSettingSchema = z.object({
+  extensionsEnabled: z.boolean().optional(),
+});
+
+const CliFeatureSettingSchema = z.object({
+  extensionsSetting: ExtensionsSettingSchema.optional(),
+  advancedFeaturesEnabled: z.boolean().optional(),
+});
+
+const McpSettingSchema = z.object({
+  mcpEnabled: z.boolean().optional(),
+  overrideMcpConfigJson: z.string().optional(),
+});
+
+export const FetchAdminControlsResponseSchema = z.object({
+  secureModeEnabled: z.boolean().optional(),
+  mcpSetting: McpSettingSchema.optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});

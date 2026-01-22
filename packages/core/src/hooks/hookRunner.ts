@@ -15,6 +15,7 @@ import type {
   BeforeAgentInput,
   BeforeModelInput,
   BeforeModelOutput,
+  BeforeToolInput,
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -104,10 +105,15 @@ export class HookRunner {
     hookConfigs: HookConfig[],
     eventName: HookEventName,
     input: HookInput,
+    onHookStart?: (config: HookConfig, index: number) => void,
+    onHookEnd?: (config: HookConfig, result: HookExecutionResult) => void,
   ): Promise<HookExecutionResult[]> {
-    const promises = hookConfigs.map((config) =>
-      this.executeHook(config, eventName, input),
-    );
+    const promises = hookConfigs.map(async (config, index) => {
+      onHookStart?.(config, index);
+      const result = await this.executeHook(config, eventName, input);
+      onHookEnd?.(config, result);
+      return result;
+    });
 
     return Promise.all(promises);
   }
@@ -119,12 +125,17 @@ export class HookRunner {
     hookConfigs: HookConfig[],
     eventName: HookEventName,
     input: HookInput,
+    onHookStart?: (config: HookConfig, index: number) => void,
+    onHookEnd?: (config: HookConfig, result: HookExecutionResult) => void,
   ): Promise<HookExecutionResult[]> {
     const results: HookExecutionResult[] = [];
     let currentInput = input;
 
-    for (const config of hookConfigs) {
+    for (let i = 0; i < hookConfigs.length; i++) {
+      const config = hookConfigs[i];
+      onHookStart?.(config, i);
       const result = await this.executeHook(config, eventName, currentInput);
+      onHookEnd?.(config, result);
       results.push(result);
 
       // If the hook succeeded and has output, use it to modify the input for the next hook
@@ -186,6 +197,20 @@ export class HookRunner {
                 ...currentRequest,
                 ...partialRequest,
               } as LLMRequest;
+            }
+          }
+          break;
+
+        case HookEventName.BeforeTool:
+          if ('tool_input' in hookOutput.hookSpecificOutput) {
+            const newToolInput = hookOutput.hookSpecificOutput[
+              'tool_input'
+            ] as Record<string, unknown>;
+            if (newToolInput && 'tool_input' in modifiedInput) {
+              (modifiedInput as BeforeToolInput).tool_input = {
+                ...(modifiedInput as BeforeToolInput).tool_input,
+                ...newToolInput,
+              };
             }
           }
           break;

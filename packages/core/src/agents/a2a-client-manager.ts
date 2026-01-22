@@ -64,11 +64,11 @@ export class A2AClientManager {
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
-    if (this.clients.has(name)) {
+    if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl = fetch;
+    let fetchImpl: typeof fetch = fetch;
     if (authHandler) {
       fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
     }
@@ -98,6 +98,15 @@ export class A2AClientManager {
     );
 
     return agentCard;
+  }
+
+  /**
+   * Invalidates all cached clients and agent cards.
+   */
+  clearCache(): void {
+    this.clients.clear();
+    this.agentCards.clear();
+    debugLogger.debug('[A2AClientManager] Cache cleared.');
   }
 
   /**

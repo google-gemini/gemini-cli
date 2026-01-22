@@ -9,6 +9,7 @@ import {
   classifyGoogleError,
   RetryableQuotaError,
   TerminalQuotaError,
+  ValidationRequiredError,
 } from './googleQuotaErrors.js';
 import * as errorParser from './googleErrors.js';
 import type { GoogleApiError } from './googleErrors.js';
@@ -342,7 +343,7 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
@@ -393,7 +394,7 @@ describe('classifyGoogleError', () => {
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for generic 429 without specific message', () => {
+  it('should return RetryableQuotaError without delay time for generic 429 without specific message', () => {
     const generic429 = {
       status: 429,
       message: 'Resource exhausted. No specific retry info.',
@@ -403,11 +404,11 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for 429 with empty details and no regex match', () => {
+  it('should return RetryableQuotaError without delay time for 429 with empty details and no regex match', () => {
     const errorWithEmptyDetails = {
       error: {
         code: 429,
@@ -420,11 +421,11 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
   });
 
-  it('should return RetryableQuotaError with 5s fallback for 429 with some detail', () => {
+  it('should return RetryableQuotaError without delay time for 429 with some detail', () => {
     const errorWithEmptyDetails = {
       error: {
         code: 429,
@@ -446,7 +447,193 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBe(5000);
+      expect(result.retryDelayMs).toBeUndefined();
     }
+  });
+
+  it('should return ValidationRequiredError for 403 with VALIDATION_REQUIRED from cloudcode-pa domain', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required to continue.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            validation_link: 'https://fallback.example.com/validate',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description: 'Complete validation to continue',
+              url: 'https://example.com/validate',
+            },
+            {
+              description: 'Learn more',
+              url: 'https://support.google.com/accounts?p=al_alert',
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    expect((result as ValidationRequiredError).validationLink).toBe(
+      'https://example.com/validate',
+    );
+    expect((result as ValidationRequiredError).validationDescription).toBe(
+      'Complete validation to continue',
+    );
+    expect((result as ValidationRequiredError).learnMoreUrl).toBe(
+      'https://support.google.com/accounts?p=al_alert',
+    );
+    expect((result as ValidationRequiredError).cause).toBe(apiError);
+  });
+
+  it('should correctly parse Learn more URL when first link description contains "Learn more" text', () => {
+    // This tests the real API response format where the description of the first
+    // link contains "Learn more:" text, but we should use the second link's URL
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required to continue.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {},
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description:
+                'Further action is required to use this service. Navigate to the following URL to complete verification:\n\nhttps://accounts.sandbox.google.com/signin/continue?...\n\nLearn more:\n\nhttps://support.google.com/accounts?p=al_alert\n',
+              url: 'https://accounts.sandbox.google.com/signin/continue?sarp=1&scc=1&continue=...',
+            },
+            {
+              description: 'Learn more',
+              url: 'https://support.google.com/accounts?p=al_alert',
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    // Should get the validation link from the first link
+    expect((result as ValidationRequiredError).validationLink).toBe(
+      'https://accounts.sandbox.google.com/signin/continue?sarp=1&scc=1&continue=...',
+    );
+    // Should get the Learn more URL from the SECOND link, not the first
+    expect((result as ValidationRequiredError).learnMoreUrl).toBe(
+      'https://support.google.com/accounts?p=al_alert',
+    );
+  });
+
+  it('should fallback to ErrorInfo metadata when Help detail is not present', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'staging-cloudcode-pa.googleapis.com',
+          metadata: {
+            validation_link: 'https://staging.example.com/validate',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    expect((result as ValidationRequiredError).validationLink).toBe(
+      'https://staging.example.com/validate',
+    );
+    expect(
+      (result as ValidationRequiredError).validationDescription,
+    ).toBeUndefined();
+    expect((result as ValidationRequiredError).learnMoreUrl).toBeUndefined();
+  });
+
+  it('should return original error for 403 with different reason', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Access denied.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'ACCESS_DENIED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {},
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error();
+    const result = classifyGoogleError(originalError);
+    expect(result).toBe(originalError);
+    expect(result).not.toBeInstanceOf(ValidationRequiredError);
+  });
+
+  it('should find learn more link by hostname when description is different', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Validation required.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {},
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.Help',
+          links: [
+            {
+              description: 'Complete validation',
+              url: 'https://accounts.google.com/validate',
+            },
+            {
+              description: 'More information', // Not exactly "Learn more"
+              url: 'https://support.google.com/accounts?p=al_alert',
+            },
+          ],
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
+    expect((result as ValidationRequiredError).learnMoreUrl).toBe(
+      'https://support.google.com/accounts?p=al_alert',
+    );
+  });
+
+  it('should return original error for 403 from non-cloudcode domain', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Forbidden.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'other.googleapis.com',
+          metadata: {},
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error();
+    const result = classifyGoogleError(originalError);
+    expect(result).toBe(originalError);
+    expect(result).not.toBeInstanceOf(ValidationRequiredError);
   });
 });

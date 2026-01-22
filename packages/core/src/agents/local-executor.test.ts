@@ -57,8 +57,12 @@ import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
-import type { ModelConfigKey } from '../services/modelConfigService.js';
+import type {
+  ModelConfigKey,
+  ResolvedModelConfig,
+} from '../services/modelConfigService.js';
 import { getModelConfigAlias } from './registry.js';
+import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
   mockSendMessageStream,
@@ -219,10 +223,22 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
     name: 'TestAgent',
     description: 'An agent for testing.',
     inputConfig: {
-      inputs: { goal: { type: 'string', required: true, description: 'goal' } },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
+      },
     },
-    modelConfig: { model: 'gemini-test-model', temp: 0, top_p: 1 },
-    runConfig: { max_time_minutes: 5, max_turns: 5, ...runConfigOverrides },
+    modelConfig: {
+      model: 'gemini-test-model',
+      generateContentConfig: {
+        temperature: 0,
+        topP: 1,
+      },
+    },
+    runConfig: { maxTimeMinutes: 5, maxTurns: 5, ...runConfigOverrides },
     promptConfig: { systemPrompt: 'Achieve the goal: ${goal}.' },
     toolConfig: { tools },
     outputConfig,
@@ -269,8 +285,13 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
-    parentToolRegistry = new ToolRegistry(mockConfig);
-    parentToolRegistry.registerTool(new LSTool(mockConfig));
+    parentToolRegistry = new ToolRegistry(
+      mockConfig,
+      mockConfig.getMessageBus(),
+    );
+    parentToolRegistry.registerTool(
+      new LSTool(mockConfig, mockConfig.getMessageBus()),
+    );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );
@@ -396,8 +417,12 @@ describe('LocalAgentExecutor', () => {
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
-      definition.inputConfig.inputs = {
-        goal: { type: 'string', required: true, description: 'goal' },
+      definition.inputConfig.inputSchema = {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
       };
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1187,6 +1212,101 @@ describe('LocalAgentExecutor', () => {
     });
   });
 
+  describe('Model Routing', () => {
+    it('should use model routing when the agent model is "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'auto';
+
+      const mockRouter = {
+        route: vi.fn().mockResolvedValue({
+          model: 'routed-model',
+          metadata: { source: 'test', reasoning: 'test' },
+        }),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'auto'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'auto',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'routed-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT use model routing when the agent model is NOT "auto"', async () => {
+      const definition = createTestDefinition();
+      definition.modelConfig.model = 'concrete-model';
+
+      const mockRouter = {
+        route: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
+        mockRouter as unknown as ModelRouterService,
+      );
+
+      // Mock resolved config to return 'concrete-model'
+      vi.spyOn(
+        mockConfig.modelConfigService,
+        'getResolvedConfig',
+      ).mockReturnValue({
+        model: 'concrete-model',
+        generateContentConfig: {},
+      } as unknown as ResolvedModelConfig);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockRouter.route).not.toHaveBeenCalled();
+      expect(mockSendMessageStream).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'concrete-model' }),
+        expect.any(Array),
+        expect.any(String),
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
   describe('run (Termination Conditions)', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
@@ -1217,7 +1337,7 @@ describe('LocalAgentExecutor', () => {
     it('should terminate when max_turns is reached', async () => {
       const MAX = 2;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1234,7 +1354,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should terminate with TIMEOUT if a model call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1249,9 +1369,13 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             await new Promise<void>((resolve) => {
               // This promise resolves when aborted, ending the generator.
-              signal?.addEventListener('abort', () => {
-                resolve();
-              });
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  resolve();
+                },
+                { once: true },
+              );
             });
           })(),
       );
@@ -1291,7 +1415,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should terminate with TIMEOUT if a tool call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 1,
+        maxTimeMinutes: 1,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1379,7 +1503,7 @@ describe('LocalAgentExecutor', () => {
     it('should recover successfully if complete_task is called during the grace turn after MAX_TURNS', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1427,7 +1551,7 @@ describe('LocalAgentExecutor', () => {
     it('should fail if complete_task is NOT called during the grace turn after MAX_TURNS', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1546,7 +1670,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should recover successfully from a TIMEOUT', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1561,7 +1685,9 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             // This promise never resolves, it waits for abort.
             await new Promise<void>((resolve) => {
-              signal?.addEventListener('abort', () => resolve());
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
             });
           })(),
       );
@@ -1601,7 +1727,7 @@ describe('LocalAgentExecutor', () => {
 
     it('should fail recovery from a TIMEOUT if the grace period also times out', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_time_minutes: 0.5, // 30 seconds
+        maxTimeMinutes: 0.5, // 30 seconds
       });
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1614,7 +1740,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1625,7 +1753,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1693,7 +1823,7 @@ describe('LocalAgentExecutor', () => {
     it('should log a RecoveryAttemptEvent when a recoverable error occurs and recovery fails', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 
@@ -1718,7 +1848,7 @@ describe('LocalAgentExecutor', () => {
     it('should log a successful RecoveryAttemptEvent when recovery succeeds', async () => {
       const MAX = 1;
       const definition = createTestDefinition([LS_TOOL_NAME], {
-        max_turns: MAX,
+        maxTurns: MAX,
       });
       const executor = await LocalAgentExecutor.create(definition, mockConfig);
 

@@ -13,6 +13,7 @@ import {
   AfterModelHookOutput,
   HookEventName,
   HookType,
+  BeforeToolHookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -91,6 +92,11 @@ describe('Hook Output Classes', () => {
     it('should return BeforeToolSelectionHookOutput for BeforeToolSelection event', () => {
       const output = createHookOutput(HookEventName.BeforeToolSelection, {});
       expect(output).toBeInstanceOf(BeforeToolSelectionHookOutput);
+    });
+
+    it('should return BeforeToolHookOutput for BeforeTool event', () => {
+      const output = createHookOutput(HookEventName.BeforeTool, {});
+      expect(output).toBeInstanceOf(BeforeToolHookOutput);
     });
   });
 
@@ -171,11 +177,22 @@ describe('Hook Output Classes', () => {
       expect(output.applyToolConfigModifications(target)).toBe(target);
     });
 
-    it('getAdditionalContext should return additionalContext if present', () => {
+    it('getAdditionalContext should return additional context if present', () => {
       const output = new DefaultHookOutput({
         hookSpecificOutput: { additionalContext: 'some context' },
       });
       expect(output.getAdditionalContext()).toBe('some context');
+    });
+
+    it('getAdditionalContext should sanitize context by escaping <', () => {
+      const output = new DefaultHookOutput({
+        hookSpecificOutput: {
+          additionalContext: 'context with <tag> and </hook_context>',
+        },
+      });
+      expect(output.getAdditionalContext()).toBe(
+        'context with &lt;tag&gt; and &lt;/hook_context&gt;',
+      );
     });
 
     it('getAdditionalContext should return undefined if additionalContext is not present', () => {
@@ -313,45 +330,17 @@ describe('Hook Output Classes', () => {
       expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response if shouldStopExecution is true', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true', () => {
       const output = new AfterModelHookOutput({
         continue: false,
         stopReason: 'stopped by hook',
       });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
 
-    it('getModifiedResponse should return a synthetic stop response with default reason if shouldStopExecution is true and no stopReason', () => {
+    it('getModifiedResponse should return undefined if shouldStopExecution is true and no stopReason', () => {
       const output = new AfterModelHookOutput({ continue: false });
-      const expectedResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: ['No reason provided'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      expect(output.getModifiedResponse()).toEqual(expectedResponse);
-      expect(defaultHookTranslator.fromHookLLMResponse).toHaveBeenCalledWith(
-        expectedResponse,
-      );
+      expect(output.getModifiedResponse()).toBeUndefined();
     });
   });
 });
