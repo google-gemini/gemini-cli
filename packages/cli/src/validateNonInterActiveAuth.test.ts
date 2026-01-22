@@ -295,7 +295,7 @@ describe('validateNonInterActiveAuth', () => {
   });
 
   it('succeeds if effectiveAuthType matches enforcedAuthType', async () => {
-    mockSettings.merged.security!.auth!.enforcedType = AuthType.USE_GEMINI;
+    mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({});
     await validateNonInteractiveAuth(
@@ -309,8 +309,7 @@ describe('validateNonInterActiveAuth', () => {
   });
 
   it('exits if configuredAuthType does not match enforcedAuthType', async () => {
-    mockSettings.merged.security!.auth!.enforcedType =
-      AuthType.LOGIN_WITH_GOOGLE;
+    mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
     });
@@ -336,8 +335,7 @@ describe('validateNonInterActiveAuth', () => {
   });
 
   it('exits if auth from env var does not match enforcedAuthType', async () => {
-    mockSettings.merged.security!.auth!.enforcedType =
-      AuthType.LOGIN_WITH_GOOGLE;
+    mockSettings.merged.security.auth.enforcedType = AuthType.LOGIN_WITH_GOOGLE;
     process.env['GEMINI_API_KEY'] = 'fake-key';
     const nonInteractiveConfig = createLocalMockConfig({
       getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
@@ -398,7 +396,7 @@ describe('validateNonInterActiveAuth', () => {
     });
 
     it(`prints JSON error when enforced auth mismatches current auth and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
-      mockSettings.merged.security!.auth!.enforcedType = AuthType.USE_GEMINI;
+      mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
       const nonInteractiveConfig = createLocalMockConfig({
         getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
         getContentGeneratorConfig: vi

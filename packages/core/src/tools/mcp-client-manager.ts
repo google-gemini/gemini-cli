@@ -27,22 +27,26 @@ import { debugLogger } from '../utils/debugLogger.js';
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
+  private readonly clientVersion: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
   private discoveryPromise: Promise<void> | undefined;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
   private readonly eventEmitter?: EventEmitter;
+  private pendingRefreshPromise: Promise<void> | null = null;
   private readonly blockedMcpServers: Array<{
     name: string;
     extensionName: string;
   }> = [];
 
   constructor(
+    clientVersion: string,
     toolRegistry: ToolRegistry,
     cliConfig: Config,
     eventEmitter?: EventEmitter,
   ) {
+    this.clientVersion = clientVersion;
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
@@ -66,10 +70,11 @@ export class McpClientManager {
   async stopExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
-      Object.keys(extension.mcpServers ?? {}).map(
-        this.disconnectClient.bind(this),
+      Object.keys(extension.mcpServers ?? {}).map((name) =>
+        this.disconnectClient(name, true),
       ),
     );
+    await this.cliConfig.refreshMcpContext();
   }
 
   /**
@@ -89,6 +94,7 @@ export class McpClientManager {
         }),
       ),
     );
+    await this.cliConfig.refreshMcpContext();
   }
 
   private isAllowedMcpServer(name: string) {
@@ -111,7 +117,7 @@ export class McpClientManager {
     return true;
   }
 
-  private async disconnectClient(name: string) {
+  private async disconnectClient(name: string, skipRefresh = false) {
     const existing = this.clients.get(name);
     if (existing) {
       try {
@@ -123,11 +129,10 @@ export class McpClientManager {
           `Error stopping client '${name}': ${getErrorMessage(error)}`,
         );
       } finally {
-        // This is required to update the content generator configuration with the
-        // new tool configuration.
-        const geminiClient = this.cliConfig.getGeminiClient();
-        if (geminiClient.isInitialized()) {
-          await geminiClient.setTools();
+        if (!skipRefresh) {
+          // This is required to update the content generator configuration with the
+          // new tool configuration and system instructions.
+          await this.cliConfig.refreshMcpContext();
         }
       }
     }
@@ -163,8 +168,7 @@ export class McpClientManager {
       return;
     }
 
-    const currentDiscoveryPromise = new Promise<void>((resolve, _reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
       (async () => {
         try {
           if (existing) {
@@ -182,12 +186,10 @@ export class McpClientManager {
               this.cliConfig.getWorkspaceContext(),
               this.cliConfig,
               this.cliConfig.getDebugMode(),
+              this.clientVersion,
               async () => {
                 debugLogger.log('Tools changed, updating Gemini context...');
-                const geminiClient = this.cliConfig.getGeminiClient();
-                if (geminiClient.isInitialized()) {
-                  await geminiClient.setTools();
-                }
+                await this.scheduleMcpContextRefresh();
               },
             );
           if (!existing) {
@@ -212,37 +214,40 @@ export class McpClientManager {
               );
             }
           }
+        } catch (error) {
+          const errorMessage = getErrorMessage(error);
+          coreEvents.emitFeedback(
+            'error',
+            `Error initializing MCP server '${name}': ${errorMessage}`,
+            error,
+          );
         } finally {
-          // This is required to update the content generator configuration with the
-          // new tool configuration.
-          const geminiClient = this.cliConfig.getGeminiClient();
-          if (geminiClient.isInitialized()) {
-            await geminiClient.setTools();
-          }
           resolve();
         }
-      })();
+      })().catch(reject);
     });
 
     if (this.discoveryPromise) {
-      this.discoveryPromise = this.discoveryPromise.then(
-        () => currentDiscoveryPromise,
-      );
+      // Ensure the next discovery starts regardless of the previous one's success/failure
+      this.discoveryPromise = this.discoveryPromise
+        .catch(() => {})
+        .then(() => currentDiscoveryPromise);
     } else {
       this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
       this.discoveryPromise = currentDiscoveryPromise;
     }
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     const currentPromise = this.discoveryPromise;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    currentPromise.then((_) => {
-      // If we are the last recorded discoveryPromise, then we are done, reset
-      // the world.
-      if (currentPromise === this.discoveryPromise) {
-        this.discoveryPromise = undefined;
-        this.discoveryState = MCPDiscoveryState.COMPLETED;
-      }
-    });
+    void currentPromise
+      .finally(() => {
+        // If we are the last recorded discoveryPromise, then we are done, reset
+        // the world.
+        if (currentPromise === this.discoveryPromise) {
+          this.discoveryPromise = undefined;
+          this.discoveryState = MCPDiscoveryState.COMPLETED;
+        }
+      })
+      .catch(() => {}); // Prevents unhandled rejection from the .finally branch
     return currentPromise;
   }
 
@@ -274,6 +279,7 @@ export class McpClientManager {
         this.maybeDiscoverMcpServer(name, config),
       ),
     );
+    await this.cliConfig.refreshMcpContext();
   }
 
   /**
@@ -281,7 +287,11 @@ export class McpClientManager {
    */
   async restart(): Promise<void> {
     await Promise.all(
-      Array.from(this.clients.entries()).map(async ([name, client]) => {
+      Array.from(this.clients.keys()).map(async (name) => {
+        const client = this.clients.get(name);
+        if (!client) {
+          return;
+        }
         try {
           await this.maybeDiscoverMcpServer(name, client.getServerConfig());
         } catch (error) {
@@ -291,6 +301,7 @@ export class McpClientManager {
         }
       }),
     );
+    await this.cliConfig.refreshMcpContext();
   }
 
   /**
@@ -302,6 +313,7 @@ export class McpClientManager {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
     await this.maybeDiscoverMcpServer(name, client.getServerConfig());
+    await this.cliConfig.refreshMcpContext();
   }
 
   /**
@@ -348,10 +360,36 @@ export class McpClientManager {
       const clientInstructions = client.getInstructions();
       if (clientInstructions) {
         instructions.push(
-          `# Instructions for MCP Server '${name}'\n${clientInstructions}`,
+          `The following are instructions provided by the tool server '${name}':\n---[start of server instructions]---\n${clientInstructions}\n---[end of server instructions]---`,
         );
       }
     }
     return instructions.join('\n\n');
+  }
+
+  private async scheduleMcpContextRefresh(): Promise<void> {
+    if (this.pendingRefreshPromise) {
+      return this.pendingRefreshPromise;
+    }
+
+    this.pendingRefreshPromise = (async () => {
+      // Debounce to coalesce multiple rapid updates
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      try {
+        await this.cliConfig.refreshMcpContext();
+      } catch (error) {
+        debugLogger.error(
+          `Error refreshing MCP context: ${getErrorMessage(error)}`,
+        );
+      } finally {
+        this.pendingRefreshPromise = null;
+      }
+    })();
+
+    return this.pendingRefreshPromise;
+  }
+
+  getMcpServerCount(): number {
+    return this.clients.size;
   }
 }

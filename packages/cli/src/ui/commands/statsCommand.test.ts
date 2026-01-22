@@ -37,13 +37,10 @@ describe('statsCommand', () => {
     const expectedDuration = formatDuration(
       endTime.getTime() - startTime.getTime(),
     );
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.STATS,
-        duration: expectedDuration,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.STATS,
+      duration: expectedDuration,
+    });
   });
 
   it('should fetch and display quota if config is available', async () => {
@@ -62,7 +59,6 @@ describe('statsCommand', () => {
       expect.objectContaining({
         quotas: mockQuota,
       }),
-      expect.any(Number),
     );
   });
 
@@ -75,12 +71,9 @@ describe('statsCommand', () => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     modelSubCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.MODEL_STATS,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.MODEL_STATS,
+    });
   });
 
   it('should display tool stats when using the "tools" subcommand', () => {
@@ -92,11 +85,8 @@ describe('statsCommand', () => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     toolsSubCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.TOOL_STATS,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.TOOL_STATS,
+    });
   });
 });

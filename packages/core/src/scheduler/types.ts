@@ -14,6 +14,7 @@ import type {
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
+import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 
 export interface ToolCallRequestInfo {
   callId: string;
@@ -98,7 +99,18 @@ export type WaitingToolCall = {
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  confirmationDetails: ToolCallConfirmationDetails;
+  /**
+   * Supports both legacy (with callbacks) and new (serializable) details.
+   * New code should treat this as SerializableConfirmationDetails.
+   *
+   * TODO: Remove ToolCallConfirmationDetails and collapse to just
+   * SerializableConfirmationDetails after migration.
+   */
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
+  // TODO: Make required after migration.
+  correlationId?: string;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
 };
