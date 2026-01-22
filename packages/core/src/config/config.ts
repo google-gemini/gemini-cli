@@ -634,10 +634,9 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
-    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
-    this.enableEventDrivenScheduler =
-      params.enableEventDrivenScheduler ?? false;
+    this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -686,7 +685,7 @@ export class Config {
       ? false
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
-    this.enableHooks = params.enableHooks ?? false;
+    this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
     this.codebaseInvestigatorSettings = {
