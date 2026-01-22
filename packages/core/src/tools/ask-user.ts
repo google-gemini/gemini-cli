@@ -35,7 +35,7 @@ export class AskUserTool extends BaseDeclarativeTool<
       ASK_USER_TOOL_NAME,
       'Ask User',
       'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
-      Kind.Other,
+      Kind.Communicate,
       {
         type: 'object',
         required: ['questions'],
