@@ -951,12 +951,10 @@ export function SettingsDialog({
                   const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
                   displayValue =
                     beforeCursor + chalk.inverse(atCursor) + afterCursor;
-                } else if (
-                  cursorVisible &&
-                  editCursorPos >= cpLen(editBuffer)
-                ) {
+                } else if (editCursorPos >= cpLen(editBuffer)) {
                   // Cursor is at the end - show inverted space
-                  displayValue = editBuffer + chalk.inverse(' ');
+                  displayValue =
+                    editBuffer + (cursorVisible ? chalk.inverse(' ') : ' ');
                 } else {
                   // Cursor not visible
                   displayValue = editBuffer;
