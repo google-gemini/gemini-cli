@@ -13,8 +13,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
    'test';
 21 + const anotherNew =
    'test';
-22  console.log('end of second
-    hunk');"
+22   console.log('end of
+   second hunk');"
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `
@@ -94,8 +94,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
    'test';
 21 + const anotherNew =
    'test';
-22  console.log('end of second
-    hunk');"
+22   console.log('end of
+   second hunk');"
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `

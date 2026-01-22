@@ -38,7 +38,9 @@ const noColorSemanticColors: SemanticColors = {
     primary: '',
     diff: {
       added: '',
+      addedHighlight: '',
       removed: '',
+      removedHighlight: '',
     },
   },
   border: {

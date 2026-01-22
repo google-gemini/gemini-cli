@@ -18,7 +18,9 @@ export interface SemanticColors {
     primary: string;
     diff: {
       added: string;
+      addedHighlight: string;
       removed: string;
+      removedHighlight: string;
     };
   };
   border: {
@@ -50,7 +52,10 @@ export const lightSemanticColors: SemanticColors = {
     primary: lightTheme.Background,
     diff: {
       added: lightTheme.DiffAdded,
+      addedHighlight: lightTheme.DiffAddedHighlight ?? lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
+      removedHighlight:
+        lightTheme.DiffRemovedHighlight ?? lightTheme.DiffRemoved,
     },
   },
   border: {
@@ -82,7 +87,9 @@ export const darkSemanticColors: SemanticColors = {
     primary: darkTheme.Background,
     diff: {
       added: darkTheme.DiffAdded,
+      addedHighlight: darkTheme.DiffAddedHighlight ?? darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,
+      removedHighlight: darkTheme.DiffRemovedHighlight ?? darkTheme.DiffRemoved,
     },
   },
   border: {
@@ -114,7 +121,9 @@ export const ansiSemanticColors: SemanticColors = {
     primary: ansiTheme.Background,
     diff: {
       added: ansiTheme.DiffAdded,
+      addedHighlight: ansiTheme.DiffAddedHighlight ?? ansiTheme.DiffAdded,
       removed: ansiTheme.DiffRemoved,
+      removedHighlight: ansiTheme.DiffRemovedHighlight ?? ansiTheme.DiffRemoved,
     },
   },
   border: {

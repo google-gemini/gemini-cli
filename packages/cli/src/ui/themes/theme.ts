@@ -26,7 +26,9 @@ export interface ColorsTheme {
   AccentYellow: string;
   AccentRed: string;
   DiffAdded: string;
+  DiffAddedHighlight?: string;
   DiffRemoved: string;
+  DiffRemovedHighlight?: string;
   Comment: string;
   Gray: string;
   DarkGray: string;
@@ -48,7 +50,9 @@ export interface CustomTheme {
     primary?: string;
     diff?: {
       added?: string;
+      addedHighlight?: string;
       removed?: string;
+      removedHighlight?: string;
     };
   };
   border?: {
@@ -77,7 +81,9 @@ export interface CustomTheme {
   AccentYellow?: string;
   AccentRed?: string;
   DiffAdded?: string;
+  DiffAddedHighlight?: string;
   DiffRemoved?: string;
+  DiffRemovedHighlight?: string;
   Comment?: string;
   Gray?: string;
   DarkGray?: string;
@@ -96,7 +102,9 @@ export const lightTheme: ColorsTheme = {
   AccentYellow: '#D5A40A',
   AccentRed: '#DD4C4C',
   DiffAdded: '#C6EAD8',
+  DiffAddedHighlight: '#A2D9B1',
   DiffRemoved: '#FFCCCC',
+  DiffRemovedHighlight: '#FFB3B3',
   Comment: '#008000',
   Gray: '#97a0b0',
   DarkGray: interpolateColor('#97a0b0', '#FAFAFA', 0.5),
@@ -115,7 +123,9 @@ export const darkTheme: ColorsTheme = {
   AccentYellow: '#F9E2AF',
   AccentRed: '#F38BA8',
   DiffAdded: '#28350B',
+  DiffAddedHighlight: '#435515',
   DiffRemoved: '#430000',
+  DiffRemovedHighlight: '#700000',
   Comment: '#6C7086',
   Gray: '#6C7086',
   DarkGray: interpolateColor('#6C7086', '#1E1E2E', 0.5),
@@ -134,7 +144,9 @@ export const ansiTheme: ColorsTheme = {
   AccentYellow: 'yellow',
   AccentRed: 'red',
   DiffAdded: 'green',
+  DiffAddedHighlight: 'green',
   DiffRemoved: 'red',
+  DiffRemovedHighlight: 'red',
   Comment: 'gray',
   Gray: 'gray',
   DarkGray: 'gray',
@@ -177,7 +189,11 @@ export class Theme {
         primary: this.colors.Background,
         diff: {
           added: this.colors.DiffAdded,
+          addedHighlight:
+            this.colors.DiffAddedHighlight ?? this.colors.DiffAdded,
           removed: this.colors.DiffRemoved,
+          removedHighlight:
+            this.colors.DiffRemovedHighlight ?? this.colors.DiffRemoved,
         },
       },
       border: {
@@ -275,8 +291,20 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     AccentRed: customTheme.status?.error ?? customTheme.AccentRed ?? '',
     DiffAdded:
       customTheme.background?.diff?.added ?? customTheme.DiffAdded ?? '',
+    DiffAddedHighlight:
+      customTheme.background?.diff?.addedHighlight ??
+      customTheme.DiffAddedHighlight ??
+      customTheme.background?.diff?.added ??
+      customTheme.DiffAdded ??
+      '',
     DiffRemoved:
       customTheme.background?.diff?.removed ?? customTheme.DiffRemoved ?? '',
+    DiffRemovedHighlight:
+      customTheme.background?.diff?.removedHighlight ??
+      customTheme.DiffRemovedHighlight ??
+      customTheme.background?.diff?.removed ??
+      customTheme.DiffRemoved ??
+      '',
     Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
     DarkGray:
@@ -442,7 +470,15 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       primary: customTheme.background?.primary ?? colors.Background,
       diff: {
         added: customTheme.background?.diff?.added ?? colors.DiffAdded,
+        addedHighlight:
+          customTheme.background?.diff?.addedHighlight ??
+          colors.DiffAddedHighlight ??
+          colors.DiffAdded,
         removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
+        removedHighlight:
+          customTheme.background?.diff?.removedHighlight ??
+          colors.DiffRemovedHighlight ??
+          colors.DiffRemoved,
       },
     },
     border: {

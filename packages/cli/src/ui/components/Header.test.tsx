@@ -128,7 +128,12 @@ describe('<Header />', () => {
       },
       background: {
         primary: '',
-        diff: { added: '', removed: '' },
+        diff: {
+          added: '',
+          addedHighlight: '',
+          removed: '',
+          removedHighlight: '',
+        },
       },
       border: {
         default: '',

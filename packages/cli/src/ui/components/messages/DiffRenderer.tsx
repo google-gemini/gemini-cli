@@ -8,6 +8,7 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import crypto from 'node:crypto';
+import * as Diff from 'diff';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
@@ -19,6 +20,42 @@ interface DiffLine {
   oldLine?: number;
   newLine?: number;
   content: string;
+}
+
+interface DiffChangeGroup {
+  type: 'change';
+  removed: DiffLine[];
+  added: DiffLine[];
+}
+
+type GroupedDiffLine = DiffLine | DiffChangeGroup;
+
+function groupDiffLines(lines: DiffLine[]): GroupedDiffLine[] {
+  const grouped: GroupedDiffLine[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].type === 'del') {
+      const removed: DiffLine[] = [];
+      while (i < lines.length && lines[i].type === 'del') {
+        removed.push(lines[i]);
+        i++;
+      }
+      const added: DiffLine[] = [];
+      while (i < lines.length && lines[i].type === 'add') {
+        added.push(lines[i]);
+        i++;
+      }
+      if (added.length > 0) {
+        grouped.push({ type: 'change', removed, added });
+      } else {
+        grouped.push(...removed);
+      }
+    } else {
+      grouped.push(lines[i]);
+      i++;
+    }
+  }
+  return grouped;
 }
 
 function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
@@ -256,18 +293,27 @@ const renderDiffContent = (
     ? `diff-box-${filename}`
     : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
 
+  const groupedLines = groupDiffLines(displayableLines);
+
   let lastLineNumber: number | null = null;
   const MAX_CONTEXT_LINES_WITHOUT_GAP = 5;
 
-  const content = displayableLines.reduce<React.ReactNode[]>(
-    (acc, line, index) => {
-      // Determine the relevant line number for gap calculation based on type
+  const content = groupedLines.reduce<React.ReactNode[]>(
+    (acc, entry, index) => {
+      // Determine the relevant line number for gap calculation
       let relevantLineNumberForGapCalc: number | null = null;
-      if (line.type === 'add' || line.type === 'context') {
-        relevantLineNumberForGapCalc = line.newLine ?? null;
-      } else if (line.type === 'del') {
-        // For deletions, the gap is typically in relation to the original file's line numbering
-        relevantLineNumberForGapCalc = line.oldLine ?? null;
+      if ('type' in entry && entry.type === 'change') {
+        const firstLine = entry.removed[0] || entry.added[0];
+        relevantLineNumberForGapCalc =
+          (firstLine.type === 'add' ? firstLine.newLine : firstLine.oldLine) ??
+          null;
+      } else {
+        const line = entry;
+        if (line.type === 'add' || line.type === 'context') {
+          relevantLineNumberForGapCalc = line.newLine ?? null;
+        } else if (line.type === 'del') {
+          relevantLineNumberForGapCalc = line.oldLine ?? null;
+        }
       }
 
       if (
@@ -290,82 +336,102 @@ const renderDiffContent = (
         );
       }
 
-      const lineKey = `diff-line-${index}`;
-      let gutterNumStr = '';
-      let prefixSymbol = ' ';
+      if ('type' in entry && entry.type === 'change') {
+        const removedText = entry.removed
+          .map((l) => l.content.substring(baseIndentation))
+          .join('\n');
+        const addedText = entry.added
+          .map((l) => l.content.substring(baseIndentation))
+          .join('\n');
+        const wordDiffs = Diff.diffWordsWithSpace(removedText, addedText);
 
-      switch (line.type) {
-        case 'add':
-          gutterNumStr = (line.newLine ?? '').toString();
-          prefixSymbol = '+';
-          lastLineNumber = line.newLine ?? null;
-          break;
-        case 'del':
-          gutterNumStr = (line.oldLine ?? '').toString();
-          prefixSymbol = '-';
-          // For deletions, update lastLineNumber based on oldLine if it's advancing.
-          // This helps manage gaps correctly if there are multiple consecutive deletions
-          // or if a deletion is followed by a context line far away in the original file.
+        // Render removed lines
+        const removedLinesParts = renderChangesForType(
+          'del',
+          wordDiffs,
+          semanticTheme.background.diff.removedHighlight,
+        );
+        entry.removed.forEach((line, i) => {
+          const displayContentParts = removedLinesParts[i] || [];
+          acc.push(
+            renderLine(
+              line,
+              `del-${index}-${i}`,
+              gutterWidth,
+              '-',
+              semanticTheme.background.diff.removed,
+              displayContentParts.length > 0 ? displayContentParts : undefined,
+              baseIndentation,
+              language,
+            ),
+          );
           if (line.oldLine !== undefined) {
             lastLineNumber = line.oldLine;
           }
-          break;
-        case 'context':
-          gutterNumStr = (line.newLine ?? '').toString();
-          prefixSymbol = ' ';
+        });
+
+        // Render added lines
+        const addedLinesParts = renderChangesForType(
+          'add',
+          wordDiffs,
+          semanticTheme.background.diff.addedHighlight,
+        );
+        entry.added.forEach((line, i) => {
+          const displayContentParts = addedLinesParts[i] || [];
+          acc.push(
+            renderLine(
+              line,
+              `add-${index}-${i}`,
+              gutterWidth,
+              '+',
+              semanticTheme.background.diff.added,
+              displayContentParts.length > 0 ? displayContentParts : undefined,
+              baseIndentation,
+              language,
+            ),
+          );
           lastLineNumber = line.newLine ?? null;
-          break;
-        default:
-          return acc;
+        });
+      } else {
+        const line = entry;
+
+        let prefixSymbol = ' ';
+        let backgroundColor: string | undefined = undefined;
+
+        switch (line.type) {
+          case 'add':
+            prefixSymbol = '+';
+            backgroundColor = semanticTheme.background.diff.added;
+            lastLineNumber = line.newLine ?? null;
+            break;
+          case 'del':
+            prefixSymbol = '-';
+            backgroundColor = semanticTheme.background.diff.removed;
+            if (line.oldLine !== undefined) {
+              lastLineNumber = line.oldLine;
+            }
+            break;
+          case 'context':
+            prefixSymbol = ' ';
+            lastLineNumber = line.newLine ?? null;
+            break;
+          default:
+            break;
+        }
+
+        acc.push(
+          renderLine(
+            line,
+            `line-${index}`,
+            gutterWidth,
+            prefixSymbol,
+            backgroundColor,
+            undefined,
+            baseIndentation,
+            language,
+          ),
+        );
       }
-
-      const displayContent = line.content.substring(baseIndentation);
-
-      const backgroundColor =
-        line.type === 'add'
-          ? semanticTheme.background.diff.added
-          : line.type === 'del'
-            ? semanticTheme.background.diff.removed
-            : undefined;
-      acc.push(
-        <Box key={lineKey} flexDirection="row">
-          <Box
-            width={gutterWidth + 1}
-            paddingRight={1}
-            flexShrink={0}
-            backgroundColor={backgroundColor}
-            justifyContent="flex-end"
-          >
-            <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
-          </Box>
-          {line.type === 'context' ? (
-            <>
-              <Text>{prefixSymbol} </Text>
-              <Text wrap="wrap">{colorizeLine(displayContent, language)}</Text>
-            </>
-          ) : (
-            <Text
-              backgroundColor={
-                line.type === 'add'
-                  ? semanticTheme.background.diff.added
-                  : semanticTheme.background.diff.removed
-              }
-              wrap="wrap"
-            >
-              <Text
-                color={
-                  line.type === 'add'
-                    ? semanticTheme.status.success
-                    : semanticTheme.status.error
-                }
-              >
-                {prefixSymbol}
-              </Text>{' '}
-              {colorizeLine(displayContent, language)}
-            </Text>
-          )}
-        </Box>,
-      );
       return acc;
     },
     [],
@@ -381,6 +447,85 @@ const renderDiffContent = (
     </MaxSizedBox>
   );
 };
+
+const renderLine = (
+  line: DiffLine,
+  key: string,
+  gutterWidth: number,
+  prefixSymbol: string,
+  backgroundColor: string | undefined,
+  displayContentParts: React.ReactNode[] | undefined,
+  baseIndentation: number,
+  language: string | null,
+) => {
+  const gutterNumStr =
+    (line.type === 'add' || line.type === 'context'
+      ? line.newLine
+      : line.oldLine
+    )?.toString() || '';
+  const displayContent = line.content.substring(baseIndentation);
+
+  return (
+    <Box key={key} flexDirection="row">
+      <Box
+        width={gutterWidth + 1}
+        paddingRight={1}
+        flexShrink={0}
+        backgroundColor={backgroundColor}
+        justifyContent="flex-end"
+      >
+        <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
+      </Box>
+      <Text backgroundColor={backgroundColor} wrap="wrap">
+        <Text
+          color={
+            line.type === 'add'
+              ? semanticTheme.status.success
+              : line.type === 'del'
+                ? semanticTheme.status.error
+                : undefined
+          }
+        >
+          {prefixSymbol}
+        </Text>{' '}
+        {displayContentParts
+          ? displayContentParts
+          : colorizeLine(displayContent, language)}
+      </Text>
+    </Box>
+  );
+};
+
+function renderChangesForType(
+  type: 'add' | 'del',
+  allChanges: Diff.Change[],
+  highlightColor: string | undefined,
+) {
+  const lines: React.ReactNode[][] = [[]];
+
+  allChanges.forEach((change, changeIndex) => {
+    if (type === 'add' && change.removed) return;
+    if (type === 'del' && change.added) return;
+
+    const isHighlighted =
+      (type === 'add' && change.added) || (type === 'del' && change.removed);
+    const color = isHighlighted ? highlightColor : undefined;
+
+    const parts = change.value.split('\n');
+    parts.forEach((part, partIndex) => {
+      if (partIndex > 0) lines.push([]);
+      lines[lines.length - 1].push(
+        <Text
+          key={`change-${changeIndex}-part-${partIndex}`}
+          backgroundColor={color}
+        >
+          {part}
+        </Text>,
+      );
+    });
+  });
+  return lines;
+}
 
 const getLanguageFromExtension = (extension: string): string | null => {
   const languageMap: { [key: string]: string } = {
