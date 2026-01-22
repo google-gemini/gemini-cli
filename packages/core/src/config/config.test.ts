@@ -856,9 +856,9 @@ describe('Server Config (config.ts)', () => {
   });
 
   describe('Event Driven Scheduler Configuration', () => {
-    it('should default enableEventDrivenScheduler to false when not provided', () => {
+    it('should default enableEventDrivenScheduler to true when not provided', () => {
       const config = new Config(baseParams);
-      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(true);
     });
 
     it('should set enableEventDrivenScheduler to false when provided as false', () => {

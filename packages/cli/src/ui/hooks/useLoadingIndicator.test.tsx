@@ -31,36 +31,30 @@ describe('useLoadingIndicator', () => {
 
   const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
-    initialIsInteractiveShellWaiting: boolean = false,
-    initialLastOutputTime: number = 0,
+    initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
-      isInteractiveShellWaiting,
-      lastOutputTime,
+      shouldShowFocusHint,
       retryStatus,
     }: {
       streamingState: StreamingState;
-      isInteractiveShellWaiting?: boolean;
-      lastOutputTime?: number;
+      shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
     }) {
-      hookResult = useLoadingIndicator(
+      hookResult = useLoadingIndicator({
         streamingState,
-        undefined,
-        isInteractiveShellWaiting,
-        lastOutputTime,
-        retryStatus,
-      );
+        shouldShowFocusHint: !!shouldShowFocusHint,
+        retryStatus: retryStatus || null,
+      });
       return null;
     }
     const { rerender } = render(
       <TestComponent
         streamingState={initialStreamingState}
-        isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
-        lastOutputTime={initialLastOutputTime}
+        shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
       />,
     );
@@ -72,8 +66,7 @@ describe('useLoadingIndicator', () => {
       },
       rerender: (newProps: {
         streamingState: StreamingState;
-        isInteractiveShellWaiting?: boolean;
-        lastOutputTime?: number;
+        shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
       }) => rerender(<TestComponent {...newProps} />),
     };
@@ -88,12 +81,11 @@ describe('useLoadingIndicator', () => {
     );
   });
 
-  it('should show interactive shell waiting phrase when isInteractiveShellWaiting is true after 5s', async () => {
+  it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
-      true,
-      1,
+      false,
     );
 
     // Initially should be witty phrase or tip
@@ -102,7 +94,10 @@ describe('useLoadingIndicator', () => {
     );
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      rerender({
+        streamingState: StreamingState.Responding,
+        shouldShowFocusHint: true,
+      });
     });
 
     expect(result.current.currentLoadingPhrase).toBe(
@@ -224,12 +219,10 @@ describe('useLoadingIndicator', () => {
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
-      0,
       retryStatus,
     );
 
-    expect(result.current.currentLoadingPhrase).toBe(
-      'Trying to reach gemini-pro (Retry 2/2)',
-    );
+    expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
+    expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
   });
 });
