@@ -64,6 +64,7 @@ powerful tool for developers.
 
 ## Documentation
 
-- Suggest adding documentation when making significant code changes.
+- Suggest documentation updates when code changes render existing documentation
+  obsolete or incomplete.
 - Located in the `docs/` directory.
 - Use the `docs-writer` skill.
