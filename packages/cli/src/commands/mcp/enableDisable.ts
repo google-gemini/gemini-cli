@@ -13,6 +13,7 @@ import {
 } from '../../config/mcp/mcpServerEnablement.js';
 import { loadSettings } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
+import { getMcpServersFromConfig } from './list.js';
 
 const GREEN = '\x1b[32m';
 const YELLOW = '\x1b[33m';
@@ -31,8 +32,8 @@ async function handleEnable(args: Args): Promise<void> {
   // Check settings blocks
   const settings = loadSettings();
 
-  // Validate server exists
-  const servers = settings.merged.mcpServers || {};
+  // Get all servers including extensions
+  const servers = await getMcpServersFromConfig();
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
@@ -40,6 +41,22 @@ async function handleEnable(args: Args): Promise<void> {
     );
     return;
   }
+
+  // Check if server is from an extension
+  const serverKey = Object.keys(servers).find(
+    (key) => normalizeServerId(key) === name,
+  );
+  const server = serverKey ? servers[serverKey] : undefined;
+  if (server?.extension) {
+    debugLogger.log(
+      `${RED}Error:${RESET} Server '${args.name}' is provided by extension '${server.extension.name}'.`,
+    );
+    debugLogger.log(
+      `Use 'gemini extensions enable ${server.extension.name}' to manage this extension.`,
+    );
+    return;
+  }
+
   const result = await canLoadServer(name, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
     allowedList: settings.merged.mcp?.allowed,
@@ -73,13 +90,27 @@ async function handleDisable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
-  // Validate server exists
-  const settings = loadSettings();
-  const servers = settings.merged.mcpServers || {};
+  // Get all servers including extensions
+  const servers = await getMcpServersFromConfig();
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
+    );
+    return;
+  }
+
+  // Check if server is from an extension
+  const serverKey = Object.keys(servers).find(
+    (key) => normalizeServerId(key) === name,
+  );
+  const server = serverKey ? servers[serverKey] : undefined;
+  if (server?.extension) {
+    debugLogger.log(
+      `${RED}Error:${RESET} Server '${args.name}' is provided by extension '${server.extension.name}'.`,
+    );
+    debugLogger.log(
+      `Use 'gemini extensions disable ${server.extension.name}' to manage this extension.`,
     );
     return;
   }
