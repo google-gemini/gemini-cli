@@ -96,7 +96,9 @@ describe('FolderTrustDialog', () => {
     );
 
     // Unmount immediately (before 250ms)
-    unmount();
+    act(() => {
+      unmount();
+    });
 
     await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).not.toHaveBeenCalled();

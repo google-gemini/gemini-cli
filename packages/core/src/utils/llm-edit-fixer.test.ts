@@ -110,7 +110,7 @@ describe('FixLLMEditWithInstruction', () => {
     // Verify the warning was logged
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Could not find promptId in context. This is unexpected. Using a fallback ID: llm-fixer-fallback-',
+        'Could not find promptId in context for llm-fixer. This is unexpected. Using a fallback ID: llm-fixer-fallback-',
       ),
     );
 
