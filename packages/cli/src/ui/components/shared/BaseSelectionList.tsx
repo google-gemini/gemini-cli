@@ -143,7 +143,7 @@ export function BaseSelectionList<
             </Box>
 
             {/* Item number */}
-            {showNumbers && (
+            {showNumbers && !item.hideNumber && (
               <Box
                 marginRight={1}
                 flexShrink={0}
