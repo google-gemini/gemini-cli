@@ -4,6 +4,22 @@ Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
 
+## 🚀 Availability
+
+> **Experimental Feature**: Hooks are currently enabled by default only in the
+> **Preview** and **Nightly** release channels.
+
+If you are on the Stable channel, you must explicitly enable the hooks system in
+your `settings.json`:
+
+```json
+{
+  "hooksConfig": {
+    "enabled": true
+  }
+}
+```
+
 - **[Writing hooks guide](/docs/hooks/writing-hooks)**: A tutorial on creating
   your first hook with comprehensive examples.
 - **[Hooks reference](/docs/hooks/reference)**: The definitive technical
