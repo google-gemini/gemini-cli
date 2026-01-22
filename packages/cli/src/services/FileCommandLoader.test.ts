@@ -1337,4 +1337,69 @@ describe('FileCommandLoader', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('Sanitization', () => {
+    it('sanitizes command names from filenames containing control characters', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test\twith\nnewlines.toml': 'prompt = "Test prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+      expect(commands).toHaveLength(1);
+      // Non-alphanumeric characters (except - and .) become underscores
+      expect(commands[0].name).toBe('test_with_newlines');
+    });
+
+    it('truncates excessively long filenames', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const longName = 'a'.repeat(60) + '.toml';
+      mock({
+        [userCommandsDir]: {
+          [longName]: 'prompt = "Test prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name.length).toBe(50);
+      expect(commands[0].name).toBe('a'.repeat(47) + '...');
+    });
+
+    it('sanitizes descriptions containing newlines and ANSI codes', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test.toml':
+            'prompt = "Test"\ndescription = "Line 1\\nLine 2\\tTabbed\\r\\n\\u001B[31mRed text\\u001B[0m"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+      expect(commands).toHaveLength(1);
+      // Newlines and tabs become spaces, ANSI is stripped
+      expect(commands[0].description).toBe('Line 1 Line 2 Tabbed Red text');
+    });
+
+    it('truncates long descriptions', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      const longDesc = 'd'.repeat(150);
+      mock({
+        [userCommandsDir]: {
+          'test.toml': `prompt = "Test"\ndescription = "${longDesc}"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+      expect(commands).toHaveLength(1);
+      expect(commands[0].description.length).toBe(100);
+      expect(commands[0].description).toBe('d'.repeat(97) + '...');
+    });
+  });
 });
