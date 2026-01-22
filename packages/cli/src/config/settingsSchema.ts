@@ -1141,7 +1141,7 @@ const SETTINGS_SCHEMA = {
         label: 'Disable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Disable LLM-based error correction for edit tools.
           When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
@@ -1444,7 +1444,7 @@ const SETTINGS_SCHEMA = {
         label: 'Event Driven Scheduler',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enables event-driven scheduler within the CLI session.',
         showInDialog: false,
       },
@@ -1661,7 +1661,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Hooks',
         category: 'Advanced',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
         showInDialog: false,

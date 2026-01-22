@@ -59,7 +59,7 @@ const MOCK_AGENT_V1: AgentDefinition = {
   kind: 'local',
   name: 'MockAgent',
   description: 'Mock Description V1',
-  inputConfig: { inputs: {} },
+  inputConfig: { inputSchema: { type: 'object' } },
   modelConfig: {
     model: 'test',
     generateContentConfig: {
@@ -447,7 +447,7 @@ describe('AgentRegistry', () => {
         name: 'RemoteAgent',
         description: 'A remote agent',
         agentCardUrl: 'https://example.com/card',
-        inputConfig: { inputs: {} },
+        inputConfig: { inputSchema: { type: 'object' } },
       };
 
       vi.mocked(A2AClientManager.getInstance).mockReturnValue({
@@ -470,7 +470,7 @@ describe('AgentRegistry', () => {
         name: 'RemoteAgent',
         description: 'A remote agent',
         agentCardUrl: 'https://example.com/card',
-        inputConfig: { inputs: {} },
+        inputConfig: { inputSchema: { type: 'object' } },
       };
 
       vi.mocked(A2AClientManager.getInstance).mockReturnValue({
@@ -603,7 +603,9 @@ describe('AgentRegistry', () => {
 
       expect(clearCacheSpy).toHaveBeenCalled();
       expect(registry.getDefinition('InitialAgent')).toBeUndefined();
+      expect(registry.getDiscoveredDefinition('InitialAgent')).toBeUndefined();
       expect(registry.getDefinition('NewAgent')).toBeDefined();
+      expect(registry.getDiscoveredDefinition('NewAgent')).toBeDefined();
       expect(emitSpy).toHaveBeenCalled();
     });
   });
@@ -697,6 +699,65 @@ describe('AgentRegistry', () => {
         expect.arrayContaining([MOCK_AGENT_V1, ANOTHER_AGENT]),
       );
     });
+
+    it('getAllDiscoveredAgentNames should return all names including disabled ones', async () => {
+      const configWithDisabled = makeMockedConfig({
+        agents: {
+          overrides: {
+            DisabledAgent: { enabled: false },
+          },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+
+      const enabledAgent = { ...MOCK_AGENT_V1, name: 'EnabledAgent' };
+      const disabledAgent = { ...MOCK_AGENT_V1, name: 'DisabledAgent' };
+
+      await registryWithDisabled.testRegisterAgent(enabledAgent);
+      await registryWithDisabled.testRegisterAgent(disabledAgent);
+
+      const discoveredNames = registryWithDisabled.getAllDiscoveredAgentNames();
+      expect(discoveredNames).toContain('EnabledAgent');
+      expect(discoveredNames).toContain('DisabledAgent');
+      expect(discoveredNames).toHaveLength(2);
+
+      const activeNames = registryWithDisabled.getAllAgentNames();
+      expect(activeNames).toContain('EnabledAgent');
+      expect(activeNames).not.toContain('DisabledAgent');
+      expect(activeNames).toHaveLength(1);
+    });
+
+    it('getDiscoveredDefinition should return the definition for a disabled agent', async () => {
+      const configWithDisabled = makeMockedConfig({
+        agents: {
+          overrides: {
+            DisabledAgent: { enabled: false },
+          },
+        },
+      });
+      const registryWithDisabled = new TestableAgentRegistry(
+        configWithDisabled,
+      );
+
+      const disabledAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'DisabledAgent',
+        description: 'I am disabled',
+      };
+
+      await registryWithDisabled.testRegisterAgent(disabledAgent);
+
+      expect(
+        registryWithDisabled.getDefinition('DisabledAgent'),
+      ).toBeUndefined();
+
+      const discovered =
+        registryWithDisabled.getDiscoveredDefinition('DisabledAgent');
+      expect(discovered).toBeDefined();
+      expect(discovered?.description).toBe('I am disabled');
+    });
   });
 
   describe('overrides', () => {
@@ -730,7 +791,7 @@ describe('AgentRegistry', () => {
         name: 'RemoteAgent',
         description: 'A remote agent',
         agentCardUrl: 'https://example.com/card',
-        inputConfig: { inputs: {} },
+        inputConfig: { inputSchema: { type: 'object' } },
       };
 
       await registry.testRegisterAgent(remoteAgent);

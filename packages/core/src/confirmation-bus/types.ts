@@ -22,6 +22,8 @@ export enum MessageBusType {
   HOOK_EXECUTION_RESPONSE = 'hook-execution-response',
   HOOK_POLICY_DECISION = 'hook-policy-decision',
   TOOL_CALLS_UPDATE = 'tool-calls-update',
+  ASK_USER_REQUEST = 'ask-user-request',
+  ASK_USER_RESPONSE = 'ask-user-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -74,6 +76,7 @@ export type SerializableConfirmationDetails =
       fileDiff: string;
       originalContent: string | null;
       newContent: string;
+      isModifying?: boolean;
     }
   | {
       type: 'exec';
@@ -81,6 +84,7 @@ export type SerializableConfirmationDetails =
       command: string;
       rootCommand: string;
       rootCommands: string[];
+      commands?: string[];
     }
   | {
       type: 'mcp';
@@ -139,6 +143,42 @@ export interface HookPolicyDecision {
   reason?: string;
 }
 
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export enum QuestionType {
+  CHOICE = 'choice',
+  TEXT = 'text',
+  YESNO = 'yesno',
+}
+
+export interface Question {
+  question: string;
+  header: string;
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
+  type?: QuestionType;
+  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  options?: QuestionOption[];
+  /** Allow multiple selections. Only applies to 'choice' type. */
+  multiSelect?: boolean;
+  /** Placeholder hint text for 'text' type input field. */
+  placeholder?: string;
+}
+
+export interface AskUserRequest {
+  type: MessageBusType.ASK_USER_REQUEST;
+  questions: Question[];
+  correlationId: string;
+}
+
+export interface AskUserResponse {
+  type: MessageBusType.ASK_USER_RESPONSE;
+  correlationId: string;
+  answers: { [questionIndex: string]: string };
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -149,4 +189,6 @@ export type Message =
   | HookExecutionRequest
   | HookExecutionResponse
   | HookPolicyDecision
+  | AskUserRequest
+  | AskUserResponse
   | ToolCallsUpdateMessage;
