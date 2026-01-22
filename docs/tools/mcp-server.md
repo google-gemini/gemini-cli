@@ -733,7 +733,7 @@ The MCP integration tracks several states:
 
 ## Important notes
 
-### Security sonsiderations
+### Security considerations
 
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
