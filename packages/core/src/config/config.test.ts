@@ -941,10 +941,14 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when codebaseInvestigatorSettings.enabled is true', async () => {
+    it('should register subagents as tools when agents.overrides.codebase_investigator.enabled is true', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: true },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
       };
       const config = new Config(params);
 
@@ -991,11 +995,15 @@ describe('Server Config (config.ts)', () => {
       expect(registeredWrappers).toHaveLength(1);
     });
 
-    it('should not register subagents as tools when codebaseInvestigatorSettings.enabled is false', async () => {
+    it('should not register subagents as tools when agents are disabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: false },
-        cliHelpAgentSettings: { enabled: false },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: false },
+            cli_help: { enabled: false },
+          },
+        },
       };
       const config = new Config(params);
 
@@ -1008,11 +1016,6 @@ describe('Server Config (config.ts)', () => {
       await config.initialize();
 
       expect(DelegateToAgentToolMock).not.toHaveBeenCalled();
-    });
-
-    it('should not set default codebase investigator model in config (defaults in registry)', () => {
-      const config = new Config(baseParams);
-      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
     });
 
     describe('with minified tool class names', () => {

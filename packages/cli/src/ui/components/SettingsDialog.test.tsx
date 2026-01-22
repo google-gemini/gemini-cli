@@ -381,7 +381,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
-        expect(lastFrame()).toContain('Codebase Investigator Max Num Turns');
+        expect(lastFrame()).toContain('Hook Notifications');
       });
 
       unmount();
@@ -1213,9 +1213,7 @@ describe('SettingsDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('vim');
         expect(lastFrame()).toContain('Vim Mode');
-        expect(lastFrame()).not.toContain(
-          'Codebase Investigator Max Num Turns',
-        );
+        expect(lastFrame()).not.toContain('Hook Notifications');
       });
 
       unmount();
