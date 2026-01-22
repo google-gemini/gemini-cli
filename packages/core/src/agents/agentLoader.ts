@@ -247,12 +247,16 @@ export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
 ): AgentDefinition {
   const inputConfig = {
-    inputs: {
-      query: {
-        type: 'string' as const,
-        description: 'The task for the agent.',
-        required: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The task for the agent.',
+        },
       },
+      // query is not required because it defaults to "Get Started!" if not provided
+      required: [],
     },
   };
 

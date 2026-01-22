@@ -16,13 +16,7 @@ import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  DEFAULT_GEMINI_MODEL,
-  GEMINI_MODEL_ALIAS_AUTO,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  isPreviewModel,
-  isAutoModel,
-} from '../config/models.js';
+import { isAutoModel } from '../config/models.js';
 import {
   type ModelConfig,
   ModelConfigService,
@@ -45,6 +39,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
 export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly agents = new Map<string, AgentDefinition<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
   constructor(private readonly config: Config) {}
 
@@ -73,6 +69,7 @@ export class AgentRegistry {
     A2AClientManager.getInstance().clearCache();
     await this.config.reloadAgents();
     this.agents.clear();
+    this.allDefinitions.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
   }
@@ -85,6 +82,8 @@ export class AgentRegistry {
   }
 
   private async loadAgents(): Promise<void> {
+    this.agents.clear();
+    this.allDefinitions.clear();
     this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
@@ -144,68 +143,8 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
-    const cliHelpSettings = this.config.getCliHelpAgentSettings();
-    const agentsSettings = this.config.getAgentsSettings();
-    const agentsOverrides = agentsSettings.overrides ?? {};
-
-    // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
-    if (
-      investigatorSettings?.enabled &&
-      agentsOverrides[CodebaseInvestigatorAgent.name]?.enabled !== false
-    ) {
-      let model;
-      const settingsModel = investigatorSettings.model;
-      // Check if the user explicitly set a model in the settings.
-      if (settingsModel && settingsModel !== GEMINI_MODEL_ALIAS_AUTO) {
-        model = settingsModel;
-      } else {
-        // Use Preview Flash model if the main model is any of the preview models
-        // If the main model is not preview model, use default pro model.
-        model = isPreviewModel(this.config.getModel())
-          ? PREVIEW_GEMINI_FLASH_MODEL
-          : DEFAULT_GEMINI_MODEL;
-      }
-
-      const agentDef = {
-        ...CodebaseInvestigatorAgent,
-        modelConfig: {
-          ...CodebaseInvestigatorAgent.modelConfig,
-          model,
-          generateContentConfig: {
-            ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig,
-            thinkingConfig: {
-              ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig
-                ?.thinkingConfig,
-              thinkingBudget:
-                investigatorSettings.thinkingBudget ??
-                CodebaseInvestigatorAgent.modelConfig.generateContentConfig
-                  ?.thinkingConfig?.thinkingBudget,
-            },
-          },
-        },
-        runConfig: {
-          ...CodebaseInvestigatorAgent.runConfig,
-          maxTimeMinutes:
-            investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.maxTimeMinutes,
-          maxTurns:
-            investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.maxTurns,
-        },
-      };
-      this.registerLocalAgent(agentDef);
-    }
-
-    // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
-    if (
-      cliHelpSettings.enabled &&
-      agentsOverrides[CliHelpAgent.name]?.enabled !== false
-    ) {
-      this.registerLocalAgent(CliHelpAgent(this.config));
-    }
-
-    // Register the generalist agent.
+    this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
+    this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
   }
 
@@ -250,6 +189,8 @@ export class AgentRegistry {
       );
       return;
     }
+
+    this.allDefinitions.set(definition.name, definition);
 
     const settingsOverrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
@@ -304,6 +245,8 @@ export class AgentRegistry {
       );
       return;
     }
+
+    this.allDefinitions.set(definition.name, definition);
 
     const overrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
@@ -417,7 +360,8 @@ export class AgentRegistry {
   /**
    * Retrieves an agent definition by name.
    */
-  getDefinition(name: string): AgentDefinition | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinition(name: string): AgentDefinition<any> | undefined {
     return this.agents.get(name);
   }
 
@@ -433,6 +377,20 @@ export class AgentRegistry {
    */
   getAllAgentNames(): string[] {
     return Array.from(this.agents.keys());
+  }
+
+  /**
+   * Returns a list of all discovered agent names, regardless of whether they are enabled.
+   */
+  getAllDiscoveredAgentNames(): string[] {
+    return Array.from(this.allDefinitions.keys());
+  }
+
+  /**
+   * Retrieves a discovered agent definition by name.
+   */
+  getDiscoveredDefinition(name: string): AgentDefinition | undefined {
+    return this.allDefinitions.get(name);
   }
 
   /**

@@ -14,7 +14,6 @@ import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
-import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
@@ -25,8 +24,17 @@ import {
   type UIActions,
   UIActionsContext,
 } from '../ui/contexts/UIActionsContext.js';
+import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
+import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+import { FakePersistentState } from './persistentStateFake.js';
+
+export const persistentStateMock = new FakePersistentState();
+
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (
@@ -150,6 +158,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openAgentConfigDialog: vi.fn(),
+  closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
   openSessionBrowser: vi.fn(),
   closeSessionBrowser: vi.fn(),
@@ -188,6 +198,7 @@ export const renderWithProviders = (
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
+    persistentState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -197,6 +208,10 @@ export const renderWithProviders = (
     config?: Config;
     useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
+    persistentState?: {
+      get?: typeof persistentStateMock.get;
+      set?: typeof persistentStateMock.set;
+    };
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -216,6 +231,15 @@ export const renderWithProviders = (
       },
     },
   ) as UIState;
+
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
+
+  persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
   let finalSettings = settings;
@@ -239,6 +263,10 @@ export const renderWithProviders = (
 
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
+  const allToolCalls = (finalUiState.pendingHistoryItems || [])
+    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
+    .flatMap((item) => item.tools);
+
   const renderResult = render(
     <ConfigContext.Provider value={config}>
       <SettingsContext.Provider value={finalSettings}>
@@ -247,20 +275,22 @@ export const renderWithProviders = (
             <ShellFocusContext.Provider value={shellFocus}>
               <StreamingContext.Provider value={finalUiState.streamingState}>
                 <UIActionsContext.Provider value={finalUIActions}>
-                  <KeypressProvider>
-                    <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                      <ScrollProvider>
-                        <Box
-                          width={terminalWidth}
-                          flexShrink={0}
-                          flexGrow={0}
-                          flexDirection="column"
-                        >
-                          {component}
-                        </Box>
-                      </ScrollProvider>
-                    </MouseProvider>
-                  </KeypressProvider>
+                  <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+                    <KeypressProvider>
+                      <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                        <ScrollProvider>
+                          <Box
+                            width={terminalWidth}
+                            flexShrink={0}
+                            flexGrow={0}
+                            flexDirection="column"
+                          >
+                            {component}
+                          </Box>
+                        </ScrollProvider>
+                      </MouseProvider>
+                    </KeypressProvider>
+                  </ToolActionsProvider>
                 </UIActionsContext.Provider>
               </StreamingContext.Provider>
             </ShellFocusContext.Provider>

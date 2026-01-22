@@ -373,6 +373,7 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
+  let initialAuthFailed = false;
   if (!settings.merged.security.auth.useExternal) {
     try {
       if (
@@ -400,8 +401,7 @@ export async function main() {
       }
     } catch (err) {
       debugLogger.error('Error authenticating:', err);
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      initialAuthFailed = true;
     }
   }
 
@@ -427,6 +427,10 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
+      if (initialAuthFailed) {
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
@@ -664,9 +668,8 @@ export async function main() {
         const additionalContext = result.getAdditionalContext();
         if (additionalContext) {
           // Prepend context to input (System Context -> Stdin -> Question)
-          input = input
-            ? `${additionalContext}\n\n${input}`
-            : additionalContext;
+          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
+          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
         }
       }
     }
@@ -728,6 +731,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,

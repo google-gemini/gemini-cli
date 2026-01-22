@@ -53,6 +53,7 @@ import { RESUME_LATEST } from '../utils/sessionUtils.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
+import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
@@ -665,6 +666,12 @@ export async function loadCliConfig(
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
   const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
+  // Create MCP enablement manager and callbacks
+  const mcpEnablementManager = McpServerEnablementManager.getInstance();
+  const mcpEnablementCallbacks = mcpEnabled
+    ? mcpEnablementManager.getEnablementCallbacks()
+    : undefined;
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -686,6 +693,7 @@ export async function loadCliConfig(
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
     mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
     agents: settings.agents,
@@ -764,9 +772,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    codebaseInvestigatorSettings:
-      settings.experimental?.codebaseInvestigatorSettings,
-    cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
@@ -778,7 +783,7 @@ export async function loadCliConfig(
     // TODO: loading of hooks based on workspace trust
     enableHooks:
       (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? false),
+      (settings.hooksConfig?.enabled ?? true),
     enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
