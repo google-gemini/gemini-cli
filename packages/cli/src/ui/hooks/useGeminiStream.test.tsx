@@ -3305,15 +3305,17 @@ describe('useGeminiStream', () => {
       | ((tools: TrackedToolCall[]) => Promise<void>)
       | null = null;
 
-    mockUseReactToolScheduler.mockImplementation((onComplete) => {
-      capturedOnComplete = onComplete;
-      return [
-        [alreadySubmittedTool, newTool], // Current tracked state with flags
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-        vi.fn(),
-      ];
-    });
+    mockUseToolScheduler.mockImplementation(
+      (onComplete: (tools: TrackedToolCall[]) => Promise<void>) => {
+        capturedOnComplete = onComplete;
+        return [
+          [alreadySubmittedTool, newTool], // Current tracked state with flags
+          mockScheduleToolCalls,
+          mockMarkToolsAsSubmitted,
+          vi.fn(),
+        ];
+      },
+    );
 
     renderHook(() =>
       useGeminiStream(
@@ -3416,15 +3418,17 @@ describe('useGeminiStream', () => {
       | ((tools: TrackedToolCall[]) => Promise<void>)
       | null = null;
 
-    mockUseReactToolScheduler.mockImplementation((onComplete) => {
-      capturedOnComplete = onComplete;
-      return [
-        [completedTool],
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-        vi.fn(),
-      ];
-    });
+    mockUseToolScheduler.mockImplementation(
+      (onComplete: (tools: TrackedToolCall[]) => Promise<void>) => {
+        capturedOnComplete = onComplete;
+        return [
+          [completedTool],
+          mockScheduleToolCalls,
+          mockMarkToolsAsSubmitted,
+          vi.fn(),
+        ];
+      },
+    );
 
     renderHook(() =>
       useGeminiStream(
