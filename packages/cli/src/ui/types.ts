@@ -19,7 +19,7 @@ import type {
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export type { ThoughtSummary, SkillDefinition, ToolResultDisplay };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -385,7 +385,7 @@ export const VERBOSITY_MAPPING: Record<HistoryItemType, Verbosity> = {
   user: Verbosity.INFO,
   gemini: Verbosity.INFO,
   gemini_content: Verbosity.INFO,
-  tool_group: Verbosity.VERBOSE,
+  tool_group: Verbosity.INFO,
   user_shell: Verbosity.INFO,
   about: Verbosity.INFO,
   stats: Verbosity.INFO,

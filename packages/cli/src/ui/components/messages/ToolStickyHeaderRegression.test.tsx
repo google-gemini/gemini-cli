@@ -110,7 +110,7 @@ describe('ToolMessage Sticky Header Regression', () => {
 
     // Scroll down so that tool-1's header should be stuck
     await act(async () => {
-      listRef?.scrollBy(5);
+      listRef?.scrollBy(6);
     });
 
     // tool-1 header should still be visible because it is sticky
@@ -120,10 +120,10 @@ describe('ToolMessage Sticky Header Regression', () => {
     expect(lastFrame()).toContain('Description for tool-1');
     // Content lines 1-4 should be scrolled off
     expect(lastFrame()).not.toContain('c1-01');
-    expect(lastFrame()).not.toContain('c1-04');
-    // Line 6 and 7 should be visible (terminalHeight=5 means only 2 lines of content show below 3-line header)
-    expect(lastFrame()).toContain('c1-06');
+    expect(lastFrame()).not.toContain('c1-05');
+    // Line 7 and 8 should be visible (terminalHeight=5 means only 2 lines of content show below 3-line header)
     expect(lastFrame()).toContain('c1-07');
+    expect(lastFrame()).toContain('c1-08');
     expect(lastFrame()).toMatchSnapshot();
 
     // Scroll further so tool-1 is completely gone and tool-2's header should be stuck

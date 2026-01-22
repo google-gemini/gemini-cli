@@ -16,6 +16,8 @@ import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { DenseToolMessage } from './DenseToolMessage.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -49,6 +51,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
+  const { merged: settings } = useSettings();
+  const isVerboseMode = settings.output?.verbosity === 'verbose';
+
   const isShellCommand = toolCalls.some(
     (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
@@ -101,6 +106,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
+      marginBottom={1}
     >
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
@@ -109,6 +115,18 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           tool.name === SHELL_COMMAND_NAME ||
           tool.name === SHELL_NAME ||
           tool.name === SHELL_TOOL_NAME;
+
+        // Use dense view if not verbose, not a shell tool (for interactivity), and not confirming (needs prompt)
+        const useDenseView =
+          !isVerboseMode &&
+          !isShellTool &&
+          tool.status !== ToolCallStatus.Confirming;
+
+        if (useDenseView) {
+          return (
+            <DenseToolMessage key={tool.callId} {...tool} isFirst={isFirst} />
+          );
+        }
 
         const commonProps = {
           ...tool,
@@ -180,22 +198,36 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       })}
       {
         /*
-              We have to keep the bottom border separate so it doesn't get
-              drawn over by the sticky header directly inside it.
-             */
-        toolCalls.length > 0 && (
-          <Box
-            height={0}
-            width={terminalWidth}
-            borderLeft={true}
-            borderRight={true}
-            borderTop={false}
-            borderBottom={true}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-            borderStyle="round"
-          />
-        )
+          We have to keep the bottom border separate so it doesn't get
+          drawn over by the sticky header directly inside it.
+          Only render if the last tool was displayed in full/verbose mode.
+         */
+        (() => {
+          if (toolCalls.length === 0) return null;
+          const lastTool = toolCalls[toolCalls.length - 1];
+          const isShell =
+            lastTool.name === SHELL_COMMAND_NAME ||
+            lastTool.name === SHELL_NAME ||
+            lastTool.name === SHELL_TOOL_NAME;
+          const isConfirming = lastTool.status === ToolCallStatus.Confirming;
+          const showBottomBorder = isVerboseMode || isShell || isConfirming;
+
+          if (!showBottomBorder) return null;
+
+          return (
+            <Box
+              height={0}
+              width={terminalWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={true}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              borderStyle="round"
+            />
+          );
+        })()
       }
     </Box>
   );
