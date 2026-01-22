@@ -977,7 +977,7 @@ export const useGeminiStream = (
               'info',
               'Waiting for MCP servers to initialize... Slash commands are still available.',
             );
-            return;
+            return false;
           }
 
           const queryId = `${Date.now()}-${Math.random()}`;
@@ -987,7 +987,7 @@ export const useGeminiStream = (
               streamingState === StreamingState.WaitingForConfirmation) &&
             !options?.isContinuation
           )
-            return;
+            return false;
 
           const userMessageTimestamp = Date.now();
 
@@ -1013,7 +1013,7 @@ export const useGeminiStream = (
             );
 
             if (!shouldProceed || queryToSend === null) {
-              return;
+              return false;
             }
 
             if (!options?.isContinuation) {
@@ -1054,7 +1054,7 @@ export const useGeminiStream = (
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
-                return;
+                return false;
               }
 
               if (pendingHistoryItemRef.current) {
@@ -1096,6 +1096,7 @@ export const useGeminiStream = (
                   },
                 });
               }
+              return true;
             } catch (error: unknown) {
               spanMetadata.error = error;
               if (error instanceof UnauthorizedError) {
@@ -1121,6 +1122,7 @@ export const useGeminiStream = (
                   userMessageTimestamp,
                 );
               }
+              return false;
             } finally {
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
@@ -1326,7 +1328,7 @@ export const useGeminiStream = (
         return;
       }
 
-      await submitQuery(
+      const submitted = await submitQuery(
         responsesToSend,
         {
           isContinuation: true,
@@ -1334,7 +1336,9 @@ export const useGeminiStream = (
         prompt_ids[0],
       );
 
-      markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+      if (submitted) {
+        markToolsAsSubmitted(callIdsToMarkAsSubmitted);
+      }
     },
     [
       submitQuery,
