@@ -104,6 +104,7 @@ export class DelegateToAgentTool extends BaseDeclarativeTool<
         toolSchema = agentSchemas[0];
       } else {
         toolSchema = {
+          type: 'object',
           anyOf: agentSchemas,
         };
       }
