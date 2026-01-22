@@ -1387,7 +1387,7 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
           args: ['--foo', 'bar'],
-          env: { FOO: 'bar' },
+          env: { GEMINI_CLI_FOO: 'bar' },
           cwd: 'test/cwd',
         },
         false,
@@ -1398,7 +1398,7 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: expect.objectContaining({ FOO: 'bar' }),
+        env: expect.objectContaining({ GEMINI_CLI_FOO: 'bar' }),
         stderr: 'pipe',
       });
     });
@@ -1412,7 +1412,7 @@ describe('mcp-client', () => {
       process.env = {
         ...originalEnv,
         GEMINI_API_KEY: 'sensitive-key',
-        SAFE_VAR: 'safe-value',
+        GEMINI_CLI_SAFE_VAR: 'safe-value',
       };
       // Ensure strict sanitization is not triggered for this test
       delete process.env['GITHUB_SHA'];
@@ -1430,7 +1430,7 @@ describe('mcp-client', () => {
 
         const callArgs = mockedTransport.mock.calls[0][0];
         expect(callArgs.env).toBeDefined();
-        expect(callArgs.env!['SAFE_VAR']).toBe('safe-value');
+        expect(callArgs.env!['GEMINI_CLI_SAFE_VAR']).toBe('safe-value');
         expect(callArgs.env!['GEMINI_API_KEY']).toBeUndefined();
       } finally {
         process.env = originalEnv;
@@ -1450,7 +1450,7 @@ describe('mcp-client', () => {
             name: 'test-ext',
             resolvedSettings: [
               {
-                envVar: 'EXT_VAR',
+                envVar: 'GEMINI_CLI_EXT_VAR',
                 value: 'ext-value',
                 sensitive: false,
                 name: 'ext-setting',
@@ -1469,7 +1469,7 @@ describe('mcp-client', () => {
 
       const callArgs = mockedTransport.mock.calls[0][0];
       expect(callArgs.env).toBeDefined();
-      expect(callArgs.env!['EXT_VAR']).toBe('ext-value');
+      expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
     });
 
     describe('useGoogleCredentialProvider', () => {

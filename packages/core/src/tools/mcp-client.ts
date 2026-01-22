@@ -1809,6 +1809,12 @@ export async function createTransport(
         },
         {
           ...sanitizationConfig,
+          allowedEnvironmentVariables: [
+            ...(sanitizationConfig.allowedEnvironmentVariables ?? []),
+            ...(mcpServerConfig.extension?.resolvedSettings?.map(
+              (s) => s.envVar,
+            ) ?? []),
+          ],
           enableEnvironmentVariableRedaction: true,
         },
       ) as Record<string, string>,
@@ -1869,9 +1875,7 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      if (!setting.sensitive) {
-        env[setting.envVar] = setting.value;
-      }
+      env[setting.envVar] = setting.value;
     }
   }
   return env;
