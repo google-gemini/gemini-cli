@@ -223,7 +223,13 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
     name: 'TestAgent',
     description: 'An agent for testing.',
     inputConfig: {
-      inputs: { goal: { type: 'string', required: true, description: 'goal' } },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
+      },
     },
     modelConfig: {
       model: 'gemini-test-model',
@@ -411,8 +417,12 @@ describe('LocalAgentExecutor', () => {
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
-      definition.inputConfig.inputs = {
-        goal: { type: 'string', required: true, description: 'goal' },
+      definition.inputConfig.inputSchema = {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
       };
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1359,9 +1369,13 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             await new Promise<void>((resolve) => {
               // This promise resolves when aborted, ending the generator.
-              signal?.addEventListener('abort', () => {
-                resolve();
-              });
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  resolve();
+                },
+                { once: true },
+              );
             });
           })(),
       );
@@ -1671,7 +1685,9 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             // This promise never resolves, it waits for abort.
             await new Promise<void>((resolve) => {
-              signal?.addEventListener('abort', () => resolve());
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
             });
           })(),
       );
@@ -1724,7 +1740,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1735,7 +1753,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
