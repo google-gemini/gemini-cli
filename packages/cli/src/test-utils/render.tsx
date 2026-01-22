@@ -14,7 +14,6 @@ import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
-import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
@@ -25,6 +24,8 @@ import {
   type UIActions,
   UIActionsContext,
 } from '../ui/contexts/UIActionsContext.js';
+import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
+import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -166,6 +167,7 @@ const mockUIActions: UIActions = {
   handleFinalSubmit: vi.fn(),
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
+  handleValidationChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
@@ -173,6 +175,7 @@ const mockUIActions: UIActions = {
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -237,6 +240,10 @@ export const renderWithProviders = (
 
   const finalUIActions = { ...mockUIActions, ...uiActions };
 
+  const allToolCalls = (finalUiState.pendingHistoryItems || [])
+    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
+    .flatMap((item) => item.tools);
+
   const renderResult = render(
     <ConfigContext.Provider value={config}>
       <SettingsContext.Provider value={finalSettings}>
@@ -245,20 +252,22 @@ export const renderWithProviders = (
             <ShellFocusContext.Provider value={shellFocus}>
               <StreamingContext.Provider value={finalUiState.streamingState}>
                 <UIActionsContext.Provider value={finalUIActions}>
-                  <KeypressProvider>
-                    <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                      <ScrollProvider>
-                        <Box
-                          width={terminalWidth}
-                          flexShrink={0}
-                          flexGrow={0}
-                          flexDirection="column"
-                        >
-                          {component}
-                        </Box>
-                      </ScrollProvider>
-                    </MouseProvider>
-                  </KeypressProvider>
+                  <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+                    <KeypressProvider>
+                      <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                        <ScrollProvider>
+                          <Box
+                            width={terminalWidth}
+                            flexShrink={0}
+                            flexGrow={0}
+                            flexDirection="column"
+                          >
+                            {component}
+                          </Box>
+                        </ScrollProvider>
+                      </MouseProvider>
+                    </KeypressProvider>
+                  </ToolActionsProvider>
                 </UIActionsContext.Provider>
               </StreamingContext.Provider>
             </ShellFocusContext.Provider>
