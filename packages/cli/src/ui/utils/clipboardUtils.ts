@@ -36,6 +36,10 @@ let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
 
 // Helper to check the user's display server and whether they have a compatible clipboard tool installed
 function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
+  if (linuxClipboardTool !== null) {
+    return linuxClipboardTool;
+  }
+
   let toolName: 'wl-paste' | 'xclip' | null = null;
   const displayServer = process.env['XDG_SESSION_TYPE'];
 
@@ -46,6 +50,7 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
   try {
     // output is piped to stdio: 'ignore' to suppress the path printing to console
     execSync(`command -v ${toolName}`, { stdio: 'ignore' });
+    linuxClipboardTool = toolName;
     return toolName;
   } catch (e) {
     debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
@@ -126,10 +131,7 @@ async function saveFromCommand(
 async function checkWlPasteForImage() {
   try {
     const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
-    if (stdout.includes('image/')) {
-      linuxClipboardTool = 'wl-paste';
-      return true;
-    }
+    return stdout.includes('image/');
   } catch (e) {
     debugLogger.warn('Error checking wl-clipboard for image:', e);
   }
@@ -148,10 +150,7 @@ async function checkXclipForImage() {
       'TARGETS',
       '-o',
     ]);
-    if (stdout.includes('image/')) {
-      linuxClipboardTool = 'xclip';
-      return true;
-    }
+    return stdout.includes('image/');
   } catch (e) {
     debugLogger.warn('Error checking xclip for image:', e);
   }
