@@ -38,7 +38,7 @@ import type {
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
+import { AgentTerminateMode, DEFAULT_QUERY_STRING } from './types.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -67,6 +67,10 @@ type AgentTurnResult =
       terminateReason: AgentTerminateMode;
       finalResult: string | null;
     };
+
+export function createUnauthorizedToolError(toolName: string): string {
+  return `Unauthorized tool call: '${toolName}' is not available to this agent.`;
+}
 
 /**
  * Executes an agent loop based on an {@link AgentDefinition}.
@@ -391,7 +395,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : 'Get Started!';
+        : DEFAULT_QUERY_STRING;
       let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
       while (true) {
@@ -883,7 +887,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Handle standard tools
       if (!allowedToolNames.has(functionCall.name as string)) {
-        const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
+        const error = createUnauthorizedToolError(functionCall.name as string);
 
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 

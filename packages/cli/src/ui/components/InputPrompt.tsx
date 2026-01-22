@@ -141,7 +141,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId } = useUIState();
+  const { mainAreaWidth, activePtyId, history } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -506,7 +506,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for rewind
+        // Handle double ESC
         if (escPressCount.current === 0) {
           escPressCount.current = 1;
           setShowEscapePrompt(true);
@@ -517,9 +517,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             resetEscapeState();
           }, 500);
         } else {
-          // Second ESC triggers rewind
+          // Second ESC
           resetEscapeState();
-          onSubmit('/rewind');
+          if (buffer.text.length > 0) {
+            buffer.setText('');
+            resetCompletionState();
+          } else {
+            if (history.length > 0) {
+              onSubmit('/rewind');
+            }
+          }
         }
         return;
       }
@@ -855,8 +862,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         completion.promptCompletion.text &&
         key.sequence &&
         key.sequence.length === 1 &&
+        !key.alt &&
         !key.ctrl &&
-        !key.meta
+        !key.cmd
       ) {
         completion.promptCompletion.clear();
         setExpandedSuggestionIndex(-1);
@@ -891,6 +899,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
+      history,
     ],
   );
 

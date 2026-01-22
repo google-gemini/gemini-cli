@@ -253,11 +253,15 @@ Body`);
           maxTimeMinutes: 5,
         },
         inputConfig: {
-          inputs: {
-            query: {
-              type: 'string',
-              required: false,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The task for the agent.',
+              },
             },
+            required: [],
           },
         },
       });
@@ -309,12 +313,15 @@ Body`);
         displayName: undefined,
         agentCardUrl: 'https://example.com/card',
         inputConfig: {
-          inputs: {
-            query: {
-              type: 'string',
-              description: 'The task for the agent.',
-              required: false,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The task for the agent.',
+              },
             },
+            required: [],
           },
         },
       });

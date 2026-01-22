@@ -61,6 +61,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -95,6 +96,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -283,6 +285,14 @@ export async function startInteractiveUI(
 
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
+
+  // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
+  // sandbox mode, we re-fetch the admin controls from the server once we enter
+  // the sandbox.
+  // TODO: Cache settings in sandbox mode as well.
+  const adminControlsListner = setupAdminControlsListener();
+  registerCleanup(adminControlsListner.cleanup);
+
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -358,16 +368,17 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+  adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-  if (
-    settings.merged.security.auth.selectedType &&
-    !settings.merged.security.auth.useExternal
-  ) {
+  if (!settings.merged.security.auth.useExternal) {
     try {
-      if (partialConfig.isInteractive()) {
+      if (
+        partialConfig.isInteractive() &&
+        settings.merged.security.auth.selectedType
+      ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
@@ -378,7 +389,7 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else {
+      } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,
           settings.merged.security.auth.useExternal,
@@ -399,6 +410,9 @@ export async function main() {
   if (remoteAdminSettings) {
     settings.setRemoteAdminSettings(remoteAdminSettings);
   }
+
+  // Run deferred command now that we have admin settings.
+  await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
@@ -451,7 +465,7 @@ export async function main() {
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, []);
+      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
@@ -464,6 +478,7 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+    adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
@@ -637,18 +652,22 @@ export async function main() {
     const sessionStartSource = resumedSessionData
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
-    const result = await config
-      .getHookSystem()
-      ?.fireSessionStartEvent(sessionStartSource);
 
-    if (result?.finalOutput) {
-      if (result.finalOutput.systemMessage) {
-        writeToStderr(result.finalOutput.systemMessage + '\n');
-      }
-      const additionalContext = result.finalOutput.getAdditionalContext();
-      if (additionalContext) {
-        // Prepend context to input (System Context -> Stdin -> Question)
-        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+      if (result) {
+        if (result.systemMessage) {
+          writeToStderr(result.systemMessage + '\n');
+        }
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          // Prepend context to input (System Context -> Stdin -> Question)
+          input = input
+            ? `${additionalContext}\n\n${input}`
+            : additionalContext;
+        }
       }
     }
 
@@ -709,6 +728,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
@@ -755,4 +775,37 @@ export function initializeOutputListenersAndFlush() {
     }
   }
   coreEvents.drainBacklogs();
+}
+
+function setupAdminControlsListener() {
+  let pendingSettings: FetchAdminControlsResponse | undefined;
+  let config: Config | undefined;
+
+  const messageHandler = (msg: unknown) => {
+    const message = msg as {
+      type?: string;
+      settings?: FetchAdminControlsResponse;
+    };
+    if (message?.type === 'admin-settings' && message.settings) {
+      if (config) {
+        config.setRemoteAdminSettings(message.settings);
+      } else {
+        pendingSettings = message.settings;
+      }
+    }
+  };
+
+  process.on('message', messageHandler);
+
+  return {
+    setConfig: (newConfig: Config) => {
+      config = newConfig;
+      if (pendingSettings) {
+        config.setRemoteAdminSettings(pendingSettings);
+      }
+    },
+    cleanup: () => {
+      process.off('message', messageHandler);
+    },
+  };
 }

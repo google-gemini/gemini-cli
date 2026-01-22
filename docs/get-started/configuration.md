@@ -110,13 +110,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
-- **`general.disableAutoUpdate`** (boolean):
-  - **Description:** Disable automatic updates
-  - **Default:** `false`
+- **`general.enableAutoUpdate`** (boolean):
+  - **Description:** Enable automatic updates.
+  - **Default:** `true`
 
-- **`general.disableUpdateNag`** (boolean):
-  - **Description:** Disable update notification prompts.
-  - **Default:** `false`
+- **`general.enableAutoUpdateNotification`** (boolean):
+  - **Description:** Enable update notification prompts.
+  - **Default:** `true`
 
 - **`general.checkpointing.enabled`** (boolean):
   - **Description:** Enable session checkpointing for recovery
@@ -266,9 +266,9 @@ their corresponding top-level category object in your `settings.json` file.
     provided, the CLI cycles through these instead of the defaults.
   - **Default:** `[]`
 
-- **`ui.accessibility.disableLoadingPhrases`** (boolean):
-  - **Description:** Disable loading phrases for accessibility
-  - **Default:** `false`
+- **`ui.accessibility.enableLoadingPhrases`** (boolean):
+  - **Description:** Enable loading phrases during operations.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.accessibility.screenReader`** (boolean):
@@ -607,9 +607,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`context.fileFiltering.disableFuzzySearch`** (boolean):
-  - **Description:** Disable fuzzy search when searching for files.
-  - **Default:** `false`
+- **`context.fileFiltering.enableFuzzySearch`** (boolean):
+  - **Description:** Enable fuzzy search when searching for files.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 #### `tools`
@@ -707,7 +707,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable LLM-based error correction for edit tools. When
     enabled, tools will fail immediately if exact string matches are not found,
     instead of attempting to self-correct.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -835,6 +835,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.enableEventDrivenScheduler`** (boolean):
+  - **Description:** Enables event-driven scheduler within the CLI session.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
@@ -899,21 +904,23 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
-#### `hooks`
+#### `hooksConfig`
 
-- **`hooks.enabled`** (boolean):
+- **`hooksConfig.enabled`** (boolean):
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
-  - **Default:** `false`
+  - **Default:** `true`
 
-- **`hooks.disabled`** (array):
+- **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
     Hooks in this list will not execute even if configured.
   - **Default:** `[]`
 
-- **`hooks.notifications`** (boolean):
+- **`hooksConfig.notifications`** (boolean):
   - **Description:** Show visual indicators when hooks are executing.
   - **Default:** `true`
+
+#### `hooks`
 
 - **`hooks.BeforeTool`** (array):
   - **Description:** Hooks that execute before tool execution. Can intercept,
@@ -1165,7 +1172,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
-  - Example: `export GEMINI_MODEL="gemini-2.5-flash"`
+  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
@@ -1310,7 +1317,7 @@ for that specific session.
 
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
-  - Example: `npm start -- --model gemini-1.5-pro-latest`
+  - Example: `npm start -- --model gemini-3-pro-preview`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
     non-interactive mode.
@@ -1346,6 +1353,10 @@ for that specific session.
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
+    - `plan`: Read-only mode for tool calls (requires experimental planning to
+      be enabled).
+      > **Note:** This mode is currently under development and not yet fully
+      > functional.
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
     `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
