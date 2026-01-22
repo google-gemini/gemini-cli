@@ -1911,7 +1911,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
+      });
 
+      await waitFor(() => {
         expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
       unmount();
