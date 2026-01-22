@@ -105,21 +105,12 @@ lightweight extraction logic, though for most shell scripts `jq` is sufficient.
 
 ## Debugging
 
-### The "Strict JSON" Rule
+### The "Strict JSON" rule
 
 The most common cause of hook failure is "polluting" the standard output.
 
 - **stdout** is for **JSON only**.
 - **stderr** is for **logs and text**.
-
-**Bad:**
-
-```bash
-#!/bin/bash
-echo "Starting check..."  # <--- This breaks the JSON parser!
-echo '{"decision": "allow"}'
-
-```
 
 **Good:**
 
@@ -373,6 +364,89 @@ git add .gemini/settings.json
 
 ```
 
+## Hook security
+
+### Threat Model
+
+Understanding where hooks come from and what they can do is critical for secure
+usage.
+
+| Hook Source                   | Description                                                                                                                |
+| :---------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| **System**                    | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
+| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                         |
+| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
+| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
+
+#### Project Hook Security
+
+When you open a project with hooks defined in `.gemini/settings.json`:
+
+1. **Detection**: Gemini CLI detects the hooks.
+2. **Identification**: A unique identity is generated for each hook based on its
+   `name` and `command`.
+3. **Warning**: If this specific hook identity has not been seen before, a
+   **warning** is displayed.
+4. **Execution**: The hook is executed (unless specific security settings block
+   it).
+5. **Trust**: The hook is marked as "trusted" for this project.
+
+> **Modification detection**: If the `command` string of a project hook is
+> changed (e.g., by a `git pull`), its identity changes. Gemini CLI will treat
+> it as a **new, untrusted hook** and warn you again. This prevents malicious
+> actors from silently swapping a verified command for a malicious one.
+
+### Risks
+
+| Risk                         | Description                                                                                                                          |
+| :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| **Arbitrary Code Execution** | Hooks run as your user. They can do anything you can do (delete files, install software).                                            |
+| **Data Exfiltration**        | A hook could read your input (prompts), output (code), or environment variables (`GEMINI_API_KEY`) and send them to a remote server. |
+| **Prompt Injection**         | Malicious content in a file or web page could trick an LLM into running a tool that triggers a hook in an unexpected way.            |
+
+### Mitigation Strategies
+
+#### Verify the source
+
+**Verify the source** of any project hooks or extensions before enabling them.
+
+- For open-source projects, a quick review of the hook scripts is recommended.
+- For extensions, ensure you trust the author or publisher (e.g., verified
+  publishers, well-known community members).
+- Be cautious with obfuscated scripts or compiled binaries from unknown sources.
+
+#### Sanitize environment
+
+Hooks inherit the environment of the Gemini CLI process, which may include
+sensitive API keys. Gemini CLI provides a
+[redaction system](/docs/get-started/configuration#environment-variable-redaction)
+that automatically filters variables matching sensitive patterns (e.g., `KEY`,
+`TOKEN`).
+
+> **Disabled by Default**: Environment redaction is currently **OFF by
+> default**. We strongly recommend enabling it if you are running third-party
+> hooks or working in sensitive environments.
+
+**Impact on hooks:**
+
+- **Security**: Prevents your hook scripts from accidentally leaking secrets.
+- **Troubleshooting**: If your hook depends on a specific environment variable
+  that is being blocked, you must explicitly allow it in `settings.json`.
+
+```json
+{
+  "security": {
+    "environmentVariableRedaction": {
+      "enabled": true,
+      "allowed": ["MY_REQUIRED_TOOL_KEY"]
+    }
+  }
+}
+```
+
+**System administrators:** You can enforce redaction for all users in the system
+configuration.
+
 ## Troubleshooting
 
 ### Hook not executing
@@ -468,90 +542,7 @@ fi
 env > .gemini/hook-env.log
 ```
 
-## Using Hooks Securely
-
-### Threat Model
-
-Understanding where hooks come from and what they can do is critical for secure
-usage.
-
-| Hook Source                   | Description                                                                                                                |
-| :---------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| **System**                    | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
-| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                         |
-| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
-| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
-
-#### Project Hook Security
-
-When you open a project with hooks defined in `.gemini/settings.json`:
-
-1. **Detection**: Gemini CLI detects the hooks.
-2. **Identification**: A unique identity is generated for each hook based on its
-   `name` and `command`.
-3. **Warning**: If this specific hook identity has not been seen before, a
-   **warning** is displayed.
-4. **Execution**: The hook is executed (unless specific security settings block
-   it).
-5. **Trust**: The hook is marked as "trusted" for this project.
-
-> **Modification Detection**: If the `command` string of a project hook is
-> changed (e.g., by a `git pull`), its identity changes. Gemini CLI will treat
-> it as a **new, untrusted hook** and warn you again. This prevents malicious
-> actors from silently swapping a verified command for a malicious one.
-
-### Risks
-
-| Risk                         | Description                                                                                                                          |
-| :--------------------------- | :----------------------------------------------------------------------------------------------------------------------------------- |
-| **Arbitrary Code Execution** | Hooks run as your user. They can do anything you can do (delete files, install software).                                            |
-| **Data Exfiltration**        | A hook could read your input (prompts), output (code), or environment variables (`GEMINI_API_KEY`) and send them to a remote server. |
-| **Prompt Injection**         | Malicious content in a file or web page could trick an LLM into running a tool that triggers a hook in an unexpected way.            |
-
-### Mitigation Strategies
-
-#### Verify the source
-
-**Verify the source** of any project hooks or extensions before enabling them.
-
-- For open-source projects, a quick review of the hook scripts is recommended.
-- For extensions, ensure you trust the author or publisher (e.g., verified
-  publishers, well-known community members).
-- Be cautious with obfuscated scripts or compiled binaries from unknown sources.
-
-#### Sanitize Environment
-
-Hooks inherit the environment of the Gemini CLI process, which may include
-sensitive API keys. Gemini CLI provides a
-[redaction system](/docs/get-started/configuration#environment-variable-redaction)
-that automatically filters variables matching sensitive patterns (e.g., `KEY`,
-`TOKEN`).
-
-> **Disabled by Default**: Environment redaction is currently **OFF by
-> default**. We strongly recommend enabling it if you are running third-party
-> hooks or working in sensitive environments.
-
-**Impact on Hooks:**
-
-- **Security**: Prevents your hook scripts from accidentally leaking secrets.
-- **Troubleshooting**: If your hook depends on a specific environment variable
-  that is being blocked, you must explicitly allow it in `settings.json`.
-
-```json
-{
-  "security": {
-    "environmentVariableRedaction": {
-      "enabled": true,
-      "allowed": ["MY_REQUIRED_TOOL_KEY"]
-    }
-  }
-}
-```
-
-**System Administrators:** You can enforce redaction for all users in the system
-configuration.
-
-## Authoring Secure Hooks
+## Authoring secure hooks
 
 When writing your own hooks, follow these practices to ensure they are robust
 and secure.

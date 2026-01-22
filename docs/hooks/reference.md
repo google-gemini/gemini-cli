@@ -1,13 +1,13 @@
-# Hooks Reference
+# Hooks reference
 
 This document provides the technical specification for Gemini CLI hooks,
 including JSON schemas and API details.
 
-## Global Hook Mechanics
+## Global hook mechanics
 
-- **Communication**: `stdin` for Input (JSON), `stdout` for Output (JSON),
+- **Communication**: `stdin` for Input (JSON), `stdout` for Output (JSON), and
   `stderr` for logs and feedback.
-- **Exit Codes**:
+- **Exit codes**:
   - `0`: Success. `stdout` is parsed as JSON. **Preferred for all logic.**
   - `2`: System Block. The action is blocked; `stderr` is used as the rejection
     reason.
@@ -18,7 +18,7 @@ including JSON schemas and API details.
 
 ---
 
-## 🧬 Base Input Schema
+## Base input schema
 
 All hooks receive these common fields via `stdin`:
 
@@ -34,7 +34,7 @@ All hooks receive these common fields via `stdin`:
 
 ---
 
-## 📤 Common Output Fields
+## Common output fields
 
 Most hooks support these fields in their `stdout` JSON:
 
@@ -49,9 +49,9 @@ Most hooks support these fields in their `stdout` JSON:
 
 ---
 
-## 🛠️ Tool Hooks
+## Tool hooks
 
-### Matchers and Tool Names
+### Matchers and tool names
 
 For `BeforeTool` and `AfterTool` events, the `matcher` field in your settings is
 compared against the name of the tool being executed.
@@ -107,7 +107,7 @@ hiding sensitive output from the agent.
 
 ---
 
-## 🤖 Agent Hooks
+## Agent hooks
 
 ### `BeforeAgent`
 
@@ -147,7 +147,7 @@ case is response validation and automatic retries.
 
 ---
 
-## 🧠 Model Hooks
+## Model hooks
 
 ### `BeforeModel`
 
@@ -205,21 +205,21 @@ redaction or PII filtering.
 
 ---
 
-## 📅 Lifecycle & System Hooks
+## Lifecycle & system hooks
 
 ### `SessionStart`
 
 Fires on application startup, resuming a session, or after a `/clear` command.
 Used for loading initial context.
 
-- **Input Fields**:
+- **Input fields**:
   - `source`: (`"startup" | "resume" | "clear"`)
-- **Relevant Output Fields**:
+- **Relevant output fields**:
   - `hookSpecificOutput.additionalContext`: (`string`)
     - **Interactive**: Injected as the first turn in history.
     - **Non-interactive**: Prepended to the user's prompt.
   - `systemMessage`: Shown at the start of the session.
-- **Advisory Only**: `continue` and `decision` fields are **ignored**. Startup
+- **Advisory only**: `continue` and `decision` fields are **ignored**. Startup
   is never blocked.
 
 ### `SessionEnd`

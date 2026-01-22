@@ -1,10 +1,10 @@
-# Gemini CLI hooks
+# Gemini CLI hooks (experimental)
 
 Hooks are scripts or programs that Gemini CLI executes at specific points in the
 agentic loop, allowing you to intercept and customize behavior without modifying
 the CLI's source code.
 
-## 🚀 Availability
+## Availability
 
 > **Experimental Feature**: Hooks are currently enabled by default only in the
 > **Preview** and **Nightly** release channels.
@@ -63,11 +63,11 @@ Hooks are triggered by specific events in Gemini CLI's lifecycle.
 | `PreCompress`         | Before context compression                     | Advisory               | Save state, notify user                      |
 | `Notification`        | When a system notification occurs              | Advisory               | Forward to desktop alerts, logging           |
 
-### Global Mechanics
+### Global mechanics
 
 Understanding these core principles is essential for building robust hooks.
 
-#### Strict JSON Requirements (The "Golden Rule")
+#### Strict JSON requirements (The "Golden Rule")
 
 Hooks communicate via `stdin` (Input) and `stdout` (Output).
 
@@ -81,7 +81,7 @@ Hooks communicate via `stdin` (Input) and `stdout` (Output).
    `echo "debug" >&2`). Gemini CLI captures `stderr` but never attempts to parse
    it as JSON.
 
-#### Exit Codes
+#### Exit codes
 
 Gemini CLI uses exit codes to determine the high-level outcome of a hook
 execution:
@@ -97,9 +97,9 @@ execution:
 You can filter which specific tools or triggers fire your hook using the
 `matcher` field.
 
-- **Tool Events** (`BeforeTool`, `AfterTool`): Matchers are **Regular
+- **Tool events** (`BeforeTool`, `AfterTool`): Matchers are **Regular
   Expressions**. (e.g., `"write_.*"`).
-- **Lifecycle Events**: Matchers are **Exact Strings**. (e.g., `"startup"`).
+- **Lifecycle events**: Matchers are **Exact Strings**. (e.g., `"startup"`).
 - **Wildcards**: `"*"` or `""` (empty string) matches all occurrences.
 
 ## Configuration
@@ -108,9 +108,9 @@ Hook definitions are configured in `settings.json`. Gemini CLI merges
 configurations from multiple layers in the following order of precedence
 (highest to lowest):
 
-1.  **Project Settings**: `.gemini/settings.json` in the current directory.
-2.  **User Settings**: `~/.gemini/settings.json`.
-3.  **System Settings**: `/etc/gemini-cli/settings.json`.
+1.  **Project settings**: `.gemini/settings.json` in the current directory.
+2.  **User settings**: `~/.gemini/settings.json`.
+3.  **System settings**: `/etc/gemini-cli/settings.json`.
 4.  **Extensions**: Hooks defined by installed extensions.
 
 ### Configuration schema
@@ -136,7 +136,7 @@ configurations from multiple layers in the following order of precedence
 }
 ```
 
-### Environment Variables
+### Environment variables
 
 Hooks are executed with a sanitized environment.
 
@@ -145,7 +145,7 @@ Hooks are executed with a sanitized environment.
 - `GEMINI_CWD`: The current working directory.
 - `CLAUDE_PROJECT_DIR`: (Alias) Provided for compatibility.
 
-## Security and Risks
+## Security and risks
 
 > **Warning: Hooks execute arbitrary code with your user privileges.** By
 > configuring hooks, you are allowing scripts to run shell commands on your
