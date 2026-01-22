@@ -14,7 +14,8 @@ import { coreEvents, CoreEvent } from '../utils/events.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  GEMINI_MODEL_ALIAS_AUTO,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -23,6 +24,7 @@ import * as tomlLoader from './agentLoader.js';
 import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ConfigParameters } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import { ThinkingLevel } from '@google/genai';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -127,14 +129,27 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should use preview flash model for codebase investigator if main model is preview pro', async () => {
-      const previewConfig = makeMockedConfig({
-        model: PREVIEW_GEMINI_MODEL,
-        codebaseInvestigatorSettings: {
-          enabled: true,
-          model: GEMINI_MODEL_ALIAS_AUTO,
-        },
+    it('should use default model for codebase investigator for non-preview models', async () => {
+      const previewConfig = makeMockedConfig({ model: DEFAULT_GEMINI_MODEL });
+      const previewRegistry = new TestableAgentRegistry(previewConfig);
+
+      await previewRegistry.initialize();
+
+      const investigatorDef = previewRegistry.getDefinition(
+        'codebase_investigator',
+      ) as LocalAgentDefinition;
+      expect(investigatorDef).toBeDefined();
+      expect(investigatorDef?.modelConfig.model).toBe(DEFAULT_GEMINI_MODEL);
+      expect(
+        investigatorDef?.modelConfig.generateContentConfig?.thinkingConfig,
+      ).toStrictEqual({
+        includeThoughts: true,
+        thinkingBudget: DEFAULT_THINKING_MODE,
       });
+    });
+
+    it('should use preview flash model for codebase investigator if main model is preview pro', async () => {
+      const previewConfig = makeMockedConfig({ model: PREVIEW_GEMINI_MODEL });
       const previewRegistry = new TestableAgentRegistry(previewConfig);
 
       await previewRegistry.initialize();
@@ -146,15 +161,17 @@ describe('AgentRegistry', () => {
       expect(investigatorDef?.modelConfig.model).toBe(
         PREVIEW_GEMINI_FLASH_MODEL,
       );
+      expect(
+        investigatorDef?.modelConfig.generateContentConfig?.thinkingConfig,
+      ).toStrictEqual({
+        includeThoughts: true,
+        thinkingLevel: ThinkingLevel.HIGH,
+      });
     });
 
     it('should use preview flash model for codebase investigator if main model is preview auto', async () => {
       const previewConfig = makeMockedConfig({
         model: PREVIEW_GEMINI_MODEL_AUTO,
-        codebaseInvestigatorSettings: {
-          enabled: true,
-          model: GEMINI_MODEL_ALIAS_AUTO,
-        },
       });
       const previewRegistry = new TestableAgentRegistry(previewConfig);
 
@@ -172,9 +189,13 @@ describe('AgentRegistry', () => {
     it('should use the model from the investigator settings', async () => {
       const previewConfig = makeMockedConfig({
         model: PREVIEW_GEMINI_MODEL,
-        codebaseInvestigatorSettings: {
-          enabled: true,
-          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        agents: {
+          overrides: {
+            codebase_investigator: {
+              enabled: true,
+              modelConfig: { model: DEFAULT_GEMINI_FLASH_LITE_MODEL },
+            },
+          },
         },
       });
       const previewRegistry = new TestableAgentRegistry(previewConfig);
@@ -232,8 +253,12 @@ describe('AgentRegistry', () => {
     it('should NOT load TOML agents when enableAgents is false', async () => {
       const disabledConfig = makeMockedConfig({
         enableAgents: false,
-        codebaseInvestigatorSettings: { enabled: false },
-        cliHelpAgentSettings: { enabled: false },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: false },
+            cli_help: { enabled: false },
+          },
+        },
       });
       const disabledRegistry = new TestableAgentRegistry(disabledConfig);
 
@@ -254,9 +279,13 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
-    it('should register CLI help agent if disabled', async () => {
+    it('should NOT register CLI help agent if disabled', async () => {
       const config = makeMockedConfig({
-        cliHelpAgentSettings: { enabled: false },
+        agents: {
+          overrides: {
+            cli_help: { enabled: false },
+          },
+        },
       });
       const registry = new TestableAgentRegistry(config);
 
