@@ -7,8 +7,9 @@
 import { createHash } from 'node:crypto';
 import { type Content, Type } from '@google/genai';
 import { type BaseLlmClient } from '../core/baseLlmClient.js';
-import { LruCache } from './LruCache.js';
-import { getPromptIdWithFallback } from './promptIdContext.js';
+import { LRUCache } from 'mnemonist';
+import { promptIdContext } from './promptIdContext.js';
+import { debugLogger } from './debugLogger.js';
 
 const MAX_CACHE_SIZE = 50;
 const GENERATE_JSON_TIMEOUT_MS = 40000; // 40 seconds
@@ -83,7 +84,7 @@ const SearchReplaceEditSchema = {
   required: ['search', 'replace', 'explanation'],
 };
 
-const editCorrectionWithInstructionCache = new LruCache<
+const editCorrectionWithInstructionCache = new LRUCache<
   string,
   SearchReplaceEdit
 >(MAX_CACHE_SIZE);

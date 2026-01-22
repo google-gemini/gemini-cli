@@ -29,7 +29,7 @@ import {
   isDefaultValue,
   requiresRestart,
   getRestartRequiredFromModified,
-  getDefaultValue,
+  getEffectiveDefaultValue,
   setPendingSettingValueAny,
   getNestedValue,
   getEffectiveValue,
@@ -743,7 +743,10 @@ export function SettingsDialog({
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
           const currentSetting = items[activeSettingIndex];
           if (currentSetting) {
-            const defaultValue = getDefaultValue(currentSetting.value);
+            const defaultValue = getEffectiveDefaultValue(
+              currentSetting.value,
+              config,
+            );
             const defType = currentSetting.type;
             if (defType === 'boolean') {
               const booleanDefaultValue =
@@ -948,12 +951,10 @@ export function SettingsDialog({
                   const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
                   displayValue =
                     beforeCursor + chalk.inverse(atCursor) + afterCursor;
-                } else if (
-                  cursorVisible &&
-                  editCursorPos >= cpLen(editBuffer)
-                ) {
+                } else if (editCursorPos >= cpLen(editBuffer)) {
                   // Cursor is at the end - show inverted space
-                  displayValue = editBuffer + chalk.inverse(' ');
+                  displayValue =
+                    editBuffer + (cursorVisible ? chalk.inverse(' ') : ' ');
                 } else {
                   // Cursor not visible
                   displayValue = editBuffer;
@@ -963,7 +964,10 @@ export function SettingsDialog({
                 const path = item.value.split('.');
                 const currentValue = getNestedValue(pendingSettings, path);
 
-                const defaultValue = getDefaultValue(item.value);
+                const defaultValue = getEffectiveDefaultValue(
+                  item.value,
+                  config,
+                );
 
                 if (currentValue !== undefined && currentValue !== null) {
                   displayValue = String(currentValue);

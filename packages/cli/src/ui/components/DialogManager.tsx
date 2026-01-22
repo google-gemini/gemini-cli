@@ -8,7 +8,6 @@ import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
@@ -18,6 +17,7 @@ import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { ValidationDialog } from './ValidationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -69,6 +69,16 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.validationRequest) {
+    return (
+      <ValidationDialog
+        validationLink={uiState.validationRequest.validationLink}
+        validationDescription={uiState.validationRequest.validationDescription}
+        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        onChoice={uiActions.handleValidationChoice}
+      />
+    );
+  }
   if (uiState.shouldShowIdePrompt) {
     return (
       <IdeIntegrationNudge
@@ -83,11 +93,6 @@ export const DialogManager = ({
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
       />
-    );
-  }
-  if (uiState.shellConfirmationRequest) {
-    return (
-      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
     );
   }
   if (uiState.loopDetectionConfirmationRequest) {
