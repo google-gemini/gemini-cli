@@ -30,7 +30,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
+import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -516,18 +516,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           escapeTimerRef.current = setTimeout(() => {
             resetEscapeState();
           }, 500);
-        } else {
-          // Second ESC
-          resetEscapeState();
-          if (buffer.text.length > 0) {
-            buffer.setText('');
-            resetCompletionState();
-          } else {
-            if (history.length > 0) {
-              onSubmit('/rewind');
-            }
-          }
+          return;
         }
+
+        // Second ESC
+        resetEscapeState();
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        } else if (history.length > 0) {
+          onSubmit('/rewind');
+          return;
+        }
+        coreEvents.emitFeedback('info', 'Nothing to rewind to');
         return;
       }
 
