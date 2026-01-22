@@ -2147,6 +2147,77 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Agent Configuration Dialog Integration', () => {
+    it('should initialize with dialog closed and no agent selected', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
+      unmount!();
+    });
+
+    it('should update state when openAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+      expect(capturedUIState.selectedAgentName).toBe('test-agent');
+      expect(capturedUIState.selectedAgentDisplayName).toBe('Test Agent');
+      expect(capturedUIState.selectedAgentDefinition).toEqual(agentDefinition);
+      unmount!();
+    });
+
+    it('should clear state when closeAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+
+      act(() => {
+        capturedUIActions.closeAgentConfigDialog();
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
+      unmount!();
+    });
+  });
+
   describe('CoreEvents Integration', () => {
     it('subscribes to UserFeedback and drains backlog on mount', async () => {
       let unmount: () => void;
