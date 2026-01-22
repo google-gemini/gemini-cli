@@ -12,6 +12,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
 import { useBanner } from '../hooks/useBanner.js';
+import { useTips } from '../hooks/useTips.js';
 
 interface AppHeaderProps {
   version: string;
@@ -23,6 +24,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
 
   const { bannerText } = useBanner(bannerData, config);
+  const { showTips } = useTips();
 
   return (
     <Box flexDirection="column">
@@ -38,9 +40,8 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
           )}
         </>
       )}
-      {!(settings.merged.ui.hideTips || config.getScreenReader()) && (
-        <Tips config={config} />
-      )}
+      {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
+        showTips && <Tips config={config} />}
     </Box>
   );
 };
