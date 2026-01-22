@@ -32,7 +32,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = ({
     if (typeof resultDisplay === 'string') {
       const flattened = resultDisplay.replace(/\n/g, ' ').trim();
       denseResult =
-        flattened.length > 50 ? flattened.slice(0, 47) + '...' : flattened;
+        flattened.length > 120 ? flattened.slice(0, 117) + '...' : flattened;
     } else if (typeof resultDisplay === 'object') {
       if ('fileDiff' in resultDisplay) {
         denseResult = `Diff applied to ${(resultDisplay as FileDiffResult).fileName}`;
@@ -47,26 +47,30 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = ({
     if (typeof resultDisplay === 'string') {
       const flattened = resultDisplay.replace(/\n/g, ' ').trim();
       denseResult =
-        flattened.length > 50 ? flattened.slice(0, 47) + '...' : flattened;
+        flattened.length > 120 ? flattened.slice(0, 117) + '...' : flattened;
     } else {
       denseResult = 'Failed';
     }
   }
 
   return (
-    <Box marginLeft={3} flexDirection="row">
+    <Box marginLeft={3} flexDirection="row" flexWrap="wrap">
       <ToolStatusIndicator status={status} name={name} />
-      <Box marginLeft={1}>
-        <Text color={theme.text.primary} bold>
+      <Box maxWidth={25} flexShrink={1} flexGrow={0}>
+        <Text color={theme.text.primary} bold wrap="truncate-end">
           {name}
         </Text>
       </Box>
-      <Box marginLeft={1}>
-        <Text color={theme.text.secondary}>{description}</Text>
+      <Box marginLeft={1} flexShrink={1} flexGrow={0}>
+        <Text color={theme.text.secondary} wrap="truncate-end">
+          {description}
+        </Text>
       </Box>
       {denseResult && (
-        <Box marginLeft={1}>
-          <Text color={theme.text.accent}>→ {denseResult}</Text>
+        <Box marginLeft={1} flexGrow={1}>
+          <Text color={theme.text.accent} wrap="wrap">
+            → {denseResult}
+          </Text>
         </Box>
       )}
     </Box>

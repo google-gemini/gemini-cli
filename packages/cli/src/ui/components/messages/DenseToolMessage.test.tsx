@@ -32,12 +32,13 @@ describe('DenseToolMessage', () => {
   });
 
   it('truncates long string results', () => {
-    const longResult = 'A'.repeat(100);
+    const longResult = 'A'.repeat(200);
     const { lastFrame } = renderWithProviders(
       <DenseToolMessage {...defaultProps} resultDisplay={longResult} />,
     );
-    const output = lastFrame();
-    expect(output).toContain('→ ' + 'A'.repeat(47) + '...');
+    // Remove all whitespace to check the continuous string content truncation
+    const output = lastFrame()?.replace(/\s/g, '');
+    expect(output).toContain('A'.repeat(117) + '...');
   });
 
   it('flattens newlines in string results', () => {
