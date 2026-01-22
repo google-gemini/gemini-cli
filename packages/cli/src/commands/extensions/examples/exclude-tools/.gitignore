@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
