@@ -132,6 +132,7 @@ export const useGeminiStream = (
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const responseStartTimeRef = useRef<number | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -565,6 +566,8 @@ export const useGeminiStream = (
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
+        // Record the start time when beginning a new gemini response
+        responseStartTimeRef.current = Date.now();
         setPendingHistoryItem({ type: 'gemini', text: '' });
         newGeminiMessageBuffer = eventValue;
       }
@@ -1058,7 +1061,23 @@ export const useGeminiStream = (
               }
 
               if (pendingHistoryItemRef.current) {
-                addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+                // Add response time to the last gemini message segment
+                const item = pendingHistoryItemRef.current;
+                if (
+                  (item.type === 'gemini' || item.type === 'gemini_content') &&
+                  responseStartTimeRef.current
+                ) {
+                  const responseTime = Math.round(
+                    (Date.now() - responseStartTimeRef.current) / 1000,
+                  );
+                  addItem(
+                    { ...item, responseTime } as HistoryItemWithoutId,
+                    userMessageTimestamp,
+                  );
+                  responseStartTimeRef.current = null;
+                } else {
+                  addItem(item, userMessageTimestamp);
+                }
                 setPendingHistoryItem(null);
               }
               if (loopDetectedRef.current) {

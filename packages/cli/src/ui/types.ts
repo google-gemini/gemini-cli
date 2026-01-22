@@ -111,11 +111,13 @@ export type HistoryItemUser = HistoryItemBase & {
 export type HistoryItemGemini = HistoryItemBase & {
   type: 'gemini';
   text: string;
+  responseTime?: number; // Response time in seconds
 };
 
 export type HistoryItemGeminiContent = HistoryItemBase & {
   type: 'gemini_content';
   text: string;
+  responseTime?: number; // Response time in seconds
 };
 
 export type HistoryItemInfo = HistoryItemBase & {

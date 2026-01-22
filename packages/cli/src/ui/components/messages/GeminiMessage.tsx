@@ -17,6 +17,7 @@ interface GeminiMessageProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  responseTime?: number; // Response time in seconds
 }
 
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({
@@ -24,30 +25,55 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
+  responseTime,
 }) => {
   const { renderMarkdown } = useUIState();
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
 
   const isAlternateBuffer = useAlternateBuffer();
+
+  // Format response time for display
+  const formatResponseTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (remainingSeconds === 0) {
+      return `${minutes}m`;
+    }
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
   return (
-    <Box flexDirection="row">
-      <Box width={prefixWidth}>
-        <Text color={theme.text.accent} aria-label={SCREEN_READER_MODEL_PREFIX}>
-          {prefix}
-        </Text>
+    <Box flexDirection="column">
+      <Box flexDirection="row">
+        <Box width={prefixWidth}>
+          <Text
+            color={theme.text.accent}
+            aria-label={SCREEN_READER_MODEL_PREFIX}
+          >
+            {prefix}
+          </Text>
+        </Box>
+        <Box flexGrow={1} flexDirection="column">
+          <MarkdownDisplay
+            text={text}
+            isPending={isPending}
+            availableTerminalHeight={
+              isAlternateBuffer ? undefined : availableTerminalHeight
+            }
+            terminalWidth={terminalWidth}
+            renderMarkdown={renderMarkdown}
+          />
+        </Box>
       </Box>
-      <Box flexGrow={1} flexDirection="column">
-        <MarkdownDisplay
-          text={text}
-          isPending={isPending}
-          availableTerminalHeight={
-            isAlternateBuffer ? undefined : availableTerminalHeight
-          }
-          terminalWidth={terminalWidth}
-          renderMarkdown={renderMarkdown}
-        />
-      </Box>
+      {!isPending && responseTime !== undefined && responseTime > 0 && (
+        <Box marginLeft={prefixWidth}>
+          <Text dimColor>({formatResponseTime(responseTime)})</Text>
+        </Box>
+      )}
     </Box>
   );
 };

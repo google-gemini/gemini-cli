@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -15,6 +15,7 @@ interface GeminiMessageContentProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  responseTime?: number; // Response time in seconds
 }
 
 /*
@@ -28,11 +29,25 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
+  responseTime,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
+
+  // Format response time for display
+  const formatResponseTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (remainingSeconds === 0) {
+      return `${minutes}m`;
+    }
+    return `${minutes}m ${remainingSeconds}s`;
+  };
 
   return (
     <Box flexDirection="column" paddingLeft={prefixWidth}>
@@ -45,6 +60,11 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
         terminalWidth={terminalWidth}
         renderMarkdown={renderMarkdown}
       />
+      {!isPending && responseTime !== undefined && responseTime > 0 && (
+        <Box>
+          <Text dimColor>({formatResponseTime(responseTime)})</Text>
+        </Box>
+      )}
     </Box>
   );
 };
