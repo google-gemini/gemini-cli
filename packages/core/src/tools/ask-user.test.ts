@@ -6,7 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AskUserTool } from './ask-user.js';
-import { MessageBusType, type Question } from '../confirmation-bus/types.js';
+import {
+  MessageBusType,
+  QuestionType,
+  type Question,
+} from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 describe('AskUserTool', () => {
@@ -146,11 +150,14 @@ describe('AskUserTool', () => {
     const invocation = tool.build({ questions });
     const executePromise = invocation.execute(new AbortController().signal);
 
-    // Verify publish called
+    // Verify publish called with normalized questions (type defaults to CHOICE)
     expect(mockMessageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.ASK_USER_REQUEST,
-        questions,
+        questions: questions.map((q) => ({
+          ...q,
+          type: QuestionType.CHOICE,
+        })),
       }),
     );
 

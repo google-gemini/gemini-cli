@@ -14,6 +14,7 @@ import {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
+  QuestionType,
   type Question,
   type AskUserRequest,
   type AskUserResponse,
@@ -135,7 +136,10 @@ export class AskUserInvocation extends BaseToolInvocation<
 
     const request: AskUserRequest = {
       type: MessageBusType.ASK_USER_REQUEST,
-      questions: this.params.questions,
+      questions: this.params.questions.map((q) => ({
+        ...q,
+        type: q.type ?? QuestionType.CHOICE,
+      })),
       correlationId,
     };
 
