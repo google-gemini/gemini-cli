@@ -61,9 +61,13 @@ describe('DelegateToAgentTool', () => {
       },
     },
     inputConfig: {
-      inputs: {
-        arg1: { type: 'string', description: 'Argument 1', required: true },
-        arg2: { type: 'number', description: 'Argument 2', required: false },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          arg1: { type: 'string', description: 'Argument 1' },
+          arg2: { type: 'number', description: 'Argument 2' },
+        },
+        required: ['arg1'],
       },
     },
     runConfig: { maxTurns: 1, maxTimeMinutes: 1 },
@@ -76,8 +80,12 @@ describe('DelegateToAgentTool', () => {
     description: 'A remote agent',
     agentCardUrl: 'https://example.com/agent.json',
     inputConfig: {
-      inputs: {
-        query: { type: 'string', description: 'Query', required: true },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Query' },
+        },
+        required: ['query'],
       },
     },
   };
@@ -153,7 +161,7 @@ describe('DelegateToAgentTool', () => {
     await expect(() =>
       invocation.execute(new AbortController().signal),
     ).rejects.toThrow(
-      "arg1: Required. Expected inputs: 'arg1' (required string), 'arg2' (optional number).",
+      `Invalid arguments for agent 'test_agent': params must have required property 'arg1'. Input schema: ${JSON.stringify(mockAgentDef.inputConfig.inputSchema)}.`,
     );
   });
 
@@ -166,7 +174,7 @@ describe('DelegateToAgentTool', () => {
     await expect(() =>
       invocation.execute(new AbortController().signal),
     ).rejects.toThrow(
-      "arg1: Expected string, received number. Expected inputs: 'arg1' (required string), 'arg2' (optional number).",
+      `Invalid arguments for agent 'test_agent': params/arg1 must be string. Input schema: ${JSON.stringify(mockAgentDef.inputConfig.inputSchema)}.`,
     );
   });
 
@@ -187,12 +195,15 @@ describe('DelegateToAgentTool', () => {
       ...mockAgentDef,
       name: 'invalid_agent',
       inputConfig: {
-        inputs: {
-          agent_name: {
-            type: 'string',
-            description: 'Conflict',
-            required: true,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            agent_name: {
+              type: 'string',
+              description: 'Conflict',
+            },
           },
+          required: ['agent_name'],
         },
       },
     };
@@ -203,6 +214,37 @@ describe('DelegateToAgentTool', () => {
     expect(() => new DelegateToAgentTool(registry, config, messageBus)).toThrow(
       "Agent 'invalid_agent' cannot have an input parameter named 'agent_name' as it is a reserved parameter for delegation.",
     );
+  });
+
+  it('should allow a remote agent missing a "query" input (will default at runtime)', () => {
+    const invalidRemoteAgentDef: AgentDefinition = {
+      kind: 'remote',
+      name: 'invalid_remote',
+      description: 'Conflict',
+      agentCardUrl: 'https://example.com/agent.json',
+      inputConfig: {
+        inputSchema: {
+          type: 'object',
+          properties: {
+            not_query: {
+              type: 'string',
+              description: 'Not a query',
+            },
+          },
+          required: ['not_query'],
+        },
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (registry as any).agents.set(
+      invalidRemoteAgentDef.name,
+      invalidRemoteAgentDef,
+    );
+
+    expect(
+      () => new DelegateToAgentTool(registry, config, messageBus),
+    ).not.toThrow();
   });
 
   it('should execute local agents silently without requesting confirmation', async () => {

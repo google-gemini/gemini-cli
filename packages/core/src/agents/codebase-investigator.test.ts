@@ -21,9 +21,11 @@ describe('CodebaseInvestigatorAgent', () => {
       'Codebase Investigator Agent',
     );
     expect(CodebaseInvestigatorAgent.description).toBeDefined();
-    expect(
-      CodebaseInvestigatorAgent.inputConfig.inputs['objective'].required,
-    ).toBe(true);
+    const inputSchema =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      CodebaseInvestigatorAgent.inputConfig.inputSchema as any;
+    expect(inputSchema.properties['objective']).toBeDefined();
+    expect(inputSchema.required).toContain('objective');
     expect(CodebaseInvestigatorAgent.outputConfig?.outputName).toBe('report');
     expect(CodebaseInvestigatorAgent.modelConfig?.model).toBe(
       DEFAULT_GEMINI_MODEL,

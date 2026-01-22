@@ -38,7 +38,7 @@ import type {
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
+import { AgentTerminateMode, DEFAULT_QUERY_STRING } from './types.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -395,7 +395,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : 'Get Started!';
+        : DEFAULT_QUERY_STRING;
       let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
       while (true) {
