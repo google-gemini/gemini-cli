@@ -45,11 +45,11 @@ export function useSessionResume({
   });
 
   const loadHistoryForResume = useCallback(
-    (
+    async (
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
       resumedData: ResumedSessionData,
-    ) => {
+    ): Promise<void> => {
       // Wait for the client.
       if (!isGeminiClientInitialized) {
         return;
@@ -64,8 +64,8 @@ export function useSessionResume({
       refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
       // Give the history to the Gemini client.
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+      // Await to ensure chat is fully initialized before allowing user input.
+      await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
     },
     [config, isGeminiClientInitialized, setQuittingMessages],
   );
@@ -84,7 +84,10 @@ export function useSessionResume({
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
-      loadHistoryForResume(
+      // Await the async loadHistoryForResume to ensure chat is initialized
+      // before the effect completes. Using void to satisfy the void return type
+      // of useEffect while still properly handling the promise.
+      void loadHistoryForResume(
         historyData.uiHistory,
         historyData.clientHistory,
         resumedSessionData,
