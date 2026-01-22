@@ -35,8 +35,10 @@ describe('hooksCommand', () => {
       };
     };
     setValue: ReturnType<typeof vi.fn>;
-    workspace: { path: string; settings: { hooks: { disabled: string[] } } };
-    user: { path: string; settings: { hooks: { disabled: string[] } } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workspace: { path: string; settings: any };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    user: { path: string; settings: any };
     forScope: ReturnType<typeof vi.fn>;
   };
 
@@ -62,12 +64,14 @@ describe('hooksCommand', () => {
     // Create mock settings
     const mockUser = {
       path: '/mock/user.json',
-      settings: { hooks: { disabled: [] } },
-    };
+      settings: { hooksConfig: { disabled: [] } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
     const mockWorkspace = {
       path: '/mock/workspace.json',
-      settings: { hooks: { disabled: [] } },
-    };
+      settings: { hooksConfig: { disabled: [] } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
 
     mockSettings = {
       merged: {
@@ -83,7 +87,8 @@ describe('hooksCommand', () => {
         if (scope === SettingScope.Workspace) return mockWorkspace;
         return mockUser;
       }),
-    };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
 
     // Create mock context with config and settings
     mockContext = createMockCommandContext({
@@ -293,8 +298,11 @@ describe('hooksCommand', () => {
 
     it('should enable a hook and update settings', async () => {
       // Update the user settings with disabled hooks
-      mockSettings.user.settings.hooks.disabled = ['test-hook', 'other-hook'];
-      mockSettings.workspace.settings.hooks.disabled = [];
+      mockSettings.user.settings.hooksConfig.disabled = [
+        'test-hook',
+        'other-hook',
+      ];
+      mockSettings.workspace.settings.hooksConfig.disabled = [];
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
@@ -307,7 +315,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.User,
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['other-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -324,7 +332,7 @@ describe('hooksCommand', () => {
 
     it('should handle error when enabling hook fails', async () => {
       // Setup so it tries to write
-      mockSettings.user.settings.hooks.disabled = ['test-hook'];
+      mockSettings.user.settings.hooksConfig.disabled = ['test-hook'];
       mockSettings.setValue.mockImplementationOnce(() => {
         throw new Error('Failed to save settings');
       });
@@ -426,8 +434,8 @@ describe('hooksCommand', () => {
 
     it('should disable a hook and update settings', async () => {
       // Ensure not disabled anywhere
-      mockSettings.workspace.settings.hooks.disabled = [];
-      mockSettings.user.settings.hooks.disabled = [];
+      mockSettings.workspace.settings.hooksConfig.disabled = [];
+      mockSettings.user.settings.hooksConfig.disabled = [];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -441,7 +449,7 @@ describe('hooksCommand', () => {
       // Should default to workspace if present
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['test-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -458,7 +466,7 @@ describe('hooksCommand', () => {
 
     it('should return info when hook is already disabled', async () => {
       // Update the context's settings with the hook already disabled in Workspace
-      mockSettings.workspace.settings.hooks.disabled = ['test-hook'];
+      mockSettings.workspace.settings.hooksConfig.disabled = ['test-hook'];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -478,7 +486,7 @@ describe('hooksCommand', () => {
     });
 
     it('should handle error when disabling hook fails', async () => {
-      mockSettings.workspace.settings.hooks.disabled = [];
+      mockSettings.workspace.settings.hooksConfig.disabled = [];
       mockSettings.setValue.mockImplementationOnce(() => {
         throw new Error('Failed to save settings');
       });
@@ -677,7 +685,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String), // enableAll uses legacy logic so it might return 'Workspace' or 'User' depending on ternary
-        'hooks.disabled',
+        'hooksConfig.disabled',
         [],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -801,7 +809,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['hook-1', 'hook-2', 'hook-3'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(

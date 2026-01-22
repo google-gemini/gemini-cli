@@ -47,7 +47,8 @@ export function enableHook(
   for (const scope of writableScopes) {
     if (isLoadableSettingScope(scope)) {
       const scopePath = settings.forScope(scope).path;
-      const scopeDisabled = settings.forScope(scope).settings.hooks?.disabled;
+      const scopeDisabled =
+        settings.forScope(scope).settings.hooksConfig?.disabled;
       if (scopeDisabled?.includes(hookName)) {
         foundInDisabledScopes.push({ scope, path: scopePath });
       } else {
@@ -71,11 +72,11 @@ export function enableHook(
     for (const { scope, path } of foundInDisabledScopes) {
       if (isLoadableSettingScope(scope)) {
         const currentScopeDisabled =
-          settings.forScope(scope).settings.hooks?.disabled ?? [];
+          settings.forScope(scope).settings.hooksConfig?.disabled ?? [];
         const newDisabled = currentScopeDisabled.filter(
           (name) => name !== hookName,
         );
-        settings.setValue(scope, 'hooks.disabled', newDisabled);
+        settings.setValue(scope, 'hooksConfig.disabled', newDisabled);
         modifiedScopes.push({ scope, path });
       }
     }
@@ -120,7 +121,7 @@ export function disableHook(
 
   const scopePath = settings.forScope(scope).path;
   const currentScopeDisabled =
-    settings.forScope(scope).settings.hooks?.disabled ?? [];
+    settings.forScope(scope).settings.hooksConfig?.disabled ?? [];
 
   if (currentScopeDisabled.includes(hookName)) {
     return {
@@ -141,7 +142,7 @@ export function disableHook(
 
   if (isLoadableSettingScope(otherScope)) {
     const otherScopeDisabled =
-      settings.forScope(otherScope).settings.hooks?.disabled;
+      settings.forScope(otherScope).settings.hooksConfig?.disabled;
     if (otherScopeDisabled?.includes(hookName)) {
       alreadyDisabledInOther.push({
         scope: otherScope,
@@ -152,7 +153,7 @@ export function disableHook(
 
   try {
     const newDisabled = [...currentScopeDisabled, hookName];
-    settings.setValue(scope, 'hooks.disabled', newDisabled);
+    settings.setValue(scope, 'hooksConfig.disabled', newDisabled);
   } catch (error) {
     return {
       status: 'error',

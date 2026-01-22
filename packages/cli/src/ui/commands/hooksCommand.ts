@@ -245,7 +245,7 @@ async function enableAllAction(
     const scopes = [SettingScope.Workspace, SettingScope.User];
     for (const scope of scopes) {
       if (isLoadableSettingScope(scope)) {
-        settings.setValue(scope, 'hooks.disabled', []);
+        settings.setValue(scope, 'hooksConfig.disabled', []);
       }
     }
 
@@ -317,7 +317,7 @@ async function disableAllAction(
     const scope = settings.workspace
       ? SettingScope.Workspace
       : SettingScope.User;
-    settings.setValue(scope, 'hooks.disabled', allHookNames);
+    settings.setValue(scope, 'hooksConfig.disabled', allHookNames);
 
     for (const hook of enabledHooks) {
       const hookName = getHookDisplayName(hook);
