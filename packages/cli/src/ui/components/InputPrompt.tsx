@@ -1043,6 +1043,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
+  const showPlanStyling =
+    !shellModeActive && approvalMode === ApprovalMode.PLAN;
 
   let statusColor: string | undefined;
   let statusText = '';
@@ -1052,6 +1054,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } else if (showYoloStyling) {
     statusColor = theme.status.error;
     statusText = 'YOLO mode';
+  } else if (showPlanStyling) {
+    statusColor = theme.status.success;
+    statusText = 'Plan mode';
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
     statusText = 'Accepting edits';
