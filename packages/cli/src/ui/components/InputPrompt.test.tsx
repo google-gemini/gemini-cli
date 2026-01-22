@@ -177,7 +177,6 @@ describe('InputPrompt', () => {
       transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
       pastedContent: {},
-      addPastedContent: vi.fn().mockReturnValue('[Pasted Text: 6 lines]'),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -1825,6 +1824,7 @@ describe('InputPrompt', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('should prevent auto-submission immediately after an unsafe paste', async () => {
@@ -2007,7 +2007,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
+      });
 
+      await waitFor(() => {
         expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
       unmount();

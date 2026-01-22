@@ -158,6 +158,10 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
       keypressHandler({
         ...key,
         name: 'return',
+        shift: true, // to make it a newline, not a submission
+        alt: false,
+        ctrl: false,
+        cmd: false,
         sequence: '\r',
         insertable: true,
       });
