@@ -201,10 +201,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         (() => {
           if (toolCalls.length === 0) return null;
           const lastTool = toolCalls[toolCalls.length - 1];
-          const isShell =
-            lastTool.name === SHELL_COMMAND_NAME ||
-            lastTool.name === SHELL_NAME ||
-            lastTool.name === SHELL_TOOL_NAME;
+          const isShell = isShellTool(lastTool.name);
           const isConfirming = lastTool.status === ToolCallStatus.Confirming;
           const showBottomBorder = isVerboseMode || isShell || isConfirming;
 
