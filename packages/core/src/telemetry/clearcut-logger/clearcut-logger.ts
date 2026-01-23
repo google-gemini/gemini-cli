@@ -511,6 +511,9 @@ export class ClearcutLogger {
   }
 
   async logStartSessionEvent(event: StartSessionEvent): Promise<void> {
+    if (!event) {
+      return;
+    }
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MODEL,

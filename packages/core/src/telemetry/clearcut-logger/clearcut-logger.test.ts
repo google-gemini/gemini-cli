@@ -1281,4 +1281,14 @@ describe('ClearcutLogger', () => {
       ]);
     });
   });
+
+  describe('logStartSessionEvent', () => {
+    it('should not throw if event is undefined', async () => {
+      const { logger } = setup();
+      // @ts-expect-error - intentionally passing undefined to reproduce the issue
+      await expect(
+        logger?.logStartSessionEvent(undefined),
+      ).resolves.not.toThrow();
+    });
+  });
 });
