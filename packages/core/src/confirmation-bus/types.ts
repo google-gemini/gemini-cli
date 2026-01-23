@@ -177,6 +177,8 @@ export interface AskUserResponse {
   type: MessageBusType.ASK_USER_RESPONSE;
   correlationId: string;
   answers: { [questionIndex: string]: string };
+  /** When true, indicates the user cancelled the dialog without submitting answers */
+  cancelled?: boolean;
 }
 
 export type Message =

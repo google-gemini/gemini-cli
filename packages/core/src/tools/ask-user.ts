@@ -148,6 +148,15 @@ export class AskUserInvocation extends BaseToolInvocation<
         if (response.correlationId === correlationId) {
           cleanup();
 
+          // Handle user cancellation
+          if (response.cancelled) {
+            resolve({
+              llmContent: 'User dismissed ask user dialog without answering.',
+              returnDisplay: 'User dismissed dialog',
+            });
+            return;
+          }
+
           // Build formatted key-value display
           const formattedAnswers = Object.entries(response.answers)
             .map(([index, answer]) => {
@@ -157,7 +166,7 @@ export class AskUserInvocation extends BaseToolInvocation<
             })
             .join('\n');
 
-          const returnDisplay = `User answered:\n${formattedAnswers}`;
+          const returnDisplay = `**User answered:**\n${formattedAnswers}`;
 
           resolve({
             llmContent: JSON.stringify({ answers: response.answers }),
