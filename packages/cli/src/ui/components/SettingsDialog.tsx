@@ -75,12 +75,18 @@ interface SettingsDialogProps {
 const MAX_ITEMS_TO_SHOW = 8;
 
 const CATEGORY_ORDER = [
-  'APPLICATION',
-  'INTELLIGENCE & MODEL',
-  'INTERFACE & APPEARANCE',
-  'EDITOR & INPUT',
-  'FILE SYSTEM & CONTEXT',
-  'SYSTEM',
+  'General',
+  'UI',
+  'IDE',
+  'Model',
+  'Context',
+  'Tools',
+  'Security',
+  'Privacy',
+  'Experimental',
+  'Advanced',
+  'Extensions',
+  'MCP',
 ];
 
 type SettingsDialogItem =

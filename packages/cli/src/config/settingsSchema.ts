@@ -165,7 +165,7 @@ const SETTINGS_SCHEMA = {
       previewFeatures: {
         type: 'boolean',
         label: 'Preview Features',
-        category: 'APPLICATION',
+        category: 'General',
         requiresRestart: false,
         default: false,
         description: 'Access early-access features and experimental models.',
@@ -183,7 +183,7 @@ const SETTINGS_SCHEMA = {
       vimMode: {
         type: 'boolean',
         label: 'Vim Mode',
-        category: 'EDITOR & INPUT',
+        category: 'General',
         requiresRestart: false,
         default: false,
         description: 'Use Vim-style keybindings for text input.',
@@ -192,7 +192,7 @@ const SETTINGS_SCHEMA = {
       autoUpdate: {
         type: 'boolean',
         label: 'Auto Updates',
-        category: 'APPLICATION',
+        category: 'General',
         requiresRestart: false,
         default: true,
         description: 'Automatically check for and install application updates.',
@@ -231,7 +231,7 @@ const SETTINGS_SCHEMA = {
       promptCompletion: {
         type: 'boolean',
         label: 'Prompt Completion',
-        category: 'EDITOR & INPUT',
+        category: 'General',
         requiresRestart: true,
         default: false,
         description: 'Show AI-powered completion suggestions while typing.',
@@ -250,7 +250,7 @@ const SETTINGS_SCHEMA = {
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Keystroke Logging',
-        category: 'EDITOR & INPUT',
+        category: 'General',
         requiresRestart: false,
         default: false,
         description: 'Enable debug logging of keystrokes to the console.',
@@ -267,7 +267,7 @@ const SETTINGS_SCHEMA = {
           enabled: {
             type: 'boolean',
             label: 'Session Cleanup',
-            category: 'SYSTEM',
+            category: 'General',
             requiresRestart: false,
             default: false,
             description: 'Automatically delete old or excess sessions.',
@@ -319,7 +319,7 @@ const SETTINGS_SCHEMA = {
       format: {
         type: 'enum',
         label: 'Output Format',
-        category: 'APPLICATION',
+        category: 'General',
         requiresRestart: false,
         default: 'text',
         description: 'The format of the CLI output. Can be `text` or `json`.',
@@ -367,7 +367,7 @@ const SETTINGS_SCHEMA = {
       windowTitle: {
         type: 'boolean',
         label: 'Window Title',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: true,
         default: true,
         description: 'Show the window title bar.',
@@ -376,7 +376,7 @@ const SETTINGS_SCHEMA = {
       windowTitleStatus: {
         type: 'boolean',
         label: 'Window Title Status',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: false,
         description:
@@ -386,7 +386,7 @@ const SETTINGS_SCHEMA = {
       homeDirectoryWarning: {
         type: 'boolean',
         label: 'Home Dir Warning',
-        category: 'FILE SYSTEM & CONTEXT',
+        category: 'UI',
         requiresRestart: true,
         default: true,
         description:
@@ -396,7 +396,7 @@ const SETTINGS_SCHEMA = {
       usageTips: {
         type: 'boolean',
         label: 'Usage Tips',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description: 'Show helpful usage tips in the UI.',
@@ -405,7 +405,7 @@ const SETTINGS_SCHEMA = {
       applicationBanner: {
         type: 'boolean',
         label: 'Application Banner',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description: 'Show the application startup banner.',
@@ -414,7 +414,7 @@ const SETTINGS_SCHEMA = {
       contextSummary: {
         type: 'boolean',
         label: 'Context Summary',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description:
@@ -433,7 +433,7 @@ const SETTINGS_SCHEMA = {
           workingDirectory: {
             type: 'boolean',
             label: 'Working Directory',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'UI',
             requiresRestart: false,
             default: true,
             description:
@@ -443,7 +443,7 @@ const SETTINGS_SCHEMA = {
           sandboxStatus: {
             type: 'boolean',
             label: 'Sandbox Status',
-            category: 'INTERFACE & APPEARANCE',
+            category: 'UI',
             requiresRestart: false,
             default: true,
             description: 'Show the sandbox status indicator in the footer.',
@@ -452,7 +452,7 @@ const SETTINGS_SCHEMA = {
           modelInfo: {
             type: 'boolean',
             label: 'Model Information',
-            category: 'INTERFACE & APPEARANCE',
+            category: 'UI',
             requiresRestart: false,
             default: true,
             description: 'Show the model name and context usage in the footer.',
@@ -461,7 +461,7 @@ const SETTINGS_SCHEMA = {
           contextPercentage: {
             type: 'boolean',
             label: 'Context Usage Percentage',
-            category: 'INTERFACE & APPEARANCE',
+            category: 'UI',
             requiresRestart: false,
             default: false,
             description: 'Show the context window remaining percentage.',
@@ -472,7 +472,7 @@ const SETTINGS_SCHEMA = {
       footerEnabled: {
         type: 'boolean',
         label: 'Footer',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description: 'Show the footer in the UI.',
@@ -481,7 +481,7 @@ const SETTINGS_SCHEMA = {
       showMemoryUsage: {
         type: 'boolean',
         label: 'Memory Usage',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: false,
         description: 'Display memory usage information in the UI.',
@@ -490,7 +490,7 @@ const SETTINGS_SCHEMA = {
       showLineNumbers: {
         type: 'boolean',
         label: 'Line Numbers',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description: 'Show line numbers in the chat window.',
@@ -499,7 +499,7 @@ const SETTINGS_SCHEMA = {
       showCitations: {
         type: 'boolean',
         label: 'Citation Display',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: false,
         description: 'Show citations for generated text in the chat.',
@@ -508,7 +508,7 @@ const SETTINGS_SCHEMA = {
       showModelInfoInChat: {
         type: 'boolean',
         label: 'Chat Model Info',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: false,
         description: 'Show the model name in the chat for each model turn.',
@@ -517,7 +517,7 @@ const SETTINGS_SCHEMA = {
       useFullWidth: {
         type: 'boolean',
         label: 'Full Width Output',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: true,
         description: 'Use the entire width of the terminal for output.',
@@ -526,7 +526,7 @@ const SETTINGS_SCHEMA = {
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Alternate Screen Buffer',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: true,
         default: false,
         description:
@@ -536,7 +536,7 @@ const SETTINGS_SCHEMA = {
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: true,
         default: true,
         description:
@@ -546,7 +546,7 @@ const SETTINGS_SCHEMA = {
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
-        category: 'INTERFACE & APPEARANCE',
+        category: 'UI',
         requiresRestart: false,
         default: [] as string[],
         description: oneLine`
@@ -568,7 +568,7 @@ const SETTINGS_SCHEMA = {
           loadingPhrases: {
             type: 'boolean',
             label: 'Loading Phrases',
-            category: 'INTERFACE & APPEARANCE',
+            category: 'UI',
             requiresRestart: true,
             default: true,
             description:
@@ -578,7 +578,7 @@ const SETTINGS_SCHEMA = {
           screenReader: {
             type: 'boolean',
             label: 'Screen Reader Mode',
-            category: 'EDITOR & INPUT',
+            category: 'UI', // Reverted? Usually 'UI' or 'Editor'. But it's under ui.accessibility. So 'UI'.
             requiresRestart: true,
             default: false,
             description:
@@ -602,7 +602,7 @@ const SETTINGS_SCHEMA = {
       enabled: {
         type: 'boolean',
         label: 'IDE Mode',
-        category: 'APPLICATION',
+        category: 'IDE',
         requiresRestart: true,
         default: false,
         description: 'Enable IDE integration mode.',
@@ -673,7 +673,7 @@ const SETTINGS_SCHEMA = {
       maxSessionTurns: {
         type: 'number',
         label: 'Max Session Turns',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Model',
         requiresRestart: false,
         default: -1,
         description:
@@ -704,7 +704,7 @@ const SETTINGS_SCHEMA = {
       compressionThreshold: {
         type: 'number',
         label: 'Compression Threshold',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Model',
         requiresRestart: true,
         default: 0.5 as number,
         description:
@@ -714,7 +714,7 @@ const SETTINGS_SCHEMA = {
       nextSpeakerCheck: {
         type: 'boolean',
         label: 'Next Speaker Check',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Model',
         requiresRestart: false,
         default: false,
         description: 'Enforce alternating speakers in chat history.',
@@ -807,7 +807,7 @@ const SETTINGS_SCHEMA = {
       discoveryMaxDirs: {
         type: 'number',
         label: 'Memory Discovery Max Dirs',
-        category: 'FILE SYSTEM & CONTEXT',
+        category: 'Context',
         requiresRestart: false,
         default: 200,
         description: 'Maximum number of directories to search for memory.',
@@ -830,7 +830,7 @@ const SETTINGS_SCHEMA = {
       includeDirectoryMemory: {
         type: 'boolean',
         label: 'Directory Memory Scan',
-        category: 'FILE SYSTEM & CONTEXT',
+        category: 'Context',
         requiresRestart: false,
         default: false,
         description: oneLine`
@@ -850,7 +850,7 @@ const SETTINGS_SCHEMA = {
           respectGitIgnore: {
             type: 'boolean',
             label: 'Ignore Rules (.gitignore)',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'Context',
             requiresRestart: true,
             default: true,
             description: 'Respect .gitignore files when searching.',
@@ -859,7 +859,7 @@ const SETTINGS_SCHEMA = {
           respectGeminiIgnore: {
             type: 'boolean',
             label: 'Ignore Rules (.geminiignore)',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'Context',
             requiresRestart: true,
             default: true,
             description: 'Respect .geminiignore files when searching.',
@@ -868,7 +868,7 @@ const SETTINGS_SCHEMA = {
           recursiveFileSearch: {
             type: 'boolean',
             label: 'Recursive File Search',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'Context',
             requiresRestart: true,
             default: true,
             description: oneLine`
@@ -879,7 +879,7 @@ const SETTINGS_SCHEMA = {
           fuzzySearch: {
             type: 'boolean',
             label: 'Fuzzy Search',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'Context',
             requiresRestart: true,
             default: true,
             description: 'Enable fuzzy search when searching for files.',
@@ -924,7 +924,7 @@ const SETTINGS_SCHEMA = {
           interactiveShell: {
             type: 'boolean',
             label: 'Interactive Shell',
-            category: 'EDITOR & INPUT',
+            category: 'Tools',
             requiresRestart: true,
             default: true,
             description:
@@ -944,7 +944,7 @@ const SETTINGS_SCHEMA = {
           showColor: {
             type: 'boolean',
             label: 'Output Colors',
-            category: 'INTERFACE & APPEARANCE',
+            category: 'Tools',
             requiresRestart: false,
             default: false,
             description: 'Show color in shell output.',
@@ -975,7 +975,7 @@ const SETTINGS_SCHEMA = {
       autoAccept: {
         type: 'boolean',
         label: 'Auto Accept Tools',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Tools',
         requiresRestart: false,
         default: false,
         description: oneLine`
@@ -1045,7 +1045,7 @@ const SETTINGS_SCHEMA = {
       useRipgrep: {
         type: 'boolean',
         label: 'Ripgrep Integration',
-        category: 'FILE SYSTEM & CONTEXT',
+        category: 'Tools',
         requiresRestart: false,
         default: true,
         description:
@@ -1055,7 +1055,7 @@ const SETTINGS_SCHEMA = {
       toolOutputTruncation: {
         type: 'boolean',
         label: 'Tool Output Truncation',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Tools',
         requiresRestart: true,
         default: true,
         description:
@@ -1065,7 +1065,7 @@ const SETTINGS_SCHEMA = {
       truncateToolOutputThreshold: {
         type: 'number',
         label: 'Tool Output Truncation Threshold',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Tools',
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
         description:
@@ -1075,7 +1075,7 @@ const SETTINGS_SCHEMA = {
       truncateToolOutputLines: {
         type: 'number',
         label: 'Tool Output Truncation Lines',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Tools',
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
         description: 'The number of lines to keep when truncating tool output.',
@@ -1155,7 +1155,7 @@ const SETTINGS_SCHEMA = {
       yoloMode: {
         type: 'boolean',
         label: 'YOLO Mode',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Security',
         requiresRestart: true,
         default: true,
         description: 'Allow the use of YOLO mode for automatic tool approval.',
@@ -1164,7 +1164,7 @@ const SETTINGS_SCHEMA = {
       permanentToolApproval: {
         type: 'boolean',
         label: 'Permanent Tool Approval',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Security',
         requiresRestart: false,
         default: false,
         description:
@@ -1174,7 +1174,7 @@ const SETTINGS_SCHEMA = {
       blockGitExtensions: {
         type: 'boolean',
         label: 'Git Extensions',
-        category: 'SYSTEM',
+        category: 'Security',
         requiresRestart: true,
         default: false,
         description: 'Blocks installing and loading extensions from Git.',
@@ -1192,7 +1192,7 @@ const SETTINGS_SCHEMA = {
           enabled: {
             type: 'boolean',
             label: 'Folder Trust',
-            category: 'FILE SYSTEM & CONTEXT',
+            category: 'Security',
             requiresRestart: true,
             default: false,
             description:
@@ -1234,7 +1234,7 @@ const SETTINGS_SCHEMA = {
           enabled: {
             type: 'boolean',
             label: 'Environment Variable Redaction',
-            category: 'SYSTEM',
+            category: 'Security',
             requiresRestart: true,
             default: false,
             description:
@@ -1389,7 +1389,7 @@ const SETTINGS_SCHEMA = {
       skills: {
         type: 'boolean',
         label: 'Agent Skills',
-        category: 'INTELLIGENCE & MODEL',
+        category: 'Experimental',
         requiresRestart: true,
         default: false,
         description: 'Enable Agent Skills (experimental).',
@@ -1407,7 +1407,7 @@ const SETTINGS_SCHEMA = {
           enabled: {
             type: 'boolean',
             label: 'Codebase Investigator',
-            category: 'INTELLIGENCE & MODEL',
+            category: 'Experimental',
             requiresRestart: true,
             default: true,
             description: 'Allow specialized codebase analysis agent.',
@@ -1416,7 +1416,7 @@ const SETTINGS_SCHEMA = {
           maxNumTurns: {
             type: 'number',
             label: 'Codebase Investigator Max Turns',
-            category: 'INTELLIGENCE & MODEL',
+            category: 'Experimental',
             requiresRestart: true,
             default: 10,
             description:
@@ -1458,7 +1458,7 @@ const SETTINGS_SCHEMA = {
       useOSC52Paste: {
         type: 'boolean',
         label: 'OSC 52 Paste',
-        category: 'EDITOR & INPUT',
+        category: 'Experimental',
         requiresRestart: false,
         default: false,
         description:
@@ -1477,7 +1477,7 @@ const SETTINGS_SCHEMA = {
           enabled: {
             type: 'boolean',
             label: 'CLI Help Agent',
-            category: 'INTELLIGENCE & MODEL',
+            category: 'Experimental',
             requiresRestart: true,
             default: true,
             description: 'Allow specialized help and guidance agent.',
@@ -1584,7 +1584,7 @@ const SETTINGS_SCHEMA = {
       notifications: {
         type: 'boolean',
         label: 'Hook Notifications',
-        category: 'SYSTEM',
+        category: 'Advanced',
         requiresRestart: false,
         default: true,
         description: 'Show visual indicators when hooks are executing.',
