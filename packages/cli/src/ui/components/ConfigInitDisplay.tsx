@@ -39,12 +39,18 @@ export const ConfigInitDisplay = ({
         const displayedServers = connecting.slice(0, maxDisplay).join(', ');
         const remaining = connecting.length - maxDisplay;
         const suffix = remaining > 0 ? `, +${remaining} more` : '';
+        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`;
         setMessage(
-          `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`,
+          initialMessage && initialMessage !== 'Initializing...'
+            ? `${initialMessage} (${mcpMessage})`
+            : mcpMessage,
         );
       } else {
+        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size})`;
         setMessage(
-          `Connecting to MCP servers... (${connected}/${clients.size})`,
+          initialMessage && initialMessage !== 'Initializing...'
+            ? `${initialMessage} (${mcpMessage})`
+            : mcpMessage,
         );
       }
     };

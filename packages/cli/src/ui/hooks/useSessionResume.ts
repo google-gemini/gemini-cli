@@ -79,7 +79,6 @@ export function useSessionResume({
           'Failed to resume session. Please try again.',
           error,
         );
-        throw error; // Re-throw to let caller know
       } finally {
         setIsResuming(false);
       }
@@ -101,15 +100,11 @@ export function useSessionResume({
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
-      loadHistoryForResume(
+      void loadHistoryForResume(
         historyData.uiHistory,
         historyData.clientHistory,
         resumedSessionData,
-      ).catch((_error) => {
-        // Error is already handled/emitted in loadHistoryForResume,
-        // but we catch here to prevent unhandled promise rejection in the effect.
-        // We can optionally log additional context here if needed.
-      });
+      );
     }
   }, [
     resumedSessionData,
