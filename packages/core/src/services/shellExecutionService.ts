@@ -281,6 +281,7 @@ export class ShellExecutionService {
         let stderrTruncated = false;
         let stdoutToEmit = '';
         let stderrToEmit = '';
+        let pendingRaw = '';
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -300,20 +301,56 @@ export class ShellExecutionService {
             }MB.]`;
             combinedOutput += truncationMessage;
           }
-          return stripAnsi(combinedOutput).trim();
+          // Ensure no raw ESC/CSI remains even if malformed/partial at the end of output
+          return stripAnsi(combinedOutput)
+            .replaceAll('\u001b', '')
+            .replaceAll('\u009b', '')
+            .trim();
         };
 
-        const emit = () => {
+        const emit = (isFinal = false) => {
           emitTimeout = null;
           if (!isStreamingRawContent) {
             return;
           }
-          const combined = stdoutToEmit + stderrToEmit;
+          let combined = pendingRaw + stdoutToEmit + stderrToEmit;
           stdoutToEmit = '';
           stderrToEmit = '';
+          pendingRaw = '';
+
+          if (!combined) {
+            return;
+          }
+
+          if (!isFinal) {
+            // Find the last ESC or 8-bit CSI that might start a partial sequence
+            const lastEsc = Math.max(
+              combined.lastIndexOf('\u001b'),
+              combined.lastIndexOf('\u009b'),
+            );
+
+            if (lastEsc !== -1) {
+              const tail = combined.slice(lastEsc);
+              // If stripAnsi leaves the ESC/CSI at the start of the tail, it's partial.
+              // We hold onto it to be safe, unless it's too long (probably not a sequence).
+              if (
+                stripAnsi(tail).includes(combined[lastEsc]) &&
+                tail.length < 128
+              ) {
+                pendingRaw = tail;
+                combined = combined.slice(0, lastEsc);
+              }
+            }
+          }
 
           if (combined) {
-            const stripped = stripAnsi(combined);
+            let stripped = stripAnsi(combined);
+            if (isFinal) {
+              // At exit, ensure no raw ESC/CSI remains even if malformed/partial
+              stripped = stripped
+                .replaceAll('\u001b', '')
+                .replaceAll('\u009b', '');
+            }
             if (stripped) {
               onOutputEvent({
                 type: 'data',
@@ -328,7 +365,7 @@ export class ShellExecutionService {
           if (emitTimeout) {
             return;
           }
-          emitTimeout = setTimeout(emit, 100);
+          emitTimeout = setTimeout(() => emit(), 100);
         };
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
@@ -350,7 +387,9 @@ export class ShellExecutionService {
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
+              emit();
               isStreamingRawContent = false;
+              onOutputEvent({ type: 'binary_detected' });
             }
           }
 
@@ -394,31 +433,9 @@ export class ShellExecutionService {
           }
           const { finalBuffer } = cleanup();
 
-          // Emit any remaining data
-          if (stdoutToEmit || stderrToEmit) {
-            const combined = stdoutToEmit + stderrToEmit;
-            const stripped = stripAnsi(combined);
-            if (stripped) {
-              onOutputEvent({
-                type: 'data',
-                chunk: stripped,
-                incremental: true,
-              });
-            }
-          }
+          emit(true);
 
           const finalStrippedOutput = composeOutput();
-
-          if (isStreamingRawContent) {
-            // No need to emit finalStrippedOutput here as it would duplicate
-            // everything we've already streamed incrementally.
-            // But we should emit a final event if there was no output at all
-            // OR if we want to ensure the consumer has the exact final state.
-            // Actually, if we've been streaming incremental chunks, the consumer's
-            // accumulated state should be close to finalStrippedOutput.
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
-          }
 
           resolve({
             rawOutput: finalBuffer,
@@ -692,7 +709,6 @@ export class ShellExecutionService {
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
-
                 if (isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   if (decodedChunk.length === 0) {
