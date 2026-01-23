@@ -656,7 +656,6 @@ their corresponding top-level category object in your `settings.json` file.
     read-only mode.
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
-
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
@@ -1327,11 +1326,13 @@ for that specific session.
     - `default`: Prompt for approval on each tool call (default behavior)
     - `auto_edit`: Automatically approve edit tools (replace, write_file) while
       prompting for others
+    - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
     - `plan`: Read-only mode for tool calls (requires experimental planning to
       be enabled).
       > **Note:** This mode is currently under development and not yet fully
       > functional.
-  - Cannot be used together with `--yolo`.
+  - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
+    `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
 - **`--allowed-tools <tool1,tool2,...>`**:
   - A comma-separated list of tool names that will bypass the confirmation
@@ -1495,7 +1496,7 @@ Sandboxing is disabled by default, but you can enable it in a few ways:
 
 - Using `--sandbox` or `-s` flag.
 - Setting `GEMINI_SANDBOX` environment variable.
-- Sandbox is enabled when using `--yolo` by default.
+- Sandbox is enabled when using `--yolo` or `--approval-mode=yolo` by default.
 
 By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
 
