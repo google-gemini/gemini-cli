@@ -446,7 +446,7 @@ export class HookSystem {
       await this.hookEventHandler.fireNotificationEvent(
         NotificationType.ToolPermission,
         message,
-        serializedDetails as unknown as Record<string, unknown>,
+        serializedDetails,
       );
     } catch (error) {
       debugLogger.debug(
