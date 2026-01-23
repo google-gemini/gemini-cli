@@ -405,23 +405,17 @@ export class AgentRegistry {
     context += `Sub-agents are specialized expert agents that you can use to assist you in
       the completion of all or part of a task.
 
-      Each sub-agent is available as a specific tool.
+      Each sub-agent is available as a tool of the same name.
 
-      If a subagent relevant to your task is in the list below,
-      you MUST always delegate that part of the task to it by
-      using its corresponding tool.
+      You MUST always delegate tasks to the subagent with the
+      relevant expertise, if one is available.
 
-      For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the 'test-fixer' tool.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the 'license-agent' tool.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the 'codebase-investigator' tool.
-      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+      The following tools can be used to start sub-agents:\n\n`;
 
-      The following are the available sub-agents:\n\n`;
-
-    for (const [name, def] of this.agents) {
-      context += `- **${name}**: ${def.description}\n`;
+    for (const [name] of this.agents) {
+      context += `- ${name}\n`;
     }
+
     return context;
   }
 }
