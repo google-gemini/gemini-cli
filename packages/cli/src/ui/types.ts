@@ -288,6 +288,14 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
   >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
+  >;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
