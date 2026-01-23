@@ -203,6 +203,9 @@ describe('ExtensionManager theme loading', () => {
       }),
       getHookSystem: () => undefined,
       getProxy: () => undefined,
+      getAgentRegistry: () => ({
+        reload: vi.fn().mockResolvedValue(undefined),
+      }),
     } as unknown as Config;
 
     await extensionManager.start(mockConfig);
