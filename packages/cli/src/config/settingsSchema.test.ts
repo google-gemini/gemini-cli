@@ -387,7 +387,7 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
       expect(setting.description).toBe(
