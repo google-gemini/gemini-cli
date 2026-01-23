@@ -8,7 +8,7 @@ import stripAnsi from 'strip-ansi';
 import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
-import { LruCache } from '@google/gemini-cli-core';
+import { LRUCache } from 'mnemonist';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
 
 /**
@@ -32,7 +32,7 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
 
 // Cache for code points
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
-const codePointsCache = new LruCache<string, string[]>(
+const codePointsCache = new LRUCache<string, string[]>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 
@@ -123,7 +123,28 @@ export function stripUnsafeCharacters(str: string): string {
     .join('');
 }
 
-const stringWidthCache = new LruCache<string, number>(
+/**
+ * Sanitize a string for display in list-like UI components (e.g. Help, Suggestions).
+ * Removes ANSI codes, collapses whitespace characters into a single space, and optionally truncates.
+ */
+export function sanitizeForListDisplay(
+  str: string,
+  maxLength?: number,
+): string {
+  if (!str) {
+    return '';
+  }
+
+  let sanitized = stripAnsi(str).replace(/\s+/g, ' ');
+
+  if (maxLength && sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  }
+
+  return sanitized;
+}
+
+const stringWidthCache = new LRUCache<string, number>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
 

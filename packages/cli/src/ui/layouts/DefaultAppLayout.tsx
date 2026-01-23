@@ -56,7 +56,8 @@ export const DefaultAppLayout: React.FC = () => {
     <Box
       flexDirection="column"
       width={width}
-      height={isAlternateBuffer ? terminalHeight - 1 : undefined}
+      height={isAlternateBuffer ? terminalHeight : undefined}
+      paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
       overflow="hidden"
