@@ -426,7 +426,7 @@ export const ToolConfirmationMessage: React.FC<
         <MaxSizedBox
           maxHeight={availableBodyContentHeight()}
           maxWidth={terminalWidth}
-          overflowDirection="bottom"
+          overflowDirection="top"
         >
           {bodyContent}
         </MaxSizedBox>

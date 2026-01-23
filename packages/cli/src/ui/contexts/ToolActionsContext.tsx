@@ -11,7 +11,6 @@ import {
   useCallback,
   useState,
   useEffect,
-  useRef,
 } from 'react';
 import {
   IdeClient,
@@ -54,13 +53,6 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 ) => {
   const { children, config, toolCalls } = props;
 
-  // Use a ref for toolCalls so the confirm callback can always access the latest
-  // list without needing to be recreated (which would cause children to re-render).
-  const toolCallsRef = useRef(toolCalls);
-  useEffect(() => {
-    toolCallsRef.current = toolCalls;
-  }, [toolCalls]);
-
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   useEffect(() => {
@@ -85,7 +77,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
       outcome: ToolConfirmationOutcome,
       payload?: ToolConfirmationPayload,
     ) => {
-      const tool = toolCallsRef.current.find((t) => t.callId === callId);
+      const tool = toolCalls.find((t) => t.callId === callId);
       if (!tool) {
         debugLogger.warn(`ToolActions: Tool ${callId} not found`);
         return;
@@ -133,7 +125,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 
       debugLogger.warn(`ToolActions: No confirmation mechanism for ${callId}`);
     },
-    [config, ideClient],
+    [config, ideClient, toolCalls],
   );
 
   const cancel = useCallback(

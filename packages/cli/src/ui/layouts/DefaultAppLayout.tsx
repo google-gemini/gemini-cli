@@ -24,7 +24,6 @@ export const DefaultAppLayout: React.FC = () => {
   const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
 
-  // Phase 4: Global Queue Logic
   // If the event-driven scheduler is enabled AND we have a tool waiting,
   // we switch the footer mode to "Queue".
   const confirmingTool = useConfirmingTool();
@@ -69,7 +68,7 @@ export const DefaultAppLayout: React.FC = () => {
           />
         ) : (
           <>
-            {showConfirmationQueue && (
+            {showConfirmationQueue && confirmingTool && (
               <ToolConfirmationQueue confirmingTool={confirmingTool} />
             )}
             <Composer isFocused={!showConfirmationQueue} />

@@ -4,25 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, type Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock, beforeEach } from 'vitest';
 import type React from 'react';
-import { render } from '../test-utils/render.js';
+import { renderWithProviders } from '../test-utils/render.js';
 import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
-import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import { App } from './App.js';
-import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
-import {
-  type HistoryItemToolGroup,
-  StreamingState,
-  ToolCallStatus,
-} from './types.js';
-import { ConfigContext } from './contexts/ConfigContext.js';
-import { AppContext } from './contexts/AppContext.js';
-import { SettingsContext } from './contexts/SettingsContext.js';
-import { LoadedSettings, type SettingsFile } from '../config/settings.js';
-
-import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
-import { KeypressProvider } from './contexts/KeypressContext.js';
+import { type UIState } from './contexts/UIStateContext.js';
+import { StreamingState, ToolCallStatus } from './types.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -61,6 +51,10 @@ vi.mock('./components/Footer.js', () => ({
 }));
 
 describe('App', () => {
+  beforeEach(() => {
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
+  });
+
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
     quittingMessages: null,
@@ -87,58 +81,11 @@ describe('App', () => {
     },
   };
 
-  const mockConfig = makeFakeConfig();
-
-  const mockSettingsFile: SettingsFile = {
-    settings: {},
-    originalSettings: {},
-    path: '/mock/path',
-  };
-
-  const mockLoadedSettings = new LoadedSettings(
-    mockSettingsFile,
-    mockSettingsFile,
-    mockSettingsFile,
-    mockSettingsFile,
-    true,
-    [],
-  );
-
-  const mockAppState = {
-    version: '1.0.0',
-    startupWarnings: [],
-  };
-
-  const renderWithProviders = (
-    ui: React.ReactElement,
-    state: Partial<UIState>,
-    config: Config = mockConfig,
-  ) => {
-    const allToolCalls = (state.pendingHistoryItems || [])
-      .filter(
-        (item): item is HistoryItemToolGroup => item.type === 'tool_group',
-      )
-      .flatMap((item) => item.tools);
-
-    return render(
-      <AppContext.Provider value={mockAppState}>
-        <ConfigContext.Provider value={config}>
-          <SettingsContext.Provider value={mockLoadedSettings}>
-            <UIStateContext.Provider value={state as UIState}>
-              <KeypressProvider>
-                <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-                  {ui}
-                </ToolActionsProvider>
-              </KeypressProvider>
-            </UIStateContext.Provider>
-          </SettingsContext.Provider>
-        </ConfigContext.Provider>
-      </AppContext.Provider>,
-    );
-  };
-
   it('should render main content and composer when not quitting', () => {
-    const { lastFrame } = renderWithProviders(<App />, mockUIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: mockUIState,
+      useAlternateBuffer: false,
+    });
 
     expect(lastFrame()).toContain('MainContent');
     expect(lastFrame()).toContain('Notifications');
@@ -151,7 +98,10 @@ describe('App', () => {
       quittingMessages: [{ id: 1, type: 'user', text: 'test' }],
     } as UIState;
 
-    const { lastFrame } = renderWithProviders(<App />, quittingUIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: quittingUIState,
+      useAlternateBuffer: false,
+    });
 
     expect(lastFrame()).toContain('Quitting...');
   });
@@ -164,15 +114,13 @@ describe('App', () => {
       pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
     } as UIState;
 
-    mockLoadedSettings.merged.ui.useAlternateBuffer = true;
-
-    const { lastFrame } = renderWithProviders(<App />, quittingUIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: quittingUIState,
+      useAlternateBuffer: true,
+    });
 
     expect(lastFrame()).toContain('HistoryItemDisplay');
     expect(lastFrame()).toContain('Quitting...');
-
-    // Reset settings
-    mockLoadedSettings.merged.ui.useAlternateBuffer = false;
   });
 
   it('should render dialog manager when dialogs are visible', () => {
@@ -181,7 +129,9 @@ describe('App', () => {
       dialogsVisible: true,
     } as UIState;
 
-    const { lastFrame } = renderWithProviders(<App />, dialogUIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: dialogUIState,
+    });
 
     expect(lastFrame()).toContain('MainContent');
     expect(lastFrame()).toContain('Notifications');
@@ -200,7 +150,9 @@ describe('App', () => {
         [stateKey]: true,
       } as UIState;
 
-      const { lastFrame } = renderWithProviders(<App />, uiState);
+      const { lastFrame } = renderWithProviders(<App />, {
+        uiState,
+      });
 
       expect(lastFrame()).toContain(`Press Ctrl+${key} again to exit.`);
     },
@@ -209,7 +161,9 @@ describe('App', () => {
   it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
 
-    const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: mockUIState,
+    });
 
     expect(lastFrame()).toContain(`Notifications
 Footer
@@ -220,7 +174,9 @@ Composer`);
   it('should render DefaultAppLayout when screen reader is not enabled', () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
 
-    const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: mockUIState,
+    });
 
     expect(lastFrame()).toContain(`MainContent
 Notifications
@@ -254,17 +210,16 @@ Composer`);
     } as UIState;
 
     const configWithExperiment = {
-      ...mockConfig,
+      ...makeFakeConfig(),
       isEventDrivenSchedulerEnabled: () => true,
       isTrustedFolder: () => true,
       getIdeMode: () => false,
     } as unknown as Config;
 
-    const { lastFrame } = renderWithProviders(
-      <App />,
-      stateWithConfirmingTool,
-      configWithExperiment,
-    );
+    const { lastFrame } = renderWithProviders(<App />, {
+      uiState: stateWithConfirmingTool,
+      config: configWithExperiment,
+    });
 
     expect(lastFrame()).toContain('MainContent');
     expect(lastFrame()).toContain('Notifications');
@@ -277,19 +232,17 @@ Composer`);
   describe('Snapshots', () => {
     it('renders default layout correctly', () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
-      const { lastFrame } = renderWithProviders(
-        <App />,
-        mockUIState as UIState,
-      );
+      const { lastFrame } = renderWithProviders(<App />, {
+        uiState: mockUIState,
+      });
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders screen reader layout correctly', () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
-      const { lastFrame } = renderWithProviders(
-        <App />,
-        mockUIState as UIState,
-      );
+      const { lastFrame } = renderWithProviders(<App />, {
+        uiState: mockUIState,
+      });
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -298,7 +251,9 @@ Composer`);
         ...mockUIState,
         dialogsVisible: true,
       } as UIState;
-      const { lastFrame } = renderWithProviders(<App />, dialogUIState);
+      const { lastFrame } = renderWithProviders(<App />, {
+        uiState: dialogUIState,
+      });
       expect(lastFrame()).toMatchSnapshot();
     });
   });

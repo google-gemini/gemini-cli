@@ -13,17 +13,21 @@ import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay
 import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
-import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
-vi.mock('../contexts/AppContext.js', () => ({
-  useAppContext: () => ({
-    version: '0.10.0',
-  }),
-}));
+vi.mock('../contexts/AppContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/AppContext.js')>();
+  return {
+    ...actual,
+    useAppContext: () => ({
+      version: '0.10.0',
+    }),
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -85,22 +89,6 @@ const mockPendingHistoryItems: HistoryItemWithoutId[] = [
   },
 ];
 
-const mockConfig = {
-  getScreenReader: () => false,
-  getEnableInteractiveShell: () => false,
-  getModel: () => 'gemini-pro',
-  getTargetDir: () => '/tmp',
-  getDebugMode: () => false,
-  getIdeMode: () => false,
-  getGeminiMdFileCount: () => 0,
-  getExperiments: () => ({
-    flags: {},
-    experimentIds: [],
-  }),
-  getPreviewFeatures: () => false,
-  isEventDrivenSchedulerEnabled: () => false,
-} as unknown as Config;
-
 describe('AlternateBufferQuittingDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,7 +116,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: mockPendingHistoryItems,
         },
-        config: mockConfig,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
@@ -144,7 +131,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
     expect(lastFrame()).toMatchSnapshot('empty');
@@ -160,7 +146,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
@@ -176,7 +161,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: mockPendingHistoryItems,
         },
-        config: mockConfig,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
@@ -196,7 +180,6 @@ describe('AlternateBufferQuittingDisplay', () => {
           history,
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');

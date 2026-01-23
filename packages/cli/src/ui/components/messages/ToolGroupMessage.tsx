@@ -40,7 +40,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const isEventDriven = config.isEventDrivenSchedulerEnabled();
 
-  // Phase 4: Late Projection
   // If Event-Driven Scheduler is enabled, we HIDE tools that are still in
   // pre-execution states (Confirming, Pending) from the History log.
   // They live in the Global Queue or wait for their turn.

@@ -85,6 +85,5 @@ describe('ToolConfirmationQueue', () => {
     );
 
     expect(lastFrame()).toBe('');
-    expect(lastFrame()).toMatchSnapshot();
   });
 });

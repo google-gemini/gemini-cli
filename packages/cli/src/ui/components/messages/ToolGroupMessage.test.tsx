@@ -35,12 +35,24 @@ describe('<ToolGroupMessage />', () => {
     isFocused: true,
   };
 
+  const baseMockConfig = {
+    getModel: () => 'gemini-pro',
+    getTargetDir: () => '/test',
+    getDebugMode: () => false,
+    isTrustedFolder: () => true,
+    getIdeMode: () => false,
+    getEnableInteractiveShell: () => true,
+    getPreviewFeatures: () => false,
+    isEventDrivenSchedulerEnabled: () => true,
+  } as unknown as Config;
+
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
       const toolCalls = [createToolCall()];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -71,9 +83,15 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Error,
         }),
       ];
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -98,9 +116,15 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -122,6 +146,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -152,9 +177,15 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Pending,
         }),
       ];
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -187,6 +218,7 @@ describe('<ToolGroupMessage />', () => {
           availableTerminalHeight={10}
         />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -205,6 +237,7 @@ describe('<ToolGroupMessage />', () => {
           isFocused={false}
         />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -229,6 +262,7 @@ describe('<ToolGroupMessage />', () => {
           terminalWidth={40}
         />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -242,6 +276,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={[]} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
           },
@@ -272,6 +307,7 @@ describe('<ToolGroupMessage />', () => {
           <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
         </Scrollable>,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -294,6 +330,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -327,6 +364,7 @@ describe('<ToolGroupMessage />', () => {
           <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
         </Scrollable>,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [
               { type: 'tool_group', tools: toolCalls1 },
@@ -343,9 +381,15 @@ describe('<ToolGroupMessage />', () => {
   describe('Border Color Logic', () => {
     it('uses yellow border when tools are pending', () => {
       const toolCalls = [createToolCall({ status: ToolCallStatus.Pending })];
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -366,6 +410,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -387,6 +432,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -420,6 +466,7 @@ describe('<ToolGroupMessage />', () => {
           availableTerminalHeight={20}
         />,
         {
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -456,9 +503,15 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -486,10 +539,16 @@ describe('<ToolGroupMessage />', () => {
       const settings = createMockSettings({
         security: { enablePermanentToolApproval: true },
       });
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
           settings,
+          config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -515,8 +574,14 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
 
+      const mockConfig = {
+        ...baseMockConfig,
+        isEventDrivenSchedulerEnabled: () => false,
+      } as unknown as Config;
+
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: mockConfig },
       );
       expect(lastFrame()).not.toContain('Allow for all future sessions');
       expect(lastFrame()).toMatchSnapshot();
@@ -524,7 +589,7 @@ describe('<ToolGroupMessage />', () => {
     });
   });
 
-  describe('Event-Driven Scheduler (Phase 4)', () => {
+  describe('Event-Driven Scheduler', () => {
     it('hides confirming tools when event-driven scheduler is enabled', () => {
       const toolCalls = [
         createToolCall({
@@ -540,9 +605,8 @@ describe('<ToolGroupMessage />', () => {
       ];
 
       const mockConfig = {
+        ...baseMockConfig,
         isEventDrivenSchedulerEnabled: () => true,
-        isTrustedFolder: () => true,
-        getIdeMode: () => false,
       } as unknown as Config;
 
       const { lastFrame, unmount } = renderWithProviders(
@@ -577,9 +641,8 @@ describe('<ToolGroupMessage />', () => {
       ];
 
       const mockConfig = {
+        ...baseMockConfig,
         isEventDrivenSchedulerEnabled: () => true,
-        isTrustedFolder: () => true,
-        getIdeMode: () => false,
       } as unknown as Config;
 
       const { lastFrame, unmount } = renderWithProviders(

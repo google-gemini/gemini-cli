@@ -63,6 +63,10 @@ describe('terminalSetup', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     process.env = { ...originalEnv };
+    delete process.env['TERM_PROGRAM'];
+    delete process.env['CURSOR_TRACE_ID'];
+    delete process.env['VSCODE_GIT_ASKPASS_MAIN'];
+    delete process.env['VSCODE_GIT_IPC_HANDLE'];
 
     // Default mocks
     mocks.homedir.mockReturnValue('/home/user');

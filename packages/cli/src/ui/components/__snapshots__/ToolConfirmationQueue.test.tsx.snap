@@ -16,5 +16,3 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
-
-exports[`ToolConfirmationQueue > returns null if tool has no confirmation details 1`] = `""`;
