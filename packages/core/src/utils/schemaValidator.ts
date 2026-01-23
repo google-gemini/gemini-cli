@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import AjvPkg from 'ajv';
+import AjvPkg, { type AnySchema } from 'ajv';
 import * as addFormats from 'ajv-formats';
 // Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,5 +46,17 @@ export class SchemaValidator {
       return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
     }
     return null;
+  }
+
+  /**
+   * Validates a JSON schema itself. Returns null if the schema is valid,
+   * otherwise returns a string describing the validation errors.
+   */
+  static validateSchema(schema: AnySchema | undefined): string | null {
+    if (!schema) {
+      return null;
+    }
+    const isValid = ajValidator.validateSchema(schema);
+    return isValid ? null : ajValidator.errorsText(ajValidator.errors);
   }
 }

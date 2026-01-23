@@ -13,22 +13,24 @@ import {
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('CodebaseInvestigatorAgent', () => {
+  const config = makeFakeConfig();
+  const agent = CodebaseInvestigatorAgent(config);
+
   it('should have the correct agent definition', () => {
-    expect(CodebaseInvestigatorAgent.name).toBe('codebase_investigator');
-    expect(CodebaseInvestigatorAgent.displayName).toBe(
-      'Codebase Investigator Agent',
-    );
-    expect(CodebaseInvestigatorAgent.description).toBeDefined();
-    expect(
-      CodebaseInvestigatorAgent.inputConfig.inputs['objective'].required,
-    ).toBe(true);
-    expect(CodebaseInvestigatorAgent.outputConfig?.outputName).toBe('report');
-    expect(CodebaseInvestigatorAgent.modelConfig?.model).toBe(
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(CodebaseInvestigatorAgent.toolConfig?.tools).toEqual([
+    expect(agent.name).toBe('codebase_investigator');
+    expect(agent.displayName).toBe('Codebase Investigator Agent');
+    expect(agent.description).toBeDefined();
+    const inputSchema =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      agent.inputConfig.inputSchema as any;
+    expect(inputSchema.properties['objective']).toBeDefined();
+    expect(inputSchema.required).toContain('objective');
+    expect(agent.outputConfig?.outputName).toBe('report');
+    expect(agent.modelConfig?.model).toBe(DEFAULT_GEMINI_MODEL);
+    expect(agent.toolConfig?.tools).toEqual([
       LS_TOOL_NAME,
       READ_FILE_TOOL_NAME,
       GLOB_TOOL_NAME,
@@ -42,7 +44,7 @@ describe('CodebaseInvestigatorAgent', () => {
       ExplorationTrace: ['trace'],
       RelevantLocations: [],
     };
-    const processed = CodebaseInvestigatorAgent.processOutput?.(report);
+    const processed = agent.processOutput?.(report);
     expect(processed).toBe(JSON.stringify(report, null, 2));
   });
 });

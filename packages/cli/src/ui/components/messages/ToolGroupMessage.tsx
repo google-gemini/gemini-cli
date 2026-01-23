@@ -13,9 +13,8 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
-import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
-import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { isShellTool, isThisShellFocused } from './ToolShared.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -37,21 +36,22 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
 }) => {
-  const isEmbeddedShellFocused =
-    embeddedShellFocused &&
-    toolCalls.some(
-      (t) =>
-        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
-    );
+  const isEmbeddedShellFocused = toolCalls.some((t) =>
+    isThisShellFocused(
+      t.name,
+      t.status,
+      t.ptyId,
+      activeShellPtyId,
+      embeddedShellFocused,
+    ),
+  );
 
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
 
   const config = useConfig();
-  const isShellCommand = toolCalls.some(
-    (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
-  );
+  const isShellCommand = toolCalls.some((t) => isShellTool(t.name));
   const borderColor =
     (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
@@ -105,10 +105,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
-        const isShellTool =
-          tool.name === SHELL_COMMAND_NAME ||
-          tool.name === SHELL_NAME ||
-          tool.name === SHELL_TOOL_NAME;
+        const isShellToolCall = isShellTool(tool.name);
 
         const commonProps = {
           ...tool,
@@ -131,7 +128,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={terminalWidth}
           >
-            {isShellTool ? (
+            {isShellToolCall ? (
               <ShellToolMessage
                 {...commonProps}
                 activeShellPtyId={activeShellPtyId}
@@ -157,6 +154,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 isConfirming &&
                 tool.confirmationDetails && (
                   <ToolConfirmationMessage
+                    callId={tool.callId}
                     confirmationDetails={tool.confirmationDetails}
                     config={config}
                     isFocused={isFocused}
