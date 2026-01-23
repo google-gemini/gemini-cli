@@ -612,19 +612,77 @@ export function SettingsDialog({
     [showRestartPrompt, onRestartRequest],
   );
 
-  // Calculate effective max items based on terminal height
-  const calculatedMaxItems = useMemo(() => {
-    if (!availableTerminalHeight) return MAX_ITEMS_TO_SHOW;
-    // Account for dialog chrome: title, search, scope selector, help text, borders
-    const chromeHeight = 20;
-    const itemHeight = 3; // Label + description + spacing
-    return Math.max(
-      3,
-      Math.floor((availableTerminalHeight - chromeHeight) / itemHeight),
-    );
-  }, [availableTerminalHeight]);
+  // Calculate effective max items and scope visibility based on terminal height
+  const { effectiveMaxItemsToShow, showScopeSelection } = useMemo(() => {
+    // Only show scope selector if we have a workspace
+    const hasWorkspace = settings.workspace.path !== undefined;
 
-  const effectiveMaxItemsToShow = Math.min(calculatedMaxItems, items.length);
+    if (!availableTerminalHeight) {
+      return {
+        effectiveMaxItemsToShow: Math.min(MAX_ITEMS_TO_SHOW, items.length),
+        showScopeSelection: hasWorkspace,
+      };
+    }
+
+    // Layout constants
+    const DIALOG_PADDING = 2; // Top and bottom borders
+    const SETTINGS_TITLE_HEIGHT = 1;
+    const SEARCH_BOX_HEIGHT = 3;
+    const SCROLL_ARROWS_HEIGHT = 2;
+    const SPACING_HEIGHT = 2;
+    const SCOPE_SELECTION_HEIGHT = 4;
+    const BOTTOM_HELP_TEXT_HEIGHT = 1;
+    const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
+    const ITEM_HEIGHT = 3; // Label + description + spacing
+
+    const currentAvailableHeight = availableTerminalHeight - DIALOG_PADDING;
+
+    const baseFixedHeight =
+      SETTINGS_TITLE_HEIGHT +
+      SEARCH_BOX_HEIGHT +
+      SCROLL_ARROWS_HEIGHT +
+      SPACING_HEIGHT +
+      BOTTOM_HELP_TEXT_HEIGHT +
+      RESTART_PROMPT_HEIGHT;
+
+    // Calculate max items with scope selector
+    const heightWithScope = baseFixedHeight + SCOPE_SELECTION_HEIGHT;
+    const availableForItemsWithScope = currentAvailableHeight - heightWithScope;
+    const maxItemsWithScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
+    );
+
+    // Calculate max items without scope selector
+    const availableForItemsWithoutScope =
+      currentAvailableHeight - baseFixedHeight;
+    const maxItemsWithoutScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
+    );
+
+    // In small terminals, hide scope selector if it would allow more items to show
+    let shouldShowScope = hasWorkspace;
+    let maxItems = maxItemsWithScope;
+
+    if (hasWorkspace && availableTerminalHeight < 25) {
+      // Hide scope selector if it gains us more than 1 extra item
+      if (maxItemsWithoutScope > maxItemsWithScope + 1) {
+        shouldShowScope = false;
+        maxItems = maxItemsWithoutScope;
+      }
+    }
+
+    return {
+      effectiveMaxItemsToShow: Math.min(maxItems, items.length),
+      showScopeSelection: shouldShowScope,
+    };
+  }, [
+    availableTerminalHeight,
+    items.length,
+    settings.workspace.path,
+    showRestartPrompt,
+  ]);
 
   // Footer content for restart prompt
   const footerContent = showRestartPrompt ? (
@@ -633,9 +691,6 @@ export function SettingsDialog({
       changes now.
     </Text>
   ) : null;
-
-  // Check if scope selection should be shown
-  const showScopeSelection = settings.workspace.path !== undefined;
 
   return (
     <BaseSettingsDialog

@@ -144,11 +144,19 @@ export function BaseSettingsDialog({
   // Cursor blink effect
   useEffect(() => {
     if (!editingKey) return;
+    setCursorVisible(true);
     const interval = setInterval(() => {
       setCursorVisible((v) => !v);
-    }, 530);
+    }, 500);
     return () => clearInterval(interval);
   }, [editingKey]);
+
+  // Ensure focus stays on settings when scope selection is hidden
+  useEffect(() => {
+    if (!showScopeSelector && focusSection === 'scope') {
+      setFocusSection('settings');
+    }
+  }, [showScopeSelector, focusSection]);
 
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
@@ -268,6 +276,30 @@ export function BaseSettingsDialog({
           return;
         }
 
+        // Up/Down in edit mode - commit and navigate
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+          commitEdit();
+          const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
+          setActiveIndex(newIndex);
+          if (newIndex === items.length - 1) {
+            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+          } else if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          }
+          return;
+        }
+        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+          commitEdit();
+          const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
+          setActiveIndex(newIndex);
+          if (newIndex === 0) {
+            setScrollOffset(0);
+          } else if (newIndex >= scrollOffset + maxItemsToShow) {
+            setScrollOffset(newIndex - maxItemsToShow + 1);
+          }
+          return;
+        }
+
         // Character input
         let ch = key.sequence;
         let isValidChar = false;
@@ -296,7 +328,6 @@ export function BaseSettingsDialog({
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
           setActiveIndex(newIndex);
-          // Adjust scroll if needed
           if (newIndex === items.length - 1) {
             setScrollOffset(Math.max(0, items.length - maxItemsToShow));
           } else if (newIndex < scrollOffset) {
@@ -307,7 +338,6 @@ export function BaseSettingsDialog({
         if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
           setActiveIndex(newIndex);
-          // Adjust scroll if needed
           if (newIndex === 0) {
             setScrollOffset(0);
           } else if (newIndex >= scrollOffset + maxItemsToShow) {
