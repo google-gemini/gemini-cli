@@ -26,7 +26,11 @@ jobs:
               'https://github.com/google-gemini/gemini-cli/issues/15324',
               'https://github.com/google-gemini/gemini-cli/issues/17202',
               'https://github.com/google-gemini/gemini-cli/issues/17203'
-            ];
+            ].map(url => url.toLowerCase());
+
+            const headers = {
+              'GraphQL-Features': 'sub_issues'
+            };
 
             // Single issue processing (for event triggers)
             async function processSingleIssue(owner, repo, number) {
@@ -55,7 +59,7 @@ jobs:
                 }
               `;
               try {
-                const result = await github.graphql(query, { owner, repo, number });
+                const result = await github.graphql(query, { owner, repo, number, headers });
 
                 if (!result || !result.repository || !result.repository.issue) {
                   console.log(`Issue #${number} not found or data missing.`);
@@ -66,7 +70,7 @@ jobs:
                 await checkAndLabel(issue, owner, repo);
               } catch (error) {
                 console.error(`Failed to process issue #${number}:`, error);
-                throw error; // Re-throw to be caught by main execution
+                throw error;
               }
             }
 
@@ -108,7 +112,7 @@ jobs:
 
               while (hasNextPage) {
                 try {
-                  const result = await github.graphql(query, { owner, repo, cursor });
+                  const result = await github.graphql(query, { owner, repo, cursor, headers });
 
                   if (!result || !result.repository || !result.repository.issues) {
                      console.error('Invalid response structure from GitHub API');
@@ -126,7 +130,7 @@ jobs:
                   cursor = result.repository.issues.pageInfo.endCursor;
                 } catch (error) {
                   console.error('Failed to fetch issues batch:', error);
-                  throw error; // Re-throw to be caught by main execution
+                  throw error;
                 }
               }
             }
@@ -139,10 +143,11 @@ jobs:
               let matched = false;
 
               while (currentParent) {
-                tracedParents.push(currentParent.url);
+                const parentUrl = currentParent.url;
+                tracedParents.push(parentUrl);
 
-                if (allowedParentUrls.includes(currentParent.url)) {
-                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${currentParent.url}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
+                if (allowedParentUrls.includes(parentUrl.toLowerCase())) {
+                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${parentUrl}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
                   await github.rest.issues.addLabels({
                     owner,
                     repo,
@@ -157,6 +162,9 @@ jobs:
 
               if (!matched && context.eventName === 'issues') {
                  console.log(`Issue #${issue.number} did not match any allowed workstreams. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
+              } else if (!matched) {
+                 // Log for debug in bulk mode if it has a parent but didn't match
+                 console.log(`Issue #${issue.number} has parents but did not match. Trace: ${tracedParents.join(' -> ')}.`);
               }
             }
 
