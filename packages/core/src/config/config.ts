@@ -955,6 +955,10 @@ export class Config {
     return this.contentGenerator?.userTier;
   }
 
+  getUserTierName(): string | undefined {
+    return this.contentGenerator?.userTierName;
+  }
+
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
