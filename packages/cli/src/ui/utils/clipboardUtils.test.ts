@@ -243,7 +243,8 @@ describe('clipboardUtils', () => {
 
       const result = await promise;
 
-      expect(result).toMatch(mockTempDir);
+      expect(result).toContain(mockTempDir);
+      expect(result).toMatch(/clipboard-\d+\.png$/);
       expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
       expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
     });
