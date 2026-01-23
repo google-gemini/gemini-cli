@@ -14,6 +14,7 @@ import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
   DEFAULT_TELEMETRY_TARGET,
@@ -2230,5 +2231,55 @@ describe('Config JIT Initialization', () => {
 
       expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
     });
+  });
+});
+
+describe('Plans Directory Initialization', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    targetDir: '/tmp/test',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '/tmp/test',
+  };
+
+  beforeEach(() => {
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.mocked(fs.mkdirSync).mockRestore();
+  });
+
+  it('should create plans directory and add it to workspace context when plan is enabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getProjectTempPlansDir();
+    expect(fs.mkdirSync).toHaveBeenCalledWith(plansDir, { recursive: true });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      plan: false,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getProjectTempPlansDir();
+    expect(fs.mkdirSync).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
   });
 });
