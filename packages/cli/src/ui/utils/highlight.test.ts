@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseInputForHighlighting } from './highlight.js';
+import type { Transformation } from '../components/shared/text-buffer.js';
 
 describe('parseInputForHighlighting', () => {
   it('should handle an empty string', () => {
@@ -136,12 +137,13 @@ describe('parseInputForHighlighting', () => {
 });
 
 describe('parseInputForHighlighting with Transformations', () => {
-  const transformations = [
+  const transformations: Transformation[] = [
     {
       logStart: 10,
       logEnd: 19,
       logicalText: '@test.png',
       collapsedText: '[Image test.png]',
+      type: 'image',
     },
   ];
 
@@ -177,18 +179,20 @@ describe('parseInputForHighlighting with Transformations', () => {
 
   it('should handle multiple transformations in a line', () => {
     const line = 'Images: @test1.png and @test2.png';
-    const multiTransformations = [
+    const multiTransformations: Transformation[] = [
       {
         logStart: 8,
         logEnd: 18,
         logicalText: '@test1.png',
         collapsedText: '[Image test1.png]',
+        type: 'image',
       },
       {
         logStart: 23,
         logEnd: 33,
         logicalText: '@test2.png',
         collapsedText: '[Image test2.png]',
+        type: 'image',
       },
     ];
 
@@ -212,13 +216,13 @@ describe('parseInputForHighlighting with Transformations', () => {
   });
 
   it('should handle empty transformations array', () => {
-    const line = 'Check out @test.png';
+    const line = 'Check out @test_no_transform.png';
     const result = parseInputForHighlighting(line, 0, [], 0);
 
     // Should fall back to default highlighting
     expect(result).toEqual([
       { text: 'Check out ', type: 'default' },
-      { text: '@test.png', type: 'file' },
+      { text: '@test_no_transform.png', type: 'file' },
     ]);
   });
 
