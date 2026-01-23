@@ -1,0 +1,7 @@
+description = "Summarize the contents, purpose, and structure of a codebase."
+args = "folder_path"
+prompt = """
+# Summarization Task
+Target folder: {{args}}
+...
+"""
