@@ -79,6 +79,7 @@ export type ServerGeminiAgentExecutionStoppedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -87,6 +88,7 @@ export type ServerGeminiAgentExecutionBlockedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
