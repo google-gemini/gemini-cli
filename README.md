@@ -54,6 +54,7 @@ npm install -g @google/gemini-cli
 ```bash
 brew install gemini-cli
 ```
+
 #### Install with Anaconda (for restricted environments)
 
 ```bash
