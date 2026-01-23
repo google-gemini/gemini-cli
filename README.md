@@ -18,7 +18,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
   account.
-- **🧠 Powerful Gemini 2.5 Pro**: Access to 1M token context window.
+- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
+  context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
@@ -140,7 +141,7 @@ for details)
 **Benefits:**
 
 - **Free tier**: 60 requests/min and 1,000 requests/day
-- **Gemini 2.5 Pro** with 1M token context window
+- **Gemini 3 models** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
@@ -164,7 +165,7 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 100 requests/day with Gemini 2.5 Pro
+- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 
