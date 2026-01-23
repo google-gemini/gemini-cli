@@ -608,13 +608,16 @@ describe('AskUserDialog', () => {
         writeKey(stdin, char);
       }
 
-      writeKey(stdin, '\x1b[C'); // Right arrow
+      writeKey(stdin, '\t'); // Use Tab instead of Right arrow when text input is active
 
       await waitFor(() => {
         expect(lastFrame()).toContain('Should it be async?');
       });
 
-      writeKey(stdin, '\x1b[D'); // Left arrow
+      writeKey(stdin, '\x1b[D'); // Left arrow should work when NOT focusing a text input
+      // Wait, Async question is a CHOICE question, so Left arrow SHOULD work.
+      // But ChoiceQuestionView also captures editing custom option state?
+      // No, only if it is FOCUSING the custom option.
 
       await waitFor(() => {
         expect(lastFrame()).toContain('useAuth');
@@ -740,6 +743,113 @@ describe('AskUserDialog', () => {
 
       // Should NOT call onCancel (dialog should stay open)
       expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('allows immediate arrow navigation after switching away from text input', async () => {
+      const multiQuestions: Question[] = [
+        {
+          question: 'Choice Q?',
+          header: 'Choice',
+          options: [{ label: 'Option 1', description: '' }],
+          multiSelect: false,
+        },
+        {
+          question: 'Text Q?',
+          header: 'Text',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={multiQuestions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // 1. Move to Text Q (Right arrow works for Choice Q)
+      writeKey(stdin, '\x1b[C');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Text Q?');
+      });
+
+      // 2. Type something in Text Q to make isEditingCustomOption true
+      writeKey(stdin, 'a');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('a');
+      });
+
+      // 3. Move back to Choice Q (Left arrow works because cursor is at left edge)
+      // When typing 'a', cursor is at index 1.
+      // We need to move cursor to index 0 first for Left arrow to work for navigation.
+      writeKey(stdin, '\x1b[D'); // Left arrow moves cursor to index 0
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Text Q?');
+      });
+
+      writeKey(stdin, '\x1b[D'); // Second Left arrow should now trigger navigation
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Choice Q?');
+      });
+
+      // 4. Immediately try Right arrow to go back to Text Q
+      writeKey(stdin, '\x1b[C');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Text Q?');
+      });
+    });
+
+    it('handles rapid sequential answers correctly (stale closure protection)', async () => {
+      const multiQuestions: Question[] = [
+        {
+          question: 'Question 1?',
+          header: 'Q1',
+          options: [{ label: 'A1', description: '' }],
+          multiSelect: false,
+        },
+        {
+          question: 'Question 2?',
+          header: 'Q2',
+          options: [{ label: 'A2', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={multiQuestions}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+        />,
+      );
+
+      // Answer Q1 and Q2 sequentialy
+      act(() => {
+        stdin.write('\r'); // Select A1 for Q1 -> triggers autoAdvance
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Question 2?');
+      });
+
+      act(() => {
+        stdin.write('\r'); // Select A2 for Q2 -> triggers autoAdvance to Review
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Review your answers:');
+      });
+
+      act(() => {
+        stdin.write('\r'); // Submit from Review
+      });
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({
+          '0': 'A1',
+          '1': 'A2',
+        });
+      });
     });
   });
 });

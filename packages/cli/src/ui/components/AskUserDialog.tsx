@@ -5,8 +5,15 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo, useRef, useEffect, useReducer } from 'react';
-import { Box, Text } from 'ink';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  useReducer,
+  useContext,
+} from 'react';
+import { Box, Text, useStdout } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
@@ -15,36 +22,43 @@ import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '../../utils/checks.js';
+import { TextInput } from './shared/TextInput.js';
+import { useTextBuffer } from './shared/text-buffer.js';
+import { UIStateContext } from '../contexts/UIStateContext.js';
+import { cpLen } from '../utils/textUtils.js';
 
 interface AskUserDialogState {
   currentQuestionIndex: number;
   answers: { [key: string]: string };
   isEditingCustomOption: boolean;
+  cursorEdge: { left: boolean; right: boolean };
   submitted: boolean;
 }
 
 type AskUserDialogAction =
   | {
       type: 'NEXT_QUESTION';
-      payload: { maxIndex: number; isTextQuestion: boolean };
+      payload: { maxIndex: number };
     }
-  | { type: 'PREV_QUESTION'; payload: { isTextQuestion: boolean } }
+  | { type: 'PREV_QUESTION' }
   | {
       type: 'SET_ANSWER';
       payload: {
-        index: number;
+        index?: number;
         answer: string;
         autoAdvance?: boolean;
         maxIndex?: number;
       };
     }
   | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
+  | { type: 'SET_CURSOR_EDGE'; payload: { left: boolean; right: boolean } }
   | { type: 'SUBMIT' };
 
 const initialState: AskUserDialogState = {
   currentQuestionIndex: 0,
   answers: {},
   isEditingCustomOption: false,
+  cursorEdge: { left: true, right: true },
   submitted: false,
 };
 
@@ -58,44 +72,39 @@ function askUserDialogReducerLogic(
 
   switch (action.type) {
     case 'NEXT_QUESTION': {
-      const { maxIndex, isTextQuestion } = action.payload;
-      // Prevent navigation if editing custom option (unless it's a text question)
-      if (state.isEditingCustomOption && !isTextQuestion) {
-        return state;
-      }
-
+      const { maxIndex } = action.payload;
       if (state.currentQuestionIndex < maxIndex) {
         return {
           ...state,
           currentQuestionIndex: state.currentQuestionIndex + 1,
+          isEditingCustomOption: false,
+          cursorEdge: { left: true, right: true },
         };
       }
       return state;
     }
     case 'PREV_QUESTION': {
-      const { isTextQuestion } = action.payload;
-      // Prevent navigation if editing custom option (unless it's a text question)
-      if (state.isEditingCustomOption && !isTextQuestion) {
-        return state;
-      }
-
       if (state.currentQuestionIndex > 0) {
         return {
           ...state,
           currentQuestionIndex: state.currentQuestionIndex - 1,
+          isEditingCustomOption: false,
+          cursorEdge: { left: true, right: true },
         };
       }
       return state;
     }
     case 'SET_ANSWER': {
       const { index, answer, autoAdvance, maxIndex } = action.payload;
-      const hasAnswer = answer && answer.trim();
+      const targetIndex = index ?? state.currentQuestionIndex;
+      const hasAnswer =
+        answer !== undefined && answer !== null && answer.trim() !== '';
       const newAnswers = { ...state.answers };
 
       if (hasAnswer) {
-        newAnswers[index] = answer;
+        newAnswers[targetIndex] = answer;
       } else {
-        delete newAnswers[index];
+        delete newAnswers[targetIndex];
       }
 
       const newState = {
@@ -106,15 +115,30 @@ function askUserDialogReducerLogic(
       if (autoAdvance && typeof maxIndex === 'number') {
         if (newState.currentQuestionIndex < maxIndex) {
           newState.currentQuestionIndex += 1;
+          newState.isEditingCustomOption = false;
+          newState.cursorEdge = { left: true, right: true };
         }
       }
 
       return newState;
     }
     case 'SET_EDITING_CUSTOM': {
+      if (state.isEditingCustomOption === action.payload.isEditing) {
+        return state;
+      }
       return {
         ...state,
         isEditingCustomOption: action.payload.isEditing,
+      };
+    }
+    case 'SET_CURSOR_EDGE': {
+      const { left, right } = action.payload;
+      if (state.cursorEdge.left === left && state.cursorEdge.right === right) {
+        return state;
+      }
+      return {
+        ...state,
+        cursorEdge: { left, right },
       };
     }
     case 'SUBMIT': {
@@ -213,7 +237,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       ))}
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          Enter to submit · ←/→ to edit answers · Esc to cancel
+          Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
         </Text>
       </Box>
     </Box>
@@ -222,56 +246,12 @@ const ReviewView: React.FC<ReviewViewProps> = ({
 
 // ============== Text Question View ==============
 
-interface TextQuestionState {
-  textValue: string;
-}
-
-type TextQuestionAction =
-  | { type: 'TYPE'; payload: { char: string } }
-  | { type: 'BACKSPACE' }
-  | { type: 'CLEAR' }
-  | { type: 'SET'; payload: { value: string } };
-
-function textQuestionReducer(
-  state: TextQuestionState,
-  action: TextQuestionAction,
-): TextQuestionState {
-  switch (action.type) {
-    case 'TYPE': {
-      return {
-        ...state,
-        textValue: state.textValue + action.payload.char,
-      };
-    }
-    case 'BACKSPACE': {
-      return {
-        ...state,
-        textValue: state.textValue.slice(0, -1),
-      };
-    }
-    case 'CLEAR': {
-      return {
-        ...state,
-        textValue: '',
-      };
-    }
-    case 'SET': {
-      return {
-        ...state,
-        textValue: action.payload.value,
-      };
-    }
-    default:
-      checkExhaustive(action);
-      return state;
-  }
-}
-
 interface TextQuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
+  onCursorEdgeChange?: (edge: { left: boolean; right: boolean }) => void;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -282,58 +262,68 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
+  onCursorEdgeChange,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
-  const [state, dispatch] = useReducer(textQuestionReducer, {
-    textValue: initialAnswer || '',
-  });
-  const { textValue } = state;
+  const uiState = useContext(UIStateContext);
+  const { stdout } = useStdout();
+  const terminalWidth = uiState?.terminalWidth ?? stdout?.columns ?? 80;
 
-  // Sync state change with parent
+  const buffer = useTextBuffer({
+    initialText: initialAnswer,
+    viewport: { width: terminalWidth - 10, height: 1 },
+    singleLine: true,
+    isValidPath: () => false,
+  });
+
+  const { text: textValue } = buffer;
+
+  // Sync state change with parent - only when it actually changes
+  const lastTextValueRef = useRef(textValue);
   useEffect(() => {
-    onSelectionChange?.(textValue);
+    if (textValue !== lastTextValueRef.current) {
+      onSelectionChange?.(textValue);
+      lastTextValueRef.current = textValue;
+    }
   }, [textValue, onSelectionChange]);
 
-  const handleTextTyping = useCallback(
+  // Sync cursor edge state with parent - only when it actually changes
+  const lastEdgeRef = useRef<{ left: boolean; right: boolean } | null>(null);
+  useEffect(() => {
+    const isLeft = buffer.cursor[1] === 0;
+    const isRight = buffer.cursor[1] === cpLen(buffer.lines[0] || '');
+    if (
+      !lastEdgeRef.current ||
+      isLeft !== lastEdgeRef.current.left ||
+      isRight !== lastEdgeRef.current.right
+    ) {
+      onCursorEdgeChange?.({ left: isLeft, right: isRight });
+      lastEdgeRef.current = { left: isLeft, right: isRight };
+    }
+  }, [buffer.cursor, buffer.lines, onCursorEdgeChange]);
+
+  // Handle Ctrl+C to clear all text
+  const handleExtraKeys = useCallback(
     (key: Key) => {
-      // Handle Ctrl+C to clear all text
       if (keyMatchers[Command.QUIT](key)) {
-        dispatch({ type: 'CLEAR' });
-        return;
-      }
-
-      // Handle backspace
-      if (key.name === 'backspace' || key.name === 'delete') {
-        dispatch({ type: 'BACKSPACE' });
-        return;
-      }
-
-      // Handle Enter to submit
-      if (keyMatchers[Command.RETURN](key)) {
-        if (textValue.trim()) {
-          onAnswer(textValue.trim());
-        }
-        return;
-      }
-
-      // Handle printable characters
-      if (
-        key.sequence &&
-        key.sequence.length === 1 &&
-        !key.ctrl &&
-        !key.alt &&
-        key.sequence.charCodeAt(0) >= 32
-      ) {
-        dispatch({ type: 'TYPE', payload: { char: key.sequence } });
-        onEditingCustomOption?.(true);
+        buffer.setText('');
       }
     },
-    [textValue, onAnswer, onEditingCustomOption, dispatch],
+    [buffer],
   );
 
-  useKeypress(handleTextTyping, { isActive: true });
+  useKeypress(handleExtraKeys, { isActive: true });
+
+  const handleSubmit = useCallback(
+    (val: string) => {
+      if (val.trim()) {
+        onAnswer(val.trim());
+      }
+    },
+    [onAnswer],
+  );
 
   // Notify parent that we're in text input mode (for Ctrl+C handling)
   useEffect(() => {
@@ -344,7 +334,6 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   }, [onEditingCustomOption]);
 
   const placeholder = question.placeholder || 'Enter your response';
-  const showPlaceholder = !textValue;
 
   return (
     <Box
@@ -362,17 +351,11 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
       <Box flexDirection="row" marginBottom={1}>
         <Text color={theme.text.accent}>{'> '}</Text>
-        {showPlaceholder ? (
-          <Text color={theme.text.secondary} italic>
-            <Text color={theme.text.accent}>{'|'}</Text>
-            {placeholder}
-          </Text>
-        ) : (
-          <Text color={theme.text.primary}>
-            {textValue}
-            <Text color={theme.text.accent}>{'|'}</Text>
-          </Text>
-        )}
+        <TextInput
+          buffer={buffer}
+          placeholder={placeholder}
+          onSubmit={handleSubmit}
+        />
       </Box>
 
       {keyboardHints}
@@ -392,16 +375,16 @@ interface OptionItem {
 
 interface ChoiceQuestionState {
   selectedIndices: Set<number>;
-  customOptionText: string;
   isCustomOptionSelected: boolean;
   isCustomOptionFocused: boolean;
 }
 
 type ChoiceQuestionAction =
   | { type: 'TOGGLE_INDEX'; payload: { index: number; multiSelect: boolean } }
-  | { type: 'TYPE_CUSTOM'; payload: { char: string; multiSelect: boolean } }
-  | { type: 'BACKSPACE_CUSTOM'; payload: { multiSelect: boolean } }
-  | { type: 'CLEAR_CUSTOM'; payload: { multiSelect: boolean } }
+  | {
+      type: 'SET_CUSTOM_SELECTED';
+      payload: { selected: boolean; multiSelect: boolean };
+    }
   | { type: 'TOGGLE_CUSTOM_SELECTED'; payload: { multiSelect: boolean } }
   | { type: 'SET_CUSTOM_FOCUSED'; payload: { focused: boolean } };
 
@@ -427,44 +410,18 @@ function choiceQuestionReducer(
           : false,
       };
     }
-    case 'TYPE_CUSTOM': {
-      const { char, multiSelect } = action.payload;
-      const newText = state.customOptionText + char;
+    case 'SET_CUSTOM_SELECTED': {
+      const { selected, multiSelect } = action.payload;
       return {
         ...state,
-        customOptionText: newText,
-        // In multi-select, typing in custom auto-selects it
-        isCustomOptionSelected: multiSelect
-          ? true
-          : state.isCustomOptionSelected,
+        isCustomOptionSelected: selected,
         // In single-select, selecting custom deselects others
         selectedIndices: multiSelect ? state.selectedIndices : new Set(),
-        isCustomOptionFocused: true,
-      };
-    }
-    case 'BACKSPACE_CUSTOM': {
-      const { multiSelect } = action.payload;
-      const newText = state.customOptionText.slice(0, -1);
-      const newIsCustomOptionSelected = multiSelect
-        ? newText.length > 0
-        : state.isCustomOptionSelected;
-
-      return {
-        ...state,
-        customOptionText: newText,
-        isCustomOptionSelected: newIsCustomOptionSelected,
-      };
-    }
-    case 'CLEAR_CUSTOM': {
-      return {
-        ...state,
-        customOptionText: '',
-        isCustomOptionSelected: false,
       };
     }
     case 'TOGGLE_CUSTOM_SELECTED': {
       const { multiSelect } = action.payload;
-      if (!multiSelect || !state.customOptionText.trim()) return state;
+      if (!multiSelect) return state;
 
       return {
         ...state,
@@ -488,6 +445,7 @@ interface ChoiceQuestionViewProps {
   onAnswer: (answer: string) => void;
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
+  onCursorEdgeChange?: (edge: { left: boolean; right: boolean }) => void;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -498,10 +456,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
+  onCursorEdgeChange,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
+  const uiState = useContext(UIStateContext);
+  const { stdout } = useStdout();
+  const terminalWidth = uiState?.terminalWidth ?? stdout?.columns ?? 80;
+
   const questionOptions = useMemo(
     () => question.options ?? [],
     [question.options],
@@ -512,7 +475,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     if (!initialAnswer) {
       return {
         selectedIndices: new Set<number>(),
-        customOptionText: '',
         isCustomOptionSelected: false,
         isCustomOptionFocused: false,
       };
@@ -520,7 +482,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
     // Check if initialAnswer matches any option labels
     const selectedIndices = new Set<number>();
-    let customOptionText = '';
     let isCustomOptionSelected = false;
 
     if (question.multiSelect) {
@@ -530,7 +491,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         if (index !== -1) {
           selectedIndices.add(index);
         } else {
-          customOptionText = answer;
           isCustomOptionSelected = true;
         }
       });
@@ -541,14 +501,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       if (index !== -1) {
         selectedIndices.add(index);
       } else {
-        customOptionText = initialAnswer;
         isCustomOptionSelected = true;
       }
     }
 
     return {
       selectedIndices,
-      customOptionText,
       isCustomOptionSelected,
       isCustomOptionFocused: false,
     };
@@ -558,12 +516,49 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     choiceQuestionReducer,
     initialReducerState,
   );
-  const {
-    selectedIndices,
-    customOptionText,
-    isCustomOptionSelected,
-    isCustomOptionFocused,
-  } = state;
+  const { selectedIndices, isCustomOptionSelected, isCustomOptionFocused } =
+    state;
+
+  const initialCustomText = useMemo(() => {
+    if (!initialAnswer) return '';
+    if (question.multiSelect) {
+      const answers = initialAnswer.split(', ');
+      const custom = answers.find(
+        (a) => !questionOptions.some((opt) => opt.label === a),
+      );
+      return custom || '';
+    } else {
+      const isPredefined = questionOptions.some(
+        (opt) => opt.label === initialAnswer,
+      );
+      return isPredefined ? '' : initialAnswer;
+    }
+  }, [initialAnswer, questionOptions, question.multiSelect]);
+
+  const customBuffer = useTextBuffer({
+    initialText: initialCustomText,
+    viewport: { width: terminalWidth - 20, height: 1 },
+    singleLine: true,
+    isValidPath: () => false,
+  });
+
+  const customOptionText = customBuffer.text;
+
+  // Sync cursor edge state with parent - only when it actually changes
+  const lastEdgeRef = useRef<{ left: boolean; right: boolean } | null>(null);
+  useEffect(() => {
+    const isLeft = customBuffer.cursor[1] === 0;
+    const isRight =
+      customBuffer.cursor[1] === cpLen(customBuffer.lines[0] || '');
+    if (
+      !lastEdgeRef.current ||
+      isLeft !== lastEdgeRef.current.left ||
+      isRight !== lastEdgeRef.current.right
+    ) {
+      onCursorEdgeChange?.({ left: isLeft, right: isRight });
+      lastEdgeRef.current = { left: isLeft, right: isRight };
+    }
+  }, [customBuffer.cursor, customBuffer.lines, onCursorEdgeChange]);
 
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
@@ -586,15 +581,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     [questionOptions],
   );
 
-  // Synchronize selection changes with parent
+  // Synchronize selection changes with parent - only when it actually changes
+  const lastBuiltAnswerRef = useRef('');
   useEffect(() => {
-    onSelectionChange?.(
-      buildAnswerString(
-        selectedIndices,
-        isCustomOptionSelected,
-        customOptionText,
-      ),
+    const newAnswer = buildAnswerString(
+      selectedIndices,
+      isCustomOptionSelected,
+      customOptionText,
     );
+    if (newAnswer !== lastBuiltAnswerRef.current) {
+      onSelectionChange?.(newAnswer);
+      lastBuiltAnswerRef.current = newAnswer;
+    }
   }, [
     selectedIndices,
     isCustomOptionSelected,
@@ -603,32 +601,16 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     onSelectionChange,
   ]);
 
-  // Handle keypresses for both custom option typing and "type-to-jump"
-  const handleChoiceKeypress = useCallback(
+  // Handle "Type-to-Jump" and Ctrl+C for custom buffer
+  const handleExtraKeys = useCallback(
     (key: Key) => {
-      // If focusing custom option, handle editing keys
-      if (isCustomOptionFocused) {
-        // Handle Ctrl+C to clear all text
-        if (keyMatchers[Command.QUIT](key)) {
-          dispatch({
-            type: 'CLEAR_CUSTOM',
-            payload: { multiSelect: !!question.multiSelect },
-          });
-          return;
-        }
-
-        // Handle backspace
-        if (key.name === 'backspace' || key.name === 'delete') {
-          dispatch({
-            type: 'BACKSPACE_CUSTOM',
-            payload: { multiSelect: !!question.multiSelect },
-          });
-          return;
-        }
+      // If focusing custom option, handle Ctrl+C
+      if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
+        customBuffer.setText('');
+        return;
       }
 
-      // Handle printable characters (ignore control keys)
-      // This works both when focused (editing) and when not focused (type-to-jump)
+      // Type-to-jump: if a printable character is typed and not focused, jump to custom
       const isPrintable =
         key.sequence &&
         key.sequence.length === 1 &&
@@ -636,33 +618,20 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         !key.alt &&
         key.sequence.charCodeAt(0) >= 32;
 
-      // Avoid capturing numbers if they might be used for selection (1-9)
       const isNumber = /^[0-9]$/.test(key.sequence);
-      // We assume BaseSelectionList handles numbers if showNumbers is true (which implies we shouldn't steal them)
-      // Since we don't know showNumbers here easily without props, we'll assume we shouldn't steal numbers if not focused.
-      // If focused, we treat numbers as text input.
-      const shouldCapture = isPrintable && (isCustomOptionFocused || !isNumber);
 
-      if (shouldCapture) {
-        dispatch({
-          type: 'TYPE_CUSTOM',
-          payload: {
-            char: key.sequence,
-            multiSelect: !!question.multiSelect,
-          },
-        });
+      if (isPrintable && !isCustomOptionFocused && !isNumber) {
+        dispatch({ type: 'SET_CUSTOM_FOCUSED', payload: { focused: true } });
         onEditingCustomOption?.(true);
+        // We can't easily inject the first key into useTextBuffer's internal state
+        // but TextInput will handle subsequent keys once it's focused.
+        customBuffer.setText(key.sequence);
       }
     },
-    [
-      isCustomOptionFocused,
-      question.multiSelect,
-      onEditingCustomOption,
-      dispatch,
-    ],
+    [isCustomOptionFocused, customBuffer, onEditingCustomOption],
   );
 
-  useKeypress(handleChoiceKeypress, { isActive: true });
+  useKeypress(handleExtraKeys, { isActive: true });
 
   const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(
@@ -687,7 +656,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         type: 'other',
         index: list.length,
       };
-      list.push({ key: otherItem.key, value: otherItem });
+      list.push({ key: 'other', value: otherItem });
     }
 
     if (question.multiSelect) {
@@ -711,10 +680,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         type: 'SET_CUSTOM_FOCUSED',
         payload: { focused: nowFocusingCustomOption },
       });
-      // Notify parent when we stop focusing custom option (so navigation can resume)
-      if (!nowFocusingCustomOption) {
-        onEditingCustomOption?.(false);
-      }
+      // Notify parent when we start/stop focusing custom option (so navigation can resume)
+      onEditingCustomOption?.(nowFocusingCustomOption);
     },
     [onEditingCustomOption],
   );
@@ -746,10 +713,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         if (itemValue.type === 'option') {
           onAnswer(itemValue.label);
         } else if (itemValue.type === 'other') {
-          // Submit the other text if it has content
+          // In single select, selecting other submits it if it has text
           if (customOptionText.trim()) {
-            // Reset editing state before submitting so navigation works on next question
-            onEditingCustomOption?.(false);
             onAnswer(customOptionText.trim());
           }
         }
@@ -761,10 +726,19 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       isCustomOptionSelected,
       customOptionText,
       onAnswer,
-      onEditingCustomOption,
       buildAnswerString,
     ],
   );
+
+  // Auto-select custom option when typing in it
+  useEffect(() => {
+    if (customOptionText.trim() && !isCustomOptionSelected) {
+      dispatch({
+        type: 'SET_CUSTOM_SELECTED',
+        payload: { selected: true, multiSelect: !!question.multiSelect },
+      });
+    }
+  }, [customOptionText, isCustomOptionSelected, question.multiSelect]);
 
   return (
     <Box
@@ -802,48 +776,26 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const displayText = customOptionText || '';
             const placeholder = 'Enter a custom value';
-            const showPlaceholder = !displayText && context.isSelected;
-            const showCursor = context.isSelected;
             return (
-              <Box flexDirection="column">
-                <Box flexDirection="row">
-                  {showCheck && (
-                    <Text
-                      color={
-                        isChecked ? theme.text.accent : theme.text.secondary
-                      }
-                    >
-                      [{isChecked ? 'x' : ' '}]
-                    </Text>
-                  )}
-                  <Text color={theme.text.primary}> </Text>
-                  {showPlaceholder ? (
-                    <Text color={theme.text.secondary} italic>
-                      <Text color={theme.text.accent}>
-                        {showCursor ? '▌' : ''}
-                      </Text>
-                      {placeholder}
-                    </Text>
-                  ) : (
-                    <Text
-                      color={
-                        isChecked && !question.multiSelect
-                          ? theme.status.success
-                          : displayText
-                            ? theme.text.primary
-                            : theme.text.secondary
-                      }
-                    >
-                      {displayText || (context.isSelected ? '' : placeholder)}
-                      {showCursor && <Text color={theme.text.accent}>▌</Text>}
-                    </Text>
-                  )}
-                  {isChecked && !question.multiSelect && (
-                    <Text color={theme.status.success}> ✓</Text>
-                  )}
-                </Box>
+              <Box flexDirection="row">
+                {showCheck && (
+                  <Text
+                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                  >
+                    [{isChecked ? 'x' : ' '}]
+                  </Text>
+                )}
+                <Text color={theme.text.primary}> </Text>
+                <TextInput
+                  buffer={customBuffer}
+                  placeholder={placeholder}
+                  focus={context.isSelected}
+                  onSubmit={() => handleSelect(optionItem)}
+                />
+                {isChecked && !question.multiSelect && (
+                  <Text color={theme.status.success}> ✓</Text>
+                )}
               </Box>
             );
           }
@@ -901,10 +853,15 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onActiveTextInputChange,
 }) => {
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
-  const { currentQuestionIndex, answers, isEditingCustomOption, submitted } =
-    state;
+  const {
+    currentQuestionIndex,
+    answers,
+    isEditingCustomOption,
+    cursorEdge,
+    submitted,
+  } = state;
 
-  // Use refs for synchronous checks to prevent race conditions
+  // Use refs for synchronous checks to prevent race conditions in handleCancel
   const isEditingCustomOptionRef = useRef(false);
   isEditingCustomOptionRef.current = isEditingCustomOption;
 
@@ -912,8 +869,14 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     dispatch({ type: 'SET_EDITING_CUSTOM', payload: { isEditing } });
   }, []);
 
+  const handleCursorEdgeChange = useCallback(
+    (edge: { left: boolean; right: boolean }) => {
+      dispatch({ type: 'SET_CURSOR_EDGE', payload: edge });
+    },
+    [],
+  );
+
   // Sync isEditingCustomOption state with parent for global keypress handling
-  // Clean up on unmount to ensure Ctrl+C works normally after dialog closes
   useEffect(() => {
     onActiveTextInputChange?.(isEditingCustomOption);
     return () => {
@@ -950,25 +913,34 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (key: Key) => {
       if (submitted) return;
 
-      const currentQuestionIsText =
-        questions[currentQuestionIndex]?.type === 'text';
+      const isTab = key.name === 'tab';
+      const isShiftTab = isTab && key.shift;
+      const isPlainTab = isTab && !key.shift;
 
-      if (keyMatchers[Command.MOVE_RIGHT](key) || key.name === 'tab') {
+      const isRight = key.name === 'right' && !key.ctrl && !key.alt;
+      const isLeft = key.name === 'left' && !key.ctrl && !key.alt;
+
+      // Tab always works. Arrows work if NOT editing OR if at the corresponding edge.
+      const shouldGoNext =
+        isPlainTab || (isRight && (!isEditingCustomOption || cursorEdge.right));
+      const shouldGoPrev =
+        isShiftTab || (isLeft && (!isEditingCustomOption || cursorEdge.left));
+
+      if (shouldGoNext) {
         // Allow navigation up to Review tab for multi-question flows
         const maxIndex =
           questions.length > 1 ? reviewTabIndex : questions.length - 1;
         dispatch({
           type: 'NEXT_QUESTION',
-          payload: { maxIndex, isTextQuestion: currentQuestionIsText },
+          payload: { maxIndex },
         });
-      } else if (keyMatchers[Command.MOVE_LEFT](key)) {
+      } else if (shouldGoPrev) {
         dispatch({
           type: 'PREV_QUESTION',
-          payload: { isTextQuestion: currentQuestionIsText },
         });
       }
     },
-    [currentQuestionIndex, questions, reviewTabIndex, submitted],
+    [isEditingCustomOption, cursorEdge, questions, reviewTabIndex, submitted],
   );
 
   useKeypress(handleNavigation, {
@@ -976,7 +948,6 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   });
 
   // Effect to trigger submission when state.submitted becomes true
-  // This ensures the callback is called only after state update is processed
   useEffect(() => {
     if (submitted) {
       onSubmit(answers);
@@ -991,7 +962,6 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       dispatch({
         type: 'SET_ANSWER',
         payload: {
-          index: currentQuestionIndex,
           answer,
           autoAdvance: questions.length > 1,
           maxIndex: reviewTabIndex,
@@ -1002,7 +972,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         dispatch({ type: 'SUBMIT' });
       }
     },
-    [currentQuestionIndex, questions.length, submitted],
+    [questions.length, submitted],
   );
 
   // Submit from Review tab
@@ -1017,13 +987,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       dispatch({
         type: 'SET_ANSWER',
         payload: {
-          index: currentQuestionIndex,
           answer,
           autoAdvance: false,
         },
       });
     },
-    [currentQuestionIndex, submitted],
+    [submitted],
   );
 
   const answeredIndices = useMemo(
@@ -1092,9 +1061,9 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   const keyboardHints = (
     <Box marginTop={1}>
       <Text color={theme.text.secondary}>
-        {currentQuestion.type === 'text'
+        {currentQuestion.type === 'text' || isEditingCustomOption
           ? questions.length > 1
-            ? 'Enter to submit · ←/→ to switch questions · Esc to cancel'
+            ? 'Enter to submit · Tab/Shift+Tab to switch questions · Esc to cancel'
             : 'Enter to submit · Esc to cancel'
           : questions.length > 1
             ? 'Enter to select · ←/→ to switch questions · Esc to cancel'
@@ -1112,6 +1081,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
         onEditingCustomOption={handleEditingCustomOption}
+        onCursorEdgeChange={handleCursorEdgeChange}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
@@ -1126,6 +1096,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       onAnswer={handleAnswer}
       onSelectionChange={handleSelectionChange}
       onEditingCustomOption={handleEditingCustomOption}
+      onCursorEdgeChange={handleCursorEdgeChange}
       initialAnswer={answers[currentQuestionIndex]}
       progressHeader={progressHeader}
       keyboardHints={keyboardHints}

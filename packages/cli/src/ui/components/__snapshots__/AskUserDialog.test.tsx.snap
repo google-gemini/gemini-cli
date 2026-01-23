@@ -4,7 +4,7 @@ exports[`AskUserDialog > Text type questions > renders text input for type: "tex
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ What should we name this component?                                                                                  │
 │                                                                                                                      │
-│ > |e.g., UserProfileCard                                                                                             │
+│ > e.g., UserProfileCard                                                                                              │
 │                                                                                                                      │
 │                                                                                                                      │
 │ Enter to submit · Esc to cancel                                                                                      │
@@ -15,7 +15,7 @@ exports[`AskUserDialog > Text type questions > shows correct keyboard hints for 
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Enter the variable name:                                                                                             │
 │                                                                                                                      │
-│ > |Enter your response                                                                                               │
+│ > Enter your response                                                                                                │
 │                                                                                                                      │
 │                                                                                                                      │
 │ Enter to submit · Esc to cancel                                                                                      │
@@ -26,7 +26,7 @@ exports[`AskUserDialog > Text type questions > shows default placeholder when no
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Enter the database connection string:                                                                                │
 │                                                                                                                      │
-│ > |Enter your response                                                                                               │
+│ > Enter your response                                                                                                │
 │                                                                                                                      │
 │                                                                                                                      │
 │ Enter to submit · Esc to cancel                                                                                      │
@@ -44,7 +44,7 @@ exports[`AskUserDialog > allows navigating to Review tab and back 1`] = `
 │ Tests → (not answered)                                                                                               │
 │ Docs → (not answered)                                                                                                │
 │                                                                                                                      │
-│ Enter to submit · ←/→ to edit answers · Esc to cancel                                                                │
+│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -133,6 +133,6 @@ exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`
 │ License → (not answered)                                                                                             │
 │ README → (not answered)                                                                                              │
 │                                                                                                                      │
-│ Enter to submit · ←/→ to edit answers · Esc to cancel                                                                │
+│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
