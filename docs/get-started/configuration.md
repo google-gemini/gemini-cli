@@ -653,7 +653,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`tools.approvalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode.
+    read-only mode. 'yolo' is not supported yet.
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
