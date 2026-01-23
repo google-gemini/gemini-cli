@@ -49,5 +49,6 @@ export * from './src/utils/googleQuotaErrors.js';
 export type { GoogleApiError } from './src/utils/googleErrors.js';
 export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
+export { ExperimentFlags } from './src/code_assist/experiments/flagNames.js';
 export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';
 export { MAX_TURNS } from './src/core/client.js';

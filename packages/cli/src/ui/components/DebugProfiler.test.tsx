@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { coreEvents } from '@google/gemini-cli-core';
 import {
   profiler,
   DebugProfiler,
@@ -16,6 +17,7 @@ import { render } from '../../test-utils/render.js';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { FixedDeque } from 'mnemonist';
 import { debugState } from '../debug.js';
+import { act } from 'react';
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(),
@@ -265,5 +267,41 @@ describe('DebugProfiler Component', () => {
     expect(output).toContain('Renders: 10 (total)');
     expect(output).toContain('5 (idle)');
     expect(output).toContain('2 (flicker)');
+  });
+
+  it('should report an action when a CoreEvent is emitted', async () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: true,
+      constrainHeight: false,
+    } as unknown as UIState);
+
+    const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+
+    const { unmount } = render(<DebugProfiler />);
+
+    act(() => {
+      coreEvents.emitModelChanged('new-model');
+    });
+
+    expect(reportActionSpy).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should report an action when an AppEvent is emitted', async () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: true,
+      constrainHeight: false,
+    } as unknown as UIState);
+
+    const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+
+    const { unmount } = render(<DebugProfiler />);
+
+    act(() => {
+      appEvents.emit(AppEvent.SelectionWarning);
+    });
+
+    expect(reportActionSpy).toHaveBeenCalled();
+    unmount();
   });
 });

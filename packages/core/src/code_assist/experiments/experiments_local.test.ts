@@ -12,12 +12,17 @@ import type { ListExperimentsResponse } from './types.js';
 import type { ClientMetadata } from '../types.js';
 
 // Mock dependencies
-vi.mock('node:fs', () => ({
-  promises: {
-    readFile: vi.fn(),
-  },
-  readFileSync: vi.fn(),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(),
+    },
+    readFileSync: vi.fn(),
+  };
+});
 vi.mock('node:os');
 vi.mock('../server.js');
 vi.mock('./client_metadata.js', () => ({

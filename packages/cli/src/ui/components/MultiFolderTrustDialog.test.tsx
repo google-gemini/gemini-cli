@@ -91,10 +91,10 @@ describe('MultiFolderTrustDialog', () => {
     await act(async () => {
       keypressCallback({
         name: 'escape',
-        ctrl: false,
-        meta: false,
         shift: false,
-        paste: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
         sequence: '',
         insertable: false,
       });
