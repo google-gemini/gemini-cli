@@ -1204,7 +1204,6 @@ describe('MCPOAuthProvider', () => {
         'production-server',
         mockConfig,
         undefined,
-        eventEmitter,
       );
 
       const message = await messagePromise;
