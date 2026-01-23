@@ -2233,6 +2233,19 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
   });
 
+  it('should ignore "yolo" in settings.tools.approvalMode and fall back to DEFAULT', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      tools: {
+        // @ts-expect-error: testing invalid value
+        approvalMode: 'yolo',
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
   it('should throw error when --approval-mode=plan is used but experimental.plan is disabled', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -2325,13 +2338,15 @@ describe('loadCliConfig approval mode', () => {
     });
 
     it('should prioritize --approval-mode flag over settings', async () => {
-      process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+      process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
       const settings = createTestMergedSettings({
-        tools: { approvalMode: 'auto_edit' },
+        tools: { approvalMode: 'default' },
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.AUTO_EDIT,
+      );
     });
 
     it('should prioritize --yolo flag over settings', async () => {

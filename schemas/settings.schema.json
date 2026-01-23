@@ -1097,11 +1097,11 @@
         },
         "approvalMode": {
           "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, 'yolo' auto-approves all tools, and 'plan' is read-only mode.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, 'yolo' auto-approves all tools, and 'plan' is read-only mode.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
           "default": "default",
           "type": "string",
-          "enum": ["default", "auto_edit", "yolo", "plan"]
+          "enum": ["default", "auto_edit", "plan"]
         },
         "core": {
           "title": "Core Tools",
