@@ -12,7 +12,7 @@ import { debugLogger } from './debugLogger.js';
 export interface IgnoreFileFilter {
   isIgnored(filePath: string): boolean;
   getPatterns(): string[];
-  getIgnoreFilePath(): string | null;
+  getIgnoreFilePaths(): string[];
   hasPatterns(): boolean;
 }
 
@@ -104,21 +104,10 @@ export class IgnoreFileParser implements IgnoreFileFilter {
     return this.patterns;
   }
 
-  /**
-   * Returns the path to .geminiignore file if it exists and has patterns.
-   * Useful for tools like ripgrep that support --ignore-file flag.
-   */
-  getIgnoreFilePath(): string | null {
-    if (!this.hasPatterns()) {
-      return null;
-    }
-    for (const fileName of this.fileNames) {
-      const ignoreFilePath = path.join(this.projectRoot, fileName);
-      if (fs.existsSync(ignoreFilePath)) {
-        return ignoreFilePath;
-      }
-    }
-    return null;
+  getIgnoreFilePaths(): string[] {
+    return this.fileNames
+      .map((fileName) => path.join(this.projectRoot, fileName))
+      .filter((filePath) => fs.existsSync(filePath));
   }
 
   /**

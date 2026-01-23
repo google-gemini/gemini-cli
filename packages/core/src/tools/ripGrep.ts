@@ -18,12 +18,11 @@ import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import {
   FileExclusions,
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
-import { IgnoreFileParser } from '../utils/ignoreFileParser.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
@@ -193,7 +192,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     private readonly config: Config,
-    private readonly geminiIgnoreParser: IgnoreFileParser,
+    private readonly fileDiscoveryService: FileDiscoveryService,
     params: RipGrepToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -248,6 +247,21 @@ class GrepToolInvocation extends BaseToolInvocation<
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
+      }
+
+      if (!this.params.no_ignore) {
+        const uniqueFiles = Array.from(
+          new Set(allMatches.map((m) => m.filePath)),
+        );
+        const absoluteFilePaths = uniqueFiles.map((f) =>
+          path.resolve(searchDirAbs!, f),
+        );
+        const allowedFiles =
+          this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+        const allowedSet = new Set(allowedFiles);
+        allMatches = allMatches.filter((m) =>
+          allowedSet.has(path.resolve(searchDirAbs!, m.filePath)),
+        );
       }
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
@@ -370,9 +384,10 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       if (this.config.getFileFilteringRespectGeminiIgnore()) {
         // Add .geminiignore support (ripgrep natively handles .gitignore)
-        const geminiIgnorePath = this.geminiIgnoreParser.getIgnoreFilePath();
-        if (geminiIgnorePath) {
-          rgArgs.push('--ignore-file', geminiIgnorePath);
+        const geminiIgnorePaths =
+          this.fileDiscoveryService.getIgnoreFilePaths();
+        for (const ignorePath of geminiIgnorePaths) {
+          rgArgs.push('--ignore-file', ignorePath);
         }
       }
     }
@@ -479,7 +494,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
-  private readonly geminiIgnoreParser: IgnoreFileParser;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private readonly config: Config,
@@ -545,9 +560,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-    this.geminiIgnoreParser = new IgnoreFileParser(
+    this.fileDiscoveryService = new FileDiscoveryService(
       config.getTargetDir(),
-      GEMINI_IGNORE_FILE_NAME,
+      config.getFileFilteringOptions(),
     );
   }
 
@@ -585,7 +600,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
-      this.geminiIgnoreParser,
+      this.fileDiscoveryService,
       params,
       messageBus ?? this.messageBus,
       _toolName,

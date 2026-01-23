@@ -13,6 +13,7 @@ import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import type { Ignore } from './ignore.js';
 import { loadIgnoreRules } from './ignore.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
+import { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
 describe('crawler', () => {
   let tmpDir: string;
@@ -30,12 +31,11 @@ describe('crawler', () => {
       src: ['not-ignored.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: true,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -57,6 +57,7 @@ describe('crawler', () => {
 
   it('should combine .gitignore and .geminiignore rules', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': 'dist/',
       [GEMINI_IGNORE_FILE_NAME]: 'build/',
       dist: ['ignored-by-git.js'],
@@ -64,12 +65,11 @@ describe('crawler', () => {
       src: ['not-ignored.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: true,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -96,12 +96,11 @@ describe('crawler', () => {
       src: ['main.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
-      ignoreDirs: ['logs'],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, ['logs']);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -118,6 +117,7 @@ describe('crawler', () => {
 
   it('should handle negated directories', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['build/**', '!build/public', '!build/public/**'].join(
         '\n',
       ),
@@ -128,12 +128,11 @@ describe('crawler', () => {
       src: ['main.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -158,17 +157,17 @@ describe('crawler', () => {
 
   it('should handle root-level file negation', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['*.mk', '!Foo.mk'].join('\n'),
       'bar.mk': '',
       'Foo.mk': '',
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -185,6 +184,7 @@ describe('crawler', () => {
 
   it('should handle directory negation with glob', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': [
         'third_party/**',
         '!third_party/foo',
@@ -201,12 +201,11 @@ describe('crawler', () => {
       },
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -230,17 +229,17 @@ describe('crawler', () => {
 
   it('should correctly handle negated patterns in .gitignore', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['dist/**', '!dist/keep.js'].join('\n'),
       dist: ['ignore.js', 'keep.js'],
       src: ['main.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -267,12 +266,11 @@ describe('crawler', () => {
       src: ['file1.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: true,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -288,16 +286,16 @@ describe('crawler', () => {
 
   it('should handle empty or commented-only ignore files', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': '# This is a comment\n\n   \n',
       src: ['main.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -318,12 +316,11 @@ describe('crawler', () => {
       src: ['main.js'],
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const results = await crawl({
       crawlDirectory: tmpDir,
@@ -350,12 +347,11 @@ describe('crawler', () => {
 
     it('should hit the cache for subsequent crawls', async () => {
       tmpDir = await createTmpDir({ 'file1.js': '' });
-      const ignore = loadIgnoreRules({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
+      const service = new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
       });
+      const ignore = loadIgnoreRules(service, []);
       const options = {
         crawlDirectory: tmpDir,
         cwd: tmpDir,
@@ -383,17 +379,19 @@ describe('crawler', () => {
 
     it('should miss the cache when ignore rules change', async () => {
       tmpDir = await createTmpDir({
+        '.git': {},
         '.gitignore': 'a.txt',
         'a.txt': '',
         'b.txt': '',
       });
       const getIgnore = () =>
-        loadIgnoreRules({
-          projectRoot: tmpDir,
-          useGitignore: true,
-          useGeminiignore: false,
-          ignoreDirs: [],
-        });
+        loadIgnoreRules(
+          new FileDiscoveryService(tmpDir, {
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          }),
+          [],
+        );
       const getOptions = (ignore: Ignore) => ({
         crawlDirectory: tmpDir,
         cwd: tmpDir,
@@ -422,12 +420,11 @@ describe('crawler', () => {
 
     it('should miss the cache after TTL expires', async () => {
       tmpDir = await createTmpDir({ 'file1.js': '' });
-      const ignore = loadIgnoreRules({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
+      const service = new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
       });
+      const ignore = loadIgnoreRules(service, []);
       const options = {
         crawlDirectory: tmpDir,
         cwd: tmpDir,
@@ -453,12 +450,11 @@ describe('crawler', () => {
 
     it('should miss the cache when maxDepth changes', async () => {
       tmpDir = await createTmpDir({ 'file1.js': '' });
-      const ignore = loadIgnoreRules({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
+      const service = new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
       });
+      const ignore = loadIgnoreRules(service, []);
       const getOptions = (maxDepth?: number) => ({
         crawlDirectory: tmpDir,
         cwd: tmpDir,
@@ -505,12 +501,11 @@ describe('crawler', () => {
     });
 
     const getCrawlResults = async (maxDepth?: number) => {
-      const ignore = loadIgnoreRules({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
+      const service = new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
       });
+      const ignore = loadIgnoreRules(service, []);
       const paths = await crawl({
         crawlDirectory: tmpDir,
         cwd: tmpDir,
@@ -581,12 +576,11 @@ describe('crawler', () => {
       'file3.js': '',
     });
 
-    const ignore = loadIgnoreRules({
-      projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
-      ignoreDirs: [],
+    const service = new FileDiscoveryService(tmpDir, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: false,
     });
+    const ignore = loadIgnoreRules(service, []);
 
     const paths = await crawl({
       crawlDirectory: tmpDir,

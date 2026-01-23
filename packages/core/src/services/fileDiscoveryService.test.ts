@@ -415,4 +415,60 @@ describe('FileDiscoveryService', () => {
       expect(filtered).toEqual([path.join(projectRoot, 'debug.log')]);
     });
   });
+
+  describe('getIgnoreFilePaths & getAllIgnoreFilePaths', () => {
+    beforeEach(async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile('.gitignore', '*.log');
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, '*.tmp');
+      await createTestFile('.customignore', '*.secret');
+    });
+
+    it('should return .geminiignore path by default', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      const paths = service.getIgnoreFilePaths();
+      expect(paths).toEqual([path.join(projectRoot, GEMINI_IGNORE_FILE_NAME)]);
+    });
+
+    it('should not return .geminiignore path if respectGeminiIgnore is false', () => {
+      const service = new FileDiscoveryService(projectRoot, {
+        respectGeminiIgnore: false,
+      });
+      const paths = service.getIgnoreFilePaths();
+      expect(paths).toEqual([]);
+    });
+
+    it('should return custom ignore file paths', () => {
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: ['.customignore'],
+      });
+      const paths = service.getIgnoreFilePaths();
+      expect(paths).toContain(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
+      expect(paths).toContain(path.join(projectRoot, '.customignore'));
+    });
+
+    it('should return all ignore paths including .gitignore', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      const paths = service.getAllIgnoreFilePaths();
+      expect(paths).toContain(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
+      expect(paths).toContain(path.join(projectRoot, '.gitignore'));
+    });
+
+    it('should not return .gitignore if respectGitIgnore is false', () => {
+      const service = new FileDiscoveryService(projectRoot, {
+        respectGitIgnore: false,
+      });
+      const paths = service.getAllIgnoreFilePaths();
+      expect(paths).toContain(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
+      expect(paths).not.toContain(path.join(projectRoot, '.gitignore'));
+    });
+
+    it('should not return .gitignore if it does not exist', async () => {
+      await fs.rm(path.join(projectRoot, '.gitignore'));
+      const service = new FileDiscoveryService(projectRoot);
+      const paths = service.getAllIgnoreFilePaths();
+      expect(paths).not.toContain(path.join(projectRoot, '.gitignore'));
+      expect(paths).toContain(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
+    });
+  });
 });

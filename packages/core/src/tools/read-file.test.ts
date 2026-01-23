@@ -474,6 +474,36 @@ describe('ReadFileTool', () => {
         const invocation = tool.build(params);
         expect(typeof invocation).not.toBe('string');
       });
+
+      it('should allow reading ignored files if respectGeminiIgnore is false', async () => {
+        const ignoredFilePath = path.join(tempRootDir, 'foo.bar');
+        await fsp.writeFile(ignoredFilePath, 'content', 'utf-8');
+
+        const configNoIgnore = {
+          getFileService: () => new FileDiscoveryService(tempRootDir),
+          getFileSystemService: () => new StandardFileSystemService(),
+          getTargetDir: () => tempRootDir,
+          getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+          getFileFilteringOptions: () => ({
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          }),
+          storage: {
+            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+          },
+          isInteractive: () => false,
+        } as unknown as Config;
+
+        const toolNoIgnore = new ReadFileTool(
+          configNoIgnore,
+          createMockMessageBus(),
+        );
+        const params: ReadFileToolParams = {
+          file_path: ignoredFilePath,
+        };
+        const invocation = toolNoIgnore.build(params);
+        expect(typeof invocation).not.toBe('string');
+      });
     });
   });
 });

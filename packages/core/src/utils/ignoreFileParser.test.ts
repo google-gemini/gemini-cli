@@ -62,9 +62,9 @@ describe('GeminiIgnoreParser', () => {
 
     it('should return ignore file path when patterns exist', () => {
       const parser = new IgnoreFileParser(projectRoot, GEMINI_IGNORE_FILE_NAME);
-      expect(parser.getIgnoreFilePath()).toBe(
+      expect(parser.getIgnoreFilePaths()).toEqual([
         path.join(projectRoot, GEMINI_IGNORE_FILE_NAME),
-      );
+      ]);
     });
 
     it('should return true for hasPatterns when patterns exist', () => {
@@ -76,7 +76,7 @@ describe('GeminiIgnoreParser', () => {
       const parser = new IgnoreFileParser(projectRoot, GEMINI_IGNORE_FILE_NAME);
       await fs.rm(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
       expect(parser.hasPatterns()).toBe(false);
-      expect(parser.getIgnoreFilePath()).toBeNull();
+      expect(parser.getIgnoreFilePaths()).toEqual([]);
     });
   });
 
@@ -87,9 +87,9 @@ describe('GeminiIgnoreParser', () => {
       expect(parser.isIgnored('any_file.txt')).toBe(false);
     });
 
-    it('should return null for getIgnoreFilePath when no patterns exist', () => {
+    it('should return empty array for getIgnoreFilePaths when no patterns exist', () => {
       const parser = new IgnoreFileParser(projectRoot, GEMINI_IGNORE_FILE_NAME);
-      expect(parser.getIgnoreFilePath()).toBeNull();
+      expect(parser.getIgnoreFilePaths()).toEqual([]);
     });
 
     it('should return false for hasPatterns when no patterns exist', () => {
@@ -103,9 +103,11 @@ describe('GeminiIgnoreParser', () => {
       await createTestFile(GEMINI_IGNORE_FILE_NAME, '');
     });
 
-    it('should return null for getIgnoreFilePath', () => {
+    it('should return file path for getIgnoreFilePaths', () => {
       const parser = new IgnoreFileParser(projectRoot, GEMINI_IGNORE_FILE_NAME);
-      expect(parser.getIgnoreFilePath()).toBeNull();
+      expect(parser.getIgnoreFilePaths()).toEqual([
+        path.join(projectRoot, GEMINI_IGNORE_FILE_NAME),
+      ]);
     });
 
     it('should return false for hasPatterns', () => {
@@ -122,9 +124,11 @@ describe('GeminiIgnoreParser', () => {
       );
     });
 
-    it('should return null for getIgnoreFilePath', () => {
+    it('should return file path for getIgnoreFilePaths', () => {
       const parser = new IgnoreFileParser(projectRoot, GEMINI_IGNORE_FILE_NAME);
-      expect(parser.getIgnoreFilePath()).toBeNull();
+      expect(parser.getIgnoreFilePaths()).toEqual([
+        path.join(projectRoot, GEMINI_IGNORE_FILE_NAME),
+      ]);
     });
 
     it('should return false for hasPatterns', () => {
@@ -160,15 +164,16 @@ describe('GeminiIgnoreParser', () => {
       expect(parser.isIgnored('important.txt')).toBe(false);
     });
 
-    it('should return the first existing file path', () => {
+    it('should return all existing file paths', () => {
       const parser = new IgnoreFileParser(projectRoot, [
         'nonexistent.ignore',
         primaryFile,
         secondaryFile,
       ]);
-      expect(parser.getIgnoreFilePath()).toBe(
+      expect(parser.getIgnoreFilePaths()).toEqual([
         path.join(projectRoot, primaryFile),
-      );
+        path.join(projectRoot, secondaryFile),
+      ]);
     });
   });
 });

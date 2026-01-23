@@ -10,6 +10,7 @@ import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
 import { IgnoreFileParser } from '../utils/ignoreFileParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import fs from 'node:fs';
 import * as path from 'node:path';
 
 export interface FilterFilesOptions {
@@ -142,5 +143,39 @@ export class FileDiscoveryService {
     options: FilterFilesOptions = {},
   ): boolean {
     return this.filterFiles([filePath], options).length === 0;
+  }
+
+  /**
+   * Returns the list of ignore files being used (e.g. .geminiignore) excluding .gitignore.
+   */
+  getIgnoreFilePaths(): string[] {
+    const paths: string[] = [];
+    if (
+      this.geminiIgnoreFilter &&
+      this.defaultFilterFileOptions.respectGeminiIgnore
+    ) {
+      paths.push(...this.geminiIgnoreFilter.getIgnoreFilePaths());
+    }
+    if (this.customIgnoreFilter) {
+      paths.push(...this.customIgnoreFilter.getIgnoreFilePaths());
+    }
+    return paths;
+  }
+
+  /**
+   * Returns all ignore files including .gitignore if applicable.
+   */
+  getAllIgnoreFilePaths(): string[] {
+    const paths = this.getIgnoreFilePaths();
+    if (
+      this.gitIgnoreFilter &&
+      this.defaultFilterFileOptions.respectGitIgnore
+    ) {
+      const gitIgnorePath = path.join(this.projectRoot, '.gitignore');
+      if (fs.existsSync(gitIgnorePath)) {
+        paths.push(gitIgnorePath);
+      }
+    }
+    return paths;
   }
 }
