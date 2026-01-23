@@ -55,7 +55,7 @@ and parameters.
 The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
 You can use either model aliases (user-friendly names) or concrete model names.
 
-### Model Aliases
+### Model aliases
 
 These are convenient shortcuts that map to specific models:
 
