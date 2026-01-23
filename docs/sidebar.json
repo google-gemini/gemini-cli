@@ -42,6 +42,10 @@
       {
         "label": "Examples",
         "slug": "docs/get-started/examples"
+      },
+      {
+        "label": "CLI cheatsheet",
+        "slug": "docs/get-started/cli-cheatsheet"
       }
     ]
   },
@@ -51,10 +55,6 @@
       {
         "label": "Introduction",
         "slug": "docs/cli"
-      },
-      {
-        "label": "CLI Reference",
-        "slug": "docs/cli/cli-reference"
       },
       {
         "label": "Commands",
