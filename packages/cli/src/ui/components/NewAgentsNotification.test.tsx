@@ -43,11 +43,7 @@ describe('NewAgentsNotification', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('New Agents Discovered');
-    expect(frame).toContain('Agent A');
-    expect(frame).toContain('Description A');
-    expect(frame).toContain('Agent B');
-    expect(frame).toContain('Description B');
+    expect(frame).toMatchSnapshot();
     unmount();
   });
 
@@ -65,10 +61,7 @@ describe('NewAgentsNotification', () => {
     );
 
     const frame = lastFrame();
-    expect(frame).toContain('Agent 0');
-    expect(frame).toContain('Agent 4');
-    expect(frame).not.toContain('Agent 5'); // Should be truncated
-    expect(frame).toContain('... and 2 more');
+    expect(frame).toMatchSnapshot();
     unmount();
   });
 

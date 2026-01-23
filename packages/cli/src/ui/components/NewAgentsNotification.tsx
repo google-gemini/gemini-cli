@@ -40,8 +40,9 @@ export const NewAgentsNotification = ({
   ];
 
   // Limit display to 5 agents to avoid overflow, show count for rest
-  const displayAgents = agents.slice(0, 5);
-  const remaining = agents.length - 5;
+  const MAX_DISPLAYED_AGENTS = 5;
+  const displayAgents = agents.slice(0, MAX_DISPLAYED_AGENTS);
+  const remaining = agents.length - MAX_DISPLAYED_AGENTS;
 
   return (
     <Box flexDirection="column" width="100%">
