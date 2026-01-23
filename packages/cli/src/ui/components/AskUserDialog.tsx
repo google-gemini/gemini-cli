@@ -10,6 +10,7 @@ import React, {
   useMemo,
   useRef,
   useEffect,
+  useReducer,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -17,6 +18,104 @@ import type { Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+
+interface AskUserDialogState {
+  currentQuestionIndex: number;
+  answers: { [key: string]: string };
+  isEditingCustomOption: boolean;
+  submitted: boolean;
+}
+
+type AskUserDialogAction =
+  | { type: 'NEXT_QUESTION'; payload: { maxIndex: number } }
+  | { type: 'PREV_QUESTION' }
+  | {
+      type: 'SET_ANSWER';
+      payload: {
+        index: number;
+        answer: string;
+        autoAdvance?: boolean;
+        maxIndex?: number;
+      };
+    }
+  | { type: 'SET_EDITING_CUSTOM'; payload: { isEditing: boolean } }
+  | { type: 'SUBMIT' };
+
+const initialState: AskUserDialogState = {
+  currentQuestionIndex: 0,
+  answers: {},
+  isEditingCustomOption: false,
+  submitted: false,
+};
+
+function askUserDialogReducerLogic(
+  state: AskUserDialogState,
+  action: AskUserDialogAction,
+): AskUserDialogState {
+  if (state.submitted) {
+    return state;
+  }
+
+  switch (action.type) {
+    case 'NEXT_QUESTION': {
+      if (state.currentQuestionIndex < action.payload.maxIndex) {
+        return {
+          ...state,
+          currentQuestionIndex: state.currentQuestionIndex + 1,
+        };
+      }
+      return state;
+    }
+    case 'PREV_QUESTION': {
+      if (state.currentQuestionIndex > 0) {
+        return {
+          ...state,
+          currentQuestionIndex: state.currentQuestionIndex - 1,
+        };
+      }
+      return state;
+    }
+    case 'SET_ANSWER': {
+      const { index, answer, autoAdvance, maxIndex } = action.payload;
+      const hasAnswer = answer && answer.trim();
+      const newAnswers = { ...state.answers };
+
+      if (hasAnswer) {
+        newAnswers[index] = answer;
+      } else {
+        delete newAnswers[index];
+      }
+
+      const newState = {
+        ...state,
+        answers: newAnswers,
+      };
+
+      if (autoAdvance && typeof maxIndex === 'number') {
+        if (newState.currentQuestionIndex < maxIndex) {
+          newState.currentQuestionIndex += 1;
+        }
+      }
+
+      return newState;
+    }
+    case 'SET_EDITING_CUSTOM': {
+      return {
+        ...state,
+        isEditingCustomOption: action.payload.isEditing,
+      };
+    }
+    case 'SUBMIT': {
+      return {
+        ...state,
+        submitted: true,
+      };
+    }
+    default:
+      return state;
+  }
+}
 
 interface AskUserDialogProps {
   questions: Question[];
@@ -99,7 +198,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   // Handle Enter to submit
   useKeypress(
     (key: Key) => {
-      if (key.name === 'return') {
+      if (keyMatchers[Command.RETURN](key)) {
         onSubmit();
       }
     },
@@ -173,7 +272,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const handleTextTyping = useCallback(
     (key: Key) => {
       // Handle Ctrl+C to clear all text
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.QUIT](key)) {
         setTextValue('');
         onSelectionChange?.('');
         return;
@@ -188,7 +287,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       }
 
       // Handle Enter to submit
-      if (key.name === 'return') {
+      if (keyMatchers[Command.RETURN](key)) {
         if (textValue.trim()) {
           onAnswer(textValue.trim());
         }
@@ -372,7 +471,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       if (!isCustomOptionFocused) return;
 
       // Handle Ctrl+C to clear all text
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.QUIT](key)) {
         setCustomOptionText('');
         setIsCustomOptionSelected(false);
         // Save for multi-select
@@ -686,14 +785,17 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onCancel,
   onActiveTextInputChange,
 }) => {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<{ [key: string]: string }>({});
-  const [isEditingCustomOption, setIsEditingCustomOption] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
+  const { currentQuestionIndex, answers, isEditingCustomOption, submitted } =
+    state;
+
   // Use refs for synchronous checks to prevent race conditions
-  const submittedRef = useRef(false);
   const isEditingCustomOptionRef = useRef(false);
   isEditingCustomOptionRef.current = isEditingCustomOption;
+
+  const handleEditingCustomOption = useCallback((isEditing: boolean) => {
+    dispatch({ type: 'SET_EDITING_CUSTOM', payload: { isEditing } });
+  }, []);
 
   // Sync isEditingCustomOption state with parent for global keypress handling
   // Clean up on unmount to ensure Ctrl+C works normally after dialog closes
@@ -707,18 +809,17 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   // Handle Escape or Ctrl+C to cancel (but not Ctrl+C when editing custom option)
   const handleCancel = useCallback(
     (key: Key) => {
-      if (submittedRef.current) return;
-      if (key.name === 'escape') {
+      if (submitted) return;
+      if (keyMatchers[Command.ESCAPE](key)) {
         onCancel();
       } else if (
-        key.ctrl &&
-        key.name === 'c' &&
+        keyMatchers[Command.QUIT](key) &&
         !isEditingCustomOptionRef.current
       ) {
         onCancel();
       }
     },
-    [onCancel],
+    [onCancel, submitted],
   );
 
   useKeypress(handleCancel, {
@@ -736,86 +837,80 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       // (isEditingCustomOption blocks navigation for choice-type custom option field, not text-type questions)
       const currentQuestionIsText =
         questions[currentQuestionIndex]?.type === 'text';
-      if (
-        (isEditingCustomOption && !currentQuestionIsText) ||
-        submittedRef.current
-      )
+      if ((isEditingCustomOption && !currentQuestionIsText) || submitted)
         return;
 
-      if (key.name === 'tab' || key.name === 'right') {
+      if (keyMatchers[Command.MOVE_RIGHT](key) || key.name === 'tab') {
         // Allow navigation up to Review tab for multi-question flows
         const maxIndex =
           questions.length > 1 ? reviewTabIndex : questions.length - 1;
-        if (currentQuestionIndex < maxIndex) {
-          setCurrentQuestionIndex((prev) => prev + 1);
-        }
-      } else if (key.name === 'left') {
-        if (currentQuestionIndex > 0) {
-          setCurrentQuestionIndex((prev) => prev - 1);
-        }
+        dispatch({ type: 'NEXT_QUESTION', payload: { maxIndex } });
+      } else if (keyMatchers[Command.MOVE_LEFT](key)) {
+        dispatch({ type: 'PREV_QUESTION' });
       }
     },
-    [isEditingCustomOption, currentQuestionIndex, questions, reviewTabIndex],
+    [
+      isEditingCustomOption,
+      currentQuestionIndex,
+      questions,
+      reviewTabIndex,
+      submitted,
+    ],
   );
 
   useKeypress(handleNavigation, {
     isActive: questions.length > 1 && !submitted,
   });
 
+  // Effect to trigger submission when state.submitted becomes true
+  // This ensures the callback is called only after state update is processed
+  useEffect(() => {
+    if (submitted) {
+      onSubmit(answers);
+    }
+  }, [submitted, answers, onSubmit]);
+
   const handleAnswer = useCallback(
     (answer: string) => {
-      if (submittedRef.current) return;
+      if (submitted) return;
 
-      // Only record non-empty answers
-      const hasAnswer = answer && answer.trim();
-      const newAnswers = hasAnswer
-        ? { ...answers, [currentQuestionIndex]: answer }
-        : answers;
-      if (hasAnswer) {
-        setAnswers(newAnswers);
-      }
+      const reviewTabIndex = questions.length;
+      dispatch({
+        type: 'SET_ANSWER',
+        payload: {
+          index: currentQuestionIndex,
+          answer,
+          autoAdvance: questions.length > 1,
+          maxIndex: reviewTabIndex,
+        },
+      });
 
-      // For single questions, submit directly (no review tab)
       if (questions.length === 1) {
-        submittedRef.current = true;
-        setSubmitted(true);
-        onSubmit(newAnswers);
-        return;
-      }
-
-      // For multi-questions, advance to next question or Review tab
-      if (currentQuestionIndex < reviewTabIndex) {
-        setCurrentQuestionIndex((prev) => prev + 1);
+        dispatch({ type: 'SUBMIT' });
       }
     },
-    [currentQuestionIndex, questions.length, answers, onSubmit, reviewTabIndex],
+    [currentQuestionIndex, questions.length, submitted],
   );
 
   // Submit from Review tab
   const handleReviewSubmit = useCallback(() => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
-    setSubmitted(true);
-    onSubmit(answers);
-  }, [answers, onSubmit]);
+    if (submitted) return;
+    dispatch({ type: 'SUBMIT' });
+  }, [submitted]);
 
-  // Save multi-select selections without triggering navigation
   const handleSelectionChange = useCallback(
     (answer: string) => {
-      if (submittedRef.current) return;
-      const hasAnswer = answer && answer.trim();
-      if (hasAnswer) {
-        setAnswers((prev) => ({ ...prev, [currentQuestionIndex]: answer }));
-      } else {
-        // Remove empty answer from state
-        setAnswers((prev) => {
-          const next = { ...prev };
-          delete next[currentQuestionIndex];
-          return next;
-        });
-      }
+      if (submitted) return;
+      dispatch({
+        type: 'SET_ANSWER',
+        payload: {
+          index: currentQuestionIndex,
+          answer,
+          autoAdvance: false,
+        },
+      });
     },
-    [currentQuestionIndex],
+    [currentQuestionIndex, submitted],
   );
 
   const answeredIndices = useMemo(
@@ -873,7 +968,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         question={currentQuestion}
         onAnswer={handleAnswer}
         onSelectionChange={handleSelectionChange}
-        onEditingCustomOption={setIsEditingCustomOption}
+        onEditingCustomOption={handleEditingCustomOption}
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
@@ -900,7 +995,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       question={effectiveQuestion}
       onAnswer={handleAnswer}
       onSelectionChange={handleSelectionChange}
-      onEditingCustomOption={setIsEditingCustomOption}
+      onEditingCustomOption={handleEditingCustomOption}
       initialAnswer={answers[currentQuestionIndex]}
       progressHeader={progressHeader}
       keyboardHints={keyboardHints}
