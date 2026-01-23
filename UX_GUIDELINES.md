@@ -50,15 +50,42 @@ like "Hide."
 | `Hide Footer: False`    | `Footer: Show`     |
 | `Show Tips: False`      | `Usage Tips: Hide` |
 
-### 4. Value Terminology: Semantic State
+### 4. Value Terminology & Visuals: "On" vs. "Off"
 
-Avoid exposing raw data types to the user.
+Avoid exposing raw data types or verbose state descriptions. Use high-contrast,
+short terms for boolean toggles.
 
-- **Principle:** Use `Enabled/Disabled` or `On/Off` instead of `true/false`.
-- **Why:** `true/false` feels like a raw configuration file or JSON dump.
-  `Enabled/Disabled` feels like a polished interface control.
+- **Principle:** Use **On** and **Off** for all boolean settings.
+- **Visuals:**
+  - **On:** Render in **Green** (Success color).
+  - **Off:** Render in **Gray** (Secondary/Dimmed color).
+- **Why:** "On/Off" provides immediate status recognition with minimal character
+  width, improving scanability.
 
-| ❌ Avoid         | ✅ Recommended         |
-| :--------------- | :--------------------- |
-| `true` / `false` | `Enabled` / `Disabled` |
-| `yes` / `no`     | `On` / `Off`           |
+| ❌ Avoid         | ✅ Recommended |
+| :--------------- | :------------- |
+| `true` / `false` | `On` / `Off`   |
+| `Enabled`        | `On`           |
+| `Disabled`       | `Off`          |
+
+### 5. Header Styling
+
+Headers serve as primary visual delimiters.
+
+- **Style:** **Bold Title Case** text followed by a horizontal separator (`─`)
+  extending to the right edge.
+- **Spacing:** Always insert one empty line _after_ the header row before items
+  begin.
+- **Example:** `Application ──────────────────────────────────────────`
+
+### 6. Standard Categories
+
+Organize settings into these standard groups to maintain consistency across the
+application.
+
+1.  **APPLICATION** (Global app behavior, updates, modes)
+2.  **INTELLIGENCE & MODEL** (AI behavior, limits, approvals)
+3.  **INTERFACE & APPEARANCE** (Visuals, layout, colors)
+4.  **EDITOR & INPUT** (Interaction, keybindings, editing)
+5.  **FILE SYSTEM & CONTEXT** (File access, search, boundaries)
+6.  **SYSTEM** (Low-level config, maintenance, security hooks)
