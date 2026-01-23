@@ -40,22 +40,25 @@ export function TextInput({
 
   const handleKeyPress = useCallback(
     (key: Key) => {
+      // console.log(`TextInput handleKeyPress ${key.name} priority subscriber`);
       if (key.name === 'escape') {
         onCancel?.();
-        return;
+        return true;
       }
 
       if (key.name === 'return') {
         onSubmit?.(text);
-        return;
+        return true;
       }
 
-      handleInput(key);
+      const handled = handleInput(key);
+      // console.log(`TextInput handled: ${handled}`);
+      return handled;
     },
     [handleInput, onCancel, onSubmit, text],
   );
 
-  useKeypress(handleKeyPress, { isActive: focus });
+  useKeypress(handleKeyPress, { isActive: focus, priority: true });
 
   const showPlaceholder = text.length === 0 && placeholder;
 

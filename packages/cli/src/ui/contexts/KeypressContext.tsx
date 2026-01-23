@@ -215,7 +215,9 @@ function bufferBackslashEnter(
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
+  return (key: Key) => {
+    bufferer.next(key);
+  };
 }
 
 /**
@@ -267,7 +269,9 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
+  return (key: Key) => {
+    bufferer.next(key);
+  };
 }
 
 /**
@@ -620,10 +624,10 @@ export interface Key {
   sequence: string;
 }
 
-export type KeypressHandler = (key: Key) => void;
+export type KeypressHandler = (key: Key) => boolean | void;
 
 interface KeypressContextValue {
-  subscribe: (handler: KeypressHandler) => void;
+  subscribe: (handler: KeypressHandler, priority?: boolean) => void;
   unsubscribe: (handler: KeypressHandler) => void;
 }
 
@@ -652,18 +656,49 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+
   const subscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.add(handler),
-    [subscribers],
+    (handler: KeypressHandler, priority = false) => {
+      if (priority) {
+        prioritySubscribers.add(handler);
+      } else {
+        normalSubscribers.add(handler);
+      }
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const unsubscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.delete(handler),
-    [subscribers],
+    (handler: KeypressHandler) => {
+      prioritySubscribers.delete(handler);
+      normalSubscribers.delete(handler);
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const broadcast = useCallback(
-    (key: Key) => subscribers.forEach((handler) => handler(key)),
-    [subscribers],
+    (key: Key) => {
+      // Process priority subscribers first, in reverse order (stack behavior)
+      const priorityHandlers = Array.from(prioritySubscribers).reverse();
+      for (const handler of priorityHandlers) {
+        if (handler(key) === true) {
+          // debugLogger.debug(`Key ${key.name} consumed by priority handler`);
+          return;
+        }
+      }
+
+      // Then process normal subscribers, also in reverse order
+      const normalHandlers = Array.from(normalSubscribers).reverse();
+      for (const handler of normalHandlers) {
+        if (handler(key) === true) {
+          // debugLogger.debug(`Key ${key.name} consumed by normal handler`);
+          return;
+        }
+      }
+    },
+    [prioritySubscribers, normalSubscribers],
   );
 
   useEffect(() => {

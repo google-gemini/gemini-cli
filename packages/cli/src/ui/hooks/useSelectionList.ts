@@ -397,17 +397,18 @@ export function useSelectionList<T>({
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        // console.log(`useSelectionList handleKeypress ${key.name} normal subscriber`);
         dispatch({ type: 'MOVE_DOWN' });
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
-        return;
+        return true;
       }
 
       // Handle numeric input for quick selection
@@ -426,7 +427,7 @@ export function useSelectionList<T>({
           numberInputTimer.current = setTimeout(() => {
             numberInputRef.current = '';
           }, NUMBER_INPUT_TIMEOUT_MS);
-          return;
+          return true;
         }
 
         if (targetIndex >= 0 && targetIndex < itemsLength) {
@@ -455,7 +456,9 @@ export function useSelectionList<T>({
           // Number is out of bounds
           numberInputRef.current = '';
         }
+        return true;
       }
+      return false;
     },
     [dispatch, itemsLength, showNumbers],
   );
