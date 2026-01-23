@@ -814,6 +814,32 @@ export function getTransformUnderCursor(
   return null;
 }
 
+export interface ExpandedPasteInfo {
+  startLine: number;
+  lineCount: number;
+  prefix: string;
+  suffix: string;
+}
+
+/**
+ * Check if a line index falls within an expanded paste region.
+ * Returns the paste placeholder ID if found, null otherwise.
+ */
+export function getExpandedPasteAtLine(
+  lineIndex: number,
+  expandedPasteInfo: Map<string, ExpandedPasteInfo>,
+): string | null {
+  for (const [id, info] of expandedPasteInfo) {
+    if (
+      lineIndex >= info.startLine &&
+      lineIndex < info.startLine + info.lineCount
+    ) {
+      return id;
+    }
+  }
+  return null;
+}
+
 /**
  * Represents an atomic placeholder that should be deleted as a unit.
  * Extensible to support future placeholder types.
@@ -1272,6 +1298,15 @@ export interface TextBufferState {
   viewportHeight: number;
   visualLayout: VisualLayout;
   pastedContent: Record<string, string>;
+  expandedPasteInfo: Map<
+    string,
+    {
+      startLine: number;
+      lineCount: number;
+      prefix: string;
+      suffix: string;
+    }
+  >;
 }
 
 const historyLimit = 100;
@@ -1383,7 +1418,9 @@ export type TextBufferAction =
   | { type: 'vim_move_to_first_line' }
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
-  | { type: 'vim_escape_insert_mode' };
+  | { type: 'vim_escape_insert_mode' }
+  | { type: 'toggle_paste_expansion'; payload: { id: string } }
+  | { type: 'detach_expanded_paste'; payload: { id: string } };
 
 export interface TextBufferOptions {
   inputFilter?: (text: string) => string;
@@ -1422,7 +1459,24 @@ function textBufferReducerLogic(
     }
 
     case 'insert': {
-      const nextState = pushUndoLocal(state);
+      let currentState = state;
+      // Detach any expanded paste if cursor is within it
+      const expandedId = getExpandedPasteAtLine(
+        state.cursorRow,
+        state.expandedPasteInfo,
+      );
+      if (expandedId) {
+        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        newExpandedInfo.delete(expandedId);
+        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
+        currentState = {
+          ...state,
+          expandedPasteInfo: newExpandedInfo,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      const nextState = pushUndoLocal(currentState);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1507,10 +1561,28 @@ function textBufferReducerLogic(
     }
 
     case 'backspace': {
-      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+      // Detach any expanded paste if cursor is within it
+      let currentState = state;
+      const expandedId = getExpandedPasteAtLine(
+        state.cursorRow,
+        state.expandedPasteInfo,
+      );
+      if (expandedId) {
+        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        newExpandedInfo.delete(expandedId);
+        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
+        currentState = {
+          ...state,
+          expandedPasteInfo: newExpandedInfo,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      const { cursorRow, cursorCol, lines, transformationsByLine } =
+        currentState;
 
       // Early return if at start of buffer
-      if (cursorCol === 0 && cursorRow === 0) return state;
+      if (cursorCol === 0 && cursorRow === 0) return currentState;
 
       // Check if cursor is at end of an atomic placeholder
       const transformations = transformationsByLine[cursorRow] ?? [];
@@ -1767,7 +1839,25 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const { cursorRow, cursorCol, lines, transformationsByLine } = state;
+      // Detach any expanded paste if cursor is within it
+      let currentState = state;
+      const expandedId = getExpandedPasteAtLine(
+        state.cursorRow,
+        state.expandedPasteInfo,
+      );
+      if (expandedId) {
+        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        newExpandedInfo.delete(expandedId);
+        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
+        currentState = {
+          ...state,
+          expandedPasteInfo: newExpandedInfo,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      const { cursorRow, cursorCol, lines, transformationsByLine } =
+        currentState;
 
       // Check if cursor is at start of an atomic placeholder
       const transformations = transformationsByLine[cursorRow] ?? [];
@@ -2051,6 +2141,130 @@ function textBufferReducerLogic(
     case 'vim_escape_insert_mode':
       return handleVimAction(state, action as VimAction);
 
+    case 'toggle_paste_expansion': {
+      const { id } = action.payload;
+      const info = state.expandedPasteInfo.get(id);
+
+      if (info) {
+        // COLLAPSE: Restore original line with placeholder
+        const newLines = [...state.lines];
+        newLines.splice(
+          info.startLine,
+          info.lineCount,
+          info.prefix + id + info.suffix,
+        );
+
+        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        newExpandedInfo.delete(id);
+
+        // Move cursor to end of collapsed placeholder
+        const newCursorRow = info.startLine;
+        const newCursorCol = cpLen(info.prefix) + cpLen(id);
+
+        const newTransformations = calculateTransformations(newLines);
+        const newVisualLayout = calculateLayout(newLines, state.viewportWidth, [
+          newCursorRow,
+          newCursorCol,
+        ]);
+
+        return {
+          ...state,
+          lines: newLines,
+          cursorRow: newCursorRow,
+          cursorCol: newCursorCol,
+          preferredCol: null,
+          expandedPasteInfo: newExpandedInfo,
+          transformationsByLine: newTransformations,
+          visualLayout: newVisualLayout,
+        };
+      } else {
+        // EXPAND: Replace placeholder with content
+        const content = state.pastedContent[id];
+        if (!content) return state;
+
+        // Find line containing placeholder
+        const lineIndex = state.lines.findIndex((line) => line.includes(id));
+        if (lineIndex === -1) return state;
+
+        const line = state.lines[lineIndex];
+        const placeholderStart = line.indexOf(id);
+        const prefix = line.slice(0, placeholderStart);
+        const suffix = line.slice(placeholderStart + id.length);
+
+        // Split content into lines
+        const contentLines = content.split('\n');
+        const newLines = [...state.lines];
+
+        let expandedLines: string[];
+        if (contentLines.length === 1) {
+          // Single-line content
+          expandedLines = [prefix + contentLines[0] + suffix];
+        } else {
+          // Multi-line content
+          expandedLines = [
+            prefix + contentLines[0],
+            ...contentLines.slice(1, -1),
+            contentLines[contentLines.length - 1] + suffix,
+          ];
+        }
+
+        newLines.splice(lineIndex, 1, ...expandedLines);
+
+        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        newExpandedInfo.set(id, {
+          startLine: lineIndex,
+          lineCount: expandedLines.length,
+          prefix,
+          suffix,
+        });
+
+        // Move cursor to end of expanded content (before suffix)
+        const newCursorRow = lineIndex + expandedLines.length - 1;
+        const lastExpandedLine = expandedLines[expandedLines.length - 1];
+        const newCursorCol = cpLen(lastExpandedLine) - cpLen(suffix);
+
+        const newTransformations = calculateTransformations(newLines);
+        const newVisualLayout = calculateLayout(newLines, state.viewportWidth, [
+          newCursorRow,
+          newCursorCol,
+        ]);
+
+        return {
+          ...state,
+          lines: newLines,
+          cursorRow: newCursorRow,
+          cursorCol: newCursorCol,
+          preferredCol: null,
+          expandedPasteInfo: newExpandedInfo,
+          transformationsByLine: newTransformations,
+          visualLayout: newVisualLayout,
+        };
+      }
+    }
+
+    case 'detach_expanded_paste': {
+      const { id } = action.payload;
+      const newExpandedInfo = new Map(state.expandedPasteInfo);
+      newExpandedInfo.delete(id);
+
+      const { [id]: _, ...newPastedContent } = state.pastedContent;
+
+      const newTransformations = calculateTransformations(state.lines);
+      const newVisualLayout = calculateLayout(
+        state.lines,
+        state.viewportWidth,
+        [state.cursorRow, state.cursorCol],
+      );
+
+      return {
+        ...state,
+        expandedPasteInfo: newExpandedInfo,
+        pastedContent: newPastedContent,
+        transformationsByLine: newTransformations,
+        visualLayout: newVisualLayout,
+      };
+    }
+
     default: {
       const exhaustiveCheck: never = action;
       debugLogger.error(`Unknown action encountered: ${exhaustiveCheck}`);
@@ -2152,6 +2366,7 @@ export function useTextBuffer({
       viewportHeight: viewport.height,
       visualLayout,
       pastedContent: {},
+      expandedPasteInfo: new Map(),
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -2169,6 +2384,7 @@ export function useTextBuffer({
     visualLayout,
     transformationsByLine,
     pastedContent,
+    expandedPasteInfo,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -2650,9 +2866,79 @@ export function useTextBuffer({
     [visualLayout, lines],
   );
 
+  const getLogicalPositionFromVisual = useCallback(
+    (visRow: number, visCol: number): { row: number; col: number } | null => {
+      const {
+        visualLines,
+        visualToLogicalMap,
+        transformedToLogicalMaps,
+        visualToTransformedMap,
+      } = visualLayout;
+
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
+
+      if (!visualToLogicalMap[clampedVisRow]) {
+        return null;
+      }
+
+      const [logRow] = visualToLogicalMap[clampedVisRow];
+      const transformedToLogicalMap = transformedToLogicalMaps?.[logRow] ?? [];
+
+      // Where does this visual line begin within the transformed line?
+      const startColInTransformed =
+        visualToTransformedMap?.[clampedVisRow] ?? 0;
+
+      // Handle wide characters: convert visual X position to character offset
+      const codePoints = toCodePoints(visualLine);
+      let currentVisX = 0;
+      let charOffset = 0;
+
+      for (const char of codePoints) {
+        const charWidth = getCachedStringWidth(char);
+        if (visCol < currentVisX + charWidth) {
+          if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+            charOffset++;
+          }
+          break;
+        }
+        currentVisX += charWidth;
+        charOffset++;
+      }
+
+      charOffset = Math.min(charOffset, codePoints.length);
+
+      const transformedCol = Math.min(
+        startColInTransformed + charOffset,
+        Math.max(0, transformedToLogicalMap.length - 1),
+      );
+
+      const row = logRow;
+      const col =
+        transformedToLogicalMap[transformedCol] ?? cpLen(lines[logRow] ?? '');
+
+      return { row, col };
+    },
+    [visualLayout, lines],
+  );
+
   const getOffset = useCallback(
     (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
     [lines, cursorRow, cursorCol],
+  );
+
+  const togglePasteExpansion = useCallback((id: string): void => {
+    dispatch({ type: 'toggle_paste_expansion', payload: { id } });
+  }, []);
+
+  const getExpandedPasteAtLineCallback = useCallback(
+    (lineIndex: number): string | null =>
+      getExpandedPasteAtLine(lineIndex, expandedPasteInfo),
+    [expandedPasteInfo],
   );
 
   const returnValue: TextBuffer = useMemo(
@@ -2686,6 +2972,10 @@ export function useTextBuffer({
       moveToOffset,
       getOffset,
       moveToVisualPosition,
+      getLogicalPositionFromVisual,
+      getExpandedPasteAtLine: getExpandedPasteAtLineCallback,
+      togglePasteExpansion,
+      expandedPasteInfo,
       deleteWordLeft,
       deleteWordRight,
 
@@ -2757,6 +3047,10 @@ export function useTextBuffer({
       moveToOffset,
       getOffset,
       moveToVisualPosition,
+      getLogicalPositionFromVisual,
+      getExpandedPasteAtLineCallback,
+      togglePasteExpansion,
+      expandedPasteInfo,
       deleteWordLeft,
       deleteWordRight,
       killLineRight,
@@ -2926,6 +3220,37 @@ export interface TextBuffer {
   getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
+  /**
+   * Convert visual coordinates to logical position without moving cursor.
+   * Returns null if the position is out of bounds.
+   */
+  getLogicalPositionFromVisual(
+    visualRow: number,
+    visualCol: number,
+  ): { row: number; col: number } | null;
+  /**
+   * Check if a line index falls within an expanded paste region.
+   * Returns the paste placeholder ID if found, null otherwise.
+   */
+  getExpandedPasteAtLine(lineIndex: number): string | null;
+  /**
+   * Toggle expansion state for a paste placeholder.
+   * If collapsed, expands to show full content inline.
+   * If expanded, collapses back to placeholder.
+   */
+  togglePasteExpansion(id: string): void;
+  /**
+   * The current expanded paste info map (read-only).
+   */
+  expandedPasteInfo: Map<
+    string,
+    {
+      startLine: number;
+      lineCount: number;
+      prefix: string;
+      suffix: string;
+    }
+  >;
 
   // Vim-specific operations
   /**

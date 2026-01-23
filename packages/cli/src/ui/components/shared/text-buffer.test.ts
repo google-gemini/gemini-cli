@@ -57,6 +57,7 @@ const initialState: TextBufferState = {
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
   pastedContent: {},
+  expandedPasteInfo: new Map(),
 };
 
 /**
