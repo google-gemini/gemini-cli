@@ -142,6 +142,8 @@ case is response validation and automatic retries.
   - `reason`: Required if denied. This text is sent **to the agent as a new
     prompt** to request a correction.
   - `continue`: Set to `false` to **stop the session** without retrying.
+  - `clearContext`: If `true`, clears conversation history (LLM memory) while
+    preserving UI display.
 - **Exit Code 2 (Retry)**: Rejects the response and triggers an automatic retry
   turn using `stderr` as the feedback prompt.
 
