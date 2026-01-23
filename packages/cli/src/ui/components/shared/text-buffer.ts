@@ -841,6 +841,28 @@ export function getExpandedPasteAtLine(
 }
 
 /**
+ * Detach any expanded paste region if the cursor is within it.
+ * This converts the expanded content to regular text that can no longer be collapsed.
+ * Returns the state unchanged if cursor is not in an expanded region.
+ */
+function detachExpandedPaste(state: TextBufferState): TextBufferState {
+  const expandedId = getExpandedPasteAtLine(
+    state.cursorRow,
+    state.expandedPasteInfo,
+  );
+  if (!expandedId) return state;
+
+  const newExpandedInfo = new Map(state.expandedPasteInfo);
+  newExpandedInfo.delete(expandedId);
+  const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
+  return {
+    ...state,
+    expandedPasteInfo: newExpandedInfo,
+    pastedContent: newPastedContent,
+  };
+}
+
+/**
  * Represents an atomic placeholder that should be deleted as a unit.
  * Extensible to support future placeholder types.
  */
@@ -1419,8 +1441,7 @@ export type TextBufferAction =
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
   | { type: 'vim_escape_insert_mode' }
-  | { type: 'toggle_paste_expansion'; payload: { id: string } }
-  | { type: 'detach_expanded_paste'; payload: { id: string } };
+  | { type: 'toggle_paste_expansion'; payload: { id: string } };
 
 export interface TextBufferOptions {
   inputFilter?: (text: string) => string;
@@ -1459,24 +1480,7 @@ function textBufferReducerLogic(
     }
 
     case 'insert': {
-      let currentState = state;
-      // Detach any expanded paste if cursor is within it
-      const expandedId = getExpandedPasteAtLine(
-        state.cursorRow,
-        state.expandedPasteInfo,
-      );
-      if (expandedId) {
-        const newExpandedInfo = new Map(state.expandedPasteInfo);
-        newExpandedInfo.delete(expandedId);
-        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
-        currentState = {
-          ...state,
-          expandedPasteInfo: newExpandedInfo,
-          pastedContent: newPastedContent,
-        };
-      }
-
-      const nextState = pushUndoLocal(currentState);
+      const nextState = pushUndoLocal(detachExpandedPaste(state));
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1561,23 +1565,7 @@ function textBufferReducerLogic(
     }
 
     case 'backspace': {
-      // Detach any expanded paste if cursor is within it
-      let currentState = state;
-      const expandedId = getExpandedPasteAtLine(
-        state.cursorRow,
-        state.expandedPasteInfo,
-      );
-      if (expandedId) {
-        const newExpandedInfo = new Map(state.expandedPasteInfo);
-        newExpandedInfo.delete(expandedId);
-        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
-        currentState = {
-          ...state,
-          expandedPasteInfo: newExpandedInfo,
-          pastedContent: newPastedContent,
-        };
-      }
-
+      const currentState = detachExpandedPaste(state);
       const { cursorRow, cursorCol, lines, transformationsByLine } =
         currentState;
 
@@ -1839,23 +1827,7 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      // Detach any expanded paste if cursor is within it
-      let currentState = state;
-      const expandedId = getExpandedPasteAtLine(
-        state.cursorRow,
-        state.expandedPasteInfo,
-      );
-      if (expandedId) {
-        const newExpandedInfo = new Map(state.expandedPasteInfo);
-        newExpandedInfo.delete(expandedId);
-        const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
-        currentState = {
-          ...state,
-          expandedPasteInfo: newExpandedInfo,
-          pastedContent: newPastedContent,
-        };
-      }
-
+      const currentState = detachExpandedPaste(state);
       const { cursorRow, cursorCol, lines, transformationsByLine } =
         currentState;
 
@@ -2240,29 +2212,6 @@ function textBufferReducerLogic(
           visualLayout: newVisualLayout,
         };
       }
-    }
-
-    case 'detach_expanded_paste': {
-      const { id } = action.payload;
-      const newExpandedInfo = new Map(state.expandedPasteInfo);
-      newExpandedInfo.delete(id);
-
-      const { [id]: _, ...newPastedContent } = state.pastedContent;
-
-      const newTransformations = calculateTransformations(state.lines);
-      const newVisualLayout = calculateLayout(
-        state.lines,
-        state.viewportWidth,
-        [state.cursorRow, state.cursorCol],
-      );
-
-      return {
-        ...state,
-        expandedPasteInfo: newExpandedInfo,
-        pastedContent: newPastedContent,
-        transformationsByLine: newTransformations,
-        visualLayout: newVisualLayout,
-      };
     }
 
     default: {
