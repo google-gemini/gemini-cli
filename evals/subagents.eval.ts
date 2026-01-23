@@ -53,8 +53,7 @@ describe('subagent eval test cases', () => {
 
   evalTest('ALWAYS_PASSES', {
     name: 'should fix linter errors in multiple projects',
-    prompt:
-      'Fix all linter errors by delegating to the codebase investigator in parallel. Do not run any shell commands to verify.',
+    prompt: 'Fix all linter errors.',
     files: {
       'project-a/eslint.config.js': `
         module.exports = [
