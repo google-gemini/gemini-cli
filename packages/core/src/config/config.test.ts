@@ -156,7 +156,7 @@ vi.mock('../agents/registry.js', () => {
 });
 
 vi.mock('../agents/subagent-tool.js', () => ({
-  SubAgentTool: vi.fn(),
+  SubagentTool: vi.fn(),
 }));
 
 vi.mock('../resources/resource-registry.js', () => ({
@@ -972,9 +972,9 @@ describe('Server Config (config.ts)', () => {
 
       const SubAgentToolMock = (
         (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubAgentTool: Mock;
+          SubagentTool: Mock;
         }
-      ).SubAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
@@ -1012,9 +1012,9 @@ describe('Server Config (config.ts)', () => {
 
       const SubAgentToolMock = (
         (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubAgentTool: Mock;
+          SubagentTool: Mock;
         }
-      ).SubAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
