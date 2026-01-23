@@ -407,8 +407,9 @@ export class AgentRegistry {
 
       Each sub-agent is available as a specific tool.
 
-      ALWAYS use the specific tool for the subagent if one
-      exists that has expertise relevant to your task.
+      If a subagent relevant to your task is in the list below,
+      you MUST always delegate that part of the task to it by
+      using its corresponding tool.
 
       For example:
       - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the 'test-fixer' tool.
