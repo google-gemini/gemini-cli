@@ -555,6 +555,48 @@ export class TestRig {
     return filteredLines.join('\n');
   }
 
+  /**
+   * Runs the CLI and returns stdout and stderr separately.
+   * Useful for tests that need to verify correct stream routing.
+   */
+  runWithStreams(
+    args: string[],
+    options?: { signal?: AbortSignal },
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+    return new Promise((resolve, reject) => {
+      const { command, initialArgs } = this._getCommandAndArgs([
+        '--approval-mode=yolo',
+      ]);
+
+      const allArgs = [...initialArgs, ...args];
+
+      const child = spawn(command, allArgs, {
+        cwd: this.testDir!,
+        stdio: 'pipe',
+        env: { ...process.env, GEMINI_CLI_HOME: this.homeDir! },
+        signal: options?.signal,
+      });
+      this._spawnedProcesses.push(child);
+
+      let stdout = '';
+      let stderr = '';
+
+      child.on('error', reject);
+
+      child.stdout!.on('data', (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr!.on('data', (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin!.end();
+      child.on('close', (exitCode) => {
+        resolve({ stdout, stderr, exitCode });
+      });
+    });
+  }
+
   runCommand(
     args: string[],
     options: {

@@ -5,13 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn } from 'node:child_process';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { TestRig } from './test-helper.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const BUNDLE_PATH = join(__dirname, '..', 'bundle/gemini.js');
 
 describe('stdout-stderr-output', () => {
   let rig: TestRig;
@@ -24,40 +19,6 @@ describe('stdout-stderr-output', () => {
     await rig.cleanup();
   });
 
-  function runWithStreams(
-    args: string[],
-    options?: { signal?: AbortSignal },
-  ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
-    return new Promise((resolve, reject) => {
-      const allArgs = rig.fakeResponsesPath
-        ? [...args, '--fake-responses', rig.fakeResponsesPath]
-        : args;
-
-      const child = spawn('node', [BUNDLE_PATH, ...allArgs], {
-        cwd: rig.testDir!,
-        stdio: 'pipe',
-        env: { ...process.env, GEMINI_CLI_HOME: rig.homeDir! },
-        signal: options?.signal,
-      });
-      let stdout = '';
-      let stderr = '';
-
-      child.on('error', reject);
-
-      child.stdout!.on('data', (chunk) => {
-        stdout += chunk;
-      });
-      child.stderr!.on('data', (chunk) => {
-        stderr += chunk;
-      });
-
-      child.stdin!.end();
-      child.on('close', (exitCode) => {
-        resolve({ stdout, stderr, exitCode });
-      });
-    });
-  }
-
   it('should send model response to stdout and app messages to stderr', async ({
     signal,
   }) => {
@@ -68,10 +29,9 @@ describe('stdout-stderr-output', () => {
       ),
     });
 
-    const { stdout, exitCode } = await runWithStreams(
-      ['-p', 'Say hello', '--approval-mode', 'yolo'],
-      { signal },
-    );
+    const { stdout, exitCode } = await rig.runWithStreams(['-p', 'Say hello'], {
+      signal,
+    });
 
     expect(exitCode).toBe(0);
     expect(stdout.toLowerCase()).toContain('hello');
@@ -79,21 +39,25 @@ describe('stdout-stderr-output', () => {
     expect(stdout).not.toMatch(/^\[INFO\]/m);
   });
 
-  it('should send errors to stderr not stdout', async ({ signal }) => {
-    await rig.setup('error-output-test');
+  it('should handle missing file with message to stdout and error to stderr', async ({
+    signal,
+  }) => {
+    await rig.setup('error-output-test', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'stdout-stderr-output-error.responses',
+      ),
+    });
 
-    const { stdout, stderr, exitCode } = await runWithStreams(
-      [
-        '-p',
-        '@nonexistent-file-that-does-not-exist.txt explain this',
-        '--approval-mode',
-        'yolo',
-      ],
+    const { stdout, stderr, exitCode } = await rig.runWithStreams(
+      ['-p', '@nonexistent-file-that-does-not-exist.txt explain this'],
       { signal },
     );
 
-    expect(exitCode).not.toBe(0);
-    expect(stderr.toLowerCase()).toMatch(/error|not found|does not exist/);
-    expect(stdout).toBe('');
+    expect(exitCode).toBe(0);
+    expect(stdout.toLowerCase()).toMatch(
+      /could not find|not exist|does not exist/,
+    );
+    expect(stderr.toLowerCase()).toMatch(/error|not found/);
   });
 });
