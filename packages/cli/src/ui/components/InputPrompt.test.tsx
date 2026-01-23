@@ -43,6 +43,7 @@ import chalk from 'chalk';
 import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import type { UIState } from '../contexts/UIStateContext.js';
+import { isLowColorDepth } from '../utils/terminalUtils.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -51,6 +52,9 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
+vi.mock('../utils/terminalUtils.js', () => ({
+  isLowColorDepth: vi.fn(() => false),
+}));
 
 const mockSlashCommands: SlashCommand[] = [
   {
@@ -262,6 +266,7 @@ describe('InputPrompt', () => {
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
         getUseBackgroundColor: () => true,
+        getTerminalBackground: () => undefined,
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
         }),
@@ -1323,14 +1328,11 @@ describe('InputPrompt', () => {
   });
 
   describe('Background Color Styles', () => {
-    let originalGetColorDepth: () => number;
-
     beforeEach(() => {
-      originalGetColorDepth = process.stdout.getColorDepth;
+      vi.mocked(isLowColorDepth).mockReturnValue(false);
     });
 
     afterEach(() => {
-      process.stdout.getColorDepth = originalGetColorDepth;
       vi.restoreAllMocks();
     });
 
@@ -1358,7 +1360,7 @@ describe('InputPrompt', () => {
     ])(
       'should render with safe grey background but NO side borders in 8-bit mode when background is $name',
       async ({ color }) => {
-        process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
+        vi.mocked(isLowColorDepth).mockReturnValue(true);
 
         const { stdout, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
@@ -1393,8 +1395,8 @@ describe('InputPrompt', () => {
       },
     );
 
-    it('should NOT render with background color or side borders when color depth is < 24 and background is NOT black', async () => {
-      process.stdout.getColorDepth = vi.fn().mockReturnValue(8);
+    it('should NOT render with background color but SHOULD render horizontal lines when color depth is < 24 and background is NOT black', async () => {
+      vi.mocked(isLowColorDepth).mockReturnValue(true);
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1409,14 +1411,15 @@ describe('InputPrompt', () => {
         const frame = stdout.lastFrame();
         expect(frame).not.toContain('▀');
         expect(frame).not.toContain('▄');
+        // It SHOULD have horizontal fallback lines
+        expect(frame).toContain('─');
+        // It SHOULD NOT have vertical side borders (standard Box borders have │)
         expect(frame).not.toContain('│');
       });
-
       unmount();
     });
-
     it('should handle 4-bit color mode (16 colors) as low color depth', async () => {
-      process.stdout.getColorDepth = vi.fn().mockReturnValue(4);
+      vi.mocked(isLowColorDepth).mockReturnValue(true);
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1424,9 +1427,48 @@ describe('InputPrompt', () => {
 
       await waitFor(() => {
         const frame = stdout.lastFrame();
+
         expect(frame).toContain('▀');
+
         expect(frame).not.toContain('│');
       });
+
+      unmount();
+    });
+
+    it('should render horizontal lines (but NO background) in 8-bit mode when background is blue', async () => {
+      vi.mocked(isLowColorDepth).mockReturnValue(true);
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+
+        {
+          uiState: {
+            terminalBackgroundColor: 'blue',
+          } as Partial<UIState>,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = stdout.lastFrame();
+
+        // Should NOT have background characters
+
+        expect(frame).not.toContain('▀');
+
+        expect(frame).not.toContain('▄');
+
+        // Should HAVE horizontal lines from the fallback Box borders
+
+        // Box style "round" uses these for top/bottom
+
+        expect(frame).toContain('─');
+
+        // Should NOT have vertical side borders
+
+        expect(frame).not.toContain('│');
+      });
+
       unmount();
     });
 
@@ -2632,20 +2674,23 @@ describe('InputPrompt', () => {
         stdin.write('\x12');
       });
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot(
-          'command-search-render-collapsed-match',
-        );
+        expect(stdout.lastFrame()).toContain('(r:)');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-render-collapsed-match',
+      );
 
       await act(async () => {
         stdin.write('\u001B[C');
       });
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot(
-          'command-search-render-expanded-match',
-        );
+        // Just wait for any update to ensure it is stable.
+        // We could also wait for specific text if we knew it.
+        expect(stdout.lastFrame()).toContain('(r:)');
       });
-
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-render-expanded-match',
+      );
       unmount();
     });
 
@@ -3047,7 +3092,8 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
+      await waitFor(() => expect(stdout.lastFrame()).toContain('!'));
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
 
@@ -3056,7 +3102,8 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
+      await waitFor(() => expect(stdout.lastFrame()).toContain('>'));
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
 
@@ -3065,10 +3112,10 @@ describe('InputPrompt', () => {
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await waitFor(() => expect(stdout.lastFrame()).toMatchSnapshot());
+      await waitFor(() => expect(stdout.lastFrame()).toContain('*'));
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
-
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;
@@ -3077,8 +3124,8 @@ describe('InputPrompt', () => {
       );
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
-        expect(stdout.lastFrame()).toMatchSnapshot();
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
   });
@@ -3180,8 +3227,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(stdout.lastFrame()).toContain('[Image');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
 
@@ -3198,8 +3246,9 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
-        expect(stdout.lastFrame()).toMatchSnapshot();
+        expect(stdout.lastFrame()).toContain('@/path/to/screenshots');
       });
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
   });

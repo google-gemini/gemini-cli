@@ -526,15 +526,6 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
-      useFullWidth: {
-        type: 'boolean',
-        label: 'Use Full Width',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Use the entire width of the terminal for output.',
-        showInDialog: true,
-      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',

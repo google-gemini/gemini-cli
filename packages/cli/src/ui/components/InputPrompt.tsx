@@ -5,14 +5,13 @@
  */
 
 import type React from 'react';
-import process from 'node:process';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
-import { interpolateColor, resolveColor } from '../themes/color-utils.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import {
   logicalPosToOffset,
@@ -49,6 +48,9 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
+import { resolveColor } from '../themes/color-utils.js';
+import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -56,8 +58,6 @@ import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
-
-const INPUT_PROMPT_BACKGROUND_OPACITY = 0.08;
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -145,7 +145,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId, history, terminalBackgroundColor } =
+  const { terminalWidth, activePtyId, history, terminalBackgroundColor } =
     useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -326,6 +326,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const allMessages = popAllMessages();
       if (allMessages) {
         buffer.setText(allMessages);
+        return true;
       } else {
         // No queued messages, proceed with input history
         inputHistory.navigateUp();
@@ -1039,6 +1040,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
   const useBackgroundColor = config.getUseBackgroundColor();
+  const isLowColor = isLowColorDepth();
+  const terminalBg = terminalBackgroundColor || 'black';
+
+  // We should fallback to lines if the background color is disabled OR if it is
+  // enabled but we are in a low color depth terminal where we don't have a safe
+  // background color to use.
+  const useLineFallback = useMemo(() => {
+    if (!useBackgroundColor) {
+      return true;
+    }
+    if (isLowColor) {
+      const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
+      if (
+        resolvedTerminalBg !== 'black' &&
+        resolvedTerminalBg !== '#000000' &&
+        resolvedTerminalBg !== '#000' &&
+        resolvedTerminalBg !== 'white' &&
+        resolvedTerminalBg !== '#ffffff' &&
+        resolvedTerminalBg !== '#fff'
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [useBackgroundColor, isLowColor, terminalBg]);
 
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
@@ -1097,99 +1123,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ? (statusColor ?? theme.border.focused)
       : theme.border.default;
 
-  const terminalBg = terminalBackgroundColor || 'black';
-
-  const isLowColorDepth = useMemo(
-    () => process.stdout.getColorDepth && process.stdout.getColorDepth() < 24,
-    [],
-  );
-
-  const backgroundColor = useMemo(() => {
-    if (!useBackgroundColor) {
-      return undefined;
-    }
-
-    // Interpolated background colors often look bad in 256-color terminals
-    // because the limited color palette can't represent the subtle blend,
-    // leading to jarring approximations.
-    if (isLowColorDepth) {
-      const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
-      if (
-        resolvedTerminalBg === 'black' ||
-        resolvedTerminalBg === '#000000' ||
-        resolvedTerminalBg === '#000'
-      ) {
-        // In 256-color mode, we use a safe grey from the grayscale ramp
-        // (#1c1c1c is index 234) which is a subtle lift from black and is
-        // guaranteed to be available and look consistent.
-        return '#1c1c1c';
-      }
-      if (
-        resolvedTerminalBg === 'white' ||
-        resolvedTerminalBg === '#ffffff' ||
-        resolvedTerminalBg === '#fff'
-      ) {
-        // Similarly for white terminals, we use a light grey from the
-        // grayscale ramp (#eeeeee is index 255) to provide a subtle drop
-        // from white.
-        return '#eeeeee';
-      }
-      return undefined;
-    }
-
-    const resolvedBorder = resolveColor(borderColor) || borderColor;
-    const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
-    // Blend 8% of the border color onto the terminal background
-    return interpolateColor(
-      resolvedTerminalBg,
-      resolvedBorder,
-      INPUT_PROMPT_BACKGROUND_OPACITY,
-    );
-  }, [useBackgroundColor, borderColor, terminalBg, isLowColorDepth]);
-
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      {!backgroundColor ? (
+      {useLineFallback ? (
         <Box
           borderStyle="round"
           borderTop={true}
           borderBottom={false}
-          borderLeft={!isLowColorDepth}
-          borderRight={!isLowColorDepth}
+          borderLeft={false}
+          borderRight={false}
           borderColor={borderColor}
-          paddingX={1}
-          width={mainAreaWidth}
+          width={terminalWidth}
           flexDirection="row"
           alignItems="flex-start"
           height={0}
         />
-      ) : (
-        <Box width={mainAreaWidth} flexDirection="row">
-          <Text backgroundColor={backgroundColor} color={terminalBg}>
-            {'▀'.repeat(mainAreaWidth)}
-          </Text>
-        </Box>
-      )}
-
-      <Box
-        borderStyle="round"
-        borderTop={false}
-        borderBottom={false}
-        borderLeft={!backgroundColor && !isLowColorDepth}
-        borderRight={!backgroundColor && !isLowColorDepth}
-        borderColor={borderColor}
-        paddingX={!backgroundColor && !isLowColorDepth ? 1 : 0}
-        width={mainAreaWidth}
-        flexDirection="row"
-        alignItems="stretch"
-        minHeight={1}
+      ) : null}
+      <HalfLinePaddedBox
+        backgroundBaseColor={
+          isShellFocused && !isEmbeddedShellFocused
+            ? theme.border.focused
+            : theme.border.default
+        }
+        backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
+        useBackgroundColor={useBackgroundColor}
       >
         <Box
           flexGrow={1}
           flexDirection="row"
-          paddingX={backgroundColor ? 1 : 0}
-          backgroundColor={backgroundColor}
+          paddingX={1}
+          borderColor={borderColor}
+          borderStyle={useLineFallback ? 'round' : undefined}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={!useBackgroundColor}
+          borderRight={!useBackgroundColor}
         >
           <Text
             color={statusColor ?? theme.text.accent}
@@ -1228,7 +1197,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               )
             ) : (
               linesToRender
-                .map((lineText, visualIdxInRenderedSet) => {
+                .map((lineText: string, visualIdxInRenderedSet: number) => {
                   const absoluteVisualIdx =
                     scrollVisualRow + visualIdxInRenderedSet;
                   const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
@@ -1369,28 +1338,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}
           </Box>
         </Box>
-      </Box>
-      {!backgroundColor ? (
+      </HalfLinePaddedBox>
+      {useLineFallback ? (
         <Box
           borderStyle="round"
           borderTop={false}
           borderBottom={true}
-          borderLeft={!isLowColorDepth}
-          borderRight={!isLowColorDepth}
+          borderLeft={false}
+          borderRight={false}
           borderColor={borderColor}
-          paddingX={1}
-          width={mainAreaWidth}
+          width={terminalWidth}
           flexDirection="row"
           alignItems="flex-start"
           height={0}
         />
-      ) : (
-        <Box width={mainAreaWidth} flexDirection="row">
-          <Text color={terminalBg} backgroundColor={backgroundColor}>
-            {'▄'.repeat(mainAreaWidth)}
-          </Text>
-        </Box>
-      )}
+      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
