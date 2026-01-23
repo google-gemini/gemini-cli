@@ -50,4 +50,66 @@ describe('subagent eval test cases', () => {
       await rig.expectToolCallSuccess(['docs-agent']);
     },
   });
+
+  evalTest('ALWAYS_PASSES', {
+    name: 'should fix linter errors in multiple projects',
+    prompt:
+      'Fix all linter errors by delegating to the codebase investigator in parallel. Do not run any shell commands to verify.',
+    files: {
+      'project-a/eslint.config.js': `
+        module.exports = [
+          {
+            files: ["**/*.js"],
+            rules: {
+              "no-var": "error"
+            }
+          }
+        ];
+      `,
+      'project-a/index.js': 'var x = 1;',
+      'project-b/eslint.config.js': `
+        module.exports = [
+          {
+            files: ["**/*.js"],
+            rules: {
+              "no-console": "error"
+            }
+          }
+        ];
+      `,
+      'project-b/main.js': 'console.log("hello");',
+    },
+    assert: async (rig) => {
+      const fileA = rig.readFile('project-a/index.js');
+      const fileB = rig.readFile('project-b/main.js');
+
+      if (fileA.includes('var x')) {
+        throw new Error(`project-a/index.js was not fixed. Content:\n${fileA}`);
+      }
+      if (fileB.includes('console.log')) {
+        throw new Error(`project-b/main.js was not fixed. Content:\n${fileB}`);
+      }
+
+      // Assert that the agent delegated to a subagent for each project.
+      const toolLogs = rig.readToolLogs();
+      const subagentCalls = toolLogs.filter((log) => {
+        if (log.toolRequest.name === 'codebase_investigator') return true;
+        if (log.toolRequest.name === 'delegate_to_agent') {
+          try {
+            const args = JSON.parse(log.toolRequest.args);
+            return args.agent_name === 'codebase_investigator';
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+
+      if (subagentCalls.length < 2) {
+        throw new Error(
+          `Expected at least 2 codebase_investigator calls, but found ${subagentCalls.length}`,
+        );
+      }
+    },
+  });
 });
