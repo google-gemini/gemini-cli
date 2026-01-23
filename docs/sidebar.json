@@ -89,6 +89,10 @@
         "slug": "docs/cli/session-management"
       },
       {
+        "label": "Agent Skills",
+        "slug": "docs/cli/skills"
+      },
+      {
         "label": "Settings",
         "slug": "docs/cli/settings"
       },
@@ -198,7 +202,7 @@
     ]
   },
   {
-    "label": "Hooks",
+    "label": "Hooks (experimental)",
     "items": [
       {
         "label": "Introduction",
@@ -266,10 +270,6 @@
       {
         "label": "Preview release",
         "slug": "docs/changelogs/preview"
-      },
-      {
-        "label": "Changelog",
-        "slug": "docs/changelogs/releases"
       }
     ]
   },

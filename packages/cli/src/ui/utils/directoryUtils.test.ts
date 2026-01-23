@@ -16,6 +16,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...original,
+    homedir: () => mockHomeDir,
     loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
       memoryContent: 'mock memory',
       fileCount: 10,
@@ -35,10 +36,14 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-  statSync: vi.fn(),
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    statSync: vi.fn(),
+  };
+});
 
 vi.mock('node:fs/promises', () => ({
   opendir: vi.fn(),

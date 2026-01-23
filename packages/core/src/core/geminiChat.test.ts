@@ -22,12 +22,12 @@ import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
+import type { HookSystem } from '../hooks/hookSystem.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -192,9 +192,7 @@ describe('GeminiChat', () => {
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -218,6 +216,37 @@ describe('GeminiChat', () => {
     it('should initialize lastPromptTokenCount for empty history', () => {
       const chatEmpty = new GeminiChat(mockConfig);
       expect(chatEmpty.getLastPromptTokenCount()).toBe(0);
+    });
+  });
+
+  describe('setHistory', () => {
+    it('should recalculate lastPromptTokenCount when history is updated', () => {
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const chatWithHistory = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        initialHistory,
+      );
+      const initialCount = chatWithHistory.getLastPromptTokenCount();
+
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'This is a much longer history item that should result in more tokens than just hello.',
+            },
+          ],
+        },
+      ];
+      chatWithHistory.setHistory(newHistory);
+
+      expect(chatWithHistory.getLastPromptTokenCount()).toBeGreaterThan(
+        initialCount,
+      );
     });
   });
 
@@ -2267,6 +2296,155 @@ describe('GeminiChat', () => {
         }),
         expect.any(String),
       );
+    });
+  });
+
+  describe('Hook execution control', () => {
+    let mockHookSystem: HookSystem;
+    beforeEach(() => {
+      vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
+
+      mockHookSystem = {
+        fireBeforeModelEvent: vi.fn().mockResolvedValue({ blocked: false }),
+        fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
+        fireBeforeToolSelectionEvent: vi.fn().mockResolvedValue({}),
+      } as unknown as HookSystem;
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
+    });
+
+    it('should yield AGENT_EXECUTION_STOPPED when BeforeModel hook stops execution', async () => {
+      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
+        blocked: true,
+        stopped: true,
+        reason: 'stopped by hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        type: StreamEventType.AGENT_EXECUTION_STOPPED,
+        reason: 'stopped by hook',
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_BLOCKED and synthetic response when BeforeModel hook blocks execution', async () => {
+      const syntheticResponse = {
+        candidates: [{ content: { parts: [{ text: 'blocked' }] } }],
+      } as GenerateContentResponse;
+
+      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
+        blocked: true,
+        reason: 'blocked by hook',
+        syntheticResponse,
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toHaveLength(2);
+      expect(events[0]).toEqual({
+        type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+        reason: 'blocked by hook',
+      });
+      expect(events[1]).toEqual({
+        type: StreamEventType.CHUNK,
+        value: syntheticResponse,
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_STOPPED when AfterModel hook stops execution', async () => {
+      // Mock content generator to return a stream
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'response' }] } }],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      vi.mocked(mockHookSystem.fireAfterModelEvent).mockResolvedValue({
+        response: {} as GenerateContentResponse,
+        stopped: true,
+        reason: 'stopped by after hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toContainEqual({
+        type: StreamEventType.AGENT_EXECUTION_STOPPED,
+        reason: 'stopped by after hook',
+      });
+    });
+
+    it('should yield AGENT_EXECUTION_BLOCKED and response when AfterModel hook blocks execution', async () => {
+      const response = {
+        candidates: [{ content: { parts: [{ text: 'response' }] } }],
+      } as unknown as GenerateContentResponse;
+
+      // Mock content generator to return a stream
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield response;
+        })(),
+      );
+
+      vi.mocked(mockHookSystem.fireAfterModelEvent).mockResolvedValue({
+        response,
+        blocked: true,
+        reason: 'blocked by after hook',
+      });
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'test',
+        'prompt-id',
+        new AbortController().signal,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      expect(events).toContainEqual({
+        type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+        reason: 'blocked by after hook',
+      });
+      // Should also contain the chunk (hook response)
+      expect(events).toContainEqual({
+        type: StreamEventType.CHUNK,
+        value: response,
+      });
     });
   });
 });

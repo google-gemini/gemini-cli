@@ -25,9 +25,86 @@ export interface SkillDefinition {
   body: string;
   /** Whether the skill is currently disabled. */
   disabled?: boolean;
+  /** Whether the skill is a built-in skill. */
+  isBuiltin?: boolean;
 }
 
-const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)/;
+export const FRONTMATTER_REGEX =
+  /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?/;
+
+/**
+ * Parses frontmatter content using YAML with a fallback to simple key-value parsing.
+ * This handles cases where description contains colons that would break YAML parsing.
+ */
+function parseFrontmatter(
+  content: string,
+): { name: string; description: string } | null {
+  try {
+    const parsed = yaml.load(content);
+    if (parsed && typeof parsed === 'object') {
+      const { name, description } = parsed as Record<string, unknown>;
+      if (typeof name === 'string' && typeof description === 'string') {
+        return { name, description };
+      }
+    }
+  } catch (yamlError) {
+    debugLogger.debug(
+      'YAML frontmatter parsing failed, falling back to simple parser:',
+      yamlError,
+    );
+  }
+
+  return parseSimpleFrontmatter(content);
+}
+
+/**
+ * Simple frontmatter parser that extracts name and description fields.
+ * Handles cases where values contain colons that would break YAML parsing.
+ */
+function parseSimpleFrontmatter(
+  content: string,
+): { name: string; description: string } | null {
+  const lines = content.split(/\r?\n/);
+  let name: string | undefined;
+  let description: string | undefined;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Match "name:" at the start of the line (optional whitespace)
+    const nameMatch = line.match(/^\s*name:\s*(.*)$/);
+    if (nameMatch) {
+      name = nameMatch[1].trim();
+      continue;
+    }
+
+    // Match "description:" at the start of the line (optional whitespace)
+    const descMatch = line.match(/^\s*description:\s*(.*)$/);
+    if (descMatch) {
+      const descLines = [descMatch[1].trim()];
+
+      // Check for multi-line description (indented continuation lines)
+      while (i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        // If next line is indented, it's a continuation of the description
+        if (nextLine.match(/^[ \t]+\S/)) {
+          descLines.push(nextLine.trim());
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      description = descLines.filter(Boolean).join(' ');
+      continue;
+    }
+  }
+
+  if (name !== undefined && description !== undefined) {
+    return { name, description };
+  }
+  return null;
+}
 
 /**
  * Discovers and loads all skills in the provided directory.
@@ -44,7 +121,7 @@ export async function loadSkillsFromDir(
       return [];
     }
 
-    const skillFiles = await glob('*/SKILL.md', {
+    const skillFiles = await glob(['SKILL.md', '*/SKILL.md'], {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
@@ -60,8 +137,7 @@ export async function loadSkillsFromDir(
     if (discoveredSkills.length === 0) {
       const files = await fs.readdir(absoluteSearchPath);
       if (files.length > 0) {
-        coreEvents.emitFeedback(
-          'warning',
+        debugLogger.debug(
           `Failed to load skills from ${absoluteSearchPath}. The directory is not empty but no valid skills were discovered. Please ensure SKILL.md files are present in subdirectories and have valid frontmatter.`,
         );
       }
@@ -90,21 +166,16 @@ export async function loadSkillFromFile(
       return null;
     }
 
-    const frontmatter = yaml.load(match[1]);
-    if (!frontmatter || typeof frontmatter !== 'object') {
-      return null;
-    }
-
-    const { name, description } = frontmatter as Record<string, unknown>;
-    if (typeof name !== 'string' || typeof description !== 'string') {
+    const frontmatter = parseFrontmatter(match[1]);
+    if (!frontmatter) {
       return null;
     }
 
     return {
-      name,
-      description,
+      name: frontmatter.name,
+      description: frontmatter.description,
       location: filePath,
-      body: match[2].trim(),
+      body: match[2]?.trim() ?? '',
     };
   } catch (error) {
     debugLogger.log(`Error parsing skill file ${filePath}:`, error);
