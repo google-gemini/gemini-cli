@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -13,7 +13,13 @@ import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
-import { cpSlice, cpLen } from '../../utils/textUtils.js';
+import {
+  cpSlice,
+  cpLen,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
+import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -33,6 +39,8 @@ export interface SettingsDialogItem {
   isGreyedOut?: boolean;
   /** Scope message e.g., "(Modified in Workspace)" */
   scopeMessage?: string;
+  /** Raw value for edit mode initialization */
+  rawValue?: string | number | boolean;
 }
 
 /**
@@ -54,42 +62,39 @@ export interface BaseSettingsDialogProps {
   // Items - parent provides the list
   /** List of items to display */
   items: SettingsDialogItem[];
-  /** Currently active/highlighted item index */
-  activeIndex: number;
-
-  // Edit mode state
-  /** Key of the item currently being edited, or null if not editing */
-  editingKey: string | null;
-  /** Current edit buffer content */
-  editBuffer: string;
-  /** Cursor position within edit buffer */
-  editCursorPos: number;
-  /** Whether cursor is visible (for blinking effect) */
-  cursorVisible: boolean;
 
   // Scope selector
   /** Whether to show the scope selector. Default: true */
   showScopeSelector?: boolean;
   /** Currently selected scope */
   selectedScope: LoadableSettingScope;
-  /** Callback when scope is highlighted (hovered/navigated to) */
-  onScopeHighlight?: (scope: LoadableSettingScope) => void;
-  /** Callback when scope is selected (Enter pressed) */
-  onScopeSelect?: (scope: LoadableSettingScope) => void;
-
-  // Focus management
-  /** Which section has focus: 'settings' or 'scope' */
-  focusSection: 'settings' | 'scope';
-
-  // Scroll
-  /** Current scroll offset */
-  scrollOffset: number;
-  /** Maximum number of items to show at once */
-  maxItemsToShow: number;
+  /** Callback when scope changes */
+  onScopeChange?: (scope: LoadableSettingScope) => void;
 
   // Layout
+  /** Maximum number of items to show at once */
+  maxItemsToShow: number;
   /** Maximum label width for alignment */
   maxLabelWidth?: number;
+
+  // Action callbacks
+  /** Called when a boolean/enum item is toggled */
+  onItemToggle: (key: string, item: SettingsDialogItem) => void;
+  /** Called when edit mode is committed with new value */
+  onEditCommit: (
+    key: string,
+    newValue: string,
+    item: SettingsDialogItem,
+  ) => void;
+  /** Called when Ctrl+C is pressed to clear/reset an item */
+  onItemClear: (key: string, item: SettingsDialogItem) => void;
+  /** Called when dialog should close */
+  onClose: () => void;
+  /** Optional custom key handler for parent-specific keys. Return true if handled. */
+  onKeyPress?: (
+    key: Key,
+    currentItem: SettingsDialogItem | undefined,
+  ) => boolean;
 
   // Optional extra content below help text (for restart prompt, etc.)
   /** Optional footer content (e.g., restart prompt) */
@@ -97,8 +102,8 @@ export interface BaseSettingsDialogProps {
 }
 
 /**
- * A base settings dialog component that handles rendering and layout.
- * Parent components handle business logic (saving, filtering, etc.).
+ * A base settings dialog component that handles rendering, layout, and keyboard navigation.
+ * Parent components handle business logic (saving, filtering, etc.) via callbacks.
  */
 export function BaseSettingsDialog({
   title,
@@ -106,21 +111,45 @@ export function BaseSettingsDialog({
   searchPlaceholder = 'Search to filter',
   searchBuffer,
   items,
-  activeIndex,
-  editingKey,
-  editBuffer,
-  editCursorPos,
-  cursorVisible,
   showScopeSelector = true,
   selectedScope,
-  onScopeHighlight,
-  onScopeSelect,
-  focusSection,
-  scrollOffset,
+  onScopeChange,
   maxItemsToShow,
   maxLabelWidth,
+  onItemToggle,
+  onEditCommit,
+  onItemClear,
+  onClose,
+  onKeyPress,
   footerContent,
 }: BaseSettingsDialogProps): React.JSX.Element {
+  // Internal state
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
+    'settings',
+  );
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editBuffer, setEditBuffer] = useState('');
+  const [editCursorPos, setEditCursorPos] = useState(0);
+  const [cursorVisible, setCursorVisible] = useState(true);
+
+  // Reset active index when items change (e.g., search filter)
+  useEffect(() => {
+    if (activeIndex >= items.length) {
+      setActiveIndex(Math.max(0, items.length - 1));
+    }
+  }, [items.length, activeIndex]);
+
+  // Cursor blink effect
+  useEffect(() => {
+    if (!editingKey) return;
+    const interval = setInterval(() => {
+      setCursorVisible((v) => !v);
+    }, 530);
+    return () => clearInterval(interval);
+  }, [editingKey]);
+
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
     ...item,
@@ -133,6 +162,200 @@ export function BaseSettingsDialog({
   // Show scroll indicators if there are more items than can be displayed
   const showScrollUp = items.length > maxItemsToShow;
   const showScrollDown = items.length > maxItemsToShow;
+
+  // Get current item
+  const currentItem = items[activeIndex];
+
+  // Start editing a field
+  const startEditing = useCallback((key: string, initialValue: string) => {
+    setEditingKey(key);
+    setEditBuffer(initialValue);
+    setEditCursorPos(cpLen(initialValue));
+    setCursorVisible(true);
+  }, []);
+
+  // Commit edit and exit edit mode
+  const commitEdit = useCallback(() => {
+    if (editingKey && currentItem) {
+      onEditCommit(editingKey, editBuffer, currentItem);
+    }
+    setEditingKey(null);
+    setEditBuffer('');
+    setEditCursorPos(0);
+  }, [editingKey, editBuffer, currentItem, onEditCommit]);
+
+  // Handle scope highlight (for RadioButtonSelect)
+  const handleScopeHighlight = useCallback(
+    (scope: LoadableSettingScope) => {
+      onScopeChange?.(scope);
+    },
+    [onScopeChange],
+  );
+
+  // Handle scope select (for RadioButtonSelect)
+  const handleScopeSelect = useCallback(
+    (scope: LoadableSettingScope) => {
+      onScopeChange?.(scope);
+    },
+    [onScopeChange],
+  );
+
+  // Keyboard handling
+  useKeypress(
+    (key: Key) => {
+      // Let parent handle custom keys first
+      if (onKeyPress?.(key, currentItem)) {
+        return;
+      }
+
+      // Edit mode handling
+      if (editingKey) {
+        const item = items.find((i) => i.key === editingKey);
+        const type = item?.type ?? 'string';
+
+        // Navigation within edit buffer
+        if (keyMatchers[Command.MOVE_LEFT](key)) {
+          setEditCursorPos((p) => Math.max(0, p - 1));
+          return;
+        }
+        if (keyMatchers[Command.MOVE_RIGHT](key)) {
+          setEditCursorPos((p) => Math.min(cpLen(editBuffer), p + 1));
+          return;
+        }
+        if (keyMatchers[Command.HOME](key)) {
+          setEditCursorPos(0);
+          return;
+        }
+        if (keyMatchers[Command.END](key)) {
+          setEditCursorPos(cpLen(editBuffer));
+          return;
+        }
+
+        // Backspace
+        if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+          if (editCursorPos > 0) {
+            setEditBuffer((b) => {
+              const before = cpSlice(b, 0, editCursorPos - 1);
+              const after = cpSlice(b, editCursorPos);
+              return before + after;
+            });
+            setEditCursorPos((p) => p - 1);
+          }
+          return;
+        }
+
+        // Delete
+        if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+          if (editCursorPos < cpLen(editBuffer)) {
+            setEditBuffer((b) => {
+              const before = cpSlice(b, 0, editCursorPos);
+              const after = cpSlice(b, editCursorPos + 1);
+              return before + after;
+            });
+          }
+          return;
+        }
+
+        // Escape in edit mode - commit (consistent with SettingsDialog)
+        if (keyMatchers[Command.ESCAPE](key)) {
+          commitEdit();
+          return;
+        }
+
+        // Enter in edit mode - commit
+        if (keyMatchers[Command.RETURN](key)) {
+          commitEdit();
+          return;
+        }
+
+        // Character input
+        let ch = key.sequence;
+        let isValidChar = false;
+        if (type === 'number') {
+          isValidChar = /[0-9\-+.]/.test(ch);
+        } else {
+          isValidChar = ch.length === 1 && ch.charCodeAt(0) >= 32;
+          // Sanitize string input to prevent unsafe characters
+          ch = stripUnsafeCharacters(ch);
+        }
+
+        if (isValidChar && ch.length > 0) {
+          setEditBuffer((b) => {
+            const before = cpSlice(b, 0, editCursorPos);
+            const after = cpSlice(b, editCursorPos);
+            return before + ch + after;
+          });
+          setEditCursorPos((p) => p + 1);
+        }
+        return;
+      }
+
+      // Not in edit mode - handle navigation and actions
+      if (focusSection === 'settings') {
+        // Up/Down navigation with wrap-around
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+          const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
+          setActiveIndex(newIndex);
+          // Adjust scroll if needed
+          if (newIndex === items.length - 1) {
+            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+          } else if (newIndex < scrollOffset) {
+            setScrollOffset(newIndex);
+          }
+          return;
+        }
+        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+          const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
+          setActiveIndex(newIndex);
+          // Adjust scroll if needed
+          if (newIndex === 0) {
+            setScrollOffset(0);
+          } else if (newIndex >= scrollOffset + maxItemsToShow) {
+            setScrollOffset(newIndex - maxItemsToShow + 1);
+          }
+          return;
+        }
+
+        // Enter - toggle or start edit
+        if (keyMatchers[Command.RETURN](key) && currentItem) {
+          if (currentItem.type === 'boolean' || currentItem.type === 'enum') {
+            onItemToggle(currentItem.key, currentItem);
+          } else {
+            // Start editing for string/number
+            const rawVal = currentItem.rawValue;
+            const initialValue = rawVal !== undefined ? String(rawVal) : '';
+            startEditing(currentItem.key, initialValue);
+          }
+          return;
+        }
+
+        // Ctrl+L - clear/reset to default (using only Ctrl+L to avoid Ctrl+C exit conflict)
+        if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
+          onItemClear(currentItem.key, currentItem);
+          return;
+        }
+
+        // Number keys for quick edit on number fields
+        if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
+          startEditing(currentItem.key, key.sequence);
+          return;
+        }
+      }
+
+      // Tab - switch focus section
+      if (key.name === 'tab' && showScopeSelector) {
+        setFocusSection((s) => (s === 'settings' ? 'scope' : 'settings'));
+        return;
+      }
+
+      // Escape - close dialog
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onClose();
+        return;
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
@@ -305,8 +528,8 @@ export function BaseSettingsDialog({
               initialIndex={scopeItems.findIndex(
                 (item) => item.value === selectedScope,
               )}
-              onSelect={onScopeSelect ?? (() => {})}
-              onHighlight={onScopeHighlight}
+              onSelect={handleScopeSelect}
+              onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
               showNumbers={focusSection === 'scope'}
             />
@@ -318,7 +541,7 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select
+            (Use Enter to select, Ctrl+L to reset
             {showScopeSelector ? ', Tab to change focus' : ''}, Esc to close)
           </Text>
         </Box>
