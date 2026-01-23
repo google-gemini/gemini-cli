@@ -19,7 +19,7 @@ and parameters.
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management) |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management) |
 
-### Positional Arguments
+### Positional arguments
 
 | Argument | Type              | Description                                                                                                        |
 | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
