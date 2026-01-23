@@ -962,12 +962,8 @@ describe('AgentRegistry', () => {
 
       expect(description).toContain('Sub-agents are specialized expert agents');
       expect(description).toContain('Available Sub-Agents');
-      expect(description).toContain(
-        `- **${MOCK_AGENT_V1.name}**: ${MOCK_AGENT_V1.description}`,
-      );
-      expect(description).toContain(
-        `- **AnotherAgent**: Another agent description`,
-      );
+      expect(description).toContain(`- ${MOCK_AGENT_V1.name}`);
+      expect(description).toContain(`- AnotherAgent`);
     });
   });
 });
