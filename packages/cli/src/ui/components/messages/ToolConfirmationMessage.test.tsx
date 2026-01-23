@@ -14,8 +14,26 @@ import {
   renderWithProviders,
   createMockSettings,
 } from '../../../test-utils/render.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
+
+vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../../contexts/ToolActionsContext.js')
+    >();
+  return {
+    ...actual,
+    useToolActions: vi.fn(),
+  };
+});
 
 describe('ToolConfirmationMessage', () => {
+  const mockConfirm = vi.fn();
+  vi.mocked(useToolActions).mockReturnValue({
+    confirm: mockConfirm,
+    cancel: vi.fn(),
+  });
+
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
@@ -32,6 +50,7 @@ describe('ToolConfirmationMessage', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -56,6 +75,7 @@ describe('ToolConfirmationMessage', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -64,6 +84,34 @@ describe('ToolConfirmationMessage', () => {
     );
 
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('should display multiple commands for exec type when provided', () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiple Commands',
+      command: 'echo "hello"', // Primary command
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+      commands: ['echo "hello"', 'ls -la', 'whoami'], // Multi-command list
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('ls -la');
+    expect(output).toContain('whoami');
+    expect(output).toMatchSnapshot();
   });
 
   describe('with folder trust', () => {
@@ -134,6 +182,7 @@ describe('ToolConfirmationMessage', () => {
 
         const { lastFrame } = renderWithProviders(
           <ToolConfirmationMessage
+            callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
             availableTerminalHeight={30}
@@ -152,6 +201,7 @@ describe('ToolConfirmationMessage', () => {
 
         const { lastFrame } = renderWithProviders(
           <ToolConfirmationMessage
+            callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
             availableTerminalHeight={30}
@@ -184,6 +234,7 @@ describe('ToolConfirmationMessage', () => {
 
       const { lastFrame } = renderWithProviders(
         <ToolConfirmationMessage
+          callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
           availableTerminalHeight={30}
@@ -207,6 +258,7 @@ describe('ToolConfirmationMessage', () => {
 
       const { lastFrame } = renderWithProviders(
         <ToolConfirmationMessage
+          callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
           availableTerminalHeight={30}

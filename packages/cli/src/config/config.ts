@@ -38,8 +38,12 @@ import {
   type OutputFormat,
   GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
-import { saveModelChange, loadSettings } from './settings.js';
+import {
+  type Settings,
+  type MergedSettings,
+  saveModelChange,
+  loadSettings,
+} from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -54,7 +58,6 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { getEnableHooks, getEnableHooksUI } from './settingsSchema.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -80,9 +83,14 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  rawOutput: boolean | undefined;
+  acceptRawOutputRisk: boolean | undefined;
+  isCommand: boolean | undefined;
 }
 
-export async function parseArguments(settings: Settings): Promise<CliArgs> {
+export async function parseArguments(
+  settings: MergedSettings,
+): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
   const yargsInstance = yargs(rawArgv)
     .locale('en')
@@ -90,7 +98,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-
     .option('debug', {
       alias: 'd',
       type: 'boolean',
@@ -138,9 +145,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('approval-mode', {
           type: 'string',
           nargs: 1,
-          choices: ['default', 'auto_edit', 'yolo'],
+          choices: ['default', 'auto_edit', 'yolo', 'plan'],
           description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -243,6 +250,15 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Path to a file to record model responses for testing.',
           hidden: true,
+        })
+        .option('raw-output', {
+          type: 'boolean',
+          description:
+            'Disable sanitization of model output (e.g. allow ANSI escape sequences). WARNING: This can be a security risk if the model output is untrusted.',
+        })
+        .option('accept-raw-output-risk', {
+          type: 'boolean',
+          description: 'Suppress the security warning when using --raw-output.',
         }),
     )
     // Register MCP subcommands
@@ -280,16 +296,15 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       return true;
     });
 
-  if (settings?.experimental?.extensionManagement ?? true) {
+  if (settings.experimental?.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings?.experimental?.skills ?? false) {
+  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
     yargsInstance.command(skillsCommand);
   }
-
   // Register hooks command if hooks are enabled
-  if (getEnableHooksUI(settings)) {
+  if (settings.tools?.enableHooks) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -392,7 +407,7 @@ export interface LoadCliConfigOptions {
 }
 
 export async function loadCliConfig(
-  settings: Settings,
+  settings: MergedSettings,
   sessionId: string,
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
@@ -447,6 +462,7 @@ export async function loadCliConfig(
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
     eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
 
@@ -460,7 +476,9 @@ export async function loadCliConfig(
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
-      [],
+      settings.context?.loadMemoryFromIncludeDirectories || false
+        ? includeDirectories
+        : [],
       debugMode,
       fileService,
       extensionManager,
@@ -487,12 +505,20 @@ export async function loadCliConfig(
       case 'auto_edit':
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
+      case 'plan':
+        if (!(settings.experimental?.plan ?? false)) {
+          throw new Error(
+            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          );
+        }
+        approvalMode = ApprovalMode.PLAN;
+        break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, plan, default`,
         );
     }
   } else {
@@ -551,7 +577,7 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !hasQuery && !argv.prompt);
+    (process.stdin.isTTY && !hasQuery && !argv.prompt && !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -573,6 +599,11 @@ export async function loadCliConfig(
     );
 
     switch (approvalMode) {
+      case ApprovalMode.PLAN:
+        // In plan non-interactive mode, all tools that require approval are excluded.
+        // TODO(#16625): Replace this default exclusion logic with specific rules for plan mode.
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        break;
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
         extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
@@ -590,10 +621,7 @@ export async function loadCliConfig(
     }
   }
 
-  const excludeTools = mergeExcludeTools(
-    settings,
-    extraExcludes.length > 0 ? extraExcludes : undefined,
-  );
+  const excludeTools = mergeExcludeTools(settings, extraExcludes);
 
   // Create a settings object that includes CLI overrides for policy generation
   const effectiveSettings: Settings = {
@@ -639,6 +667,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
+    clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
@@ -707,7 +736,10 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    skillsSupport: settings.experimental?.skills,
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler,
+    skillsSupport:
+      settings.experimental?.skills || (settings.skills?.enabled ?? true),
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
@@ -740,17 +772,22 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
+    rawOutput: argv.rawOutput,
+    acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: getEnableHooks(settings),
-    enableHooksUI: getEnableHooksUI(settings),
+    enableHooks:
+      (settings.tools?.enableHooks ?? true) &&
+      (settings.hooksConfig?.enabled ?? true),
+    enableHooksUI: settings.tools?.enableHooks ?? true,
     hooks: settings.hooks || {},
+    disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
-        disabledSkills: refreshedSettings.merged.skills?.disabled,
+        disabledSkills: refreshedSettings.merged.skills.disabled,
         agents: refreshedSettings.merged.agents,
       };
     },
@@ -758,12 +795,12 @@ export async function loadCliConfig(
 }
 
 function mergeExcludeTools(
-  settings: Settings,
-  extraExcludes?: string[] | undefined,
+  settings: MergedSettings,
+  extraExcludes: string[] = [],
 ): string[] {
   const allExcludeTools = new Set([
-    ...(settings.tools?.exclude || []),
-    ...(extraExcludes || []),
+    ...(settings.tools.exclude || []),
+    ...extraExcludes,
   ]);
-  return [...allExcludeTools];
+  return Array.from(allExcludeTools);
 }

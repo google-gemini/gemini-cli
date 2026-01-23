@@ -12,7 +12,10 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
+import {
+  logicalPosToOffset,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -27,7 +30,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
+import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -138,7 +141,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId } = useUIState();
+  const { mainAreaWidth, activePtyId, history } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -221,13 +224,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      let processedValue = submittedValue;
+      if (buffer.pastedContent) {
+        // Replace placeholders like [Pasted Text: 6 lines] with actual content
+        processedValue = processedValue.replace(
+          PASTED_TEXT_PLACEHOLDER_REGEX,
+          (match) => buffer.pastedContent[match] || match,
+        );
+      }
+
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(processedValue);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -360,8 +372,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        const offset = buffer.getOffset();
-        buffer.replaceRangeByOffset(offset, offset, textToInsert);
+        buffer.insert(textToInsert, { paste: true });
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
@@ -495,7 +506,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for rewind
+        // Handle double ESC
         if (escPressCount.current === 0) {
           escPressCount.current = 1;
           setShowEscapePrompt(true);
@@ -505,11 +516,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           escapeTimerRef.current = setTimeout(() => {
             resetEscapeState();
           }, 500);
-        } else {
-          // Second ESC triggers rewind
-          resetEscapeState();
-          onSubmit('/rewind');
+          return;
         }
+
+        // Second ESC
+        resetEscapeState();
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        } else if (history.length > 0) {
+          onSubmit('/rewind');
+          return;
+        }
+        coreEvents.emitFeedback('info', 'Nothing to rewind to');
         return;
       }
 
@@ -844,8 +864,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         completion.promptCompletion.text &&
         key.sequence &&
         key.sequence.length === 1 &&
+        !key.alt &&
         !key.ctrl &&
-        !key.meta
+        !key.cmd
       ) {
         completion.promptCompletion.clear();
         setExpandedSuggestionIndex(-1);
@@ -880,6 +901,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
+      history,
     ],
   );
 
@@ -1182,7 +1204,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    seg.type === 'command' || seg.type === 'file'
+                    seg.type === 'command' ||
+                    seg.type === 'file' ||
+                    seg.type === 'paste'
                       ? theme.text.accent
                       : theme.text.primary;
 

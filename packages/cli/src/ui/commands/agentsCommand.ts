@@ -12,7 +12,6 @@ import type {
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
-import type { AgentOverride } from '@google/gemini-cli-core';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';
 import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
 
@@ -84,15 +83,12 @@ async function enableAction(
   }
 
   const allAgents = agentRegistry.getAllAgentNames();
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
-    (name) => overrides[name]?.disabled === true,
+    (name) => overrides[name]?.enabled === false,
   );
 
-  if (allAgents.includes(agentName)) {
+  if (allAgents.includes(agentName) && !disabledAgents.includes(agentName)) {
     return {
       type: 'message',
       messageType: 'info',
@@ -100,7 +96,7 @@ async function enableAction(
     };
   }
 
-  if (!disabledAgents.includes(agentName)) {
+  if (!disabledAgents.includes(agentName) && !allAgents.includes(agentName)) {
     return {
       type: 'message',
       messageType: 'error',
@@ -157,12 +153,9 @@ async function disableAction(
   }
 
   const allAgents = agentRegistry.getAllAgentNames();
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
-    (name) => overrides[name]?.disabled === true,
+    (name) => overrides[name]?.enabled === false,
   );
 
   if (disabledAgents.includes(agentName)) {
@@ -211,12 +204,9 @@ function completeAgentsToEnable(context: CommandContext, partialArg: string) {
   const { config, settings } = context.services;
   if (!config) return [];
 
-  const overrides = (settings.merged.agents?.overrides ?? {}) as Record<
-    string,
-    AgentOverride
-  >;
+  const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.entries(overrides)
-    .filter(([_, override]) => override?.disabled === true)
+    .filter(([_, override]) => override?.enabled === false)
     .map(([name]) => name);
 
   return disabledAgents.filter((name) => name.startsWith(partialArg));

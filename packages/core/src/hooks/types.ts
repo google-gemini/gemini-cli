@@ -45,6 +45,11 @@ export enum HookEventName {
 }
 
 /**
+ * Fields in the hooks configuration that are not hook event names
+ */
+export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
+
+/**
  * Hook configuration entry
  */
 export interface CommandHookConfig {
@@ -210,7 +215,7 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Get additional context for adding to responses
+   * Get sanitized additional context for adding to responses.
    */
   getAdditionalContext(): string | undefined {
     if (
@@ -218,7 +223,12 @@ export class DefaultHookOutput implements HookOutput {
       'additionalContext' in this.hookSpecificOutput
     ) {
       const context = this.hookSpecificOutput['additionalContext'];
-      return typeof context === 'string' ? context : undefined;
+      if (typeof context !== 'string') {
+        return undefined;
+      }
+
+      // Sanitize by escaping < and > to prevent tag injection
+      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     return undefined;
   }

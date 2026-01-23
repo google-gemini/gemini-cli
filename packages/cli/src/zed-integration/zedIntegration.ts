@@ -27,6 +27,7 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
   resolveModel,
   createWorkingStdio,
   startupProfiler,
@@ -121,7 +122,7 @@ export class GeminiAgent {
 
   async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
     const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
     // Only clear credentials when switching to a different auth method
     if (selectedAuthType && selectedAuthType !== method) {
@@ -147,7 +148,7 @@ export class GeminiAgent {
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
 
     let isAuthenticated = false;
-    if (this.settings.merged.security?.auth?.selectedType) {
+    if (this.settings.merged.security.auth.selectedType) {
       try {
         await config.refreshAuth(
           this.settings.merged.security.auth.selectedType,
@@ -817,7 +818,7 @@ export class Session {
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
           processedQueryParts.push({
-            text: '\n--- Content from referenced files ---',
+            text: `\n${REFERENCE_CONTENT_START}`,
           });
           for (const part of result.llmContent) {
             if (typeof part === 'string') {
