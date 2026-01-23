@@ -368,6 +368,97 @@ interface OptionItem {
   index: number;
 }
 
+interface ChoiceQuestionState {
+  selectedIndices: Set<number>;
+  customOptionText: string;
+  isCustomOptionSelected: boolean;
+  isCustomOptionFocused: boolean;
+}
+
+type ChoiceQuestionAction =
+  | { type: 'TOGGLE_INDEX'; payload: { index: number; multiSelect: boolean } }
+  | { type: 'TYPE_CUSTOM'; payload: { char: string; multiSelect: boolean } }
+  | { type: 'BACKSPACE_CUSTOM'; payload: { multiSelect: boolean } }
+  | { type: 'CLEAR_CUSTOM'; payload: { multiSelect: boolean } }
+  | { type: 'TOGGLE_CUSTOM_SELECTED'; payload: { multiSelect: boolean } }
+  | { type: 'SET_CUSTOM_FOCUSED'; payload: { focused: boolean } };
+
+function choiceQuestionReducer(
+  state: ChoiceQuestionState,
+  action: ChoiceQuestionAction,
+): ChoiceQuestionState {
+  switch (action.type) {
+    case 'TOGGLE_INDEX': {
+      const { index, multiSelect } = action.payload;
+      const newIndices = new Set(multiSelect ? state.selectedIndices : []);
+      if (newIndices.has(index)) {
+        newIndices.delete(index);
+      } else {
+        newIndices.add(index);
+      }
+      return {
+        ...state,
+        selectedIndices: newIndices,
+        // In single select, selecting an option deselects custom
+        isCustomOptionSelected: multiSelect
+          ? state.isCustomOptionSelected
+          : false,
+      };
+    }
+    case 'TYPE_CUSTOM': {
+      const { char, multiSelect } = action.payload;
+      const newText = state.customOptionText + char;
+      return {
+        ...state,
+        customOptionText: newText,
+        // In multi-select, typing in custom auto-selects it
+        isCustomOptionSelected: multiSelect
+          ? true
+          : state.isCustomOptionSelected,
+        // In single-select, selecting custom deselects others
+        selectedIndices: multiSelect ? state.selectedIndices : new Set(),
+      };
+    }
+    case 'BACKSPACE_CUSTOM': {
+      const { multiSelect } = action.payload;
+      const newText = state.customOptionText.slice(0, -1);
+      const newIsCustomOptionSelected = multiSelect
+        ? newText.length > 0
+        : state.isCustomOptionSelected;
+
+      return {
+        ...state,
+        customOptionText: newText,
+        isCustomOptionSelected: newIsCustomOptionSelected,
+      };
+    }
+    case 'CLEAR_CUSTOM': {
+      return {
+        ...state,
+        customOptionText: '',
+        isCustomOptionSelected: false,
+      };
+    }
+    case 'TOGGLE_CUSTOM_SELECTED': {
+      const { multiSelect } = action.payload;
+      if (!multiSelect || !state.customOptionText.trim()) return state;
+
+      return {
+        ...state,
+        isCustomOptionSelected: !state.isCustomOptionSelected,
+      };
+    }
+    case 'SET_CUSTOM_FOCUSED': {
+      return {
+        ...state,
+        isCustomOptionFocused: action.payload.focused,
+      };
+    }
+    default:
+      return state;
+  }
+}
+
 interface ChoiceQuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
@@ -393,12 +484,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   );
 
   // Initialize state from initialAnswer if returning to a previously answered question
-  const initialState = useMemo(() => {
+  const initialReducerState = useMemo((): ChoiceQuestionState => {
     if (!initialAnswer) {
       return {
         selectedIndices: new Set<number>(),
         customOptionText: '',
         isCustomOptionSelected: false,
+        isCustomOptionFocused: false,
       };
     }
 
@@ -430,19 +522,24 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       }
     }
 
-    return { selectedIndices, customOptionText, isCustomOptionSelected };
+    return {
+      selectedIndices,
+      customOptionText,
+      isCustomOptionSelected,
+      isCustomOptionFocused: false,
+    };
   }, [initialAnswer, questionOptions, question.multiSelect]);
 
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
-    initialState.selectedIndices,
+  const [state, dispatch] = useReducer(
+    choiceQuestionReducer,
+    initialReducerState,
   );
-  const [customOptionText, setCustomOptionText] = useState(
-    initialState.customOptionText,
-  );
-  const [isCustomOptionSelected, setIsCustomOptionSelected] = useState(
-    initialState.isCustomOptionSelected,
-  );
-  const [isCustomOptionFocused, setIsCustomOptionFocused] = useState(false);
+  const {
+    selectedIndices,
+    customOptionText,
+    isCustomOptionSelected,
+    isCustomOptionFocused,
+  } = state;
 
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
@@ -465,6 +562,23 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     [questionOptions],
   );
 
+  // Synchronize selection changes with parent
+  useEffect(() => {
+    onSelectionChange?.(
+      buildAnswerString(
+        selectedIndices,
+        isCustomOptionSelected,
+        customOptionText,
+      ),
+    );
+  }, [
+    selectedIndices,
+    isCustomOptionSelected,
+    customOptionText,
+    buildAnswerString,
+    onSelectionChange,
+  ]);
+
   // Handle inline typing when custom option is focused
   const handleCustomOptionTyping = useCallback(
     (key: Key) => {
@@ -472,33 +586,19 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
       // Handle Ctrl+C to clear all text
       if (keyMatchers[Command.QUIT](key)) {
-        setCustomOptionText('');
-        setIsCustomOptionSelected(false);
-        // Save for multi-select
-        if (question.multiSelect) {
-          onSelectionChange?.(buildAnswerString(selectedIndices, false, ''));
-        }
+        dispatch({
+          type: 'CLEAR_CUSTOM',
+          payload: { multiSelect: !!question.multiSelect },
+        });
         return;
       }
 
       // Handle backspace
       if (key.name === 'backspace' || key.name === 'delete') {
-        const newText = customOptionText.slice(0, -1);
-        setCustomOptionText(newText);
-        const newIsCustomOptionSelected = newText.length > 0;
-        if (!newIsCustomOptionSelected) {
-          setIsCustomOptionSelected(false);
-        }
-        // Save for multi-select
-        if (question.multiSelect) {
-          onSelectionChange?.(
-            buildAnswerString(
-              selectedIndices,
-              newIsCustomOptionSelected,
-              newText,
-            ),
-          );
-        }
+        dispatch({
+          type: 'BACKSPACE_CUSTOM',
+          payload: { multiSelect: !!question.multiSelect },
+        });
         return;
       }
 
@@ -510,28 +610,21 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         !key.alt &&
         key.sequence.charCodeAt(0) >= 32
       ) {
-        const newText = customOptionText + key.sequence;
-        setCustomOptionText(newText);
-        // Only mark as selected in multi-select mode (for single-select, green/checkmark
-        // should only appear for previously submitted answers from initialAnswer)
-        if (question.multiSelect) {
-          setIsCustomOptionSelected(true);
-          // Save immediately so navigation preserves it
-          onSelectionChange?.(
-            buildAnswerString(selectedIndices, true, newText),
-          );
-        }
+        dispatch({
+          type: 'TYPE_CUSTOM',
+          payload: {
+            char: key.sequence,
+            multiSelect: !!question.multiSelect,
+          },
+        });
         onEditingCustomOption?.(true);
       }
     },
     [
       isCustomOptionFocused,
-      customOptionText,
-      onEditingCustomOption,
       question.multiSelect,
-      onSelectionChange,
-      buildAnswerString,
-      selectedIndices,
+      onEditingCustomOption,
+      dispatch,
     ],
   );
 
@@ -580,7 +673,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
       const nowFocusingCustomOption = itemValue.type === 'other';
-      setIsCustomOptionFocused(nowFocusingCustomOption);
+      dispatch({
+        type: 'SET_CUSTOM_FOCUSED',
+        payload: { focused: nowFocusingCustomOption },
+      });
       // Notify parent when we stop focusing custom option (so navigation can resume)
       if (!nowFocusingCustomOption) {
         onEditingCustomOption?.(false);
@@ -593,37 +689,17 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     (itemValue: OptionItem) => {
       if (question.multiSelect) {
         if (itemValue.type === 'option') {
-          const newIndices = new Set(selectedIndices);
-          if (newIndices.has(itemValue.index)) {
-            newIndices.delete(itemValue.index);
-          } else {
-            newIndices.add(itemValue.index);
-          }
-          setSelectedIndices(newIndices);
-          // Save selection immediately so navigation preserves it
-          onSelectionChange?.(
-            buildAnswerString(
-              newIndices,
-              isCustomOptionSelected,
-              customOptionText,
-            ),
-          );
+          dispatch({
+            type: 'TOGGLE_INDEX',
+            payload: { index: itemValue.index, multiSelect: true },
+          });
         } else if (itemValue.type === 'other') {
-          // Toggle other selection
-          if (customOptionText.trim()) {
-            const newIsCustomOptionSelected = !isCustomOptionSelected;
-            setIsCustomOptionSelected(newIsCustomOptionSelected);
-            // Save selection immediately
-            onSelectionChange?.(
-              buildAnswerString(
-                selectedIndices,
-                newIsCustomOptionSelected,
-                customOptionText,
-              ),
-            );
-          }
+          dispatch({
+            type: 'TOGGLE_CUSTOM_SELECTED',
+            payload: { multiSelect: true },
+          });
         } else if (itemValue.type === 'done') {
-          // Done just triggers navigation, selections already saved
+          // Done just triggers navigation, selections already saved via useEffect
           onAnswer(
             buildAnswerString(
               selectedIndices,
@@ -652,7 +728,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       customOptionText,
       onAnswer,
       onEditingCustomOption,
-      onSelectionChange,
       buildAnswerString,
     ],
   );
