@@ -19,6 +19,7 @@ import type {
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -69,6 +70,11 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openAgentConfigDialog: (
+    name: string,
+    displayName: string,
+    definition: AgentDefinition,
+  ) => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
@@ -76,6 +82,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  setText: (text: string) => void;
 }
 
 /**
@@ -210,7 +217,13 @@ export const useSlashCommandProcessor = (
           refreshStatic();
           setBannerVisible(false);
         },
-        loadHistory,
+        loadHistory: (history, postLoadInput) => {
+          loadHistory(history);
+          refreshStatic();
+          if (postLoadInput !== undefined) {
+            actions.setText(postLoadInput);
+          }
+        },
         setDebugMessage: actions.setDebugMessage,
         pendingItem,
         setPendingItem,
@@ -218,6 +231,7 @@ export const useSlashCommandProcessor = (
         toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         reloadCommands,
+        openAgentConfigDialog: actions.openAgentConfigDialog,
         extensionsUpdateState,
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
@@ -446,6 +460,26 @@ export const useSlashCommandProcessor = (
                     case 'model':
                       actions.openModelDialog();
                       return { type: 'handled' };
+                    case 'agentConfig': {
+                      const props = result.props as Record<string, unknown>;
+                      if (
+                        !props ||
+                        typeof props['name'] !== 'string' ||
+                        typeof props['displayName'] !== 'string' ||
+                        !props['definition']
+                      ) {
+                        throw new Error(
+                          'Received invalid properties for agentConfig dialog action.',
+                        );
+                      }
+
+                      actions.openAgentConfigDialog(
+                        props['name'],
+                        props['displayName'],
+                        props['definition'] as AgentDefinition,
+                      );
+                      return { type: 'handled' };
+                    }
                     case 'permissions':
                       actions.openPermissionsDialog(
                         result.props as { targetDirectory?: string },
