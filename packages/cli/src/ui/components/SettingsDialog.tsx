@@ -55,6 +55,7 @@ import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 import { TextInput } from './shared/TextInput.js';
+import { Tabs } from './shared/Tabs.js';
 
 interface FzfResult {
   item: string;
@@ -118,6 +119,8 @@ export function SettingsDialog({
   const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
     'settings',
   );
+  // Tab state
+  const [activeTab, setActiveTab] = useState('All');
   // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
@@ -256,26 +259,51 @@ export function SettingsDialog({
     return max;
   }, [selectedScope, settings]);
 
+  const categories = getDialogSettingsByCategory();
+  const availableCategories = Object.keys(categories);
+  const tabs = ['All', ...availableCategories];
+
   const generateSettingsItems = (): SettingsDialogItem[] => {
     if (searchQuery.trim()) {
-      // Flat list for search results
-      return filteredKeys.map((key) => {
-        const definition = getSettingDefinition(key);
-        return {
-          type: 'setting',
-          settingType: definition?.type || 'string',
-          label: definition?.label || key,
-          description: definition?.description,
-          value: key,
-          toggle: () => handleToggle(key, definition?.type),
-        };
+      const items: SettingsDialogItem[] = [];
+      const sortedCategories = [
+        ...CATEGORY_ORDER.filter((c) => availableCategories.includes(c)),
+        ...availableCategories
+          .filter((c) => !CATEGORY_ORDER.includes(c))
+          .sort(),
+      ];
+
+      sortedCategories.forEach((category) => {
+        const categorySettings = categories[category];
+        if (categorySettings) {
+          const matches = categorySettings.filter((def) =>
+            filteredKeys.includes(def.key),
+          );
+
+          if (matches.length > 0) {
+            items.push({
+              type: 'header',
+              label: category,
+              value: `__header_${category}`,
+            });
+            matches.forEach((def) => {
+              items.push({
+                type: 'setting',
+                settingType: def.type,
+                label: def.label || def.key,
+                description: def.description,
+                value: def.key,
+                toggle: () => handleToggle(def.key, def.type),
+              });
+            });
+          }
+        }
       });
+      return items;
     }
 
     // Grouped list
     const items: SettingsDialogItem[] = [];
-    const categories = getDialogSettingsByCategory();
-    const availableCategories = Object.keys(categories);
 
     // Filter order to include only present categories, then add any remaining
     const sortedCategories = [
@@ -283,14 +311,21 @@ export function SettingsDialog({
       ...availableCategories.filter((c) => !CATEGORY_ORDER.includes(c)).sort(),
     ];
 
-    sortedCategories.forEach((category) => {
+    const categoriesToDisplay =
+      activeTab === 'All'
+        ? sortedCategories
+        : sortedCategories.filter((c) => c === activeTab);
+
+    categoriesToDisplay.forEach((category) => {
       const categorySettings = categories[category];
       if (categorySettings && categorySettings.length > 0) {
-        items.push({
-          type: 'header',
-          label: category,
-          value: `__header_${category}`,
-        });
+        if (activeTab === 'All') {
+          items.push({
+            type: 'header',
+            label: category,
+            value: `__header_${category}`,
+          });
+        }
         categorySettings.forEach((def) => {
           items.push({
             type: 'setting',
@@ -418,6 +453,12 @@ export function SettingsDialog({
   };
 
   const items = generateSettingsItems();
+
+  // Reset index when tab changes
+  useEffect(() => {
+    setActiveSettingIndex(activeTab === 'All' ? 1 : 0);
+    setScrollOffset(0);
+  }, [activeTab]);
 
   // Ensure activeSettingIndex is valid (not on a header)
   useEffect(() => {
@@ -695,10 +736,32 @@ export function SettingsDialog({
     (key) => {
       const { name } = key;
 
-      if (name === 'tab' && showScopeSelection) {
-        setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
+      if (name === 'tab') {
+        setFocusSection((prev) => {
+          if (prev === 'settings' && showScopeSelection) {
+            return 'scope';
+          }
+          return 'settings';
+        });
       }
+
       if (focusSection === 'settings') {
+        if (!editingKey) {
+          if (name === 'left') {
+            const currentIndex = tabs.indexOf(activeTab);
+            const nextIndex =
+              currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
+            setActiveTab(tabs[nextIndex]);
+            return;
+          }
+          if (name === 'right') {
+            const currentIndex = tabs.indexOf(activeTab);
+            const nextIndex =
+              currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
+            setActiveTab(tabs[nextIndex]);
+            return;
+          }
+        }
         // If editing, capture input and control keys
         if (editingKey) {
           const definition = getSettingDefinition(editingKey);
@@ -1000,32 +1063,40 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Box marginX={1}>
-          <Text
-            bold={focusSection === 'settings' && !editingKey}
-            wrap="truncate"
+        <Box flexDirection="column" flexShrink={0}>
+          <Box marginX={1}>
+            <Text
+              bold={focusSection === 'settings' && !editingKey}
+              wrap="truncate"
+            >
+              {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
+            </Text>
+          </Box>
+          <Box
+            borderStyle="round"
+            borderColor={
+              editingKey
+                ? theme.border.default
+                : focusSection === 'settings'
+                  ? theme.border.focused
+                  : theme.border.default
+            }
+            paddingX={1}
+            height={3}
+            marginTop={1}
+            flexShrink={0}
           >
-            {focusSection === 'settings' ? '> ' : '  '}Settings{' '}
-          </Text>
-        </Box>
-        <Box
-          borderStyle="round"
-          borderColor={
-            editingKey
-              ? theme.border.default
-              : focusSection === 'settings'
-                ? theme.border.focused
-                : theme.border.default
-          }
-          paddingX={1}
-          height={3}
-          marginTop={1}
-        >
-          <TextInput
-            focus={focusSection === 'settings' && !editingKey}
-            buffer={buffer}
-            placeholder="Search to filter"
-          />
+            <TextInput
+              focus={focusSection === 'settings' && !editingKey}
+              buffer={buffer}
+              placeholder="Search to filter"
+            />
+          </Box>
+          {!searchQuery.trim() && (
+            <Box marginBottom={1} marginLeft={1} marginTop={1} flexShrink={0}>
+              <Tabs tabs={tabs} activeTab={activeTab} />
+            </Box>
+          )}
         </Box>
         <Box height={1} />
         {visibleItems.length === 0 ? (
