@@ -70,11 +70,13 @@ export const NewAgentsNotification = ({
             {displayAgents.map((agent) => (
               <Box key={agent.name} flexDirection="column" marginBottom={1}>
                 <Text bold>- {agent.name}</Text>
-                <Text color="gray"> {agent.description}</Text>
+                <Text color={theme.text.secondary}> {agent.description}</Text>
               </Box>
             ))}
             {remaining > 0 && (
-              <Text color="gray">... and {remaining} more.</Text>
+              <Text color={theme.text.secondary}>
+                ... and {remaining} more.
+              </Text>
             )}
           </Box>
         </Box>
