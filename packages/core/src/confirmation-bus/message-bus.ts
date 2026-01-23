@@ -16,6 +16,37 @@ import {
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+function formatMessageForDebugLog(message: Message): string {
+  if (message.type === MessageBusType.HOOK_EXECUTION_REQUEST) {
+    const inputKeys = Object.keys(message.input ?? {});
+    return `[MESSAGE_BUS] publish: hook-execution-request (eventName=${message.eventName}, correlationId=${message.correlationId}, inputKeys=[${inputKeys.join(', ')}])`;
+  }
+
+  if (message.type === MessageBusType.HOOK_EXECUTION_RESPONSE) {
+    const parts: string[] = [
+      `correlationId=${message.correlationId}`,
+      `success=${message.success}`,
+    ];
+
+    const outputKeys = message.output ? Object.keys(message.output) : [];
+    if (outputKeys.length > 0) {
+      parts.push(`outputKeys=[${outputKeys.join(', ')}]`);
+    }
+
+    if (message.error) {
+      const errorMessage =
+        message.error instanceof Error
+          ? message.error.message
+          : String(message.error);
+      parts.push(`error=${errorMessage}`);
+    }
+
+    return `[MESSAGE_BUS] publish: hook-execution-response (${parts.join(', ')})`;
+  }
+
+  return `[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`;
+}
+
 export class MessageBus extends EventEmitter {
   constructor(
     private readonly policyEngine: PolicyEngine,
@@ -46,7 +77,7 @@ export class MessageBus extends EventEmitter {
 
   async publish(message: Message): Promise<void> {
     if (this.debug) {
-      debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
+      debugLogger.debug(formatMessageForDebugLog(message));
     }
     try {
       if (!this.isValidMessage(message)) {
