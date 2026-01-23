@@ -147,4 +147,14 @@ describe('ConfigInitDisplay', () => {
       expect(lastFrame()).toMatchSnapshot();
     });
   });
+
+  it('updates message when initialMessage prop changes', async () => {
+    const { rerender, lastFrame } = render(
+      <ConfigInitDisplay message="First message" />,
+    );
+    expect(lastFrame()).toContain('First message');
+
+    rerender(<ConfigInitDisplay message="Second message" />);
+    expect(lastFrame()).toContain('Second message');
+  });
 });
