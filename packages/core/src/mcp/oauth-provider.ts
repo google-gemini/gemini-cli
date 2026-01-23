@@ -904,7 +904,8 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
-    displayMessage(`→ Opening your browser for OAuth sign-in...
+    displayMessage(`Authentication required for MCP Server: '${serverName}'
+→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}
