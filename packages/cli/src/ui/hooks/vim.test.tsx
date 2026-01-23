@@ -36,9 +36,10 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 const createKey = (partial: Partial<Key>): Key => ({
   name: partial.name || '',
   sequence: partial.sequence || '',
-  ctrl: partial.ctrl || false,
-  meta: partial.meta || false,
   shift: partial.shift || false,
+  alt: partial.alt || false,
+  ctrl: partial.ctrl || false,
+  cmd: partial.cmd || false,
   insertable: partial.insertable || false,
   ...partial,
 });
@@ -66,6 +67,7 @@ const createMockTextBufferState = (
       transformedToLogicalMaps: lines.map(() => []),
       visualToTransformedMap: [],
     },
+    pastedContent: {},
     ...partial,
   };
 };
