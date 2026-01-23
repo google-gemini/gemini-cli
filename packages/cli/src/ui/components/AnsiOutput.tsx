@@ -14,18 +14,25 @@ interface AnsiOutputProps {
   data: AnsiOutput;
   availableTerminalHeight?: number;
   width: number;
+  maxLines?: number;
 }
 
 export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   data,
   availableTerminalHeight,
   width,
+  maxLines,
 }) => {
-  const lastLines = data.slice(
-    -(availableTerminalHeight && availableTerminalHeight > 0
+  const effectiveHeight =
+    availableTerminalHeight && availableTerminalHeight > 0
       ? availableTerminalHeight
-      : DEFAULT_HEIGHT),
-  );
+      : (maxLines ?? DEFAULT_HEIGHT);
+
+  const limit = maxLines
+    ? Math.min(effectiveHeight, maxLines)
+    : effectiveHeight;
+
+  const lastLines = data.slice(-limit);
   return (
     <Box flexDirection="column" width={width} flexShrink={0}>
       {lastLines.map((line: AnsiLine, lineIndex: number) => (

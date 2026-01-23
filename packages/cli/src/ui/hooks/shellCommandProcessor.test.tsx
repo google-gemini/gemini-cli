@@ -43,7 +43,9 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 vi.mock('node:crypto');
-vi.mock('../utils/textUtils.js');
+vi.mock('../utils/textUtils.js', () => ({
+  pruneShellOutput: vi.fn((output) => output),
+}));
 
 import {
   useShellCommandProcessor,

@@ -27,6 +27,7 @@ export interface ToolResultDisplayProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   renderOutputAsMarkdown?: boolean;
+  maxLines?: number;
 }
 
 interface FileDiffResult {
@@ -39,15 +40,20 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   availableTerminalHeight,
   terminalWidth,
   renderOutputAsMarkdown = true,
+  maxLines,
 }) => {
   const { renderMarkdown } = useUIState();
 
-  const availableHeight = availableTerminalHeight
+  let availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
         MIN_LINES_SHOWN + 1, // enforce minimum lines shown
       )
     : undefined;
+
+  if (maxLines && availableHeight) {
+    availableHeight = Math.min(availableHeight, maxLines);
+  }
 
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
@@ -107,6 +113,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         data={truncatedResultDisplay as AnsiOutput}
         availableTerminalHeight={availableHeight}
         width={childWidth}
+        maxLines={maxLines}
       />
     );
   }

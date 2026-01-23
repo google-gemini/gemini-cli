@@ -26,8 +26,10 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { themeManager } from '../../ui/themes/theme-manager.js';
+import { pruneShellOutput } from '../utils/textUtils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const MAX_OUTPUT_LINES_HISTORY = 10;
 const MAX_OUTPUT_LENGTH = 10000;
 
 function addShellCommandToGeminiHistory(
@@ -284,7 +286,10 @@ export const useShellCommandProcessor = (
               const finalToolDisplay: IndividualToolCallDisplay = {
                 ...initialToolDisplay,
                 status: finalStatus,
-                resultDisplay: finalOutput,
+                resultDisplay: pruneShellOutput(
+                  finalOutput,
+                  MAX_OUTPUT_LINES_HISTORY,
+                ),
               };
 
               // Add the complete, contextual result to the local UI history.

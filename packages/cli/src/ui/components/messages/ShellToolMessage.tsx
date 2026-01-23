@@ -153,6 +153,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
+          maxLines={10}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
