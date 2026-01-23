@@ -47,18 +47,7 @@ describe('subagent eval test cases', () => {
       'README.md': 'TODO: update the README.',
     },
     assert: async (rig, _result) => {
-      await rig.expectToolCallSuccess(
-        ['delegate_to_agent'],
-        undefined,
-        (args) => {
-          try {
-            const parsed = JSON.parse(args);
-            return parsed.agent_name === 'docs-agent';
-          } catch {
-            return false;
-          }
-        },
-      );
+      await rig.expectToolCallSuccess(['docs-agent']);
     },
   });
 });
