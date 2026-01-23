@@ -143,6 +143,16 @@ function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   });
 }
 
+function isToolAwaitingConfirmation(
+  pendingHistoryItems: HistoryItemWithoutId[],
+) {
+  return pendingHistoryItems
+    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
+    .some((item) =>
+      item.tools.some((tool) => ToolCallStatus.Confirming === tool.status),
+    );
+}
+
 interface AppContainerProps {
   config: Config;
   startupWarnings?: string[];
@@ -918,8 +928,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         ...pendingSlashCommandHistoryItems,
         ...pendingGeminiHistoryItems,
       ];
+      if (isToolAwaitingConfirmation(pendingHistoryItems)) {
+        return; // Don't clear - user may be composing a follow-up message
+      }
       if (isToolExecuting(pendingHistoryItems)) {
-        buffer.setText(''); // Just clear the prompt
+        buffer.setText(''); // Clear for Ctrl+C cancellation
         return;
       }
 
