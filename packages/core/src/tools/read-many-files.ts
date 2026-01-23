@@ -30,6 +30,8 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
 import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
 
+import { REFERENCE_CONTENT_END } from '../utils/constants.js';
+
 /**
  * Parameters for the ReadManyFilesTool.
  */
@@ -98,7 +100,7 @@ function getDefaultExcludes(config?: Config): string[] {
 }
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
-const DEFAULT_OUTPUT_TERMINATOR = '\n--- End of content ---';
+const DEFAULT_OUTPUT_TERMINATOR = `\n${REFERENCE_CONTENT_END}`;
 
 class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
@@ -107,7 +109,7 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ReadManyFilesParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -447,7 +449,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
 
   constructor(
     private config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const parameterSchema = {
       type: 'object',
@@ -517,18 +519,18 @@ This tool is useful when you need to understand or analyze a collection of files
 - Gathering context from multiple configuration files.
 - When the user asks to "read all files in X directory" or "show me the content of all Y files".
 
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '${REFERENCE_CONTENT_END}' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
       Kind.Read,
       parameterSchema,
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
   protected createInvocation(
     params: ReadManyFilesParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ReadManyFilesParams, ToolResult> {
