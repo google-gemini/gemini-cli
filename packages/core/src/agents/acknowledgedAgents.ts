@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export interface AcknowledgedAgentsMap {
   // Project Path -> Agent Name -> Agent Hash
@@ -17,23 +18,8 @@ export interface AcknowledgedAgentsMap {
 }
 
 export class AcknowledgedAgentsService {
-  private static instance: AcknowledgedAgentsService;
   private acknowledgedAgents: AcknowledgedAgentsMap = {};
   private loaded = false;
-
-  private constructor() {}
-
-  static getInstance(): AcknowledgedAgentsService {
-    if (!AcknowledgedAgentsService.instance) {
-      AcknowledgedAgentsService.instance = new AcknowledgedAgentsService();
-    }
-    return AcknowledgedAgentsService.instance;
-  }
-
-  static resetInstanceForTesting(): void {
-    // @ts-expect-error -- Resetting private static instance for testing purposes
-    AcknowledgedAgentsService.instance = undefined;
-  }
 
   load(): void {
     if (this.loaded) return;
@@ -44,8 +30,11 @@ export class AcknowledgedAgentsService {
         const content = fs.readFileSync(filePath, 'utf-8');
         this.acknowledgedAgents = JSON.parse(content);
       }
-    } catch (error) {
-      debugLogger.error('Failed to load acknowledged agents:', error);
+    } catch (error: unknown) {
+      debugLogger.error(
+        'Failed to load acknowledged agents:',
+        getErrorMessage(error),
+      );
       // Fallback to empty
       this.acknowledgedAgents = {};
     }

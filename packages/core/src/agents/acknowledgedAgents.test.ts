@@ -17,7 +17,6 @@ describe('AcknowledgedAgentsService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    AcknowledgedAgentsService.resetInstanceForTesting();
     vi.mocked(Storage.getAcknowledgedAgentsPath).mockReturnValue(MOCK_PATH);
   });
 
@@ -26,7 +25,7 @@ describe('AcknowledgedAgentsService', () => {
   });
 
   it('should acknowledge an agent and save to disk', () => {
-    const service = AcknowledgedAgentsService.getInstance();
+    const service = new AcknowledgedAgentsService();
 
     // Mock mkdir to succeed
     vi.mocked(fs.existsSync).mockReturnValue(false); // Dir doesn't exist initially
@@ -43,7 +42,7 @@ describe('AcknowledgedAgentsService', () => {
   });
 
   it('should return true for acknowledged agent', () => {
-    const service = AcknowledgedAgentsService.getInstance();
+    const service = new AcknowledgedAgentsService();
 
     // Pre-load logic (simulated by mocking readFileSync if needed, or just setting state via acknowledge)
     // Here we just use acknowledge first
@@ -64,7 +63,7 @@ describe('AcknowledgedAgentsService', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(data));
 
-    const service = AcknowledgedAgentsService.getInstance();
+    const service = new AcknowledgedAgentsService();
 
     expect(
       service.isAcknowledged('/project', 'AgentLoaded', 'hashLoaded'),
@@ -77,7 +76,7 @@ describe('AcknowledgedAgentsService', () => {
       throw new Error('Read error');
     });
 
-    const service = AcknowledgedAgentsService.getInstance();
+    const service = new AcknowledgedAgentsService();
 
     // Should not throw, and treated as empty
     expect(service.isAcknowledged('/project', 'Agent', 'hash')).toBe(false);

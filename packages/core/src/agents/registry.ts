@@ -9,7 +9,6 @@ import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
-import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
@@ -85,7 +84,7 @@ export class AgentRegistry {
    * Acknowledges and registers a previously unacknowledged agent.
    */
   async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
-    const ackService = AcknowledgedAgentsService.getInstance();
+    const ackService = this.config.getAcknowledgedAgentsService();
     const projectRoot = this.config.getProjectRoot();
     if (agent.metadata?.hash) {
       ackService.acknowledge(projectRoot, agent.name, agent.metadata.hash);
@@ -137,7 +136,7 @@ export class AgentRegistry {
         );
       }
 
-      const ackService = AcknowledgedAgentsService.getInstance();
+      const ackService = this.config.getAcknowledgedAgentsService();
       const projectRoot = this.config.getProjectRoot();
       const unacknowledgedAgents: AgentDefinition[] = [];
 

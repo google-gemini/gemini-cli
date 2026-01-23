@@ -1803,8 +1803,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
           const registry = config.getAgentRegistry();
           newAgents.forEach((agent) => {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            registry.acknowledgeAgent(agent);
+            void registry.acknowledgeAgent(agent);
           });
         }
         setNewAgents(null);

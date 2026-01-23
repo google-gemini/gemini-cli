@@ -11,6 +11,7 @@ import type { AgentDefinition } from './types.js';
 import { coreEvents } from '../utils/events.js';
 import * as tomlLoader from './agentLoader.js';
 import { type Config } from '../config/config.js';
+import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 
 // Mock dependencies
 vi.mock('./agentLoader.js', () => ({
@@ -26,9 +27,7 @@ const mockAckService = vi.hoisted(() => ({
 }));
 
 vi.mock('./acknowledgedAgents.js', () => ({
-  AcknowledgedAgentsService: {
-    getInstance: vi.fn(() => mockAckService),
-  },
+  AcknowledgedAgentsService: vi.fn().mockImplementation(() => mockAckService),
 }));
 
 const MOCK_AGENT_WITH_HASH: AgentDefinition = {
@@ -61,6 +60,9 @@ describe('AgentRegistry Acknowledgement', () => {
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(config, 'getFolderTrust').mockReturnValue(true);
     vi.spyOn(config, 'getProjectRoot').mockReturnValue('/project');
+    vi.spyOn(config, 'getAcknowledgedAgentsService').mockReturnValue(
+      mockAckService as unknown as AcknowledgedAgentsService,
+    );
 
     // We cannot easily spy on storage.getProjectAgentsDir if it's a property/getter unless we cast to any or it's a method
     // Assuming it's a method on Storage class
