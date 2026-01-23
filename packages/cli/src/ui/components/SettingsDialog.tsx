@@ -29,7 +29,7 @@ import {
   isDefaultValue,
   requiresRestart,
   getRestartRequiredFromModified,
-  getDefaultValue,
+  getEffectiveDefaultValue,
   setPendingSettingValueAny,
   getNestedValue,
   getEffectiveValue,
@@ -37,12 +37,17 @@ import {
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
-import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import {
+  cpSlice,
+  cpLen,
+  stripUnsafeCharacters,
+  getCachedStringWidth,
+} from '../utils/textUtils.js';
 import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -65,7 +70,7 @@ interface SettingsDialogProps {
   config?: Config;
 }
 
-const maxItemsToShow = 8;
+const MAX_ITEMS_TO_SHOW = 8;
 
 export function SettingsDialog({
   settings,
@@ -194,6 +199,31 @@ export function SettingsDialog({
     setShowRestartPrompt(newRestartRequired.size > 0);
   }, [selectedScope, settings, globalPendingChanges]);
 
+  // Calculate max width for the left column (Label/Description) to keep values aligned or close
+  const maxLabelOrDescriptionWidth = useMemo(() => {
+    const allKeys = getDialogSettingKeys();
+    let max = 0;
+    for (const key of allKeys) {
+      const def = getSettingDefinition(key);
+      if (!def) continue;
+
+      const scopeMessage = getScopeMessageForSetting(
+        key,
+        selectedScope,
+        settings,
+      );
+      const label = def.label || key;
+      const labelFull = label + (scopeMessage ? ` ${scopeMessage}` : '');
+      const lWidth = getCachedStringWidth(labelFull);
+      const dWidth = def.description
+        ? getCachedStringWidth(def.description)
+        : 0;
+
+      max = Math.max(max, lWidth, dWidth);
+    }
+    return max;
+  }, [selectedScope, settings]);
+
   const generateSettingsItems = () => {
     const settingKeys = searchQuery ? filteredKeys : getDialogSettingKeys();
 
@@ -202,6 +232,7 @@ export function SettingsDialog({
 
       return {
         label: definition?.label || key,
+        description: definition?.description,
         value: key,
         type: definition?.type,
         toggle: () => {
@@ -254,7 +285,11 @@ export function SettingsDialog({
             if (key === 'general.vimMode' && newValue !== vimEnabled) {
               // Call toggleVimEnabled to sync the VimModeContext local state
               toggleVimEnabled().catch((error) => {
-                console.error('Failed to toggle vim mode:', error);
+                coreEvents.emitFeedback(
+                  'error',
+                  'Failed to toggle vim mode:',
+                  error,
+                );
               });
             }
 
@@ -447,7 +482,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 4;
+  const DIALOG_PADDING = 5;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope
@@ -474,8 +509,8 @@ export function SettingsDialog({
     currentAvailableTerminalHeight - totalFixedHeight,
   );
 
-  // Each setting item takes 2 lines (the setting row + spacing)
-  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+  // Each setting item takes up to 3 lines (label/value row, description row, and spacing)
+  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
 
   // Decide whether to show scope selection based on remaining space
   let showScopeSelection = true;
@@ -488,7 +523,7 @@ export function SettingsDialog({
       1,
       currentAvailableTerminalHeight - totalWithScope,
     );
-    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 2));
+    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 3));
 
     // If hiding scope selection allows us to show significantly more settings, do it
     if (maxVisibleItems > maxItemsWithScope + 1) {
@@ -500,7 +535,7 @@ export function SettingsDialog({
         1,
         currentAvailableTerminalHeight - totalFixedHeight,
       );
-      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
     }
   } else {
     // For normal height, include scope selection
@@ -509,13 +544,13 @@ export function SettingsDialog({
       1,
       currentAvailableTerminalHeight - totalFixedHeight,
     );
-    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 3));
   }
 
   // Use the calculated maxVisibleItems or fall back to the original maxItemsToShow
   const effectiveMaxItemsToShow = availableTerminalHeight
     ? Math.min(maxVisibleItems, items.length)
-    : maxItemsToShow;
+    : MAX_ITEMS_TO_SHOW;
 
   // Ensure focus stays on settings when scope selection is hidden
   React.useEffect(() => {
@@ -571,7 +606,7 @@ export function SettingsDialog({
           const definition = getSettingDefinition(editingKey);
           const type = definition?.type;
 
-          if (key.paste && key.sequence) {
+          if (key.name === 'paste' && key.sequence) {
             let pasted = key.sequence;
             if (type === 'number') {
               pasted = key.sequence.replace(/[^0-9\-+.]/g, '');
@@ -708,7 +743,10 @@ export function SettingsDialog({
           // Ctrl+C or Ctrl+L: Clear current setting and reset to default
           const currentSetting = items[activeSettingIndex];
           if (currentSetting) {
-            const defaultValue = getDefaultValue(currentSetting.value);
+            const defaultValue = getEffectiveDefaultValue(
+              currentSetting.value,
+              config,
+            );
             const defType = currentSetting.type;
             if (defType === 'boolean') {
               const booleanDefaultValue =
@@ -913,12 +951,10 @@ export function SettingsDialog({
                   const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
                   displayValue =
                     beforeCursor + chalk.inverse(atCursor) + afterCursor;
-                } else if (
-                  cursorVisible &&
-                  editCursorPos >= cpLen(editBuffer)
-                ) {
+                } else if (editCursorPos >= cpLen(editBuffer)) {
                   // Cursor is at the end - show inverted space
-                  displayValue = editBuffer + chalk.inverse(' ');
+                  displayValue =
+                    editBuffer + (cursorVisible ? chalk.inverse(' ') : ' ');
                 } else {
                   // Cursor not visible
                   displayValue = editBuffer;
@@ -928,7 +964,10 @@ export function SettingsDialog({
                 const path = item.value.split('.');
                 const currentValue = getNestedValue(pendingSettings, path);
 
-                const defaultValue = getDefaultValue(item.value);
+                const defaultValue = getEffectiveDefaultValue(
+                  item.value,
+                  config,
+                );
 
                 if (currentValue !== undefined && currentValue !== null) {
                   displayValue = String(currentValue);
@@ -975,7 +1014,7 @@ export function SettingsDialog({
 
               return (
                 <React.Fragment key={item.value}>
-                  <Box marginX={1} flexDirection="row" alignItems="center">
+                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
                     <Box minWidth={2} flexShrink={0}>
                       <Text
                         color={
@@ -985,33 +1024,49 @@ export function SettingsDialog({
                         {isActive ? '●' : ''}
                       </Text>
                     </Box>
-                    <Box minWidth={50}>
-                      <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.primary
-                        }
-                      >
-                        {item.label}
-                        {scopeMessage && (
-                          <Text color={theme.text.secondary}>
-                            {' '}
-                            {scopeMessage}
-                          </Text>
-                        )}
-                      </Text>
-                    </Box>
-                    <Box minWidth={3} />
-                    <Text
-                      color={
-                        isActive
-                          ? theme.status.success
-                          : shouldBeGreyedOut
-                            ? theme.text.secondary
-                            : theme.text.primary
-                      }
+                    <Box
+                      flexDirection="row"
+                      flexGrow={1}
+                      minWidth={0}
+                      alignItems="flex-start"
                     >
-                      {displayValue}
-                    </Text>
+                      <Box
+                        flexDirection="column"
+                        width={maxLabelOrDescriptionWidth}
+                        minWidth={0}
+                      >
+                        <Text
+                          color={
+                            isActive ? theme.status.success : theme.text.primary
+                          }
+                        >
+                          {item.label}
+                          {scopeMessage && (
+                            <Text color={theme.text.secondary}>
+                              {' '}
+                              {scopeMessage}
+                            </Text>
+                          )}
+                        </Text>
+                        <Text color={theme.text.secondary} wrap="truncate">
+                          {item.description ?? ''}
+                        </Text>
+                      </Box>
+                      <Box minWidth={3} />
+                      <Box flexShrink={0}>
+                        <Text
+                          color={
+                            isActive
+                              ? theme.status.success
+                              : shouldBeGreyedOut
+                                ? theme.text.secondary
+                                : theme.text.primary
+                          }
+                        >
+                          {displayValue}
+                        </Text>
+                      </Box>
+                    </Box>
                   </Box>
                   <Box height={1} />
                 </React.Fragment>

@@ -17,6 +17,7 @@ import { CommandKind } from './types.js';
 import {
   decodeTagName,
   type MessageActionReturn,
+  INITIAL_HISTORY_LENGTH,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -25,7 +26,8 @@ import type {
   ChatDetail,
 } from '../types.js';
 import { MessageType } from '../types.js';
-import type { Content } from '@google/genai';
+import { exportHistoryToFile } from '../utils/historyExportUtils.js';
+import { convertToRestPayload } from '@google/gemini-cli-core';
 
 const getSavedChatTags = async (
   context: CommandContext,
@@ -79,7 +81,7 @@ const listCommand: SlashCommand = {
       chats: chatDetails,
     };
 
-    context.ui.addItem(item, Date.now());
+    context.ui.addItem(item);
   },
 };
 
@@ -121,7 +123,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = await config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -131,7 +133,7 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 2) {
+    if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       await logger.saveCheckpoint({ history, authType }, tag);
       return {
@@ -200,11 +202,8 @@ const resumeCommand: SlashCommand = {
     };
 
     const uiHistory: HistoryItemWithoutId[] = [];
-    let hasSystemPrompt = false;
-    let i = 0;
 
-    for (const item of conversation) {
-      i += 1;
+    for (const item of conversation.slice(INITIAL_HISTORY_LENGTH)) {
       const text =
         item.parts
           ?.filter((m) => !!m.text)
@@ -213,15 +212,11 @@ const resumeCommand: SlashCommand = {
       if (!text) {
         continue;
       }
-      if (i === 1 && text.match(/context for our chat/)) {
-        hasSystemPrompt = true;
-      }
-      if (i > 2 || !hasSystemPrompt) {
-        uiHistory.push({
-          type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
-          text,
-        } as HistoryItemWithoutId);
-      }
+
+      uiHistory.push({
+        type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
+        text,
+      } as HistoryItemWithoutId);
     }
     return {
       type: 'load_history',
@@ -278,38 +273,6 @@ const deleteCommand: SlashCommand = {
   },
 };
 
-export function serializeHistoryToMarkdown(history: Content[]): string {
-  return history
-    .map((item) => {
-      const text =
-        item.parts
-          ?.map((part) => {
-            if (part.text) {
-              return part.text;
-            }
-            if (part.functionCall) {
-              return `**Tool Command**:\n\`\`\`json\n${JSON.stringify(
-                part.functionCall,
-                null,
-                2,
-              )}\n\`\`\``;
-            }
-            if (part.functionResponse) {
-              return `**Tool Response**:\n\`\`\`json\n${JSON.stringify(
-                part.functionResponse,
-                null,
-                2,
-              )}\n\`\`\``;
-            }
-            return '';
-          })
-          .join('') || '';
-      const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
-      return `## ${(item.role || 'model').toUpperCase()} ${roleIcon}\n\n${text}`;
-    })
-    .join('\n\n---\n\n');
-}
-
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
@@ -332,7 +295,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = await context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -343,10 +306,10 @@ const shareCommand: SlashCommand = {
 
     const history = chat.getHistory();
 
-    // An empty conversation has two hidden messages that setup the context for
+    // An empty conversation has a hidden message that sets up the context for
     // the chat. Thus, to check whether a conversation has been started, we
     // can't check for length 0.
-    if (history.length <= 2) {
+    if (history.length <= INITIAL_HISTORY_LENGTH) {
       return {
         type: 'message',
         messageType: 'info',
@@ -354,15 +317,8 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    let content = '';
-    if (extension === '.json') {
-      content = JSON.stringify(history, null, 2);
-    } else {
-      content = serializeHistoryToMarkdown(history);
-    }
-
     try {
-      await fsPromises.writeFile(filePath, content);
+      await exportHistoryToFile({ history, filePath });
       return {
         type: 'message',
         messageType: 'info',
@@ -374,6 +330,46 @@ const shareCommand: SlashCommand = {
         type: 'message',
         messageType: 'error',
         content: `Error sharing conversation: ${errorMessage}`,
+      };
+    }
+  },
+};
+
+export const debugCommand: SlashCommand = {
+  name: 'debug',
+  description: 'Export the most recent API request as a JSON payload',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context): Promise<MessageActionReturn> => {
+    const req = context.services.config?.getLatestApiRequest();
+    if (!req) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'No recent API request found to export.',
+      };
+    }
+
+    const restPayload = convertToRestPayload(req);
+    const filename = `gcli-request-${Date.now()}.json`;
+    const filePath = path.join(process.cwd(), filename);
+
+    try {
+      await fsPromises.writeFile(
+        filePath,
+        JSON.stringify(restPayload, null, 2),
+      );
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Debug API request saved to ${filename}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error saving debug request: ${errorMessage}`,
       };
     }
   },

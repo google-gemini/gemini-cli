@@ -35,6 +35,16 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
+
+import { homedir as pathsHomedir } from './paths.js';
+
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
   let testRootDir: string;
@@ -67,6 +77,7 @@ describe('memoryDiscovery', () => {
     cwd = await createEmptyDir(path.join(projectRoot, 'src'));
     homedir = await createEmptyDir(path.join(testRootDir, 'userhome'));
     vi.mocked(os.homedir).mockReturnValue(homedir);
+    vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
 
   afterEach(async () => {
@@ -932,7 +943,9 @@ included directory memory
       path.join(extensionPath, 'CustomContext.md'),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
-    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith(refreshResult);
+    expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({
+      fileCount: refreshResult.fileCount,
+    });
   });
 
   it('should include MCP instructions in user memory', async () => {

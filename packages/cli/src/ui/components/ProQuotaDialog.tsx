@@ -9,13 +9,6 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 
-import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-  UserTierId,
-} from '@google/gemini-cli-core';
-
 interface ProQuotaDialogProps {
   failedModel: string;
   fallbackModel: string;
@@ -25,7 +18,6 @@ interface ProQuotaDialogProps {
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
-  userTier: UserTierId | undefined;
 }
 
 export function ProQuotaDialog({
@@ -35,17 +27,10 @@ export function ProQuotaDialog({
   isTerminalQuotaError,
   isModelNotFoundError,
   onChoice,
-  userTier,
 }: ProQuotaDialogProps): React.JSX.Element {
-  // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
-  const isPaidTier =
-    userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
   let items;
-  // flash and flash lite don't have options to switch or upgrade.
-  if (
-    failedModel === DEFAULT_GEMINI_FLASH_MODEL ||
-    failedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL
-  ) {
+  // Do not provide a fallback option if failed model and fallbackmodel are same.
+  if (failedModel === fallbackModel) {
     items = [
       {
         label: 'Keep trying',
@@ -58,22 +43,8 @@ export function ProQuotaDialog({
         key: 'retry_later',
       },
     ];
-  } else if (isModelNotFoundError || (isTerminalQuotaError && isPaidTier)) {
-    // out of quota
-    items = [
-      {
-        label: `Switch to ${fallbackModel}`,
-        value: 'retry_always' as const,
-        key: 'retry_always',
-      },
-      {
-        label: `Stop`,
-        value: 'retry_later' as const,
-        key: 'retry_later',
-      },
-    ];
-  } else if (isTerminalQuotaError && !isPaidTier) {
-    // free user gets an option to upgrade
+  } else if (isModelNotFoundError || isTerminalQuotaError) {
+    // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
     items = [
       {
         label: `Switch to ${fallbackModel}`,
@@ -118,19 +89,31 @@ export function ProQuotaDialog({
     onChoice(choice);
   };
 
+  // Helper to highlight simple slash commands in the message
+  const renderMessage = (msg: string) => {
+    const parts = msg.split(/(\s+)/);
+    return (
+      <Text>
+        {parts.map((part, index) => {
+          if (part.startsWith('/')) {
+            return (
+              <Text key={index} bold color={theme.text.accent}>
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   return (
     <Box borderStyle="round" flexDirection="column" padding={1}>
-      <Box marginBottom={1}>
-        <Text>{message}</Text>
-      </Box>
+      <Box marginBottom={1}>{renderMessage(message)}</Box>
       <Box marginTop={1} marginBottom={1}>
         <RadioButtonSelect items={items} onSelect={handleSelect} />
       </Box>
-      <Text color={theme.text.primary}>
-        {fallbackModel === DEFAULT_GEMINI_MODEL && !isModelNotFoundError
-          ? 'Note: We will periodically retry Preview Model to see if congestion has cleared.'
-          : 'Note: You can always use /model to select a different option.'}
-      </Text>
     </Box>
   );
 }

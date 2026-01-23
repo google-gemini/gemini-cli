@@ -73,6 +73,7 @@ export class Task {
   modelInfo?: string;
   currentPromptId: string | undefined;
   promptCount = 0;
+  autoExecute: boolean;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -87,6 +88,7 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoExecute = false,
   ) {
     this.id = id;
     this.contextId = contextId;
@@ -98,6 +100,7 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
+    this.autoExecute = autoExecute;
     this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
       // for future requests without retrying the current one. The 'stop'
@@ -111,15 +114,16 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    autoExecute?: boolean,
   ): Promise<Task> {
-    return new Task(id, contextId, config, eventBus);
+    return new Task(id, contextId, config, eventBus, autoExecute);
   }
 
   // Note: `getAllMCPServerStatuses` retrieves the status of all MCP servers for the entire
   // process. This is not scoped to the individual task but reflects the global connection
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
@@ -374,7 +378,7 @@ export class Task {
       if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
         this.pendingToolConfirmationDetails.set(
           tc.request.callId,
-          tc.confirmationDetails,
+          tc.confirmationDetails as ToolCallConfirmationDetails,
         );
       }
 
@@ -396,12 +400,21 @@ export class Task {
       }
     });
 
-    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      logger.info('[Task] YOLO mode enabled. Auto-approving all tool calls.');
+    if (
+      this.autoExecute ||
+      this.config.getApprovalMode() === ApprovalMode.YOLO
+    ) {
+      logger.info(
+        '[Task] ' +
+          (this.autoExecute ? '' : 'YOLO mode enabled. ') +
+          'Auto-approving all tool calls.',
+      );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          tc.confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+          (tc.confirmationDetails as ToolCallConfirmationDetails).onConfirm(
+            ToolConfirmationOutcome.ProceedOnce,
+          );
           this.pendingToolConfirmationDetails.delete(tc.request.callId);
         }
       });
@@ -562,7 +575,10 @@ export class Task {
       EDIT_TOOL_NAMES.has(request.name),
     );
 
-    if (restorableToolCalls.length > 0) {
+    if (
+      restorableToolCalls.length > 0 &&
+      this.config.getCheckpointingEnabled()
+    ) {
       const gitService = await this.config.getGitService();
       if (gitService) {
         const { checkpointsToWrite, toolCallToCheckpointMap, errors } =
@@ -696,6 +712,10 @@ export class Task {
       case GeminiEventType.ModelInfo:
         this.modelInfo = event.value;
         break;
+      case GeminiEventType.Retry:
+      case GeminiEventType.InvalidStream:
+        // An invalid stream should trigger a retry, which requires no action from the user.
+        break;
       case GeminiEventType.Error:
       default: {
         // Block scope for lexical declaration
@@ -736,8 +756,8 @@ export class Task {
       return false;
     }
 
-    const callId = part.data['callId'] as string;
-    const outcomeString = part.data['outcome'] as string;
+    const callId = part.data['callId'];
+    const outcomeString = part.data['outcome'];
     let confirmationOutcome: ToolConfirmationOutcome | undefined;
 
     if (outcomeString === 'proceed_once') {

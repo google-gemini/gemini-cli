@@ -16,8 +16,8 @@ import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import type { ToolInvocation, ToolResult } from './tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -47,7 +47,7 @@ describe('ReadFileTool', () => {
       },
       isInteractive: () => false,
     } as unknown as Config;
-    tool = new ReadFileTool(mockConfigInstance);
+    tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
   });
 
   afterEach(async () => {
@@ -72,10 +72,7 @@ describe('ReadFileTool', () => {
       };
       const result = tool.build(params);
       expect(typeof result).not.toBe('string');
-      const invocation = result as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = result;
       expect(invocation.toolLocations()[0].path).toBe(
         path.join(tempRootDir, 'test.txt'),
       );
@@ -146,11 +143,9 @@ describe('ReadFileTool', () => {
       };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
-      expect(
-        (
-          invocation as ToolInvocation<ReadFileToolParams, ToolResult>
-        ).getDescription(),
-      ).toBe(path.join('sub', 'dir', 'file.txt'));
+      expect(invocation.getDescription()).toBe(
+        path.join('sub', 'dir', 'file.txt'),
+      );
     });
 
     it('should return shortened path when file path is deep', () => {
@@ -170,9 +165,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = { file_path: deepPath };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
-      const desc = (
-        invocation as ToolInvocation<ReadFileToolParams, ToolResult>
-      ).getDescription();
+      const desc = invocation.getDescription();
       expect(desc).toContain('...');
       expect(desc).toContain('file.txt');
     });
@@ -184,22 +177,16 @@ describe('ReadFileTool', () => {
       };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
-      expect(
-        (
-          invocation as ToolInvocation<ReadFileToolParams, ToolResult>
-        ).getDescription(),
-      ).toBe(path.join('sub', 'dir', 'file.txt'));
+      expect(invocation.getDescription()).toBe(
+        path.join('sub', 'dir', 'file.txt'),
+      );
     });
 
     it('should return . if path is the root directory', () => {
       const params: ReadFileToolParams = { file_path: tempRootDir };
       const invocation = tool.build(params);
       expect(typeof invocation).not.toBe('string');
-      expect(
-        (
-          invocation as ToolInvocation<ReadFileToolParams, ToolResult>
-        ).getDescription(),
-      ).toBe('.');
+      expect(invocation.getDescription()).toBe('.');
     });
   });
 
@@ -209,10 +196,7 @@ describe('ReadFileTool', () => {
       const fileContent = 'This is a test file.';
       await fsp.writeFile(filePath, fileContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: 'textfile.txt' };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       expect(await invocation.execute(abortSignal)).toEqual({
         llmContent: fileContent,
@@ -223,10 +207,7 @@ describe('ReadFileTool', () => {
     it('should return error if file does not exist', async () => {
       const filePath = path.join(tempRootDir, 'nonexistent.txt');
       const params: ReadFileToolParams = { file_path: filePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result).toEqual({
@@ -245,10 +226,7 @@ describe('ReadFileTool', () => {
       const fileContent = 'This is a test file.';
       await fsp.writeFile(filePath, fileContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       expect(await invocation.execute(abortSignal)).toEqual({
         llmContent: fileContent,
@@ -260,10 +238,7 @@ describe('ReadFileTool', () => {
       const dirPath = path.join(tempRootDir, 'directory');
       await fsp.mkdir(dirPath);
       const params: ReadFileToolParams = { file_path: dirPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result).toEqual({
@@ -283,10 +258,7 @@ describe('ReadFileTool', () => {
       const largeContent = 'x'.repeat(21 * 1024 * 1024);
       await fsp.writeFile(filePath, largeContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result).toHaveProperty('error');
@@ -302,10 +274,7 @@ describe('ReadFileTool', () => {
       const fileContent = `Short line\n${longLine}\nAnother short line`;
       await fsp.writeFile(filePath, fileContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -323,10 +292,7 @@ describe('ReadFileTool', () => {
       ]);
       await fsp.writeFile(imagePath, pngHeader);
       const params: ReadFileToolParams = { file_path: imagePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toEqual({
@@ -344,10 +310,7 @@ describe('ReadFileTool', () => {
       const pdfHeader = Buffer.from('%PDF-1.4');
       await fsp.writeFile(pdfPath, pdfHeader);
       const params: ReadFileToolParams = { file_path: pdfPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toEqual({
@@ -365,10 +328,7 @@ describe('ReadFileTool', () => {
       const binaryData = Buffer.from([0x00, 0xff, 0x00, 0xff]);
       await fsp.writeFile(binPath, binaryData);
       const params: ReadFileToolParams = { file_path: binPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe(
@@ -382,10 +342,7 @@ describe('ReadFileTool', () => {
       const svgContent = '<svg><circle cx="50" cy="50" r="40"/></svg>';
       await fsp.writeFile(svgPath, svgContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: svgPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe(svgContent);
@@ -398,10 +355,7 @@ describe('ReadFileTool', () => {
       const largeContent = '<svg>' + 'x'.repeat(1024 * 1024 + 1) + '</svg>';
       await fsp.writeFile(svgPath, largeContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: svgPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe(
@@ -416,10 +370,7 @@ describe('ReadFileTool', () => {
       const emptyPath = path.join(tempRootDir, 'empty.txt');
       await fsp.writeFile(emptyPath, '', 'utf-8');
       const params: ReadFileToolParams = { file_path: emptyPath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe('');
@@ -437,10 +388,7 @@ describe('ReadFileTool', () => {
         offset: 5, // Start from line 6
         limit: 3,
       };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -465,10 +413,7 @@ describe('ReadFileTool', () => {
       await fsp.writeFile(tempFilePath, tempFileContent, 'utf-8');
 
       const params: ReadFileToolParams = { file_path: tempFilePath };
-      const invocation = tool.build(params) as ToolInvocation<
-        ReadFileToolParams,
-        ToolResult
-      >;
+      const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe(tempFileContent);
@@ -494,7 +439,7 @@ describe('ReadFileTool', () => {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
           },
         } as unknown as Config;
-        tool = new ReadFileTool(mockConfigInstance);
+        tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
       });
 
       it('should throw error if path is ignored by a .geminiignore pattern', async () => {

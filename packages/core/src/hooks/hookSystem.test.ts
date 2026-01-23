@@ -9,6 +9,9 @@ import { HookSystem } from './hookSystem.js';
 import { Config } from '../config/config.js';
 import { HookType } from './types.js';
 import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 
@@ -21,9 +24,9 @@ type MockChildProcessWithoutNullStreams = ChildProcessWithoutNullStreams & {
 
 // Mock child_process with importOriginal for partial mocking
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual = (await importOriginal()) as object;
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     spawn: vi.fn(),
   };
 });
@@ -58,13 +61,16 @@ describe('HookSystem Integration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
+    const testDir = path.join(os.tmpdir(), 'test-hooks');
+    fs.mkdirSync(testDir, { recursive: true });
+
     // Create a real config with simple command hook configurations for testing
     config = new Config({
       model: 'gemini-1.5-flash',
-      targetDir: '/tmp/test-hooks',
+      targetDir: testDir,
       sessionId: 'test-session',
       debugMode: false,
-      cwd: '/tmp/test-hooks',
+      cwd: testDir,
       hooks: {
         BeforeTool: [
           {
@@ -127,10 +133,7 @@ describe('HookSystem Integration', () => {
         'Hook system initialized successfully',
       );
 
-      // Verify system is initialized
-      const status = hookSystem.getStatus();
-      expect(status.initialized).toBe(true);
-      // Note: totalHooks might be 0 if hook validation rejects the test hooks
+      expect(hookSystem.getAllHooks().length).toBe(1);
     });
 
     it('should not initialize twice', async () => {
@@ -144,13 +147,16 @@ describe('HookSystem Integration', () => {
     });
 
     it('should handle initialization errors gracefully', async () => {
+      const invalidDir = path.join(os.tmpdir(), 'test-hooks-invalid');
+      fs.mkdirSync(invalidDir, { recursive: true });
+
       // Create a config with invalid hooks to trigger initialization errors
       const invalidConfig = new Config({
         model: 'gemini-1.5-flash',
-        targetDir: '/tmp/test-hooks-invalid',
+        targetDir: invalidDir,
         sessionId: 'test-session-invalid',
         debugMode: false,
-        cwd: '/tmp/test-hooks-invalid',
+        cwd: invalidDir,
         hooks: {
           BeforeTool: [
             {
@@ -204,12 +210,6 @@ describe('HookSystem Integration', () => {
       });
       expect(result.success).toBe(true);
     });
-
-    it('should throw error when not initialized', () => {
-      expect(() => hookSystem.getEventHandler()).toThrow(
-        'Hook system not initialized',
-      );
-    });
   });
 
   describe('hook execution', () => {
@@ -261,33 +261,18 @@ describe('HookSystem Integration', () => {
     });
   });
 
-  describe('system management', () => {
-    it('should return correct status when initialized', async () => {
-      await hookSystem.initialize();
-
-      const status = hookSystem.getStatus();
-
-      expect(status.initialized).toBe(true);
-      // Note: totalHooks might be 0 if hook validation rejects the test hooks
-      expect(typeof status.totalHooks).toBe('number');
-    });
-
-    it('should return uninitialized status', () => {
-      const status = hookSystem.getStatus();
-
-      expect(status.initialized).toBe(false);
-    });
-  });
-
   describe('hook disabling via settings', () => {
     it('should not execute disabled hooks from settings', async () => {
+      const disabledDir = path.join(os.tmpdir(), 'test-hooks-disabled');
+      fs.mkdirSync(disabledDir, { recursive: true });
+
       // Create config with two hooks, one enabled and one disabled via settings
       const configWithDisabled = new Config({
         model: 'gemini-1.5-flash',
-        targetDir: '/tmp/test-hooks-disabled',
+        targetDir: disabledDir,
         sessionId: 'test-session-disabled',
         debugMode: false,
-        cwd: '/tmp/test-hooks-disabled',
+        cwd: disabledDir,
         hooks: {
           BeforeTool: [
             {
@@ -306,8 +291,8 @@ describe('HookSystem Integration', () => {
               ],
             },
           ],
-          disabled: ['echo "disabled-hook"'], // Disable the second hook
         },
+        disabledHooks: ['echo "disabled-hook"'], // Disable the second hook
       });
 
       (
@@ -349,13 +334,16 @@ describe('HookSystem Integration', () => {
 
   describe('hook disabling via command', () => {
     it('should disable hook when setHookEnabled is called', async () => {
+      const setEnabledDir = path.join(os.tmpdir(), 'test-hooks-setEnabled');
+      fs.mkdirSync(setEnabledDir, { recursive: true });
+
       // Create config with a hook
       const configForDisabling = new Config({
         model: 'gemini-1.5-flash',
-        targetDir: '/tmp/test-hooks-setEnabled',
+        targetDir: setEnabledDir,
         sessionId: 'test-session-setEnabled',
         debugMode: false,
-        cwd: '/tmp/test-hooks-setEnabled',
+        cwd: setEnabledDir,
         hooks: {
           BeforeTool: [
             {
