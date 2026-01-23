@@ -274,10 +274,11 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
-    it('should not await MCP initialization', async () => {
+    it('should await MCP initialization in non-interactive mode', async () => {
       const config = new Config({
         ...baseParams,
         checkpointing: false,
+        // interactive defaults to false
       });
 
       const { McpClientManager } = await import(
@@ -295,7 +296,33 @@ describe('Server Config (config.ts)', () => {
 
       await config.initialize();
 
-      // Should return immediately, before MCP finishes (50ms delay)
+      // Should wait for MCP to finish
+      expect(mcpStarted).toBe(true);
+    });
+
+    it('should not await MCP initialization in interactive mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        interactive: true,
+      });
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should return immediately, before MCP finishes
       expect(mcpStarted).toBe(false);
 
       // Wait for it to eventually finish to avoid open handles
