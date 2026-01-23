@@ -87,7 +87,11 @@ export class AgentRegistry {
     const ackService = this.config.getAcknowledgedAgentsService();
     const projectRoot = this.config.getProjectRoot();
     if (agent.metadata?.hash) {
-      ackService.acknowledge(projectRoot, agent.name, agent.metadata.hash);
+      await ackService.acknowledge(
+        projectRoot,
+        agent.name,
+        agent.metadata.hash,
+      );
       await this.registerAgent(agent);
       coreEvents.emitAgentsRefreshed();
     }
@@ -139,31 +143,28 @@ export class AgentRegistry {
       const ackService = this.config.getAcknowledgedAgentsService();
       const projectRoot = this.config.getProjectRoot();
       const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
 
-      const agentsToRegister = projectAgents.agents.filter((agent) => {
+      for (const agent of projectAgents.agents) {
         // If it's a remote agent, we might not have a hash, or we handle it differently.
         // For now, assuming project agents are primarily local .md files with hashes.
-        // If metadata or hash is missing, we default to "safe" (allow) or "unsafe" (block)?
-        // Existing behavior was allow all. To be safe, if we can't identify it, maybe we should block?
-        // But for backward compatibility with existing agents without hash (if any), maybe allow?
-        // Our loader ensures hash is there.
         if (!agent.metadata?.hash) {
-          return true;
+          agentsToRegister.push(agent);
+          continue;
         }
 
-        if (
-          ackService.isAcknowledged(
-            projectRoot,
-            agent.name,
-            agent.metadata.hash,
-          )
-        ) {
-          return true;
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
         } else {
           unacknowledgedAgents.push(agent);
-          return false;
         }
-      });
+      }
 
       if (unacknowledgedAgents.length > 0) {
         coreEvents.emitAgentsDiscovered(unacknowledgedAgents);

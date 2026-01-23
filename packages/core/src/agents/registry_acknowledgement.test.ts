@@ -20,10 +20,10 @@ vi.mock('./agentLoader.js', () => ({
 
 // Mock AcknowledgedAgentsService
 const mockAckService = vi.hoisted(() => ({
-  load: vi.fn(),
-  save: vi.fn(),
-  isAcknowledged: vi.fn(),
-  acknowledge: vi.fn(),
+  load: vi.fn().mockResolvedValue(undefined),
+  save: vi.fn().mockResolvedValue(undefined),
+  isAcknowledged: vi.fn().mockResolvedValue(false),
+  acknowledge: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./acknowledgedAgents.js', () => ({
@@ -84,7 +84,7 @@ describe('AgentRegistry Acknowledgement', () => {
         return { agents: [], errors: [] };
       },
     );
-    mockAckService.isAcknowledged.mockReturnValue(false);
+    mockAckService.isAcknowledged.mockResolvedValue(false);
     vi.clearAllMocks();
   });
 
@@ -93,7 +93,7 @@ describe('AgentRegistry Acknowledgement', () => {
   });
 
   it('should not register unacknowledged project agents and emit event', async () => {
-    mockAckService.isAcknowledged.mockReturnValue(false);
+    mockAckService.isAcknowledged.mockResolvedValue(false);
 
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
 
@@ -115,7 +115,7 @@ describe('AgentRegistry Acknowledgement', () => {
         return { agents: [], errors: [] };
       },
     );
-    mockAckService.isAcknowledged.mockReturnValue(true);
+    mockAckService.isAcknowledged.mockResolvedValue(true);
 
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
 

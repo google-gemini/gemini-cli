@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -21,13 +22,13 @@ export class AcknowledgedAgentsService {
   private acknowledgedAgents: AcknowledgedAgentsMap = {};
   private loaded = false;
 
-  load(): void {
+  async load(): Promise<void> {
     if (this.loaded) return;
 
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, 'utf-8');
+      if (existsSync(filePath)) {
+        const content = await fs.readFile(filePath, 'utf-8');
         this.acknowledgedAgents = JSON.parse(content);
       }
     } catch (error: unknown) {
@@ -41,14 +42,14 @@ export class AcknowledgedAgentsService {
     this.loaded = true;
   }
 
-  save(): void {
+  async save(): Promise<void> {
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
       const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+      if (!existsSync(dir)) {
+        await fs.mkdir(dir, { recursive: true });
       }
-      fs.writeFileSync(
+      await fs.writeFile(
         filePath,
         JSON.stringify(this.acknowledgedAgents, null, 2),
         'utf-8',
@@ -58,23 +59,27 @@ export class AcknowledgedAgentsService {
     }
   }
 
-  isAcknowledged(
+  async isAcknowledged(
     projectPath: string,
     agentName: string,
     hash: string,
-  ): boolean {
-    this.load();
+  ): Promise<boolean> {
+    await this.load();
     const projectAgents = this.acknowledgedAgents[projectPath];
     if (!projectAgents) return false;
     return projectAgents[agentName] === hash;
   }
 
-  acknowledge(projectPath: string, agentName: string, hash: string): void {
-    this.load();
+  async acknowledge(
+    projectPath: string,
+    agentName: string,
+    hash: string,
+  ): Promise<void> {
+    await this.load();
     if (!this.acknowledgedAgents[projectPath]) {
       this.acknowledgedAgents[projectPath] = {};
     }
     this.acknowledgedAgents[projectPath][agentName] = hash;
-    this.save();
+    await this.save();
   }
 }

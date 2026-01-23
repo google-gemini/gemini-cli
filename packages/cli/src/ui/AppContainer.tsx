@@ -1799,12 +1799,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
         await runExitCleanup();
         process.exit(RELAUNCH_EXIT_CODE);
       },
-      handleNewAgentsSelect: (choice: NewAgentsChoice) => {
+      handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
           const registry = config.getAgentRegistry();
-          newAgents.forEach((agent) => {
-            void registry.acknowledgeAgent(agent);
-          });
+          try {
+            await Promise.all(
+              newAgents.map((agent) => registry.acknowledgeAgent(agent)),
+            );
+          } catch (error) {
+            debugLogger.error('Failed to acknowledge agents:', error);
+            historyManager.addItem(
+              {
+                type: MessageType.ERROR,
+                text: `Failed to acknowledge agents: ${getErrorMessage(error)}`,
+              },
+              Date.now(),
+            );
+          }
         }
         setNewAgents(null);
       },
@@ -1847,6 +1858,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setAuthContext,
       newAgents,
       config,
+      historyManager,
     ],
   );
 

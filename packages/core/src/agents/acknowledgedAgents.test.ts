@@ -6,10 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { Storage } from '../config/storage.js';
 
-vi.mock('node:fs');
+vi.mock('node:fs/promises');
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+}));
 vi.mock('../config/storage.js');
 
 describe('AcknowledgedAgentsService', () => {
@@ -24,61 +28,68 @@ describe('AcknowledgedAgentsService', () => {
     vi.restoreAllMocks();
   });
 
-  it('should acknowledge an agent and save to disk', () => {
+  it('should acknowledge an agent and save to disk', async () => {
     const service = new AcknowledgedAgentsService();
 
     // Mock mkdir to succeed
-    vi.mocked(fs.existsSync).mockReturnValue(false); // Dir doesn't exist initially
-    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
-    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
+    vi.mocked(existsSync).mockReturnValue(false); // Dir doesn't exist initially
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-    service.acknowledge('/project', 'AgentA', 'hash1');
+    await service.acknowledge('/project', 'AgentA', 'hash1');
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
+    expect(fs.writeFile).toHaveBeenCalledWith(
       MOCK_PATH,
       expect.stringContaining('"AgentA": "hash1"'),
       'utf-8',
     );
   });
 
-  it('should return true for acknowledged agent', () => {
+  it('should return true for acknowledged agent', async () => {
     const service = new AcknowledgedAgentsService();
 
-    // Pre-load logic (simulated by mocking readFileSync if needed, or just setting state via acknowledge)
-    // Here we just use acknowledge first
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-    service.acknowledge('/project', 'AgentA', 'hash1');
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-    expect(service.isAcknowledged('/project', 'AgentA', 'hash1')).toBe(true);
-    expect(service.isAcknowledged('/project', 'AgentA', 'hash2')).toBe(false);
-    expect(service.isAcknowledged('/project', 'AgentB', 'hash1')).toBe(false);
+    await service.acknowledge('/project', 'AgentA', 'hash1');
+
+    expect(await service.isAcknowledged('/project', 'AgentA', 'hash1')).toBe(
+      true,
+    );
+    expect(await service.isAcknowledged('/project', 'AgentA', 'hash2')).toBe(
+      false,
+    );
+    expect(await service.isAcknowledged('/project', 'AgentB', 'hash1')).toBe(
+      false,
+    );
   });
 
-  it('should load acknowledged agents from disk', () => {
+  it('should load acknowledged agents from disk', async () => {
     const data = {
       '/project': {
         AgentLoaded: 'hashLoaded',
       },
     };
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(data));
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(data));
 
     const service = new AcknowledgedAgentsService();
 
     expect(
-      service.isAcknowledged('/project', 'AgentLoaded', 'hashLoaded'),
+      await service.isAcknowledged('/project', 'AgentLoaded', 'hashLoaded'),
     ).toBe(true);
   });
 
-  it('should handle load errors gracefully', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFileSync).mockImplementation(() => {
-      throw new Error('Read error');
-    });
+  it('should handle load errors gracefully', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFile).mockRejectedValue(new Error('Read error'));
 
     const service = new AcknowledgedAgentsService();
 
     // Should not throw, and treated as empty
-    expect(service.isAcknowledged('/project', 'Agent', 'hash')).toBe(false);
+    expect(await service.isAcknowledged('/project', 'Agent', 'hash')).toBe(
+      false,
+    );
   });
 });

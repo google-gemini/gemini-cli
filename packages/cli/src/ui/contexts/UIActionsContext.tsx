@@ -60,7 +60,7 @@ export interface UIActions {
   setEmbeddedShellFocused: (value: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   handleRestart: () => void;
-  handleNewAgentsSelect: (choice: NewAgentsChoice) => void;
+  handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

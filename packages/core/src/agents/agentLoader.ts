@@ -16,6 +16,7 @@ import {
   DELEGATE_TO_AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -143,24 +144,30 @@ function formatZodError(error: z.ZodError, context: string): string {
  * Parses and validates an agent Markdown file with frontmatter.
  *
  * @param filePath Path to the Markdown file.
+ * @param content Optional pre-loaded content of the file.
  * @returns An array containing the single parsed agent definition.
  * @throws AgentLoadError if parsing or validation fails.
  */
 export async function parseAgentMarkdown(
   filePath: string,
+  content?: string,
 ): Promise<FrontmatterAgentDefinition[]> {
-  let content: string;
-  try {
-    content = await fs.readFile(filePath, 'utf-8');
-  } catch (error) {
-    throw new AgentLoadError(
-      filePath,
-      `Could not read file: ${(error as Error).message}`,
-    );
+  let fileContent: string;
+  if (content !== undefined) {
+    fileContent = content;
+  } else {
+    try {
+      fileContent = await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+      throw new AgentLoadError(
+        filePath,
+        `Could not read file: ${getErrorMessage(error)}`,
+      );
+    }
   }
 
   // Split frontmatter and body
-  const match = content.match(FRONTMATTER_REGEX);
+  const match = fileContent.match(FRONTMATTER_REGEX);
   if (!match) {
     throw new AgentLoadError(
       filePath,
@@ -353,7 +360,7 @@ export async function loadAgentsFromDirectory(
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
-      const agentDefs = await parseAgentMarkdown(filePath);
+      const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
         const agent = markdownToAgentDefinition(def, { hash, filePath });
         result.agents.push(agent);
