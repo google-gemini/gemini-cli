@@ -41,7 +41,7 @@ import {
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState } from '../types.js';
+import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -2431,6 +2431,95 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
     );
+  });
+
+  it('should display user query, then tool execution, then model response', async () => {
+    const userQuery = 'read this @file(test.txt)';
+    const toolExecutionMessage = 'Reading file: test.txt';
+    const modelResponseContent = 'The content of test.txt is: Hello World!';
+
+    // Mock handleAtCommand to simulate a tool call and add a tool_group message
+    handleAtCommandSpy.mockImplementation(
+      async ({ addItem: atCommandAddItem, messageId }) => {
+        atCommandAddItem(
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'client-read-123',
+                name: 'read_file',
+                description: toolExecutionMessage,
+                status: ToolCallStatus.Success,
+                resultDisplay: toolExecutionMessage,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+          messageId,
+        );
+        return { shouldProceed: true, processedQuery: userQuery };
+      },
+    );
+
+    // Mock the Gemini stream to return a model response after the tool
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: modelResponseContent,
+        };
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: 'STOP' },
+        };
+      })(),
+    );
+
+    const { result } = renderTestHook();
+
+    await act(async () => {
+      await result.current.submitQuery(userQuery);
+    });
+
+    // Assert the order of messages added to the history
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalledTimes(3); // User prompt + tool execution + model response
+
+      // 1. User's prompt
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: userQuery,
+        }),
+        expect.any(Number),
+      );
+
+      // 2. Tool execution message
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: 'tool_group',
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'read_file',
+              status: ToolCallStatus.Success,
+            }),
+          ]),
+        }),
+        expect.any(Number),
+      );
+
+      // 3. Model's response
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({
+          type: 'gemini',
+          text: modelResponseContent,
+        }),
+        expect.any(Number),
+      );
+    });
   });
   describe('Thought Reset', () => {
     it('should reset thought to null when starting a new prompt', async () => {
