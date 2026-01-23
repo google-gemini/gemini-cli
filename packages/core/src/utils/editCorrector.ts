@@ -357,7 +357,7 @@ export async function ensureCorrectFileContent(
   content: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
-  disableLLMCorrection: boolean = false,
+  disableLLMCorrection: boolean = true,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
   if (cachedResult) {

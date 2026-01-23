@@ -123,6 +123,27 @@ export function stripUnsafeCharacters(str: string): string {
     .join('');
 }
 
+/**
+ * Sanitize a string for display in list-like UI components (e.g. Help, Suggestions).
+ * Removes ANSI codes, collapses whitespace characters into a single space, and optionally truncates.
+ */
+export function sanitizeForListDisplay(
+  str: string,
+  maxLength?: number,
+): string {
+  if (!str) {
+    return '';
+  }
+
+  let sanitized = stripAnsi(str).replace(/\s+/g, ' ');
+
+  if (maxLength && sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength - 3) + '...';
+  }
+
+  return sanitized;
+}
+
 const stringWidthCache = new LRUCache<string, number>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );

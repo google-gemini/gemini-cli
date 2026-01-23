@@ -346,12 +346,16 @@ describe('SessionSummaryService', () => {
               10000,
             );
 
-            abortSignal?.addEventListener('abort', () => {
-              clearTimeout(timeoutId);
-              const abortError = new Error('This operation was aborted');
-              abortError.name = 'AbortError';
-              reject(abortError);
-            });
+            abortSignal?.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timeoutId);
+                const abortError = new Error('This operation was aborted');
+                abortError.name = 'AbortError';
+                reject(abortError);
+              },
+              { once: true },
+            );
           }),
       );
 
