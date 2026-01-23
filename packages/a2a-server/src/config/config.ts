@@ -86,11 +86,15 @@ export async function loadConfig(
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
-      customIgnoreFilePaths: process.env['CUSTOM_IGNORE_FILE_PATHS']
-        ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(',')
-        : [],
+      customIgnoreFilePaths: [
+        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
+          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(',')
+          : []),
+      ],
     },
     ideMode: false,
     folderTrust,

@@ -60,13 +60,46 @@ describe('loadConfig', () => {
     process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((config as any).fileFiltering.customIgnoreFilePaths).toBe(testPath);
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      testPath,
+    ]);
   });
 
-  it('should leave customIgnoreFilePaths undefined when env var is missing', async () => {
+  it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
+    const testPath = '/settings/ignore';
+    const settings: Settings = {
+      fileFiltering: {
+        customIgnoreFilePaths: [testPath],
+      },
+    };
+    const config = await loadConfig(settings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      testPath,
+    ]);
+  });
+
+  it('should merge customIgnoreFilePaths from settings and env var', async () => {
+    const envPath = '/env/ignore';
+    const settingsPath = '/settings/ignore';
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = envPath;
+    const settings: Settings = {
+      fileFiltering: {
+        customIgnoreFilePaths: [settingsPath],
+      },
+    };
+    const config = await loadConfig(settings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      settingsPath,
+      envPath,
+    ]);
+  });
+
+  it('should have empty customIgnoreFilePaths when both are missing', async () => {
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((config as any).fileFiltering.customIgnoreFilePaths).toBeUndefined();
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
   });
 
   it('should initialize FileDiscoveryService with correct options', async () => {

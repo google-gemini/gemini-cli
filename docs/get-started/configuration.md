@@ -612,6 +612,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.customIgnoreFilePaths`** (array):
+  - **Description:** Additional ignore file paths to respect.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `tools`
 
 - **`tools.sandbox`** (boolean | string):

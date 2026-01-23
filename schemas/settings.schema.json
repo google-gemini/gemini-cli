@@ -1023,6 +1023,16 @@
               "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "customIgnoreFilePaths": {
+              "title": "Custom Ignore File Paths",
+              "description": "Additional ignore file paths to respect.",
+              "markdownDescription": "Additional ignore file paths to respect.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false
