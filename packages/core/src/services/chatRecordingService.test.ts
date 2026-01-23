@@ -467,11 +467,8 @@ describe('ChatRecordingService', () => {
       // Should not throw
       expect(() => chatRecordingService.initialize()).not.toThrow();
 
-      // Recording should be disabled
-      expect(chatRecordingService.isRecordingDisabled()).toBe(true);
-      expect(chatRecordingService.getDisabledReason()).toBe(
-        'No space left on device (ENOSPC)',
-      );
+      // Recording should be disabled (conversationFile set to null)
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
     });
 
     it('should disable recording and not throw when ENOSPC occurs during writeConversation', () => {
@@ -501,11 +498,8 @@ describe('ChatRecordingService', () => {
         }),
       ).not.toThrow();
 
-      // Recording should be disabled
-      expect(chatRecordingService.isRecordingDisabled()).toBe(true);
-      expect(chatRecordingService.getDisabledReason()).toBe(
-        'No space left on device (ENOSPC)',
-      );
+      // Recording should be disabled (conversationFile set to null)
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
     });
 
     it('should skip recording operations when recording is disabled', () => {
@@ -611,8 +605,8 @@ describe('ChatRecordingService', () => {
         }),
       ).toThrow('Permission denied');
 
-      // Recording should NOT be disabled for non-ENOSPC errors
-      expect(chatRecordingService.isRecordingDisabled()).toBe(false);
+      // Recording should NOT be disabled for non-ENOSPC errors (file path still exists)
+      expect(chatRecordingService.getConversationFilePath()).not.toBeNull();
     });
   });
 });
