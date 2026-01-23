@@ -149,8 +149,12 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith(path.resolve('/path/to/folder1'));
-    expect(mockAddDirectory).toHaveBeenCalledWith(path.resolve('/path/to/folder2'));
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder1'),
+    );
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder2'),
+    );
     expect(mockSetValue).not.toHaveBeenCalled();
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
@@ -170,7 +174,9 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith(path.resolve('/path/to/folder1'));
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder1'),
+    );
     expect(mockSetValue).toHaveBeenCalledWith(
       path.resolve('/path/to/folder1'),
       TrustLevel.TRUST_FOLDER,
@@ -244,8 +250,12 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith(path.resolve('/path/to/good'));
-    expect(mockAddDirectory).not.toHaveBeenCalledWith(path.resolve('/path/to/error'));
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/good'),
+    );
+    expect(mockAddDirectory).not.toHaveBeenCalledWith(
+      path.resolve('/path/to/error'),
+    );
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
       mockAddItem,

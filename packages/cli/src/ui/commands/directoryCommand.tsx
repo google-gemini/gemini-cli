@@ -97,7 +97,8 @@ export const directoryCommand: SlashCommand = {
         // Filter out existing directories
         let filteredSuggestions = suggestions;
         if (context.services.config) {
-          const workspaceContext = context.services.config.getWorkspaceContext();
+          const workspaceContext =
+            context.services.config.getWorkspaceContext();
           const existingDirs = new Set(
             workspaceContext.getDirectories().map((dir) => path.normalize(dir)),
           );
