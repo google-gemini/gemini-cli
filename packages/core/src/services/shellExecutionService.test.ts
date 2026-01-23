@@ -940,6 +940,7 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
         chunk: 'file1.txt\na warning',
+        incremental: true,
       });
     });
 
@@ -967,7 +968,7 @@ describe('ShellExecutionService child_process fallback', () => {
       // Expect multiple events
       expect(chunks.length).toBeGreaterThan(1);
       expect(chunks[0]).toBe('chunk1');
-      expect(chunks[chunks.length - 1]).toBe('chunk1chunk2');
+      expect(chunks[chunks.length - 1]).toBe('chunk2');
 
       vi.useRealTimers();
     });
@@ -1224,7 +1225,7 @@ describe('ShellExecutionService child_process fallback', () => {
       const eventTypes = onOutputEventMock.mock.calls.map(
         (call: [ShellOutputEvent]) => call[0].type,
       );
-      expect(eventTypes).toEqual(['binary_detected']);
+      expect(eventTypes).toEqual(['data', 'binary_detected']);
     });
   });
 

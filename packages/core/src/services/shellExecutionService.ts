@@ -101,8 +101,10 @@ export type ShellOutputEvent =
   | {
       /** The event contains a chunk of output data. */
       type: 'data';
-      /** The decoded string chunk. */
+      /** The decoded string chunk or full terminal state. */
       chunk: string | AnsiOutput;
+      /** Whether this is an incremental chunk. Defaults to false. */
+      incremental?: boolean;
     }
   | {
       /** Signals that the output stream has been identified as binary. */
@@ -277,6 +279,8 @@ export class ShellExecutionService {
         let stderr = '';
         let stdoutTruncated = false;
         let stderrTruncated = false;
+        let stdoutToEmit = '';
+        let stderrToEmit = '';
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -304,9 +308,19 @@ export class ShellExecutionService {
           if (!isStreamingRawContent) {
             return;
           }
-          const output = composeOutput();
-          if (output) {
-            onOutputEvent({ type: 'data', chunk: output });
+          const combined = stdoutToEmit + stderrToEmit;
+          stdoutToEmit = '';
+          stderrToEmit = '';
+
+          if (combined) {
+            const stripped = stripAnsi(combined);
+            if (stripped) {
+              onOutputEvent({
+                type: 'data',
+                chunk: stripped,
+                incremental: true,
+              });
+            }
           }
         };
 
@@ -351,6 +365,7 @@ export class ShellExecutionService {
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
               stdout = newBuffer;
+              stdoutToEmit += decodedChunk;
               if (truncated) {
                 stdoutTruncated = true;
               }
@@ -361,6 +376,7 @@ export class ShellExecutionService {
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
               stderr = newBuffer;
+              stderrToEmit += decodedChunk;
               if (truncated) {
                 stderrTruncated = true;
               }
@@ -377,12 +393,29 @@ export class ShellExecutionService {
             clearTimeout(emitTimeout);
           }
           const { finalBuffer } = cleanup();
+
+          // Emit any remaining data
+          if (stdoutToEmit || stderrToEmit) {
+            const combined = stdoutToEmit + stderrToEmit;
+            const stripped = stripAnsi(combined);
+            if (stripped) {
+              onOutputEvent({
+                type: 'data',
+                chunk: stripped,
+                incremental: true,
+              });
+            }
+          }
+
           const finalStrippedOutput = composeOutput();
 
           if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
+            // No need to emit finalStrippedOutput here as it would duplicate
+            // everything we've already streamed incrementally.
+            // But we should emit a final event if there was no output at all
+            // OR if we want to ensure the consumer has the exact final state.
+            // Actually, if we've been streaming incremental chunks, the consumer's
+            // accumulated state should be close to finalStrippedOutput.
           } else {
             onOutputEvent({ type: 'binary_detected' });
           }

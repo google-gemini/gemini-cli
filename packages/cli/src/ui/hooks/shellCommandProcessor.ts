@@ -162,14 +162,15 @@ export const useShellCommandProcessor = (
                   if (isBinaryStream) break;
                   // PTY provides the full screen state, so we just replace.
                   // Child process provides chunks, so we append.
-                  if (config.getEnableInteractiveShell()) {
-                    cumulativeStdout = event.chunk;
-                    shouldUpdate = true;
-                  } else if (
+                  if (
+                    event.incremental &&
                     typeof event.chunk === 'string' &&
                     typeof cumulativeStdout === 'string'
                   ) {
                     cumulativeStdout += event.chunk;
+                    shouldUpdate = true;
+                  } else {
+                    cumulativeStdout = event.chunk;
                     shouldUpdate = true;
                   }
                   break;
