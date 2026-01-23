@@ -246,6 +246,23 @@ const saveFileWithXclip = async (tempFilePath: string) => {
 };
 
 /**
+ * Gets the directory where clipboard images should be stored for a specific project.
+ *
+ * This uses the global temporary directory but creates a project-specific subdirectory
+ * based on the hash of the project path (via `Storage.getProjectTempDir()`).
+ * This prevents path conflicts between different projects while keeping the images
+ * outside of the user's project directory.
+ *
+ * @param targetDir The root directory of the current project.
+ * @returns The absolute path to the images directory.
+ */
+function getGlobalGeminiImagesDir(targetDir: string): string {
+  const storage = new Storage(targetDir);
+  const baseDir = storage.getProjectTempDir();
+  return path.join(baseDir, 'images');
+}
+
+/**
  * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
@@ -254,11 +271,7 @@ export async function saveClipboardImage(
   targetDir: string,
 ): Promise<string | null> {
   try {
-    // Create a temporary directory for clipboard images within the target directory
-    // This avoids security restrictions on paths outside the target directory
-    const storage = new Storage(targetDir);
-    const baseDir = storage.getProjectTempDir();
-    const tempDir = path.join(baseDir, 'images');
+    const tempDir = getGlobalGeminiImagesDir(targetDir);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
@@ -383,9 +396,7 @@ export async function cleanupOldClipboardImages(
   targetDir: string,
 ): Promise<void> {
   try {
-    const storage = new Storage(targetDir);
-    const baseDir = storage.getProjectTempDir();
-    const tempDir = path.join(baseDir, 'images');
+    const tempDir = getGlobalGeminiImagesDir(targetDir);
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
