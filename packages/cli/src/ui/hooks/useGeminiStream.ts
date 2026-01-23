@@ -801,7 +801,12 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionStoppedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
+    (
+      reason: string,
+      userMessageTimestamp: number,
+      systemMessage?: string,
+      contextCleared?: boolean,
+    ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -813,13 +818,27 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      if (contextCleared) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Conversation context has been cleared.',
+          },
+          userMessageTimestamp,
+        );
+      }
       setIsResponding(false);
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
+    (
+      reason: string,
+      userMessageTimestamp: number,
+      systemMessage?: string,
+      contextCleared?: boolean,
+    ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -831,6 +850,15 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      if (contextCleared) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Conversation context has been cleared.',
+          },
+          userMessageTimestamp,
+        );
+      }
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
@@ -871,6 +899,7 @@ export const useGeminiStream = (
               event.value.reason,
               userMessageTimestamp,
               event.value.systemMessage,
+              event.value.contextCleared,
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
@@ -878,6 +907,7 @@ export const useGeminiStream = (
               event.value.reason,
               userMessageTimestamp,
               event.value.systemMessage,
+              event.value.contextCleared,
             );
             break;
           case ServerGeminiEventType.ChatCompressed:

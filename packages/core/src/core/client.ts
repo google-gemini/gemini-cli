@@ -805,15 +805,17 @@ export class GeminiClient {
         const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
 
         if (afterAgentOutput?.shouldStopExecution()) {
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
               reason: afterAgentOutput.getEffectiveReason(),
               systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
           // Clear context if requested (honor both stop + clear)
-          if (afterAgentOutput.shouldClearContext()) {
+          if (contextCleared) {
             await this.resetChat();
           }
           return turn;
@@ -821,15 +823,17 @@ export class GeminiClient {
 
         if (afterAgentOutput?.isBlockingDecision()) {
           const continueReason = afterAgentOutput.getEffectiveReason();
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
               systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
           // Clear context if requested
-          if (afterAgentOutput.shouldClearContext()) {
+          if (contextCleared) {
             await this.resetChat();
           }
           const continueRequest = [{ text: continueReason }];

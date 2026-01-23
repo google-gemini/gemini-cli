@@ -2883,10 +2883,12 @@ ${JSON.stringify(
         );
         const events = await fromAsync(stream);
 
-        expect(events).toContainEqual({
-          type: GeminiEventType.AgentExecutionStopped,
-          value: { reason: 'Stopped after agent' },
-        });
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: GeminiEventType.AgentExecutionStopped,
+            value: expect.objectContaining({ reason: 'Stopped after agent' }),
+          }),
+        );
         // sendMessageStream should not recurse
         expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
       });
@@ -2918,10 +2920,12 @@ ${JSON.stringify(
         );
         const events = await fromAsync(stream);
 
-        expect(events).toContainEqual({
-          type: GeminiEventType.AgentExecutionBlocked,
-          value: { reason: 'Please explain' },
-        });
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: expect.objectContaining({ reason: 'Please explain' }),
+          }),
+        );
         // Should have called turn run twice (original + re-prompt)
         expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
@@ -2965,7 +2969,11 @@ ${JSON.stringify(
 
         expect(events).toContainEqual({
           type: GeminiEventType.AgentExecutionBlocked,
-          value: { reason: 'Blocked and clearing context' },
+          value: {
+            reason: 'Blocked and clearing context',
+            systemMessage: undefined,
+            contextCleared: true,
+          },
         });
         expect(resetChatSpy).toHaveBeenCalledTimes(1);
 
