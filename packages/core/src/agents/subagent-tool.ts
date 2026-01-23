@@ -19,7 +19,7 @@ import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 
-export class SubAgentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
+export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
     private readonly definition: AgentDefinition,
     private readonly config: Config,

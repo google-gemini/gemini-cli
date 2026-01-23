@@ -47,12 +47,7 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    // TODO(15179): Support recursive agent invocation.
-    const agentNames = new Set(config.getAgentRegistry().getAllAgentNames());
-    const tools = config
-      .getToolRegistry()
-      .getAllToolNames()
-      .filter((name) => !agentNames.has(name));
+    const tools = config.getToolRegistry().getAllToolNames();
     return {
       tools,
     };

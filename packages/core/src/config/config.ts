@@ -101,7 +101,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
-import { SubAgentTool } from '../agents/subagent-tool.js';
+import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -1974,7 +1974,7 @@ export class Config {
 
         if (isAllowed) {
           try {
-            const tool = new SubAgentTool(
+            const tool = new SubagentTool(
               definition,
               this,
               this.getMessageBus(),
