@@ -10,11 +10,10 @@ import {
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
-  LS_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  PLAN_MODE_TOOLS,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
-  WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   DELEGATE_TO_AGENT_TOOL_NAME,
@@ -138,6 +137,16 @@ export function getCoreSystemPrompt(
   const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
   let approvalModePrompt = '';
   if (approvalMode === ApprovalMode.PLAN) {
+    // Build the list of available Plan Mode tools, filtering out any that are disabled
+    const availableToolNames = new Set(
+      config.getToolRegistry().getAllToolNames(),
+    );
+    const planModeToolsList = PLAN_MODE_TOOLS.filter((toolName) =>
+      availableToolNames.has(toolName),
+    )
+      .map((toolName) => `- \`${toolName}\``)
+      .join('\n');
+
     approvalModePrompt = `
 # Active Approval Mode: Plan
 
@@ -145,11 +154,7 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 
 ## Available Tools
 The following read-only tools are available in Plan Mode:
-- \`${GLOB_TOOL_NAME}\` - Find files by pattern
-- \`${GREP_TOOL_NAME}\` - Search file contents
-- \`${READ_FILE_TOOL_NAME}\` - Read file contents
-- \`${LS_TOOL_NAME}\` - List directory contents
-- \`${WEB_SEARCH_TOOL_NAME}\` - Search the web
+${planModeToolsList}
 
 ## Workflow Phases
 
@@ -158,21 +163,18 @@ The following read-only tools are available in Plan Mode:
 ### Phase 1: Requirements Understanding
 - Analyze the user's request to identify core requirements and constraints
 - If critical information is missing or ambiguous, ask ONE clarifying question at a time
-- Wait for the user's response before asking the next question
-- **STOP and wait for user's responses to all questions before proceeding to Phase 2**
-- Do NOT explore the codebase or create a plan yet
+- Do NOT explore the project or create a plan yet
 
-### Phase 2: Codebase Exploration
+### Phase 2: Project Exploration
 - Only begin this phase after requirements are clear
-- Use the available read-only tools to explore the codebase
+- Use the available read-only tools to explore the project
 - Identify existing patterns, conventions, and architectural decisions
-- **STOP and summarize findings before proceeding to Phase 3**
 
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
 - Include file paths, function signatures, and code snippets where helpful
-- **STOP and present the plan for review**
+- Present the plan for review
 
 ### Phase 4: Review & Approval
 - Ask the user if they approve the plan, want revisions, or want to reject it
@@ -182,7 +184,7 @@ The following read-only tools are available in Plan Mode:
 ## Constraints
 - You may ONLY use the read-only tools listed above
 - You MUST NOT modify source code, configs, or any files
-- If asked to modify code, explain you are in Plan Mode and offer to create a plan instead
+- If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits
 `;
   }
 

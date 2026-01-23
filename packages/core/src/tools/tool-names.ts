@@ -51,6 +51,19 @@ export const ALL_BUILTIN_TOOL_NAMES = [
 ] as const;
 
 /**
+ * Read-only tools available in Plan Mode.
+ * This list is used to dynamically generate the Plan Mode prompt,
+ * filtered by what tools are actually enabled in the current configuration.
+ */
+export const PLAN_MODE_TOOLS = [
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+] as const;
+
+/**
  * Validates if a tool name is syntactically valid.
  * Checks against built-in tools, discovered tools, and MCP naming conventions.
  */
