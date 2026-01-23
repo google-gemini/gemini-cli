@@ -133,10 +133,27 @@ function askUserDialogReducerLogic(
   }
 }
 
+/**
+ * Props for the AskUserDialog component.
+ */
 interface AskUserDialogProps {
+  /**
+   * The list of questions to ask the user.
+   */
   questions: Question[];
+  /**
+   * Callback fired when the user submits their answers.
+   * Returns a map of question index to answer string.
+   */
   onSubmit: (answers: { [questionIndex: string]: string }) => void;
+  /**
+   * Callback fired when the user cancels the dialog (e.g. via Escape).
+   */
   onCancel: () => void;
+  /**
+   * Optional callback to notify parent when text input is active.
+   * Useful for managing global keypress handlers.
+   */
   onActiveTextInputChange?: (active: boolean) => void;
 }
 
@@ -931,6 +948,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   );
 };
 
+/**
+ * A dialog component for asking the user a series of questions.
+ * Supports multiple question types (text, choice, yes/no, multi-select),
+ * navigation between questions, and a final review step.
+ */
 export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   questions,
   onSubmit,
