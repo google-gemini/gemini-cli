@@ -13,9 +13,10 @@ import type { Key } from './hooks/useKeypress.js';
 describe('keyMatchers', () => {
   const createKey = (name: string, mods: Partial<Key> = {}): Key => ({
     name,
-    ctrl: false,
-    meta: false,
     shift: false,
+    alt: false,
+    ctrl: false,
+    cmd: false,
     insertable: false,
     sequence: name,
     ...mods,
@@ -70,8 +71,8 @@ describe('keyMatchers', () => {
       command: Command.MOVE_WORD_LEFT,
       positive: [
         createKey('left', { ctrl: true }),
-        createKey('left', { meta: true }),
-        createKey('b', { meta: true }),
+        createKey('left', { alt: true }),
+        createKey('b', { alt: true }),
       ],
       negative: [createKey('left'), createKey('b', { ctrl: true })],
     },
@@ -79,8 +80,8 @@ describe('keyMatchers', () => {
       command: Command.MOVE_WORD_RIGHT,
       positive: [
         createKey('right', { ctrl: true }),
-        createKey('right', { meta: true }),
-        createKey('f', { meta: true }),
+        createKey('right', { alt: true }),
+        createKey('f', { alt: true }),
       ],
       negative: [createKey('right'), createKey('f', { ctrl: true })],
     },
@@ -115,7 +116,7 @@ describe('keyMatchers', () => {
       command: Command.DELETE_WORD_BACKWARD,
       positive: [
         createKey('backspace', { ctrl: true }),
-        createKey('backspace', { meta: true }),
+        createKey('backspace', { alt: true }),
         createKey('w', { ctrl: true }),
       ],
       negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
@@ -124,19 +125,19 @@ describe('keyMatchers', () => {
       command: Command.DELETE_WORD_FORWARD,
       positive: [
         createKey('delete', { ctrl: true }),
-        createKey('delete', { meta: true }),
+        createKey('delete', { alt: true }),
       ],
       negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
     },
     {
       command: Command.UNDO,
-      positive: [createKey('z', { ctrl: true, shift: false })],
-      negative: [createKey('z'), createKey('z', { ctrl: true, shift: true })],
+      positive: [createKey('z', { shift: false, ctrl: true })],
+      negative: [createKey('z'), createKey('z', { shift: true, ctrl: true })],
     },
     {
       command: Command.REDO,
-      positive: [createKey('z', { ctrl: true, shift: true })],
-      negative: [createKey('z'), createKey('z', { ctrl: true, shift: false })],
+      positive: [createKey('z', { shift: true, ctrl: true })],
+      negative: [createKey('z'), createKey('z', { shift: false, ctrl: true })],
     },
 
     // Screen control
@@ -243,14 +244,16 @@ describe('keyMatchers', () => {
       positive: [createKey('return')],
       negative: [
         createKey('return', { ctrl: true }),
-        createKey('return', { meta: true }),
+        createKey('return', { cmd: true }),
+        createKey('return', { alt: true }),
       ],
     },
     {
       command: Command.NEWLINE,
       positive: [
         createKey('return', { ctrl: true }),
-        createKey('return', { meta: true }),
+        createKey('return', { cmd: true }),
+        createKey('return', { alt: true }),
       ],
       negative: [createKey('return'), createKey('n')],
     },
@@ -285,13 +288,13 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_MARKDOWN,
-      positive: [createKey('m', { meta: true })],
+      positive: [createKey('m', { alt: true })],
       negative: [createKey('m'), createKey('m', { shift: true })],
     },
     {
       command: Command.TOGGLE_COPY_MODE,
       positive: [createKey('s', { ctrl: true })],
-      negative: [createKey('s'), createKey('s', { meta: true })],
+      negative: [createKey('s'), createKey('s', { alt: true })],
     },
     {
       command: Command.QUIT,
@@ -333,10 +336,10 @@ describe('keyMatchers', () => {
     {
       command: Command.TOGGLE_YOLO,
       positive: [createKey('y', { ctrl: true })],
-      negative: [createKey('y'), createKey('y', { meta: true })],
+      negative: [createKey('y'), createKey('y', { alt: true })],
     },
     {
-      command: Command.TOGGLE_AUTO_EDIT,
+      command: Command.CYCLE_APPROVAL_MODE,
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
     },
@@ -401,13 +404,13 @@ describe('keyMatchers', () => {
         ...defaultKeyBindings,
         [Command.QUIT]: [
           { key: 'q', ctrl: true },
-          { key: 'q', command: true },
+          { key: 'q', alt: true },
         ],
       };
 
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(true);
-      expect(matchers[Command.QUIT](createKey('q', { meta: true }))).toBe(true);
+      expect(matchers[Command.QUIT](createKey('q', { alt: true }))).toBe(true);
     });
   });
 

@@ -24,6 +24,7 @@ import type {
   IdeInfo,
   FallbackIntent,
   ValidationIntent,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -70,6 +71,10 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isAgentConfigDialogOpen: boolean;
+  selectedAgentName?: string;
+  selectedAgentDisplayName?: string;
+  selectedAgentDefinition?: AgentDefinition;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;
@@ -106,7 +111,7 @@ export interface UIState {
   activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
-  showAutoAcceptIndicator: ApprovalMode;
+  showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
