@@ -18,6 +18,7 @@ import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { checkExhaustive } from '../../utils/checks.js';
 
 interface AskUserDialogState {
   currentQuestionIndex: number;
@@ -27,8 +28,11 @@ interface AskUserDialogState {
 }
 
 type AskUserDialogAction =
-  | { type: 'NEXT_QUESTION'; payload: { maxIndex: number } }
-  | { type: 'PREV_QUESTION' }
+  | {
+      type: 'NEXT_QUESTION';
+      payload: { maxIndex: number; isTextQuestion: boolean };
+    }
+  | { type: 'PREV_QUESTION'; payload: { isTextQuestion: boolean } }
   | {
       type: 'SET_ANSWER';
       payload: {
@@ -58,7 +62,13 @@ function askUserDialogReducerLogic(
 
   switch (action.type) {
     case 'NEXT_QUESTION': {
-      if (state.currentQuestionIndex < action.payload.maxIndex) {
+      const { maxIndex, isTextQuestion } = action.payload;
+      // Prevent navigation if editing custom option (unless it's a text question)
+      if (state.isEditingCustomOption && !isTextQuestion) {
+        return state;
+      }
+
+      if (state.currentQuestionIndex < maxIndex) {
         return {
           ...state,
           currentQuestionIndex: state.currentQuestionIndex + 1,
@@ -67,6 +77,12 @@ function askUserDialogReducerLogic(
       return state;
     }
     case 'PREV_QUESTION': {
+      const { isTextQuestion } = action.payload;
+      // Prevent navigation if editing custom option (unless it's a text question)
+      if (state.isEditingCustomOption && !isTextQuestion) {
+        return state;
+      }
+
       if (state.currentQuestionIndex > 0) {
         return {
           ...state,
@@ -112,6 +128,7 @@ function askUserDialogReducerLogic(
       };
     }
     default:
+      checkExhaustive(action);
       return state;
   }
 }
@@ -287,6 +304,7 @@ function textQuestionReducer(
       };
     }
     default:
+      checkExhaustive(action);
       return state;
   }
 }
@@ -502,6 +520,7 @@ function choiceQuestionReducer(
       };
     }
     default:
+      checkExhaustive(action);
       return state;
   }
 }
@@ -965,29 +984,27 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   // Bidirectional navigation between questions using custom useKeypress for consistency
   const handleNavigation = useCallback(
     (key: Key) => {
-      // Allow navigation for text-type questions even when "editing"
-      // (isEditingCustomOption blocks navigation for choice-type custom option field, not text-type questions)
+      if (submitted) return;
+
       const currentQuestionIsText =
         questions[currentQuestionIndex]?.type === 'text';
-      if ((isEditingCustomOption && !currentQuestionIsText) || submitted)
-        return;
 
       if (keyMatchers[Command.MOVE_RIGHT](key) || key.name === 'tab') {
         // Allow navigation up to Review tab for multi-question flows
         const maxIndex =
           questions.length > 1 ? reviewTabIndex : questions.length - 1;
-        dispatch({ type: 'NEXT_QUESTION', payload: { maxIndex } });
+        dispatch({
+          type: 'NEXT_QUESTION',
+          payload: { maxIndex, isTextQuestion: currentQuestionIsText },
+        });
       } else if (keyMatchers[Command.MOVE_LEFT](key)) {
-        dispatch({ type: 'PREV_QUESTION' });
+        dispatch({
+          type: 'PREV_QUESTION',
+          payload: { isTextQuestion: currentQuestionIsText },
+        });
       }
     },
-    [
-      isEditingCustomOption,
-      currentQuestionIndex,
-      questions,
-      reviewTabIndex,
-      submitted,
-    ],
+    [currentQuestionIndex, questions, reviewTabIndex, submitted],
   );
 
   useKeypress(handleNavigation, {
@@ -1052,6 +1069,21 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   const currentQuestion = questions[currentQuestionIndex];
 
+  // For yesno type, generate Yes/No options and force single-select
+  const effectiveQuestion = useMemo(() => {
+    if (currentQuestion?.type === 'yesno') {
+      return {
+        ...currentQuestion,
+        options: [
+          { label: 'Yes', description: '' },
+          { label: 'No', description: '' },
+        ],
+        multiSelect: false,
+      };
+    }
+    return currentQuestion;
+  }, [currentQuestion]);
+
   const progressHeader =
     questions.length > 1 ? (
       <QuestionProgressHeader
@@ -1107,19 +1139,6 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       />
     );
   }
-
-  // For yesno type, generate Yes/No options and force single-select
-  const effectiveQuestion =
-    currentQuestion.type === 'yesno'
-      ? {
-          ...currentQuestion,
-          options: [
-            { label: 'Yes', description: '' },
-            { label: 'No', description: '' },
-          ],
-          multiSelect: false,
-        }
-      : currentQuestion;
 
   return (
     <ChoiceQuestionView
