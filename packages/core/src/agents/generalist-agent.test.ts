@@ -27,7 +27,7 @@ describe('GeneralistAgent', () => {
     expect(agent.kind).toBe('local');
     expect(agent.modelConfig.model).toBe('inherit');
     expect(agent.toolConfig?.tools).toBeDefined();
-    expect(agent.toolConfig?.tools).not.toContain('agent-tool');
+    expect(agent.toolConfig?.tools).toContain('agent-tool');
     expect(agent.toolConfig?.tools).toContain('tool1');
     expect(agent.promptConfig.systemPrompt).toContain('CLI agent');
     // Ensure it's non-interactive
