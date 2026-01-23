@@ -702,5 +702,44 @@ describe('AskUserDialog', () => {
       // onSubmit should not be called for empty text
       expect(onSubmit).not.toHaveBeenCalled();
     });
+
+    it('clears text on Ctrl+C', async () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Enter the class name:',
+          header: 'Class',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      const onCancel = vi.fn();
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={onCancel}
+        />,
+      );
+
+      for (const char of 'SomeText') {
+        writeKey(stdin, char);
+      }
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('SomeText');
+      });
+
+      // Send Ctrl+C
+      writeKey(stdin, '\x03'); // Ctrl+C
+
+      await waitFor(() => {
+        // Text should be cleared
+        expect(lastFrame()).not.toContain('SomeText');
+        expect(lastFrame()).toContain('>');
+      });
+
+      // Should NOT call onCancel (dialog should stay open)
+      expect(onCancel).not.toHaveBeenCalled();
+    });
   });
 });
