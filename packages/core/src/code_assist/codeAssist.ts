@@ -31,6 +31,7 @@ export async function createCodeAssistContentGenerator(
       httpOptions,
       sessionId,
       userData.userTier,
+      userData.userTierName,
     );
   }
 
