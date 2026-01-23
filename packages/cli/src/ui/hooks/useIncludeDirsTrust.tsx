@@ -5,9 +5,9 @@
  */
 
 import { useEffect } from 'react';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import { expandHomeDir, batchAddDirectories } from '../utils/directoryUtils.js';
 import {
   debugLogger,
   refreshServerHierarchicalMemory,
@@ -18,18 +18,18 @@ import { MessageType, type HistoryItem } from '../types.js';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number,
   added: string[],
   errors: string[],
 ) {
   if (!config) {
-    addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      Date.now(),
-    );
+    addItem({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     return;
   }
 
@@ -49,7 +49,7 @@ async function finishAddingDirectories(
   }
 
   if (errors.length > 0) {
-    addItem({ type: MessageType.ERROR, text: errors.join('\n') }, Date.now());
+    addItem({ type: MessageType.ERROR, text: errors.join('\n') });
   }
 }
 
@@ -79,15 +79,10 @@ export function useIncludeDirsTrust(
       const added: string[] = [];
       const errors: string[] = [];
       const workspaceContext = config.getWorkspaceContext();
-      for (const pathToAdd of pendingDirs) {
-        try {
-          workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
-          added.push(pathToAdd.trim());
-        } catch (e) {
-          const error = e as Error;
-          errors.push(`Error adding '${pathToAdd.trim()}': ${error.message}`);
-        }
-      }
+
+      const result = batchAddDirectories(workspaceContext, pendingDirs);
+      added.push(...result.added);
+      errors.push(...result.errors);
 
       if (added.length > 0 || errors.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -125,14 +120,10 @@ export function useIncludeDirsTrust(
     }
 
     const workspaceContext = config.getWorkspaceContext();
-    for (const pathToAdd of trustedDirs) {
-      try {
-        workspaceContext.addDirectory(expandHomeDir(pathToAdd));
-        added.push(pathToAdd);
-      } catch (e) {
-        const error = e as Error;
-        errors.push(`Error adding '${pathToAdd}': ${error.message}`);
-      }
+    if (trustedDirs.length > 0) {
+      const result = batchAddDirectories(workspaceContext, trustedDirs);
+      added.push(...result.added);
+      errors.push(...result.errors);
     }
 
     if (undefinedTrustDirs.length > 0) {

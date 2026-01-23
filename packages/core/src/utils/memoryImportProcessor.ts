@@ -7,7 +7,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
-import { marked, type Token } from 'marked';
 import { debugLogger } from './debugLogger.js';
 
 // Simple console logger for import processing
@@ -83,7 +82,7 @@ function hasMessage(err: unknown): err is { message: string } {
   );
 }
 
-// Helper to find all code block and inline code regions using marked
+// Helper to find all code block and inline code regions using regex
 /**
  * Finds all import statements in content without using regex
  * @returns Array of {start, _end, path} objects for each import found
@@ -154,85 +153,13 @@ function isLetter(char: string): boolean {
 
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
-  const tokens = marked.lexer(content);
-  let offset = 0;
-
-  function walkChildren(
-    children: Token[],
-    parentRaw: string,
-    baseOffset: number,
-  ) {
-    let childOffset = 0;
-    for (const child of children) {
-      const childIndexInParent = parentRaw.indexOf(child.raw, childOffset);
-      if (childIndexInParent === -1) {
-        // Child raw doesn't exist verbatim in parent (e.g., list items with
-        // normalized whitespace). Fall back to finding code regions directly
-        // in the parent's raw content.
-        findCodeSpansDirectly(parentRaw, baseOffset, regions);
-        return;
-      }
-      walk(child, baseOffset + childIndexInParent);
-      childOffset = childIndexInParent + child.raw.length;
-    }
-  }
-
-  function walk(token: Token, baseOffset: number) {
-    if (token.type === 'code' || token.type === 'codespan') {
-      regions.push([baseOffset, baseOffset + token.raw.length]);
-    }
-
-    // Walk into child tokens (paragraphs, text with inline formatting, etc.)
-    if ('tokens' in token && token.tokens) {
-      walkChildren(token.tokens, token.raw, baseOffset);
-    }
-
-    // Walk into list items (lists have 'items' instead of 'tokens')
-    if ('items' in token && Array.isArray(token.items)) {
-      walkChildren(token.items as Token[], token.raw, baseOffset);
-    }
-  }
-
-  for (const token of tokens) {
-    walk(token, offset);
-    offset += token.raw.length;
-  }
-
-  return regions;
-}
-
-// Fallback: find inline code spans directly using backtick matching
-function findCodeSpansDirectly(
-  content: string,
-  baseOffset: number,
-  regions: Array<[number, number]>,
-): void {
-  // Match fenced code blocks (```...```) and inline code (`...`)
-  // Process fenced blocks first to avoid matching their backticks as inline code
-  const fencedRegex = /```[\s\S]*?```/g;
+  // CommonMark-compliant: backtick strings must not be preceded/followed by backticks
+  const regex = /(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g;
   let match;
-  const fencedRanges: Array<[number, number]> = [];
-
-  while ((match = fencedRegex.exec(content)) !== null) {
-    const start = baseOffset + match.index;
-    const end = start + match[0].length;
-    regions.push([start, end]);
-    fencedRanges.push([match.index, match.index + match[0].length]);
+  while ((match = regex.exec(content)) !== null) {
+    regions.push([match.index, match.index + match[0].length]);
   }
-
-  // Match inline code spans (any number of backticks per CommonMark spec), avoiding fenced regions
-  const inlineRegex = /(`+)([\s\S]*?)\1/g;
-  while ((match = inlineRegex.exec(content)) !== null) {
-    // Skip if this match is inside a fenced code block
-    const matchStart = match.index;
-    const matchEnd = matchStart + match[0].length;
-    const insideFenced = fencedRanges.some(
-      ([fStart, fEnd]) => matchStart >= fStart && matchEnd <= fEnd,
-    );
-    if (!insideFenced) {
-      regions.push([baseOffset + matchStart, baseOffset + matchEnd]);
-    }
-  }
+  return regions;
 }
 
 /**

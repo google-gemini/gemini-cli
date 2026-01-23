@@ -8,7 +8,10 @@ import type { CommandModule } from 'yargs';
 import { listCommand } from './skills/list.js';
 import { enableCommand } from './skills/enable.js';
 import { disableCommand } from './skills/disable.js';
+import { installCommand } from './skills/install.js';
+import { uninstallCommand } from './skills/uninstall.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
+import { defer } from '../deferred.js';
 
 export const skillsCommand: CommandModule = {
   command: 'skills <command>',
@@ -16,10 +19,15 @@ export const skillsCommand: CommandModule = {
   describe: 'Manage agent skills.',
   builder: (yargs) =>
     yargs
-      .middleware(() => initializeOutputListenersAndFlush())
-      .command(listCommand)
-      .command(enableCommand)
-      .command(disableCommand)
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
+      .command(defer(listCommand, 'skills'))
+      .command(defer(enableCommand, 'skills'))
+      .command(defer(disableCommand, 'skills'))
+      .command(defer(installCommand, 'skills'))
+      .command(defer(uninstallCommand, 'skills'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
