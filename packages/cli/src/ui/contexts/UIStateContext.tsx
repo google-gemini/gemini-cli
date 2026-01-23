@@ -24,6 +24,7 @@ import type {
   IdeInfo,
   FallbackIntent,
   ValidationIntent,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -149,6 +150,7 @@ export interface UIState {
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
   adminSettingsChanged: boolean;
+  newAgents: AgentDefinition[] | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

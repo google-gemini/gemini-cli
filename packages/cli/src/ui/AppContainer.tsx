@@ -132,10 +132,7 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
-import {
-  NewAgentsNotification,
-  NewAgentsChoice,
-} from './components/NewAgentsNotification.js';
+import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1497,7 +1494,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!validationRequest ||
     isSessionBrowserOpen ||
     isAuthDialogOpen ||
-    authState === AuthState.AwaitingApiKeyInput;
+    authState === AuthState.AwaitingApiKeyInput ||
+    !!newAgents;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1655,6 +1653,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
       adminSettingsChanged,
+      newAgents,
     }),
     [
       isThemeDialogOpen,
@@ -1750,6 +1749,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       settingsNonce,
       adminSettingsChanged,
+      newAgents,
     ],
   );
 
@@ -1799,6 +1799,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
         await runExitCleanup();
         process.exit(RELAUNCH_EXIT_CODE);
       },
+      handleNewAgentsSelect: (choice: NewAgentsChoice) => {
+        if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
+          const registry = config.getAgentRegistry();
+          newAgents.forEach((agent) => {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            registry.acknowledgeAgent(agent);
+          });
+        }
+        setNewAgents(null);
+      },
     }),
     [
       handleThemeSelect,
@@ -1836,6 +1846,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
+      newAgents,
+      config,
     ],
   );
 
@@ -1846,26 +1858,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
           setAuthContext({});
           setAuthState(AuthState.Updating);
         }}
-      />
-    );
-  }
-
-  if (newAgents) {
-    const handleNewAgentsSelect = (choice: NewAgentsChoice) => {
-      if (choice === NewAgentsChoice.ACKNOWLEDGE) {
-        const registry = config.getAgentRegistry();
-        newAgents.forEach((agent) => {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          registry.acknowledgeAgent(agent);
-        });
-      }
-      setNewAgents(null);
-    };
-
-    return (
-      <NewAgentsNotification
-        agents={newAgents}
-        onSelect={handleNewAgentsSelect}
       />
     );
   }
