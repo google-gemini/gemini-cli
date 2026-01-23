@@ -5,7 +5,6 @@
  */
 
 import React, {
-  useState,
   useCallback,
   useMemo,
   useRef,
@@ -248,6 +247,50 @@ const ReviewView: React.FC<ReviewViewProps> = ({
 
 // ============== Text Question View ==============
 
+interface TextQuestionState {
+  textValue: string;
+}
+
+type TextQuestionAction =
+  | { type: 'TYPE'; payload: { char: string } }
+  | { type: 'BACKSPACE' }
+  | { type: 'CLEAR' }
+  | { type: 'SET'; payload: { value: string } };
+
+function textQuestionReducer(
+  state: TextQuestionState,
+  action: TextQuestionAction,
+): TextQuestionState {
+  switch (action.type) {
+    case 'TYPE': {
+      return {
+        ...state,
+        textValue: state.textValue + action.payload.char,
+      };
+    }
+    case 'BACKSPACE': {
+      return {
+        ...state,
+        textValue: state.textValue.slice(0, -1),
+      };
+    }
+    case 'CLEAR': {
+      return {
+        ...state,
+        textValue: '',
+      };
+    }
+    case 'SET': {
+      return {
+        ...state,
+        textValue: action.payload.value,
+      };
+    }
+    default:
+      return state;
+  }
+}
+
 interface TextQuestionViewProps {
   question: Question;
   onAnswer: (answer: string) => void;
@@ -267,22 +310,27 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
-  const [textValue, setTextValue] = useState(initialAnswer || '');
+  const [state, dispatch] = useReducer(textQuestionReducer, {
+    textValue: initialAnswer || '',
+  });
+  const { textValue } = state;
+
+  // Sync state change with parent
+  useEffect(() => {
+    onSelectionChange?.(textValue);
+  }, [textValue, onSelectionChange]);
 
   const handleTextTyping = useCallback(
     (key: Key) => {
       // Handle Ctrl+C to clear all text
       if (keyMatchers[Command.QUIT](key)) {
-        setTextValue('');
-        onSelectionChange?.('');
+        dispatch({ type: 'CLEAR' });
         return;
       }
 
       // Handle backspace
       if (key.name === 'backspace' || key.name === 'delete') {
-        const newText = textValue.slice(0, -1);
-        setTextValue(newText);
-        onSelectionChange?.(newText);
+        dispatch({ type: 'BACKSPACE' });
         return;
       }
 
@@ -302,13 +350,11 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
         !key.alt &&
         key.sequence.charCodeAt(0) >= 32
       ) {
-        const newText = textValue + key.sequence;
-        setTextValue(newText);
-        onSelectionChange?.(newText);
+        dispatch({ type: 'TYPE', payload: { char: key.sequence } });
         onEditingCustomOption?.(true);
       }
     },
-    [textValue, onAnswer, onSelectionChange, onEditingCustomOption],
+    [textValue, onAnswer, onEditingCustomOption, dispatch],
   );
 
   useKeypress(handleTextTyping, { isActive: true });
@@ -417,6 +463,7 @@ function choiceQuestionReducer(
           : state.isCustomOptionSelected,
         // In single-select, selecting custom deselects others
         selectedIndices: multiSelect ? state.selectedIndices : new Set(),
+        isCustomOptionFocused: true,
       };
     }
     case 'BACKSPACE_CUSTOM': {
@@ -579,37 +626,47 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     onSelectionChange,
   ]);
 
-  // Handle inline typing when custom option is focused
-  const handleCustomOptionTyping = useCallback(
+  // Handle keypresses for both custom option typing and "type-to-jump"
+  const handleChoiceKeypress = useCallback(
     (key: Key) => {
-      if (!isCustomOptionFocused) return;
+      // If focusing custom option, handle editing keys
+      if (isCustomOptionFocused) {
+        // Handle Ctrl+C to clear all text
+        if (keyMatchers[Command.QUIT](key)) {
+          dispatch({
+            type: 'CLEAR_CUSTOM',
+            payload: { multiSelect: !!question.multiSelect },
+          });
+          return;
+        }
 
-      // Handle Ctrl+C to clear all text
-      if (keyMatchers[Command.QUIT](key)) {
-        dispatch({
-          type: 'CLEAR_CUSTOM',
-          payload: { multiSelect: !!question.multiSelect },
-        });
-        return;
-      }
-
-      // Handle backspace
-      if (key.name === 'backspace' || key.name === 'delete') {
-        dispatch({
-          type: 'BACKSPACE_CUSTOM',
-          payload: { multiSelect: !!question.multiSelect },
-        });
-        return;
+        // Handle backspace
+        if (key.name === 'backspace' || key.name === 'delete') {
+          dispatch({
+            type: 'BACKSPACE_CUSTOM',
+            payload: { multiSelect: !!question.multiSelect },
+          });
+          return;
+        }
       }
 
       // Handle printable characters (ignore control keys)
-      if (
+      // This works both when focused (editing) and when not focused (type-to-jump)
+      const isPrintable =
         key.sequence &&
         key.sequence.length === 1 &&
         !key.ctrl &&
         !key.alt &&
-        key.sequence.charCodeAt(0) >= 32
-      ) {
+        key.sequence.charCodeAt(0) >= 32;
+
+      // Avoid capturing numbers if they might be used for selection (1-9)
+      const isNumber = /^[0-9]$/.test(key.sequence);
+      // We assume BaseSelectionList handles numbers if showNumbers is true (which implies we shouldn't steal them)
+      // Since we don't know showNumbers here easily without props, we'll assume we shouldn't steal numbers if not focused.
+      // If focused, we treat numbers as text input.
+      const shouldCapture = isPrintable && (isCustomOptionFocused || !isNumber);
+
+      if (shouldCapture) {
         dispatch({
           type: 'TYPE_CUSTOM',
           payload: {
@@ -628,7 +685,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ],
   );
 
-  useKeypress(handleCustomOptionTyping, { isActive: isCustomOptionFocused });
+  useKeypress(handleChoiceKeypress, { isActive: true });
 
   const selectionItems = useMemo((): Array<SelectionListItem<OptionItem>> => {
     const list: Array<SelectionListItem<OptionItem>> = questionOptions.map(

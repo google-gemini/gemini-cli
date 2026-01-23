@@ -150,6 +150,34 @@ describe('AskUserDialog', () => {
     });
   });
 
+  it('navigates to custom option when typing unbound characters (Type-to-Jump)', async () => {
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserDialog
+        questions={authQuestion}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // Type a character without navigating down
+    writeKey(stdin, 'A');
+
+    await waitFor(() => {
+      // Should show the custom input with 'A'
+      // Placeholder is hidden when text is present
+      expect(lastFrame()).toContain('A');
+      expect(lastFrame()).toContain('3.  A');
+    });
+
+    // Continue typing
+    writeKey(stdin, 'P');
+    writeKey(stdin, 'I');
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('API');
+    });
+  });
+
   it('shows progress header for multiple questions', () => {
     const multiQuestions: Question[] = [
       {
