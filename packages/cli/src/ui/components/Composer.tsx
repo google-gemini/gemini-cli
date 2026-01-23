@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
-import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
+import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
@@ -42,7 +42,7 @@ export const Composer = () => {
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { showAutoAcceptIndicator } = uiState;
+  const { showApprovalModeIndicator } = uiState;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
@@ -58,12 +58,12 @@ export const Composer = () => {
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.thought
           }
           currentLoadingPhrase={
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.currentLoadingPhrase
           }
@@ -82,9 +82,7 @@ export const Composer = () => {
       <Box
         marginTop={1}
         justifyContent={
-          settings.merged.ui?.hideContextSummary
-            ? 'flex-start'
-            : 'space-between'
+          settings.merged.ui.hideContextSummary ? 'flex-start' : 'space-between'
         }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
@@ -94,9 +92,9 @@ export const Composer = () => {
           <StatusDisplay hideContextSummary={hideContextSummary} />
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
-          {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
             !uiState.shellModeActive && (
-              <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
+              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
           {!uiState.renderMarkdown && <RawMarkdownIndicator />}
@@ -133,7 +131,7 @@ export const Composer = () => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
-          approvalMode={showAutoAcceptIndicator}
+          approvalMode={showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}
@@ -153,7 +151,7 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {!settings.merged.ui.hideFooter && !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

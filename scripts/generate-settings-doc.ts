@@ -133,6 +133,10 @@ function collectEntries(
         definition.properties &&
         Object.keys(definition.properties).length > 0;
 
+      if (definition.ignoreInDocs) {
+        continue;
+      }
+
       if (!hasChildren && (options.includeAll || definition.showInDialog)) {
         if (!sections.has(sectionKey)) {
           sections.set(sectionKey, []);
