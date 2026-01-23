@@ -67,6 +67,7 @@ describe('setupUser for existing user', () => {
       {},
       '',
       undefined,
+      undefined,
     );
   });
 
@@ -83,10 +84,12 @@ describe('setupUser for existing user', () => {
       {},
       '',
       undefined,
+      undefined,
     );
     expect(projectId).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      userTierName: 'paid',
     });
   });
 
@@ -148,6 +151,7 @@ describe('setupUser for new user', () => {
       {},
       '',
       undefined,
+      undefined,
     );
     expect(mockLoad).toHaveBeenCalled();
     expect(mockOnboardUser).toHaveBeenCalledWith({
@@ -163,6 +167,7 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      userTierName: 'paid',
     });
   });
 
@@ -178,6 +183,7 @@ describe('setupUser for new user', () => {
       {},
       '',
       undefined,
+      undefined,
     );
     expect(mockLoad).toHaveBeenCalled();
     expect(mockOnboardUser).toHaveBeenCalledWith({
@@ -192,6 +198,7 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'free-tier',
+      userTierName: 'free',
     });
   });
 
@@ -210,6 +217,7 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'test-project',
       userTier: 'standard-tier',
+      userTierName: 'paid',
     });
   });
 
@@ -268,6 +276,7 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      userTierName: 'paid',
     });
   });
 
@@ -294,6 +303,7 @@ describe('setupUser for new user', () => {
     expect(userData).toEqual({
       projectId: 'server-project',
       userTier: 'standard-tier',
+      userTierName: 'paid',
     });
   });
 });

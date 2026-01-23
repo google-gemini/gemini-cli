@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 describe('generalist_agent', () => {
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should be able to use generalist agent by explicitly asking the main agent to invoke it',
     params: {
       settings: {

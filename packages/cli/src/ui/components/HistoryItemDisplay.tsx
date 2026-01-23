@@ -112,6 +112,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
           userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
         />
       )}
       {itemForDisplay.type === 'help' && commands && (
