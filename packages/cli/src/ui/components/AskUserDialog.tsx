@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, {
+import type React from 'react';
+import {
   useCallback,
   useMemo,
   useRef,
@@ -16,6 +17,7 @@ import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
+import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '../../utils/checks.js';
@@ -156,61 +158,6 @@ interface AskUserDialogProps {
    */
   onActiveTextInputChange?: (active: boolean) => void;
 }
-
-interface QuestionProgressHeaderProps {
-  questions: Question[];
-  currentIndex: number;
-  answeredIndices: Set<number>;
-  showReviewTab?: boolean;
-  isOnReviewTab?: boolean;
-}
-
-const QuestionProgressHeader: React.FC<QuestionProgressHeaderProps> = ({
-  questions,
-  currentIndex,
-  answeredIndices,
-  showReviewTab = false,
-  isOnReviewTab = false,
-}) => {
-  if (questions.length <= 1) return null;
-
-  return (
-    <Box flexDirection="row" marginBottom={1}>
-      <Text color={theme.text.secondary}>{'← '}</Text>
-      {questions.map((q, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <Text color={theme.text.secondary}>{' │ '}</Text>}
-          <Text color={theme.text.secondary}>
-            {answeredIndices.has(i) ? '✓' : '□'}{' '}
-          </Text>
-          <Text
-            color={
-              i === currentIndex && !isOnReviewTab
-                ? theme.text.accent
-                : theme.text.secondary
-            }
-            bold={i === currentIndex && !isOnReviewTab}
-          >
-            {q.header}
-          </Text>
-        </React.Fragment>
-      ))}
-      {showReviewTab && (
-        <>
-          <Text color={theme.text.secondary}>{' │ '}</Text>
-          <Text color={theme.text.secondary}>{'≡'} </Text>
-          <Text
-            color={isOnReviewTab ? theme.text.accent : theme.text.secondary}
-            bold={isOnReviewTab}
-          >
-            Review
-          </Text>
-        </>
-      )}
-      <Text color={theme.text.secondary}>{' →'}</Text>
-    </Box>
-  );
-};
 
 interface ReviewViewProps {
   questions: Question[];
@@ -1107,14 +1054,29 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     return currentQuestion;
   }, [currentQuestion]);
 
+  // Build tabs array for TabHeader
+  const tabs = useMemo((): Tab[] => {
+    const questionTabs: Tab[] = questions.map((q, i) => ({
+      key: String(i),
+      header: q.header,
+    }));
+    // Add review tab when there are multiple questions
+    if (questions.length > 1) {
+      questionTabs.push({
+        key: 'review',
+        header: 'Review',
+        isSpecial: true,
+      });
+    }
+    return questionTabs;
+  }, [questions]);
+
   const progressHeader =
     questions.length > 1 ? (
-      <QuestionProgressHeader
-        questions={questions}
+      <TabHeader
+        tabs={tabs}
         currentIndex={currentQuestionIndex}
-        answeredIndices={answeredIndices}
-        showReviewTab={true}
-        isOnReviewTab={isOnReviewTab}
+        completedIndices={answeredIndices}
       />
     ) : null;
 
