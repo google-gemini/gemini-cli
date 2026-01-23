@@ -18,7 +18,8 @@ import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, CustomTheme } from './theme.js';
+import type { Theme, ThemeType } from './theme.js';
+import type { CustomTheme } from '@google/gemini-cli-core';
 import { createCustomTheme, validateCustomTheme } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
 import { ANSI } from './ansi.js';
@@ -237,16 +238,20 @@ class ThemeManager {
     return this.getActiveTheme().semanticColors;
   }
 
+  private _getAllCustomThemes(): Theme[] {
+    return [
+      ...Array.from(this.settingsThemes.values()),
+      ...Array.from(this.extensionThemes.values()),
+      ...Array.from(this.fileThemes.values()),
+    ];
+  }
+
   /**
    * Gets a list of custom theme names.
    * @returns Array of custom theme names.
    */
   getCustomThemeNames(): string[] {
-    return [
-      ...Array.from(this.settingsThemes.keys()),
-      ...Array.from(this.extensionThemes.keys()),
-      ...Array.from(this.fileThemes.keys()),
-    ];
+    return this._getAllCustomThemes().map((theme) => theme.name);
   }
 
   /**
@@ -272,35 +277,13 @@ class ThemeManager {
       isCustom: false,
     }));
 
-    const settingsThemes = Array.from(this.settingsThemes.values()).map(
-      (theme) => ({
-        name: theme.name,
-        type: theme.type,
-        isCustom: true,
-      }),
-    );
-
-    const extensionThemes = Array.from(this.extensionThemes.values()).map(
-      (theme) => ({
-        name: theme.name,
-        type: theme.type,
-        isCustom: true,
-      }),
-    );
-
-    const fileThemes = Array.from(this.fileThemes.values()).map((theme) => ({
+    const customThemes = this._getAllCustomThemes().map((theme) => ({
       name: theme.name,
       type: theme.type,
       isCustom: true,
     }));
 
-    const allThemes = [
-      ...builtInThemes,
-      ...settingsThemes,
-      ...extensionThemes,
-      ...fileThemes,
-    ];
-    debugLogger.log('Available themes:', allThemes);
+    const allThemes = [...builtInThemes, ...customThemes];
 
     const sortedThemes = allThemes.sort((a, b) => {
       const typeOrder = (type: ThemeType): number => {
@@ -342,12 +325,7 @@ class ThemeManager {
    * @returns A list of all available themes.
    */
   getAllThemes(): Theme[] {
-    return [
-      ...this.availableThemes,
-      ...Array.from(this.settingsThemes.values()),
-      ...Array.from(this.extensionThemes.values()),
-      ...Array.from(this.fileThemes.values()),
-    ];
+    return [...this.availableThemes, ...this._getAllCustomThemes()];
   }
 
   private isPath(themeName: string): boolean {

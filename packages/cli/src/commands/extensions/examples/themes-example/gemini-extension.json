@@ -1,0 +1,13 @@
+{
+  "name": "themes-example",
+  "version": "1.0.0",
+  "themes": [
+    {
+      "name": "My-Awesome-Theme",
+      "type": "custom",
+      "text": {
+        "primary": "#FF00FF"
+      }
+    }
+  ]
+}
