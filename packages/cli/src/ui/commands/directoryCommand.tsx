@@ -94,12 +94,37 @@ export const directoryCommand: SlashCommand = {
 
         const suggestions = await getDirectorySuggestions(trimmedLastPart);
 
-        if (parts.length > 1) {
-          const prefix = parts.slice(0, -1).join(',') + ',';
-          return suggestions.map((s) => prefix + leadingWhitespace + s);
+        // Filter out existing directories
+        let filteredSuggestions = suggestions;
+        if (context.services.config) {
+          const workspaceContext = context.services.config.getWorkspaceContext();
+          const existingDirs = new Set(
+            workspaceContext.getDirectories().map((dir) => path.normalize(dir)),
+          );
+
+          filteredSuggestions = suggestions.filter((s) => {
+            const expanded = expandHomeDir(s);
+            const absolute = path.resolve(expanded);
+
+            if (existingDirs.has(absolute)) {
+              return false;
+            }
+            if (
+              absolute.endsWith(path.sep) &&
+              existingDirs.has(absolute.slice(0, -1))
+            ) {
+              return false;
+            }
+            return true;
+          });
         }
 
-        return suggestions.map((s) => leadingWhitespace + s);
+        if (parts.length > 1) {
+          const prefix = parts.slice(0, -1).join(',') + ',';
+          return filteredSuggestions.map((s) => prefix + leadingWhitespace + s);
+        }
+
+        return filteredSuggestions.map((s) => leadingWhitespace + s);
       },
       action: async (context: CommandContext, args: string) => {
         const {

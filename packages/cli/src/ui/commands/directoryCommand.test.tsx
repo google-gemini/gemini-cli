@@ -278,10 +278,25 @@ describe('directoryCommand', () => {
         expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
         expect(results).toEqual(['docs/, src/']);
       });
+
+      it('should filter out existing directories from suggestions', async () => {
+        const existingPath = path.resolve(process.cwd(), 'existing');
+        vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue([
+          existingPath,
+        ]);
+        vi.mocked(getDirectorySuggestions).mockResolvedValue([
+          'existing/',
+          'new/',
+        ]);
+
+        const results = await completion(mockContext, 'ex');
+
+        expect(results).toEqual(['new/']);
+      });
     });
   });
 
-    describe('add with folder trust enabled', () => {
+  describe('add with folder trust enabled', () => {
     let mockIsPathTrusted: Mock;
 
     beforeEach(() => {
@@ -374,7 +389,7 @@ describe('directoryCommand', () => {
 
       const result = await addCommand.action(mockContext, newPath);
 
-       expect(result).toEqual(
+      expect(result).toEqual(
         expect.objectContaining({
           type: 'custom_dialog',
         }),
