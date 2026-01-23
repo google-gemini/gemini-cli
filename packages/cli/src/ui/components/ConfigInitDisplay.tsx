@@ -5,9 +5,13 @@
  */
 
 import { useEffect, useState } from 'react';
-import { AppEvent, appEvents } from './../../utils/events.js';
 import { Box, Text } from 'ink';
-import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
+import {
+  CoreEvent,
+  coreEvents,
+  type McpClient,
+  MCPServerStatus,
+} from '@google/gemini-cli-core';
 import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 import { theme } from '../semantic-colors.js';
 
@@ -45,9 +49,9 @@ export const ConfigInitDisplay = () => {
       }
     };
 
-    appEvents.on(AppEvent.McpClientUpdate, onChange);
+    coreEvents.on(CoreEvent.McpClientUpdate, onChange);
     return () => {
-      appEvents.off(AppEvent.McpClientUpdate, onChange);
+      coreEvents.off(CoreEvent.McpClientUpdate, onChange);
     };
   }, []);
 
