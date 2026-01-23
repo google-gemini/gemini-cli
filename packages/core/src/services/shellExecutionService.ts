@@ -271,6 +271,7 @@ export class ShellExecutionService {
       const result = new Promise<ShellExecutionResult>((resolve) => {
         let stdoutDecoder: TextDecoder | null = null;
         let stderrDecoder: TextDecoder | null = null;
+        let emitTimeout: NodeJS.Timeout | null = null;
 
         let stdout = '';
         let stderr = '';
@@ -283,6 +284,38 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+
+        const composeOutput = () => {
+          const separator = stdout.endsWith('\n') ? '' : '\n';
+          let combinedOutput =
+            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+
+          if (stdoutTruncated || stderrTruncated) {
+            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
+              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
+            }MB.]`;
+            combinedOutput += truncationMessage;
+          }
+          return stripAnsi(combinedOutput).trim();
+        };
+
+        const emit = () => {
+          emitTimeout = null;
+          if (!isStreamingRawContent) {
+            return;
+          }
+          const output = composeOutput();
+          if (output) {
+            onOutputEvent({ type: 'data', chunk: output });
+          }
+        };
+
+        const scheduleEmit = () => {
+          if (emitTimeout) {
+            return;
+          }
+          emitTimeout = setTimeout(emit, 100);
+        };
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
           if (!stdoutDecoder || !stderrDecoder) {
@@ -332,6 +365,7 @@ export class ShellExecutionService {
                 stderrTruncated = true;
               }
             }
+            scheduleEmit();
           }
         };
 
@@ -339,20 +373,11 @@ export class ShellExecutionService {
           code: number | null,
           signal: NodeJS.Signals | null,
         ) => {
-          const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
-          let combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
-
-          if (stdoutTruncated || stderrTruncated) {
-            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
-              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
-            }MB.]`;
-            combinedOutput += truncationMessage;
+          if (emitTimeout) {
+            clearTimeout(emitTimeout);
           }
-
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
+          const { finalBuffer } = cleanup();
+          const finalStrippedOutput = composeOutput();
 
           if (isStreamingRawContent) {
             if (finalStrippedOutput) {
