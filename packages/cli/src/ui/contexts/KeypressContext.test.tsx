@@ -219,7 +219,7 @@ describe('KeypressContext', () => {
           name: 'return',
           sequence: '\r',
           insertable: true,
-          shift: false,
+          shift: true,
           alt: false,
           ctrl: false,
           cmd: false,

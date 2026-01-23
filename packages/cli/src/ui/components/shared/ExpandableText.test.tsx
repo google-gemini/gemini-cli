@@ -1,20 +1,20 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '../../test-utils/render.js';
-import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
+import { render } from '../../../test-utils/render.js';
+import { ExpandableText, MAX_WIDTH } from './ExpandableText.js';
 
-describe('PrepareLabel', () => {
+describe('ExpandableText', () => {
   const color = 'white';
   const flat = (s: string | undefined) => (s ?? '').replace(/\n/g, '');
 
   it('renders plain label when no match (short label)', () => {
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label="simple command"
         userInput=""
         matchedIndex={undefined}
@@ -29,7 +29,7 @@ describe('PrepareLabel', () => {
   it('truncates long label when collapsed and no match', () => {
     const long = 'x'.repeat(MAX_WIDTH + 25);
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label={long}
         userInput=""
         textColor={color}
@@ -47,7 +47,7 @@ describe('PrepareLabel', () => {
   it('shows full long label when expanded and no match', () => {
     const long = 'y'.repeat(MAX_WIDTH + 25);
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label={long}
         userInput=""
         textColor={color}
@@ -66,7 +66,7 @@ describe('PrepareLabel', () => {
     const userInput = 'commit';
     const matchedIndex = label.indexOf(userInput);
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label={label}
         userInput={userInput}
         matchedIndex={matchedIndex}
@@ -86,7 +86,7 @@ describe('PrepareLabel', () => {
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label={label}
         userInput={core}
         matchedIndex={matchedIndex}
@@ -111,7 +111,7 @@ describe('PrepareLabel', () => {
     const label = prefix + core + suffix;
     const matchedIndex = prefix.length;
     const { lastFrame, unmount } = render(
-      <PrepareLabel
+      <ExpandableText
         label={label}
         userInput={core}
         matchedIndex={matchedIndex}
@@ -125,6 +125,26 @@ describe('PrepareLabel', () => {
     expect(f.startsWith('...')).toBe(false);
     expect(f.endsWith('...')).toBe(true);
     expect(f.length).toBe(MAX_WIDTH + 2);
+    expect(out).toMatchSnapshot();
+    unmount();
+  });
+
+  it('respects custom maxWidth', () => {
+    const customWidth = 50;
+    const long = 'z'.repeat(100);
+    const { lastFrame, unmount } = render(
+      <ExpandableText
+        label={long}
+        userInput=""
+        textColor={color}
+        isExpanded={false}
+        maxWidth={customWidth}
+      />,
+    );
+    const out = lastFrame();
+    const f = flat(out);
+    expect(f.endsWith('...')).toBe(true);
+    expect(f.length).toBe(customWidth + 3);
     expect(out).toMatchSnapshot();
     unmount();
   });
