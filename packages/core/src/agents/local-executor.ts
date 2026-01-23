@@ -110,10 +110,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       runtimeContext.getMessageBus(),
     );
     const parentToolRegistry = runtimeContext.getToolRegistry();
+    const allAgentNames = new Set(
+      runtimeContext.getAgentRegistry().getAllAgentNames(),
+    );
 
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
         if (typeof toolRef === 'string') {
+          // Check if the tool is a subagent to prevent recursion.
+          // We do not allow agents to call other agents.
+          if (allAgentNames.has(toolRef)) {
+            debugLogger.warn(
+              `[LocalAgentExecutor] Skipping subagent tool '${toolRef}' for agent '${definition.name}' to prevent recursion.`,
+            );
+            continue;
+          }
+
           // If the tool is referenced by name, retrieve it from the parent
           // registry and register it with the agent's isolated registry.
           const toolFromParent = parentToolRegistry.getTool(toolRef);
