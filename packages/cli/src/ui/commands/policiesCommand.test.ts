@@ -109,7 +109,9 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '**DENY** tool: `dangerousTool` [Priority: 10]',
       );
-      expect(content).toContain('**ALLOW** all tools (args match: `safe`)');
+      expect(content).toContain(
+        '**ALLOW** all tools (args match: `safe`) [Source: test.toml]',
+      );
       expect(content).toContain('**ASK_USER** all tools');
     });
   });

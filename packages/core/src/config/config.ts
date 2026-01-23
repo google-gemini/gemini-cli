@@ -278,6 +278,18 @@ export interface SandboxConfig {
   image: string;
 }
 
+/**
+ * Callbacks for checking MCP server enablement status.
+ * These callbacks are provided by the CLI package to bridge
+ * the enablement state to the core package.
+ */
+export interface McpEnablementCallbacks {
+  /** Check if a server is disabled for the current session only */
+  isSessionDisabled: (serverId: string) => boolean;
+  /** Check if a server is enabled in the file-based configuration */
+  isFileEnabled: (serverId: string) => Promise<boolean>;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -294,6 +306,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
@@ -426,6 +439,7 @@ export class Config {
   private readonly mcpEnabled: boolean;
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -564,6 +578,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -1235,6 +1250,10 @@ export class Config {
     return this.mcpEnabled;
   }
 
+  getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {
+    return this.mcpEnablementCallbacks;
+  }
+
   getExtensionsEnabled(): boolean {
     return this.extensionsEnabled;
   }
@@ -1656,6 +1675,23 @@ export class Config {
     await this.ensureExperimentsLoaded();
 
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+  }
+
+  async getNumericalRoutingEnabled(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+
+    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
+      ?.boolValue;
+  }
+
+  async getClassifierThreshold(): Promise<number | undefined> {
+    await this.ensureExperimentsLoaded();
+
+    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    if (flag?.intValue !== undefined) {
+      return parseInt(flag.intValue, 10);
+    }
+    return flag?.floatValue;
   }
 
   async getBannerTextNoCapacityIssues(): Promise<string> {
