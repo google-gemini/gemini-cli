@@ -656,6 +656,7 @@ their corresponding top-level category object in your `settings.json` file.
     read-only mode.
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
