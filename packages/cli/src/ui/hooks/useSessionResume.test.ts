@@ -373,7 +373,7 @@ describe('useSessionResume', () => {
               },
             }),
           {
-            initialProps: { refreshStatic: mockRefreshStatic },
+            initialProps: { refreshStatic: mockRefreshStatic as () => void },
           },
         );
         rerenderFunc = rerender;
