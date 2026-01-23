@@ -86,14 +86,16 @@ function commandExists(cmd: string): boolean {
 }
 
 /**
- * Creates a consistent error message for missing editors.
+ * Creates a consistent error message for missing editors and emits feedback.
  */
-function createEditorNotFoundError(editor: EditorType, command: string): Error {
+function handleEditorNotFound(editor: EditorType, command: string): void {
   const editorName = getEditorDisplayName(editor);
-  return new Error(
+  const message = 
     `${editorName} command '${command}' not found. ` +
-    `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`
-  );
+    `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`;
+  
+  debugLogger.error(message);
+  coreEvents.emitFeedback('error', message);
 }
 
 /**
@@ -241,9 +243,8 @@ export async function openDiff(
 
   // Pre-flight check: verify the editor command exists before attempting to spawn
   if (!commandExists(diffCommand.command)) {
-    const error = createEditorNotFoundError(editor, diffCommand.command);
-    debugLogger.error(error.message);
-    throw error;
+    handleEditorNotFound(editor, diffCommand.command);
+    return;
   }
 
   if (isTerminalEditor(editor)) {
