@@ -109,7 +109,7 @@ describe('useSessionResume', () => {
         1,
         true,
       );
-      expect(mockRefreshStatic).toHaveBeenCalled();
+      expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith(
         clientHistory,
         resumedData,
@@ -174,7 +174,7 @@ describe('useSessionResume', () => {
 
       expect(mockHistoryManager.clearItems).toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
-      expect(mockRefreshStatic).toHaveBeenCalled();
+      expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
     });
   });
@@ -338,6 +338,7 @@ describe('useSessionResume', () => {
         1,
         true,
       );
+      expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
     });
 

@@ -99,7 +99,7 @@ they appear in the UI.
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                   | `true`    |
 | Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                                                                                      | `4000000` |
 | Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                   | `1000`    |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `false`   |
+| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`    |
 
 ### Security
 
@@ -113,19 +113,16 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                            | Setting                                                 | Description                                                                         | Default |
-| ----------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                                                 | `false` |
-| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                             | `true`  |
-| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                        | `10`    |
-| Use OSC 52 Paste                    | `experimental.useOSC52Paste`                            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                          | `true`  |
-| Plan                                | `experimental.plan`                                     | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label         | Setting                      | Description                                                                         | Default |
+| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Agent Skills     | `experimental.skills`        | Enable Agent Skills (experimental).                                                 | `false` |
+| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
 
-### Hooks
+### HooksConfig
 
-| UI Label           | Setting               | Description                                      | Default |
-| ------------------ | --------------------- | ------------------------------------------------ | ------- |
-| Hook Notifications | `hooks.notifications` | Show visual indicators when hooks are executing. | `true`  |
+| UI Label           | Setting                     | Description                                      | Default |
+| ------------------ | --------------------------- | ------------------------------------------------ | ------- |
+| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing. | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

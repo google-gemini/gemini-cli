@@ -34,6 +34,7 @@ const createTestState = (
   viewportHeight: 24,
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
+  pastedContent: {},
 });
 
 describe('vim-buffer-actions', () => {
@@ -904,7 +905,9 @@ describe('vim-buffer-actions', () => {
 
     it('should preserve undo stack in operations', () => {
       const state = createTestState(['hello'], 0, 0);
-      state.undoStack = [{ lines: ['previous'], cursorRow: 0, cursorCol: 0 }];
+      state.undoStack = [
+        { lines: ['previous'], cursorRow: 0, cursorCol: 0, pastedContent: {} },
+      ];
 
       const action = {
         type: 'vim_delete_char' as const,

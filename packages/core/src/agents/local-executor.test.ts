@@ -61,6 +61,7 @@ import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
+import type { AgentRegistry } from './registry.js';
 import { getModelConfigAlias } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
@@ -223,7 +224,13 @@ const createTestDefinition = <TOutput extends z.ZodTypeAny = z.ZodUnknown>(
     name: 'TestAgent',
     description: 'An agent for testing.',
     inputConfig: {
-      inputs: { goal: { type: 'string', required: true, description: 'goal' } },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
+      },
     },
     modelConfig: {
       model: 'gemini-test-model',
@@ -292,6 +299,9 @@ describe('LocalAgentExecutor', () => {
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
+      getAllAgentNames: () => [],
+    } as unknown as AgentRegistry);
 
     mockedGetDirectoryContextString.mockResolvedValue(
       'Mocked Environment Context',
@@ -405,14 +415,44 @@ describe('LocalAgentExecutor', () => {
       const secondPart = startHistory?.[1]?.parts?.[0];
       expect(secondPart?.text).toBe('OK, starting on TestGoal.');
     });
+
+    it('should filter out subagent tools to prevent recursion', async () => {
+      const subAgentName = 'recursive-agent';
+      // Register a mock tool that simulates a subagent
+      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+
+      // Mock the agent registry to return the subagent name
+      vi.spyOn(
+        mockConfig.getAgentRegistry(),
+        'getAllAgentNames',
+      ).mockReturnValue([subAgentName]);
+
+      const definition = createTestDefinition([LS_TOOL_NAME, subAgentName]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // LS should be present
+      expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+      // Subagent should be filtered out
+      expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
   });
 
   describe('run (Execution Loop and Logic)', () => {
     it('should log AgentFinish with error if run throws', async () => {
       const definition = createTestDefinition();
       // Make the definition invalid to cause an error during run
-      definition.inputConfig.inputs = {
-        goal: { type: 'string', required: true, description: 'goal' },
+      definition.inputConfig.inputSchema = {
+        type: 'object',
+        properties: {
+          goal: { type: 'string', description: 'goal' },
+        },
+        required: ['goal'],
       };
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -1359,9 +1399,13 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             await new Promise<void>((resolve) => {
               // This promise resolves when aborted, ending the generator.
-              signal?.addEventListener('abort', () => {
-                resolve();
-              });
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  resolve();
+                },
+                { once: true },
+              );
             });
           })(),
       );
@@ -1671,7 +1715,9 @@ describe('LocalAgentExecutor', () => {
           (async function* () {
             // This promise never resolves, it waits for abort.
             await new Promise<void>((resolve) => {
-              signal?.addEventListener('abort', () => resolve());
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              });
             });
           })(),
       );
@@ -1724,7 +1770,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
@@ -1735,7 +1783,9 @@ describe('LocalAgentExecutor', () => {
           // eslint-disable-next-line require-yield
           (async function* () {
             await new Promise<void>((resolve) =>
-              signal?.addEventListener('abort', () => resolve()),
+              signal?.addEventListener('abort', () => resolve(), {
+                once: true,
+              }),
             );
           })(),
       );
