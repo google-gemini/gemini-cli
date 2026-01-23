@@ -277,7 +277,7 @@ describe('TerminalCapabilityManager', () => {
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
-    it('should infer modifyOtherKeys support from Device Attributes (DA1) alone', async () => {
+    it('should not enable modifyOtherKeys without explicit response', async () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
@@ -287,9 +287,7 @@ describe('TerminalCapabilityManager', () => {
       await promise;
 
       expect(manager.isKittyProtocolEnabled()).toBe(false);
-      // It should fall back to modifyOtherKeys because DA1 proves it's an ANSI terminal
-
-      expect(enableModifyOtherKeys).toHaveBeenCalled();
+      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
   });
 });
