@@ -657,10 +657,48 @@ describe('gemini.tsx main function kitty protocol', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: () => undefined,
       setTerminalBackground: vi.fn(),
+      getToolRegistry: () => ({ getAllTools: () => [] }),
+      getModel: () => 'gemini-pro',
+      getEmbeddingModel: () => 'embedding-model',
+      getCoreTools: () => [],
+      getApprovalMode: () => 'default',
+      getPreviewFeatures: () => false,
+      getTargetDir: () => '/',
+      getUsageStatisticsEnabled: () => false,
+      getTelemetryEnabled: () => false,
+      getTelemetryTarget: () => 'none',
+      getTelemetryOtlpEndpoint: () => '',
+      getTelemetryOtlpProtocol: () => 'grpc',
+      getTelemetryLogPromptsEnabled: () => false,
+      getContinueOnFailedApiCall: () => false,
+      getShellToolInactivityTimeout: () => 0,
+      getTruncateToolOutputThreshold: () => 0,
+      getUseRipgrep: () => false,
+      getUseWriteTodos: () => false,
+      getHooks: () => undefined,
+      getExperiments: () => undefined,
+      getFileFilteringRespectGitIgnore: () => true,
+      getOutputFormat: () => 'text',
+      getFolderTrust: () => false,
+      getPendingIncludeDirectories: () => [],
+      getWorkspaceContext: () => ({ getDirectories: () => ['/'] }),
+      getModelAvailabilityService: () => ({
+        reset: vi.fn(),
+        resetTurn: vi.fn(),
+      }),
+      getBaseLlmClient: () => ({}),
+      getGeminiClient: () => ({}),
+      getContentGenerator: () => ({}),
+      isTrustedFolder: () => true,
+      isYoloModeDisabled: () => true,
+      isPlanEnabled: () => false,
+      isEventDrivenSchedulerEnabled: () => false,
     } as unknown as Config;
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
-    vi.mocked(loadSandboxConfig).mockResolvedValue({} as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    vi.mocked(loadSandboxConfig).mockResolvedValue({
+      command: 'docker',
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(relaunchOnExitCode).mockImplementation(async (fn) => {
       await fn();
     });
@@ -1097,6 +1135,8 @@ describe('gemini.tsx main function exit codes', () => {
     vi.mocked(loadSandboxConfig).mockResolvedValue({} as any);
     vi.mocked(loadCliConfig).mockResolvedValue({
       refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
+      getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+      isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({

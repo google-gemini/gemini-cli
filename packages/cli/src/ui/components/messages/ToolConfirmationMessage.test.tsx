@@ -14,8 +14,26 @@ import {
   renderWithProviders,
   createMockSettings,
 } from '../../../test-utils/render.js';
+import { useToolActions } from '../../contexts/ToolActionsContext.js';
+
+vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../../contexts/ToolActionsContext.js')
+    >();
+  return {
+    ...actual,
+    useToolActions: vi.fn(),
+  };
+});
 
 describe('ToolConfirmationMessage', () => {
+  const mockConfirm = vi.fn();
+  vi.mocked(useToolActions).mockReturnValue({
+    confirm: mockConfirm,
+    cancel: vi.fn(),
+  });
+
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
@@ -32,6 +50,7 @@ describe('ToolConfirmationMessage', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -56,6 +75,7 @@ describe('ToolConfirmationMessage', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -79,6 +99,7 @@ describe('ToolConfirmationMessage', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -161,6 +182,7 @@ describe('ToolConfirmationMessage', () => {
 
         const { lastFrame } = renderWithProviders(
           <ToolConfirmationMessage
+            callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
             availableTerminalHeight={30}
@@ -179,6 +201,7 @@ describe('ToolConfirmationMessage', () => {
 
         const { lastFrame } = renderWithProviders(
           <ToolConfirmationMessage
+            callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
             availableTerminalHeight={30}
@@ -211,6 +234,7 @@ describe('ToolConfirmationMessage', () => {
 
       const { lastFrame } = renderWithProviders(
         <ToolConfirmationMessage
+          callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
           availableTerminalHeight={30}
@@ -234,6 +258,7 @@ describe('ToolConfirmationMessage', () => {
 
       const { lastFrame } = renderWithProviders(
         <ToolConfirmationMessage
+          callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
           availableTerminalHeight={30}

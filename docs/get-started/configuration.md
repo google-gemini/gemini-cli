@@ -707,7 +707,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable LLM-based error correction for edit tools. When
     enabled, tools will fail immediately if exact string matches are not found,
     instead of attempting to self-correct.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`tools.enableHooks`** (boolean):
@@ -837,7 +837,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.enableEventDrivenScheduler`** (boolean):
   - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
@@ -855,42 +855,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.codebaseInvestigatorSettings.enabled`** (boolean):
-  - **Description:** Enable the Codebase Investigator agent.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
-- **`experimental.codebaseInvestigatorSettings.maxNumTurns`** (number):
-  - **Description:** Maximum number of turns for the Codebase Investigator
-    agent.
-  - **Default:** `10`
-  - **Requires restart:** Yes
-
-- **`experimental.codebaseInvestigatorSettings.maxTimeMinutes`** (number):
-  - **Description:** Maximum time for the Codebase Investigator agent (in
-    minutes).
-  - **Default:** `3`
-  - **Requires restart:** Yes
-
-- **`experimental.codebaseInvestigatorSettings.thinkingBudget`** (number):
-  - **Description:** The thinking budget for the Codebase Investigator agent.
-  - **Default:** `8192`
-  - **Requires restart:** Yes
-
-- **`experimental.codebaseInvestigatorSettings.model`** (string):
-  - **Description:** The model to use for the Codebase Investigator agent.
-  - **Default:** `"auto"`
-  - **Requires restart:** Yes
-
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
     (useful for remote sessions).
   - **Default:** `false`
-
-- **`experimental.cliHelpAgentSettings.enabled`** (boolean):
-  - **Description:** Enable the CLI Help Agent.
-  - **Default:** `true`
-  - **Requires restart:** Yes
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
@@ -909,7 +877,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`hooksConfig.enabled`** (boolean):
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
