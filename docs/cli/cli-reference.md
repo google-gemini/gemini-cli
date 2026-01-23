@@ -66,7 +66,7 @@ These are convenient shortcuts that map to specific models:
 | `flash`      | `gemini-2.5-flash`                         | Fast, balanced model for most tasks.                                                                                            |
 | `flash-lite` | `gemini-2.5-flash-lite`                    | Fastest model for simple tasks.                                                                                                 |
 
-## Extensions Management
+## Extensions management
 
 | Command                                            | Description                                  | Example                                                                        |
 | -------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------ |
