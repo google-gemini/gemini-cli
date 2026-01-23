@@ -31,6 +31,7 @@ import {
   resolveModel,
   createWorkingStdio,
   startupProfiler,
+  Kind,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -463,7 +464,7 @@ export class Session {
             title: invocation.getDescription(),
             content,
             locations: invocation.toolLocations(),
-            kind: tool.kind,
+            kind: toAcpToolKind(tool.kind),
           },
         };
 
@@ -502,7 +503,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: tool.kind,
+          kind: toAcpToolKind(tool.kind),
         });
       }
 
@@ -798,7 +799,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: readManyFilesTool.kind,
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
         const result = await invocation.execute(abortSignal);
@@ -986,5 +987,27 @@ function toPermissionOptions(
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
+  }
+}
+
+/**
+ * Maps our internal tool kind to the ACP ToolKind.
+ * Fallback to 'other' for kinds that are not supported by the ACP protocol.
+ */
+function toAcpToolKind(kind: Kind): acp.ToolKind {
+  switch (kind) {
+    case Kind.Read:
+    case Kind.Edit:
+    case Kind.Delete:
+    case Kind.Move:
+    case Kind.Search:
+    case Kind.Execute:
+    case Kind.Think:
+    case Kind.Fetch:
+    case Kind.Other:
+      return kind as acp.ToolKind;
+    case Kind.Communicate:
+    default:
+      return 'other';
   }
 }
