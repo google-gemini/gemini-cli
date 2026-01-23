@@ -50,7 +50,7 @@ and parameters.
 | `--screen-reader`            | -     | boolean | -         | Enable screen reader mode for accessibility                                                                |
 | `--output-format`            | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                       |
 
-## Model Selection
+## Model selection
 
 The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
 You can use either model aliases (user-friendly names) or concrete model names.
