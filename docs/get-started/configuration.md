@@ -314,10 +314,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.5`
   - **Requires restart:** Yes
 
-- **`model.skipNextSpeakerCheck`** (boolean):
-  - **Description:** When enabled, the model skips the check that requires
-    alternating speakers in chat history. Default: Enabled (Check is skipped).
-  - **Default:** `true`
+- **`model.nextSpeakerCheck`** (boolean):
+  - **Description:** Enforce alternating speakers in chat history.
+  - **Default:** `false`
 
 #### `modelConfigs`
 

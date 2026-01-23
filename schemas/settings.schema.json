@@ -30,9 +30,9 @@
       "type": "object",
       "properties": {
         "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
+          "title": "Preview Features",
           "description": "Access early-access features and experimental models.",
-          "markdownDescription": "Access early-access features and experimental models.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Access early-access features and experimental models.\n\n- Category: `APPLICATION`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -45,14 +45,14 @@
         "vimMode": {
           "title": "Vim Mode",
           "description": "Use Vim-style keybindings for text input.",
-          "markdownDescription": "Use Vim-style keybindings for text input.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Use Vim-style keybindings for text input.\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "autoUpdate": {
-          "title": "Auto Update",
+          "title": "Auto Updates",
           "description": "Automatically check for and install application updates.",
-          "markdownDescription": "Automatically check for and install application updates.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Automatically check for and install application updates.\n\n- Category: `APPLICATION`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -83,7 +83,7 @@
         "promptCompletion": {
           "title": "Prompt Completion",
           "description": "Show AI-powered completion suggestions while typing.",
-          "markdownDescription": "Show AI-powered completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Show AI-powered completion suggestions while typing.\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -95,9 +95,9 @@
           "type": "boolean"
         },
         "debugKeystrokeLogging": {
-          "title": "Debug Keystroke Logging",
+          "title": "Keystroke Logging",
           "description": "Enable debug logging of keystrokes to the console.",
-          "markdownDescription": "Enable debug logging of keystrokes to the console.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Enable debug logging of keystrokes to the console.\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -110,7 +110,7 @@
             "enabled": {
               "title": "Session Cleanup",
               "description": "Automatically delete old or excess sessions.",
-              "markdownDescription": "Automatically delete old or excess sessions.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+              "markdownDescription": "Automatically delete old or excess sessions.\n\n- Category: `SYSTEM`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -149,7 +149,7 @@
         "format": {
           "title": "Output Format",
           "description": "The format of the CLI output. Can be `text` or `json`.",
-          "markdownDescription": "The format of the CLI output. Can be `text` or `json`.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
+          "markdownDescription": "The format of the CLI output. Can be `text` or `json`.\n\n- Category: `APPLICATION`\n- Requires restart: `no`\n- Default: `text`",
           "default": "text",
           "type": "string",
           "enum": ["text", "json"]
@@ -183,42 +183,42 @@
         "windowTitle": {
           "title": "Window Title",
           "description": "Show the window title bar.",
-          "markdownDescription": "Show the window title bar.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Show the window title bar.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "windowTitleStatus": {
           "title": "Window Title Status",
           "description": "Show Gemini CLI status and thoughts in the terminal window title.",
-          "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "homeDirectoryWarning": {
-          "title": "Home Directory Warning",
+          "title": "Home Dir Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",
-          "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "usageTips": {
           "title": "Usage Tips",
           "description": "Show helpful usage tips in the UI.",
-          "markdownDescription": "Show helpful usage tips in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show helpful usage tips in the UI.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "applicationBanner": {
           "title": "Application Banner",
           "description": "Show the application startup banner.",
-          "markdownDescription": "Show the application startup banner.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show the application startup banner.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "contextSummary": {
           "title": "Context Summary",
           "description": "Show the context summary (GEMINI.md, MCP servers) above the input.",
-          "markdownDescription": "Show the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -232,28 +232,28 @@
             "workingDirectory": {
               "title": "Working Directory",
               "description": "Show the current working directory path in the footer.",
-              "markdownDescription": "Show the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "markdownDescription": "Show the current working directory path in the footer.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "sandboxStatus": {
               "title": "Sandbox Status",
               "description": "Show the sandbox status indicator in the footer.",
-              "markdownDescription": "Show the sandbox status indicator in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "markdownDescription": "Show the sandbox status indicator in the footer.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "modelInfo": {
               "title": "Model Information",
               "description": "Show the model name and context usage in the footer.",
-              "markdownDescription": "Show the model name and context usage in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "markdownDescription": "Show the model name and context usage in the footer.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "contextPercentage": {
               "title": "Context Usage Percentage",
               "description": "Show the context window remaining percentage.",
-              "markdownDescription": "Show the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "markdownDescription": "Show the context window remaining percentage.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
@@ -263,63 +263,63 @@
         "footerEnabled": {
           "title": "Footer",
           "description": "Show the footer in the UI.",
-          "markdownDescription": "Show the footer in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show the footer in the UI.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "showMemoryUsage": {
           "title": "Memory Usage",
           "description": "Display memory usage information in the UI.",
-          "markdownDescription": "Display memory usage information in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Display memory usage information in the UI.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showLineNumbers": {
           "title": "Line Numbers",
           "description": "Show line numbers in the chat window.",
-          "markdownDescription": "Show line numbers in the chat window.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show line numbers in the chat window.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "showCitations": {
           "title": "Citation Display",
           "description": "Show citations for generated text in the chat.",
-          "markdownDescription": "Show citations for generated text in the chat.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Show citations for generated text in the chat.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "showModelInfoInChat": {
           "title": "Chat Model Info",
           "description": "Show the model name in the chat for each model turn.",
-          "markdownDescription": "Show the model name in the chat for each model turn.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Show the model name in the chat for each model turn.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "useFullWidth": {
           "title": "Full Width Output",
           "description": "Use the entire width of the terminal for output.",
-          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "useAlternateBuffer": {
           "title": "Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
-          "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Use an alternate screen buffer for the UI, preserving shell history.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",
-          "markdownDescription": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
-          "markdownDescription": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `[]`",
+          "markdownDescription": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `[]`",
           "default": [],
           "type": "array",
           "items": {
@@ -336,14 +336,14 @@
             "loadingPhrases": {
               "title": "Loading Phrases",
               "description": "Display witty phrases while waiting for operations to complete.",
-              "markdownDescription": "Display witty phrases while waiting for operations to complete.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Display witty phrases while waiting for operations to complete.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "screenReader": {
               "title": "Screen Reader Mode",
               "description": "Render output in plain-text for better screen reader accessibility.",
-              "markdownDescription": "Render output in plain-text for better screen reader accessibility.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "markdownDescription": "Render output in plain-text for better screen reader accessibility.\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
@@ -363,7 +363,7 @@
         "enabled": {
           "title": "IDE Mode",
           "description": "Enable IDE integration mode.",
-          "markdownDescription": "Enable IDE integration mode.\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Enable IDE integration mode.\n\n- Category: `APPLICATION`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -416,7 +416,7 @@
         "maxSessionTurns": {
           "title": "Max Session Turns",
           "description": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.",
-          "markdownDescription": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `-1`",
+          "markdownDescription": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `no`\n- Default: `-1`",
           "default": -1,
           "type": "number"
         },
@@ -432,15 +432,15 @@
         "compressionThreshold": {
           "title": "Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
-          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
+          "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,
           "type": "number"
         },
-        "skipNextSpeakerCheck": {
+        "nextSpeakerCheck": {
           "title": "Next Speaker Check",
-          "description": "When enabled, the model skips the check that requires alternating speakers in chat history. Default: Enabled (Check is skipped).",
-          "markdownDescription": "When enabled, the model skips the check that requires alternating speakers in chat history. Default: Enabled (Check is skipped).\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
+          "description": "Enforce alternating speakers in chat history.",
+          "markdownDescription": "Enforce alternating speakers in chat history.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         }
       },
@@ -941,7 +941,7 @@
         "discoveryMaxDirs": {
           "title": "Memory Discovery Max Dirs",
           "description": "Maximum number of directories to search for memory.",
-          "markdownDescription": "Maximum number of directories to search for memory.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `200`",
+          "markdownDescription": "Maximum number of directories to search for memory.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `no`\n- Default: `200`",
           "default": 200,
           "type": "number"
         },
@@ -958,7 +958,7 @@
         "includeDirectoryMemory": {
           "title": "Directory Memory Scan",
           "description": "Scan include directories for GEMINI.md files during memory refresh.",
-          "markdownDescription": "Scan include directories for GEMINI.md files during memory refresh.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Scan include directories for GEMINI.md files during memory refresh.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -970,30 +970,30 @@
           "type": "object",
           "properties": {
             "respectGitIgnore": {
-              "title": ".gitignore Rules",
+              "title": "Ignore Rules (.gitignore)",
               "description": "Respect .gitignore files when searching.",
-              "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "respectGeminiIgnore": {
-              "title": ".geminiignore Rules",
+              "title": "Ignore Rules (.geminiignore)",
               "description": "Respect .geminiignore files when searching.",
-              "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "recursiveFileSearch": {
               "title": "Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
-              "markdownDescription": "Enable recursive file search functionality when completing @ references in the prompt.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Enable recursive file search functionality when completing @ references in the prompt.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "fuzzySearch": {
               "title": "Fuzzy Search",
               "description": "Enable fuzzy search when searching for files.",
-              "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -1026,7 +1026,7 @@
             "interactiveShell": {
               "title": "Interactive Shell",
               "description": "Provide an interactive terminal for executing shell commands.",
-              "markdownDescription": "Provide an interactive terminal for executing shell commands.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Provide an interactive terminal for executing shell commands.\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -1038,9 +1038,9 @@
               "type": "string"
             },
             "showColor": {
-              "title": "Show Color",
+              "title": "Output Colors",
               "description": "Show color in shell output.",
-              "markdownDescription": "Show color in shell output.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+              "markdownDescription": "Show color in shell output.\n\n- Category: `INTERFACE & APPEARANCE`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -1062,9 +1062,9 @@
           "additionalProperties": false
         },
         "autoAccept": {
-          "title": "Auto Accept",
+          "title": "Auto Accept Tools",
           "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
-          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1110,28 +1110,28 @@
         "useRipgrep": {
           "title": "Ripgrep Integration",
           "description": "Use the ripgrep tool for significantly faster file content searching.",
-          "markdownDescription": "Use the ripgrep tool for significantly faster file content searching.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Use the ripgrep tool for significantly faster file content searching.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "toolOutputTruncation": {
           "title": "Tool Output Truncation",
           "description": "Truncate excessively large tool outputs to conserve context.",
-          "markdownDescription": "Truncate excessively large tool outputs to conserve context.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Truncate excessively large tool outputs to conserve context.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
           "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
+          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `4000000`",
           "default": 4000000,
           "type": "number"
         },
         "truncateToolOutputLines": {
           "title": "Tool Output Truncation Lines",
           "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
+          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `1000`",
           "default": 1000,
           "type": "number"
         },
@@ -1196,21 +1196,21 @@
         "yoloMode": {
           "title": "YOLO Mode",
           "description": "Allow the use of YOLO mode for automatic tool approval.",
-          "markdownDescription": "Allow the use of YOLO mode for automatic tool approval.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Allow the use of YOLO mode for automatic tool approval.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
         "permanentToolApproval": {
           "title": "Permanent Tool Approval",
           "description": "Allow remembering tool approvals across different CLI sessions.",
-          "markdownDescription": "Allow remembering tool approvals across different CLI sessions.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Allow remembering tool approvals across different CLI sessions.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
         "blockGitExtensions": {
-          "title": "Git Extension Blocking",
+          "title": "Git Extensions",
           "description": "Blocks installing and loading extensions from Git.",
-          "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `SYSTEM`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1224,7 +1224,7 @@
             "enabled": {
               "title": "Folder Trust",
               "description": "Require explicit trust before allowing high-risk tools in a directory.",
-              "markdownDescription": "Require explicit trust before allowing high-risk tools in a directory.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+              "markdownDescription": "Require explicit trust before allowing high-risk tools in a directory.\n\n- Category: `FILE SYSTEM & CONTEXT`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
@@ -1261,7 +1261,7 @@
             "enabled": {
               "title": "Environment Variable Redaction",
               "description": "Automatically mask environment variables that may contain secrets.",
-              "markdownDescription": "Automatically mask environment variables that may contain secrets.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+              "markdownDescription": "Automatically mask environment variables that may contain secrets.\n\n- Category: `SYSTEM`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             }
@@ -1371,12 +1371,12 @@
           "description": "Load project context dynamically as needed.",
           "markdownDescription": "Load project context dynamically as needed.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
-          "type": "boolean"
+          "$ref": "#/$defs/HookDefinitionArray"
         },
         "skills": {
           "title": "Agent Skills",
           "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1390,14 +1390,14 @@
             "enabled": {
               "title": "Codebase Investigator",
               "description": "Allow specialized codebase analysis agent.",
-              "markdownDescription": "Allow specialized codebase analysis agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Allow specialized codebase analysis agent.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "maxNumTurns": {
-              "title": "Codebase Investigator Max Num Turns",
+              "title": "Codebase Investigator Max Turns",
               "description": "Maximum number of turns for the Codebase Investigator agent.",
-              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
+              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `10`",
               "default": 10,
               "type": "number"
             },
@@ -1428,7 +1428,7 @@
         "useOSC52Paste": {
           "title": "OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
-          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `EDITOR & INPUT`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1442,7 +1442,7 @@
             "enabled": {
               "title": "CLI Help Agent",
               "description": "Allow specialized help and guidance agent.",
-              "markdownDescription": "Allow specialized help and guidance agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "markdownDescription": "Allow specialized help and guidance agent.\n\n- Category: `INTELLIGENCE & MODEL`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -1529,7 +1529,7 @@
         "notifications": {
           "title": "Hook Notifications",
           "description": "Show visual indicators when hooks are executing.",
-          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `SYSTEM`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
