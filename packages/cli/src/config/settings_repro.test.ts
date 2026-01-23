@@ -150,13 +150,17 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        enableMessageBusIntegration: true,
+        truncateToolOutputLines: 100,
       },
       experimental: {
         useModelRouter: false,
         enableSubagents: false,
-        codebaseInvestigatorSettings: {
-          enabled: true,
+      },
+      agents: {
+        overrides: {
+          codebase_investigator: {
+            enabled: true,
+          },
         },
       },
       ui: {

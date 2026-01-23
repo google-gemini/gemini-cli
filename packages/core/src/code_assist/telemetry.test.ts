@@ -14,6 +14,7 @@ import {
 import {
   ActionStatus,
   ConversationInteractionInteraction,
+  InitiationMethod,
   type StreamingLatency,
 } from './types.js';
 import {
@@ -100,6 +101,7 @@ describe('telemetry', () => {
         traceId,
         streamingLatency,
         isAgentic: true,
+        initiationMethod: InitiationMethod.COMMAND,
       });
     });
 

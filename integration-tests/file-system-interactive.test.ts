@@ -37,7 +37,7 @@ describe('Interactive file system', () => {
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
     await run.type(readPrompt);
-    await run.sendKeys('\r');
+    await run.type('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
@@ -45,7 +45,7 @@ describe('Interactive file system', () => {
     // Step 2: Write the file
     const writePrompt = `now change the version to 1.0.1 in the file`;
     await run.type(writePrompt);
-    await run.sendKeys('\r');
+    await run.type('\r');
 
     // Check tool calls made with right args
     await rig.expectToolCallSuccess(

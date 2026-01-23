@@ -45,8 +45,10 @@ export interface ToolInvocation<
   toolLocations(): ToolLocation[];
 
   /**
-   * Determines if the tool should prompt for confirmation before execution.
-   * @returns Confirmation details or false if no confirmation is needed.
+   * Checks if the tool call should be confirmed by the user before execution.
+   *
+   * @param abortSignal An AbortSignal that can be used to cancel the confirmation request.
+   * @returns A ToolCallConfirmationDetails object if confirmation is required, or false if not.
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
@@ -83,7 +85,7 @@ export abstract class BaseToolInvocation<
 {
   constructor(
     readonly params: TParams,
-    protected readonly messageBus?: MessageBus,
+    protected readonly messageBus: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
@@ -98,25 +100,24 @@ export abstract class BaseToolInvocation<
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false;
-      }
-
-      if (decision === 'DENY') {
-        throw new Error(
-          `Tool execution for "${
-            this._toolDisplayName || this._toolName
-          }" denied by policy.`,
-        );
-      }
-
-      if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
-      }
+    const decision = await this.getMessageBusDecision(abortSignal);
+    if (decision === 'ALLOW') {
+      return false;
     }
-    // When no message bus, use default confirmation flow
+
+    if (decision === 'DENY') {
+      throw new Error(
+        `Tool execution for "${
+          this._toolDisplayName || this._toolName
+        }" denied by policy.`,
+      );
+    }
+
+    if (decision === 'ASK_USER') {
+      return this.getConfirmationDetails(abortSignal);
+    }
+
+    // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
     return this.getConfirmationDetails(abortSignal);
   }
 
@@ -142,9 +143,9 @@ export abstract class BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways ||
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
     ) {
-      if (this.messageBus && this._toolName) {
+      if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        await this.messageBus.publish({
+        void this.messageBus.publish({
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
           persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
@@ -180,16 +181,21 @@ export abstract class BaseToolInvocation<
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
   ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
-    if (!this.messageBus) {
+    if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
       return Promise.resolve('ALLOW');
     }
 
     const correlationId = randomUUID();
-    const toolCall = {
-      name: this._toolName || this.constructor.name,
-      args: this.params as Record<string, unknown>,
+    const request: ToolConfirmationRequest = {
+      type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      correlationId,
+      toolCall: {
+        name: this._toolName,
+        args: this.params as Record<string, unknown>,
+      },
+      serverName: this._serverName,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -198,18 +204,19 @@ export abstract class BaseToolInvocation<
         return;
       }
 
-      let timeoutId: NodeJS.Timeout | undefined;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const cleanup = () => {
         if (timeoutId) {
           clearTimeout(timeoutId);
-          timeoutId = undefined;
+          timeoutId = null;
+        }
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
         }
         abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus?.unsubscribe(
-          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          responseHandler,
-        );
       };
 
       const abortHandler = () => {
@@ -235,7 +242,7 @@ export abstract class BaseToolInvocation<
         }
       };
 
-      abortSignal.addEventListener('abort', abortHandler);
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       timeoutId = setTimeout(() => {
         cleanup();
@@ -246,17 +253,15 @@ export abstract class BaseToolInvocation<
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         responseHandler,
       );
-
-      const request: ToolConfirmationRequest = {
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall,
-        correlationId,
-        serverName: this._serverName,
+      unsubscribe = () => {
+        this.messageBus?.unsubscribe(
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          responseHandler,
+        );
       };
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish(request);
+        void this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
         resolve('ALLOW');
@@ -341,9 +346,9 @@ export abstract class DeclarativeTool<
     readonly description: string,
     readonly kind: Kind,
     readonly parameterSchema: unknown,
+    readonly messageBus: MessageBus,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-    readonly messageBus?: MessageBus,
     readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
@@ -496,7 +501,7 @@ export abstract class BaseDeclarativeTool<
 
   protected abstract createInvocation(
     params: TParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<TParams, TResult>;
@@ -648,9 +653,11 @@ export interface Todo {
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  filePath: string;
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  isNewFile?: boolean;
 }
 
 export interface DiffStat {
@@ -692,6 +699,8 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  rootCommands: string[];
+  commands?: string[];
 }
 
 export interface ToolMcpConfirmationDetails {
@@ -736,6 +745,7 @@ export enum Kind {
   Execute = 'execute',
   Think = 'think',
   Fetch = 'fetch',
+  Communicate = 'communicate',
   Other = 'other',
 }
 

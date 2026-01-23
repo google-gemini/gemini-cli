@@ -16,6 +16,8 @@ import type {
   ClientMetadata,
   RetrieveUserQuotaRequest,
   RetrieveUserQuotaResponse,
+  FetchAdminControlsRequest,
+  FetchAdminControlsResponse,
   ConversationOffered,
   ConversationInteraction,
   StreamingLatency,
@@ -51,7 +53,6 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
-
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -160,6 +161,10 @@ export class CodeAssistServer implements ContentGenerator {
     return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
   }
 
+  async getOperation(name: string): Promise<LongRunningOperationResponse> {
+    return this.requestGetOperation<LongRunningOperationResponse>(name);
+  }
+
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
@@ -177,6 +182,15 @@ export class CodeAssistServer implements ContentGenerator {
         throw e;
       }
     }
+  }
+
+  async fetchAdminControls(
+    req: FetchAdminControlsRequest,
+  ): Promise<FetchAdminControlsResponse> {
+    return this.requestPost<FetchAdminControlsResponse>(
+      'fetchAdminControls',
+      req,
+    );
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -289,9 +303,12 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+  private async makeGetRequest<T>(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await this.client.request({
-      url: this.getMethodUrl(method),
+      url,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -301,6 +318,14 @@ export class CodeAssistServer implements ContentGenerator {
       signal,
     });
     return res.data as T;
+  }
+
+  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  }
+
+  async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
+    return this.makeGetRequest<T>(this.getOperationUrl(name), signal);
   }
 
   async requestStreamingPost<T>(
@@ -345,10 +370,18 @@ export class CodeAssistServer implements ContentGenerator {
     })();
   }
 
-  getMethodUrl(method: string): string {
+  private getBaseUrl(): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+    return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
+  }
+
+  getMethodUrl(method: string): string {
+    return `${this.getBaseUrl()}:${method}`;
+  }
+
+  getOperationUrl(name: string): string {
+    return `${this.getBaseUrl()}/${name}`;
   }
 }
 

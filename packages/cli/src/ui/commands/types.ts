@@ -16,6 +16,7 @@ import type {
   GitService,
   Logger,
   CommandActionReturn,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -68,13 +69,19 @@ export interface CommandContext {
      * Loads a new set of history items, replacing the current history.
      *
      * @param history The array of history items to load.
+     * @param postLoadInput Optional text to set in the input buffer after loading history.
      */
-    loadHistory: UseHistoryManagerReturn['loadHistory'];
+    loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     reloadCommands: () => void;
+    openAgentConfigDialog: (
+      name: string,
+      displayName: string,
+      definition: AgentDefinition,
+    ) => void;
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
@@ -112,6 +119,7 @@ export interface OpenDialogActionReturn {
     | 'settings'
     | 'sessionBrowser'
     | 'model'
+    | 'agentConfig'
     | 'permissions';
 }
 
@@ -165,6 +173,7 @@ export enum CommandKind {
   BUILT_IN = 'built-in',
   FILE = 'file',
   MCP_PROMPT = 'mcp-prompt',
+  AGENT = 'agent',
 }
 
 // The standardized contract for any command in the system.
@@ -202,6 +211,12 @@ export interface SlashCommand {
     context: CommandContext,
     partialArg: string,
   ) => Promise<string[]> | string[];
+
+  /**
+   * Whether to show the loading indicator while fetching completions.
+   * Defaults to true. Set to false for fast completions to avoid flicker.
+   */
+  showCompletionLoading?: boolean;
 
   subCommands?: SlashCommand[];
 }
