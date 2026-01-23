@@ -42,11 +42,7 @@ import type {
   OAuthTokenResponse,
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
-import {
-  MCPOAuthProvider,
-  OAUTH_DISPLAY_MESSAGE_EVENT,
-} from './oauth-provider.js';
-import { EventEmitter } from 'node:events';
+import { MCPOAuthProvider } from './oauth-provider.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import {
@@ -1195,20 +1191,17 @@ describe('MCPOAuthProvider', () => {
       );
 
       const authProvider = new MCPOAuthProvider();
-      const eventEmitter = new EventEmitter();
-      const messagePromise = new Promise<string>((resolve) => {
-        eventEmitter.on(OAUTH_DISPLAY_MESSAGE_EVENT, resolve);
-      });
 
       await authProvider.authenticate(
         'production-server',
         mockConfig,
         undefined,
-        eventEmitter,
       );
 
-      const message = await messagePromise;
-      expect(message).toContain('production-server');
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('production-server'),
+      );
     });
   });
 

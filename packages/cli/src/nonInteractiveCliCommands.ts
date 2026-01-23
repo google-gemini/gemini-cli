@@ -13,6 +13,7 @@ import {
   type Config,
 } from '@google/gemini-cli-core';
 import { CommandService } from './services/CommandService.js';
+import { BuiltinCommandLoader } from './services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from './services/FileCommandLoader.js';
 import { McpPromptLoader } from './services/McpPromptLoader.js';
 import type { CommandContext } from './ui/commands/types.js';
@@ -40,7 +41,11 @@ export const handleSlashCommand = async (
   }
 
   const commandService = await CommandService.create(
-    [new McpPromptLoader(config), new FileCommandLoader(config)],
+    [
+      new BuiltinCommandLoader(config),
+      new McpPromptLoader(config),
+      new FileCommandLoader(config),
+    ],
     abortController.signal,
   );
   const commands = commandService.getCommands();

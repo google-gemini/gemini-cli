@@ -10,13 +10,13 @@ import { appEvents, AppEvent } from './events.js';
 describe('events', () => {
   it('should allow registering and emitting events', () => {
     const callback = vi.fn();
-    appEvents.on(AppEvent.OauthDisplayMessage, callback);
+    appEvents.on(AppEvent.SelectionWarning, callback);
 
-    appEvents.emit(AppEvent.OauthDisplayMessage, 'test message');
+    appEvents.emit(AppEvent.SelectionWarning);
 
-    expect(callback).toHaveBeenCalledWith('test message');
+    expect(callback).toHaveBeenCalled();
 
-    appEvents.off(AppEvent.OauthDisplayMessage, callback);
+    appEvents.off(AppEvent.SelectionWarning, callback);
   });
 
   it('should work with events without data', () => {
