@@ -42,7 +42,11 @@ import type {
   OAuthTokenResponse,
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
-import { MCPOAuthProvider } from './oauth-provider.js';
+import {
+  MCPOAuthProvider,
+  OAUTH_DISPLAY_MESSAGE_EVENT,
+} from './oauth-provider.js';
+import { EventEmitter } from 'node:events';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import {
@@ -1153,6 +1157,58 @@ describe('MCPOAuthProvider', () => {
         0,
         expect.any(Function),
       );
+    });
+    it('should include server name in the authentication message', async () => {
+      // Mock HTTP server callback
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        // Simulate OAuth callback
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const eventEmitter = new EventEmitter();
+      const messagePromise = new Promise<string>((resolve) => {
+        eventEmitter.on(OAUTH_DISPLAY_MESSAGE_EVENT, resolve);
+      });
+
+      await authProvider.authenticate(
+        'production-server',
+        mockConfig,
+        undefined,
+        eventEmitter,
+      );
+
+      const message = await messagePromise;
+      expect(message).toContain('production-server');
     });
   });
 
