@@ -85,7 +85,7 @@ These are convenient shortcuts that map to specific models:
 
 See [Extensions Documentation](../extensions/index.md) for more details.
 
-## MCP Server Management
+## MCP server management
 
 | Command                                                       | Description                     | Example                                                                                              |
 | ------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
