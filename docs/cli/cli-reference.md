@@ -1,4 +1,4 @@
-# CLI Reference
+# CLI cheatsheet
 
 This page provides a complete reference for all Gemini CLI commands, options,
 and parameters.
