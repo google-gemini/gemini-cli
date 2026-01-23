@@ -5,13 +5,7 @@
  */
 
 import type React from 'react';
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useEffect,
-  useReducer,
-} from 'react';
+import { useCallback, useMemo, useRef, useEffect, useReducer } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
