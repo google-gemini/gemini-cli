@@ -815,12 +815,20 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const mcpInitialization = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
-    ]).catch((error) => {
-      debugLogger.error('Error initializing MCP clients:', error);
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
     });
+
+    if (!this.interactive) {
+      await mcpInitialization;
+    }
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
