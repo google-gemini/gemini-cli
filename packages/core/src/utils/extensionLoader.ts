@@ -112,6 +112,7 @@ export abstract class ExtensionLoader {
       // cache, we want to only do it once.
       await refreshServerHierarchicalMemory(this.config);
       await this.config.getHookSystem()?.initialize();
+      await this.config.getAgentRegistry().reload();
     }
   }
 
