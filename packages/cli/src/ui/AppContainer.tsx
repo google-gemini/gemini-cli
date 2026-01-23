@@ -37,6 +37,7 @@ import {
   type IdeContext,
   type UserTierId,
   type UserFeedbackPayload,
+  type AgentDefinition,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -258,6 +259,34 @@ export const AppContainer = (props: AppContainerProps) => {
     setPermissionsDialogProps(null);
   }, []);
 
+  const [isAgentConfigDialogOpen, setIsAgentConfigDialogOpen] = useState(false);
+  const [selectedAgentName, setSelectedAgentName] = useState<
+    string | undefined
+  >();
+  const [selectedAgentDisplayName, setSelectedAgentDisplayName] = useState<
+    string | undefined
+  >();
+  const [selectedAgentDefinition, setSelectedAgentDefinition] = useState<
+    AgentDefinition | undefined
+  >();
+
+  const openAgentConfigDialog = useCallback(
+    (name: string, displayName: string, definition: AgentDefinition) => {
+      setSelectedAgentName(name);
+      setSelectedAgentDisplayName(displayName);
+      setSelectedAgentDefinition(definition);
+      setIsAgentConfigDialogOpen(true);
+    },
+    [],
+  );
+
+  const closeAgentConfigDialog = useCallback(() => {
+    setIsAgentConfigDialogOpen(false);
+    setSelectedAgentName(undefined);
+    setSelectedAgentDisplayName(undefined);
+    setSelectedAgentDefinition(undefined);
+  }, []);
+
   const toggleDebugProfiler = useCallback(
     () => setShowDebugProfiler((prev) => !prev),
     [],
@@ -322,7 +351,9 @@ export const AppContainer = (props: AppContainerProps) => {
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
             role: 'user',
-            parts: [{ text: additionalContext }],
+            parts: [
+              { text: `<hook_context>${additionalContext}</hook_context>` },
+            ],
           });
         }
       }
@@ -688,6 +719,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
@@ -701,6 +733,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
+      setText: (text: string) => buffer.setText(text),
     }),
     [
       setAuthState,
@@ -709,6 +742,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openAgentConfigDialog,
       setQuittingMessages,
       setDebugMessage,
       setShowPrivacyNotice,
@@ -717,6 +751,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      buffer,
     ],
   );
 
@@ -1484,6 +1519,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
@@ -1578,6 +1614,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isAgentConfigDialogOpen,
+      selectedAgentName,
+      selectedAgentDisplayName,
+      selectedAgentDefinition,
       isPermissionsDialogOpen,
       permissionsDialogProps,
       slashCommands,
@@ -1671,6 +1711,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isAgentConfigDialogOpen,
+      selectedAgentName,
+      selectedAgentDisplayName,
+      selectedAgentDefinition,
       isPermissionsDialogOpen,
       permissionsDialogProps,
       slashCommands,
@@ -1771,6 +1815,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openAgentConfigDialog,
+      closeAgentConfigDialog,
       openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,
@@ -1832,6 +1878,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openAgentConfigDialog,
+      closeAgentConfigDialog,
       openPermissionsDialog,
       closePermissionsDialog,
       setShellModeActive,

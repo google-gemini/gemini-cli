@@ -71,6 +71,10 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isAgentConfigDialogOpen: boolean;
+  selectedAgentName?: string;
+  selectedAgentDisplayName?: string;
+  selectedAgentDefinition?: AgentDefinition;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;

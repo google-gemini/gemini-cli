@@ -8,7 +8,11 @@ import { createContext, useContext } from 'react';
 import { type Key } from '../hooks/useKeypress.js';
 import { type IdeIntegrationNudgeResult } from '../IdeIntegrationNudge.js';
 import { type FolderTrustChoice } from '../components/FolderTrustDialog.js';
-import { type AuthType, type EditorType } from '@google/gemini-cli-core';
+import {
+  type AuthType,
+  type EditorType,
+  type AgentDefinition,
+} from '@google/gemini-cli-core';
 import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
 import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
@@ -33,6 +37,12 @@ export interface UIActions {
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
+  openAgentConfigDialog: (
+    name: string,
+    displayName: string,
+    definition: AgentDefinition,
+  ) => void;
+  closeAgentConfigDialog: () => void;
   openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
   setShellModeActive: (value: boolean) => void;
