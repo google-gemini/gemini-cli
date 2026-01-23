@@ -3,7 +3,7 @@
 This page provides a reference for commonly used Gemini CLI commands, options,
 and parameters.
 
-## CLI Commands
+## CLI commands
 
 | Command                            | Description                        | Example                                             |
 | ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
