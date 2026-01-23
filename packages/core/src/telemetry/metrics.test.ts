@@ -101,7 +101,7 @@ describe('Telemetry Metrics', () => {
     vi.resetModules();
     vi.doMock('@opentelemetry/api', () => {
       const actualApi = originalOtelMockFactory();
-      (actualApi.metrics.getMeter as Mock).mockReturnValue(mockMeterInstance);
+      actualApi.metrics.getMeter.mockReturnValue(mockMeterInstance);
       return actualApi;
     });
 
@@ -280,96 +280,33 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
-    it('should record token usage with the correct attributes', () => {
-      initializeMetricsModule(mockConfig);
-      recordTokenUsageMetricsModule(mockConfig, 100, {
-        model: 'gemini-pro',
-        type: 'input',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-      });
-      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 100, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'input',
-      });
-    });
+    it.each([
+      { type: 'input', tokens: 100, model: 'gemini-pro' },
+      { type: 'output', tokens: 50, model: 'gemini-pro' },
+      { type: 'thought', tokens: 25, model: 'gemini-pro' },
+      { type: 'cache', tokens: 75, model: 'gemini-pro' },
+      { type: 'tool', tokens: 125, model: 'gemini-pro' },
+      { type: 'input', tokens: 200, model: 'gemini-different-model' },
+    ])(
+      'should record token usage for $type type with $tokens tokens for model $model',
+      ({ type, tokens, model }) => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
 
-    it('should record token usage for different types', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
+        recordTokenUsageMetricsModule(mockConfig, tokens, {
+          model,
+          type: type as 'input' | 'output' | 'thought' | 'cache' | 'tool',
+        });
 
-      recordTokenUsageMetricsModule(mockConfig, 50, {
-        model: 'gemini-pro',
-        type: 'output',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(50, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'output',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 25, {
-        model: 'gemini-pro',
-        type: 'thought',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(25, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'thought',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 75, {
-        model: 'gemini-pro',
-        type: 'cache',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(75, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'cache',
-      });
-
-      recordTokenUsageMetricsModule(mockConfig, 125, {
-        model: 'gemini-pro',
-        type: 'tool',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(125, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-pro',
-        type: 'tool',
-      });
-    });
-
-    it('should handle different models', () => {
-      initializeMetricsModule(mockConfig);
-      mockCounterAddFn.mockClear();
-
-      recordTokenUsageMetricsModule(mockConfig, 200, {
-        model: 'gemini-different-model',
-        type: 'input',
-      });
-      expect(mockCounterAddFn).toHaveBeenCalledWith(200, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        model: 'gemini-different-model',
-        type: 'input',
-      });
-    });
+        expect(mockCounterAddFn).toHaveBeenCalledWith(tokens, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          model,
+          type,
+        });
+      },
+    );
   });
 
   describe('recordLinesChanged metric', () => {
@@ -541,6 +478,8 @@ describe('Telemetry Metrics', () => {
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
         'routing.decision_source': 'default',
+        'routing.failed': false,
+        'routing.reasoning': 'test-reason',
       });
       // The session counter is called once on init
       expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
@@ -564,6 +503,8 @@ describe('Telemetry Metrics', () => {
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
         'routing.decision_source': 'classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'test-reason',
       });
 
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
@@ -571,7 +512,10 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
+        'routing.decision_model': 'gemini-pro',
         'routing.decision_source': 'classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'test-reason',
         'routing.error_message': 'test-error',
       });
     });
@@ -921,80 +865,60 @@ describe('Telemetry Metrics', () => {
     });
 
     describe('recordMemoryUsage', () => {
-      it('should record memory usage for different memory types', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 15728640, {
+      it.each([
+        {
           memory_type: MemoryMetricType.HEAP_USED,
           component: 'startup',
-        });
-
-        expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_used',
-          component: 'startup',
-        });
-      });
-
-      it('should record memory usage for all memory metric types', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 31457280, {
+          value: 15728640,
+        },
+        {
           memory_type: MemoryMetricType.HEAP_TOTAL,
           component: 'api_call',
-        });
-        recordMemoryUsageModule(mockConfig, 2097152, {
+          value: 31457280,
+        },
+        {
           memory_type: MemoryMetricType.EXTERNAL,
           component: 'tool_execution',
-        });
-        recordMemoryUsageModule(mockConfig, 41943040, {
+          value: 2097152,
+        },
+        {
           memory_type: MemoryMetricType.RSS,
           component: 'memory_monitor',
-        });
-
-        expect(mockHistogramRecordFn).toHaveBeenCalledTimes(3); // One for each call
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(1, 31457280, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_total',
-          component: 'api_call',
-        });
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(2, 2097152, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'external',
-          component: 'tool_execution',
-        });
-        expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(3, 41943040, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'rss',
-          component: 'memory_monitor',
-        });
-      });
-
-      it('should record memory usage without component', () => {
-        initializeMetricsModule(mockConfig);
-        mockHistogramRecordFn.mockClear();
-
-        recordMemoryUsageModule(mockConfig, 15728640, {
+          value: 41943040,
+        },
+        {
           memory_type: MemoryMetricType.HEAP_USED,
-        });
+          component: undefined,
+          value: 15728640,
+        },
+      ])(
+        'should record memory usage for $memory_type',
+        ({ memory_type, component, value }) => {
+          initializeMetricsModule(mockConfig);
+          mockHistogramRecordFn.mockClear();
 
-        expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
-          'session.id': 'test-session-id',
-          'installation.id': 'test-installation-id',
-          'user.email': 'test@example.com',
-          memory_type: 'heap_used',
-        });
-      });
+          recordMemoryUsageModule(mockConfig, value, {
+            memory_type,
+            component,
+          });
+
+          const expectedAttributes: Record<string, unknown> = {
+            'session.id': 'test-session-id',
+            'installation.id': 'test-installation-id',
+            'user.email': 'test@example.com',
+            memory_type,
+          };
+
+          if (component) {
+            expectedAttributes['component'] = component;
+          }
+
+          expect(mockHistogramRecordFn).toHaveBeenCalledWith(
+            value,
+            expectedAttributes,
+          );
+        },
+      );
     });
 
     describe('recordCpuUsage', () => {
@@ -1423,6 +1347,116 @@ describe('Telemetry Metrics', () => {
           'Baseline value is zero, skipping comparison.',
         );
         expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('recordHookCallMetrics', () => {
+      let recordHookCallMetricsModule: typeof import('./metrics.js').recordHookCallMetrics;
+
+      beforeEach(async () => {
+        recordHookCallMetricsModule = (await import('./metrics.js'))
+          .recordHookCallMetrics;
+      });
+
+      it('should record hook call metrics with counter and histogram', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          'test-hook',
+          150,
+          true,
+        );
+
+        // Verify counter recorded
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'test-hook',
+          success: true,
+        });
+
+        // Verify histogram recorded
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'test-hook',
+          success: true,
+        });
+      });
+
+      it('should always sanitize hook names regardless of content', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        // Test with a command that has sensitive information
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          '/path/to/.gemini/hooks/check-secrets.sh --api-key=abc123',
+          150,
+          true,
+        );
+
+        // Verify hook name is sanitized (detailed sanitization tested in hook-call-event.test.ts)
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          hook_event_name: 'BeforeTool',
+          hook_name: 'check-secrets.sh', // Sanitized
+          success: true,
+        });
+      });
+
+      it('should track both success and failure', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        // Success case
+        recordHookCallMetricsModule(
+          mockConfig,
+          'BeforeTool',
+          'test-hook',
+          100,
+          true,
+        );
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(
+          1,
+          1,
+          expect.objectContaining({
+            hook_event_name: 'BeforeTool',
+            hook_name: 'test-hook',
+            success: true,
+          }),
+        );
+
+        // Failure case
+        recordHookCallMetricsModule(
+          mockConfig,
+          'AfterTool',
+          'test-hook',
+          150,
+          false,
+        );
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(
+          2,
+          1,
+          expect.objectContaining({
+            hook_event_name: 'AfterTool',
+            hook_name: 'test-hook',
+            success: false,
+          }),
+        );
       });
     });
   });

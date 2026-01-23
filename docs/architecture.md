@@ -13,11 +13,11 @@ input:
       as handling the initial user input, presenting the final output, and
       managing the overall user experience.
     - **Key functions contained in the package:**
-      - [Input processing](/docs/cli/commands.md)
+      - [Input processing](/docs/cli/commands)
       - History management
       - Display rendering
-      - [Theme and UI customization](/docs/cli/themes.md)
-      - [CLI configuration settings](/docs/get-started/configuration.md)
+      - [Theme and UI customization](/docs/cli/themes)
+      - [CLI configuration settings](/docs/get-started/configuration)
 
 2.  **Core package (`packages/core`):**
     - **Purpose:** This acts as the backend for the Gemini CLI. It receives
@@ -37,7 +37,7 @@ input:
     - **Interaction:** `packages/core` invokes these tools based on requests
       from the Gemini model.
 
-## Interaction Flow
+## Interaction flow
 
 A typical interaction with the Gemini CLI follows this flow:
 
@@ -69,7 +69,7 @@ A typical interaction with the Gemini CLI follows this flow:
 7.  **Display to user:** The CLI package formats and displays the response to
     the user in the terminal.
 
-## Key Design Principles
+## Key design principles
 
 - **Modularity:** Separating the CLI (frontend) from the Core (backend) allows
   for independent development and potential future extensions (e.g., different

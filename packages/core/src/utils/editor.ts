@@ -6,28 +6,66 @@
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
+import { coreEvents, CoreEvent } from './events.js';
 
-export type EditorType =
-  | 'vscode'
-  | 'vscodium'
-  | 'windsurf'
-  | 'cursor'
-  | 'vim'
-  | 'neovim'
-  | 'zed'
-  | 'emacs';
+const GUI_EDITORS = [
+  'vscode',
+  'vscodium',
+  'windsurf',
+  'cursor',
+  'zed',
+  'antigravity',
+] as const;
+const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
+const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
+
+const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
+const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
+const EDITORS_SET = new Set<string>(EDITORS);
+
+export const DEFAULT_GUI_EDITOR: GuiEditorType = 'vscode';
+
+export type GuiEditorType = (typeof GUI_EDITORS)[number];
+export type TerminalEditorType = (typeof TERMINAL_EDITORS)[number];
+export type EditorType = (typeof EDITORS)[number];
+
+export function isGuiEditor(editor: EditorType): editor is GuiEditorType {
+  return GUI_EDITORS_SET.has(editor);
+}
+
+export function isTerminalEditor(
+  editor: EditorType,
+): editor is TerminalEditorType {
+  return TERMINAL_EDITORS_SET.has(editor);
+}
+
+export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
+  vscode: 'VS Code',
+  vscodium: 'VSCodium',
+  windsurf: 'Windsurf',
+  cursor: 'Cursor',
+  vim: 'Vim',
+  neovim: 'Neovim',
+  zed: 'Zed',
+  emacs: 'Emacs',
+  antigravity: 'Antigravity',
+  hx: 'Helix',
+};
+
+export function getEditorDisplayName(editor: EditorType): string {
+  return EDITOR_DISPLAY_NAMES[editor] || editor;
+}
 
 function isValidEditorType(editor: string): editor is EditorType {
-  return [
-    'vscode',
-    'vscodium',
-    'windsurf',
-    'cursor',
-    'vim',
-    'neovim',
-    'zed',
-    'emacs',
-  ].includes(editor);
+  return EDITORS_SET.has(editor);
+}
+
+/**
+ * Escapes a string for use in an Emacs Lisp string literal.
+ * Wraps in double quotes and escapes backslashes and double quotes.
+ */
+function escapeELispString(str: string): string {
+  return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 interface DiffCommand {
@@ -63,6 +101,8 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  hx: { win32: ['hx'], default: ['hx'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -72,9 +112,19 @@ export function checkHasEditorType(editor: EditorType): boolean {
   return commands.some((cmd) => commandExists(cmd));
 }
 
+export function getEditorCommand(editor: EditorType): string {
+  const commandConfig = editorCommands[editor];
+  const commands =
+    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  return (
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1]
+  );
+}
+
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  if (isGuiEditor(editor)) {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
@@ -103,12 +153,7 @@ export function getDiffCommand(
   if (!isValidEditorType(editor)) {
     return null;
   }
-  const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  const command =
-    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
-    commands[commands.length - 1];
+  const command = getEditorCommand(editor);
 
   switch (editor) {
     case 'vscode':
@@ -116,6 +161,7 @@ export function getDiffCommand(
     case 'windsurf':
     case 'cursor':
     case 'zed':
+    case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'vim':
     case 'neovim':
@@ -149,7 +195,15 @@ export function getDiffCommand(
     case 'emacs':
       return {
         command: 'emacs',
-        args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
+        args: [
+          '--eval',
+          `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
+        ],
+      };
+    case 'hx':
+      return {
+        command: 'hx',
+        args: ['--vsplit', '--', oldPath, newPath],
       };
     default:
       return null;
@@ -165,7 +219,6 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
-  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
@@ -173,9 +226,7 @@ export async function openDiff(
     return;
   }
 
-  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
-
-  if (isTerminalEditor) {
+  if (isTerminalEditor(editor)) {
     try {
       const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
@@ -187,7 +238,7 @@ export async function openDiff(
         throw new Error(`${editor} exited with code ${result.status}`);
       }
     } finally {
-      onEditorClose();
+      coreEvents.emit(CoreEvent.ExternalEditorClosed);
     }
     return;
   }

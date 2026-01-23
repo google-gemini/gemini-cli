@@ -12,7 +12,7 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
-import licenseHeader from 'eslint-plugin-license-header';
+import headers from 'eslint-plugin-headers';
 import path from 'node:path';
 import url from 'node:url';
 
@@ -29,13 +29,15 @@ export default tseslint.config(
     // Global ignores
     ignores: [
       'node_modules/*',
-      '.integration-tests/**',
       'eslint.config.js',
       'packages/**/dist/**',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
       'dist/**',
+      'evals/**',
+      'packages/test-utils/**',
+      'packages/core/src/skills/builtin/skill-creator/scripts/*.cjs',
     ],
   },
   eslint.configs.recommended,
@@ -81,6 +83,11 @@ export default tseslint.config(
       },
     },
     languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: projectRoot,
+      },
       globals: {
         ...globals.node,
         ...globals.es2021,
@@ -118,6 +125,8 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      // Prevent async errors from bypassing catch handlers
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
       'import/no-internal-modules': [
         'error',
         {
@@ -158,7 +167,43 @@ export default tseslint.config(
       'prefer-arrow-callback': 'error',
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
+      'no-console': 'error',
       'default-case': 'error',
+      '@typescript-eslint/await-thenable': ['error'],
+      '@typescript-eslint/no-floating-promises': ['error'],
+      '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'node:os',
+              importNames: ['homedir', 'tmpdir'],
+              message:
+                'Please use the helpers from @google/gemini-cli-core instead of node:os homedir()/tmpdir() to ensure strict environment isolation.',
+            },
+            {
+              name: 'os',
+              importNames: ['homedir', 'tmpdir'],
+              message:
+                'Please use the helpers from @google/gemini-cli-core instead of os homedir()/tmpdir() to ensure strict environment isolation.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Allow os.homedir() in tests and paths.ts where it is used to implement the helper
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'packages/core/src/utils/paths.ts',
+      'packages/test-utils/src/**/*.ts',
+      'scripts/**/*.js',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
   {
@@ -200,19 +245,26 @@ export default tseslint.config(
   {
     files: ['./**/*.{tsx,ts,js}'],
     plugins: {
-      'license-header': licenseHeader,
+      headers,
       import: importPlugin,
     },
     rules: {
-      'license-header/header': [
+      'headers/header-format': [
         'error',
-        [
-          '/**',
-          ' * @license',
-          ' * Copyright 2025 Google LLC',
-          ' * SPDX-License-Identifier: Apache-2.0',
-          ' */',
-        ],
+        {
+          source: 'string',
+          content: [
+            '@license',
+            'Copyright (year) Google LLC',
+            'SPDX-License-Identifier: Apache-2.0',
+          ].join('\n'),
+          patterns: {
+            year: {
+              pattern: '202[5-6]',
+              defaultValue: '2026',
+            },
+          },
+        },
       ],
       'import/enforce-node-protocol-usage': ['error', 'always'],
     },
@@ -250,6 +302,16 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // Examples should have access to standard globals like fetch
+  {
+    files: ['packages/cli/src/commands/extensions/examples/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        fetch: 'readonly',
+      },
     },
   },
   // extra settings for scripts that we run directly with node

@@ -14,6 +14,9 @@ import { enableCommand } from './extensions/enable.js';
 import { linkCommand } from './extensions/link.js';
 import { newCommand } from './extensions/new.js';
 import { validateCommand } from './extensions/validate.js';
+import { configureCommand } from './extensions/configure.js';
+import { initializeOutputListenersAndFlush } from '../gemini.js';
+import { defer } from '../deferred.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions <command>',
@@ -21,15 +24,20 @@ export const extensionsCommand: CommandModule = {
   describe: 'Manage Gemini CLI extensions.',
   builder: (yargs) =>
     yargs
-      .command(installCommand)
-      .command(uninstallCommand)
-      .command(listCommand)
-      .command(updateCommand)
-      .command(disableCommand)
-      .command(enableCommand)
-      .command(linkCommand)
-      .command(newCommand)
-      .command(validateCommand)
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
+      .command(defer(installCommand, 'extensions'))
+      .command(defer(uninstallCommand, 'extensions'))
+      .command(defer(listCommand, 'extensions'))
+      .command(defer(updateCommand, 'extensions'))
+      .command(defer(disableCommand, 'extensions'))
+      .command(defer(enableCommand, 'extensions'))
+      .command(defer(linkCommand, 'extensions'))
+      .command(defer(newCommand, 'extensions'))
+      .command(defer(validateCommand, 'extensions'))
+      .command(defer(configureCommand, 'extensions'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {

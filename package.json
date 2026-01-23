@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.13.0-nightly.20251031.c89bc30d",
+  "version": "0.27.0-nightly.20260121.97aac696f",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.13.0-nightly.20251031.c89bc30d"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-nightly.20260121.97aac696f"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -27,6 +27,10 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
+    "predocs:settings": "npm run build --workspace @google/gemini-cli-core",
+    "schema:settings": "tsx ./scripts/generate-settings-schema.ts",
+    "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
+    "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",
@@ -37,18 +41,20 @@
     "test": "npm run test --workspaces --if-present",
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
+    "test:always_passing_evals": "vitest run --config evals/vitest.config.ts",
+    "test:all_evals": "cross-env RUN_EVALS=1 vitest run --config evals/vitest.config.ts",
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
     "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
-    "lint": "eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts",
+    "lint": "eslint . --cache",
     "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
+    "preflight": "npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck && npm run test:ci",
     "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
@@ -58,7 +64,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.0",
+    "ink": "npm:@jrichman/ink@6.4.7",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -73,6 +79,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@agentclientprotocol/sdk": "^0.12.0",
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
@@ -85,19 +92,19 @@
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
+    "depcheck": "^1.4.7",
     "esbuild": "^0.25.0",
     "esbuild-plugin-wasm": "^1.1.0",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-headers": "^1.3.3",
     "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-license-header": "^0.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "glob": "^10.4.5",
+    "glob": "^12.0.0",
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "husky": "^9.1.7",
-    "ink": "npm:@jrichman/ink@6.4.0",
     "ink-testing-library": "^4.0.0",
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
@@ -110,12 +117,14 @@
     "react-devtools-core": "^6.1.2",
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
+    "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "ink": "npm:@jrichman/ink@6.4.7",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },
@@ -126,6 +135,7 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
+    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "lint-staged": {

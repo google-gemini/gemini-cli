@@ -34,26 +34,142 @@ export interface UserFeedbackPayload {
 }
 
 /**
- * Payload for the 'fallback-mode-changed' event.
+ * Payload for the 'model-changed' event.
  */
-export interface FallbackModeChangedPayload {
+export interface ModelChangedPayload {
   /**
-   * Whether fallback mode is now active.
+   * The new model that was set.
    */
-  isInFallbackMode: boolean;
+  model: string;
+}
+
+/**
+ * Payload for the 'console-log' event.
+ */
+export interface ConsoleLogPayload {
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
+  content: string;
+}
+
+/**
+ * Payload for the 'output' event.
+ */
+export interface OutputPayload {
+  isStderr: boolean;
+  chunk: Uint8Array | string;
+  encoding?: BufferEncoding;
+}
+
+/**
+ * Payload for the 'memory-changed' event.
+ */
+export interface MemoryChangedPayload {
+  fileCount: number;
+}
+
+/**
+ * Base payload for hook-related events.
+ */
+export interface HookPayload {
+  hookName: string;
+  eventName: string;
+}
+
+/**
+ * Payload for the 'hook-start' event.
+ */
+export interface HookStartPayload extends HookPayload {
+  /**
+   * The 1-based index of the current hook in the execution sequence.
+   * Used for progress indication (e.g. "Hook 1/3").
+   */
+  hookIndex?: number;
+  /**
+   * The total number of hooks in the current execution sequence.
+   */
+  totalHooks?: number;
+}
+
+/**
+ * Payload for the 'hook-end' event.
+ */
+export interface HookEndPayload extends HookPayload {
+  success: boolean;
+}
+
+/**
+ * Payload for the 'retry-attempt' event.
+ */
+export interface RetryAttemptPayload {
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error?: string;
+  model: string;
 }
 
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
-  FallbackModeChanged = 'fallback-mode-changed',
+  ModelChanged = 'model-changed',
+  ConsoleLog = 'console-log',
+  Output = 'output',
+  MemoryChanged = 'memory-changed',
+  ExternalEditorClosed = 'external-editor-closed',
+  SettingsChanged = 'settings-changed',
+  HookStart = 'hook-start',
+  HookEnd = 'hook-end',
+  AgentsRefreshed = 'agents-refreshed',
+  AdminSettingsChanged = 'admin-settings-changed',
+  RetryAttempt = 'retry-attempt',
 }
 
-export class CoreEventEmitter extends EventEmitter {
-  private _feedbackBacklog: UserFeedbackPayload[] = [];
+export interface CoreEvents {
+  [CoreEvent.UserFeedback]: [UserFeedbackPayload];
+  [CoreEvent.ModelChanged]: [ModelChangedPayload];
+  [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
+  [CoreEvent.Output]: [OutputPayload];
+  [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.SettingsChanged]: never[];
+  [CoreEvent.HookStart]: [HookStartPayload];
+  [CoreEvent.HookEnd]: [HookEndPayload];
+  [CoreEvent.AgentsRefreshed]: never[];
+  [CoreEvent.AdminSettingsChanged]: never[];
+  [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+}
+
+type EventBacklogItem = {
+  [K in keyof CoreEvents]: {
+    event: K;
+    args: CoreEvents[K];
+  };
+}[keyof CoreEvents];
+
+export class CoreEventEmitter extends EventEmitter<CoreEvents> {
+  private _eventBacklog: EventBacklogItem[] = [];
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
     super();
+  }
+
+  private _emitOrQueue<K extends keyof CoreEvents>(
+    event: K,
+    ...args: CoreEvents[K]
+  ): void {
+    if (this.listenerCount(event) === 0) {
+      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        this._eventBacklog.shift();
+      }
+      this._eventBacklog.push({ event, args } as EventBacklogItem);
+    } else {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(event, ...args);
+    }
   }
 
   /**
@@ -66,81 +182,97 @@ export class CoreEventEmitter extends EventEmitter {
     error?: unknown,
   ): void {
     const payload: UserFeedbackPayload = { severity, message, error };
-
-    if (this.listenerCount(CoreEvent.UserFeedback) === 0) {
-      if (this._feedbackBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._feedbackBacklog.shift();
-      }
-      this._feedbackBacklog.push(payload);
-    } else {
-      this.emit(CoreEvent.UserFeedback, payload);
-    }
+    this._emitOrQueue(CoreEvent.UserFeedback, payload);
   }
 
   /**
-   * Notifies subscribers that fallback mode has changed.
-   * This is synchronous and doesn't use backlog (UI should already be initialized).
+   * Broadcasts a console log message.
    */
-  emitFallbackModeChanged(isInFallbackMode: boolean): void {
-    const payload: FallbackModeChangedPayload = { isInFallbackMode };
-    this.emit(CoreEvent.FallbackModeChanged, payload);
+  emitConsoleLog(
+    type: 'log' | 'warn' | 'error' | 'debug' | 'info',
+    content: string,
+  ): void {
+    const payload: ConsoleLogPayload = { type, content };
+    this._emitOrQueue(CoreEvent.ConsoleLog, payload);
+  }
+
+  /**
+   * Broadcasts stdout/stderr output.
+   */
+  emitOutput(
+    isStderr: boolean,
+    chunk: Uint8Array | string,
+    encoding?: BufferEncoding,
+  ): void {
+    const payload: OutputPayload = { isStderr, chunk, encoding };
+    this._emitOrQueue(CoreEvent.Output, payload);
+  }
+
+  /**
+   * Notifies subscribers that the model has changed.
+   */
+  emitModelChanged(model: string): void {
+    const payload: ModelChangedPayload = { model };
+    this.emit(CoreEvent.ModelChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers that settings have been modified.
+   */
+  emitSettingsChanged(): void {
+    this.emit(CoreEvent.SettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has started.
+   */
+  emitHookStart(payload: HookStartPayload): void {
+    this.emit(CoreEvent.HookStart, payload);
+  }
+
+  /**
+   * Notifies subscribers that a hook execution has ended.
+   */
+  emitHookEnd(payload: HookEndPayload): void {
+    this.emit(CoreEvent.HookEnd, payload);
+  }
+
+  /**
+   * Notifies subscribers that agents have been refreshed.
+   */
+  emitAgentsRefreshed(): void {
+    this.emit(CoreEvent.AgentsRefreshed);
+  }
+
+  /**
+   * Notifies subscribers that admin settings have changed.
+   */
+  emitAdminSettingsChanged(): void {
+    this.emit(CoreEvent.AdminSettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a retry attempt is happening.
+   */
+  emitRetryAttempt(payload: RetryAttemptPayload): void {
+    this.emit(CoreEvent.RetryAttempt, payload);
   }
 
   /**
    * Flushes buffered messages. Call this immediately after primary UI listener
    * subscribes.
    */
-  drainFeedbackBacklog(): void {
-    const backlog = [...this._feedbackBacklog];
-    this._feedbackBacklog.length = 0; // Clear in-place
-    for (const payload of backlog) {
-      this.emit(CoreEvent.UserFeedback, payload);
+  drainBacklogs(): void {
+    const backlog = [...this._eventBacklog];
+    this._eventBacklog.length = 0; // Clear in-place
+    for (const item of backlog) {
+      (
+        this.emit as <K extends keyof CoreEvents>(
+          event: K,
+          ...args: CoreEvents[K]
+        ) => boolean
+      )(item.event, ...item.args);
     }
-  }
-
-  override on(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override on(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override on(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    return super.on(event, listener);
-  }
-
-  override off(
-    event: CoreEvent.UserFeedback,
-    listener: (payload: UserFeedbackPayload) => void,
-  ): this;
-  override off(
-    event: CoreEvent.FallbackModeChanged,
-    listener: (payload: FallbackModeChangedPayload) => void,
-  ): this;
-  override off(
-    event: string | symbol,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listener: (...args: any[]) => void,
-  ): this {
-    return super.off(event, listener);
-  }
-
-  override emit(
-    event: CoreEvent.UserFeedback,
-    payload: UserFeedbackPayload,
-  ): boolean;
-  override emit(
-    event: CoreEvent.FallbackModeChanged,
-    payload: FallbackModeChangedPayload,
-  ): boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override emit(event: string | symbol, ...args: any[]): boolean {
-    return super.emit(event, ...args);
   }
 }
 

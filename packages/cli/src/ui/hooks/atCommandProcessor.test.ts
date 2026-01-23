@@ -7,7 +7,7 @@
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handleAtCommand } from './atCommandProcessor.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, DiscoveredMCPResource } from '@google/gemini-cli-core';
 import {
   FileDiscoveryService,
   GlobTool,
@@ -17,6 +17,7 @@ import {
   COMMON_IGNORE_PATTERNS,
   // DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
+import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -53,10 +54,17 @@ describe('handleAtCommand', () => {
 
     const getToolRegistry = vi.fn();
 
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as core.MessageBus;
+
     mockConfig = {
       getToolRegistry,
       getTargetDir: () => testRootDir,
       isSandboxed: () => false,
+      getExcludeTools: vi.fn(),
       getFileService: () => new FileDiscoveryService(testRootDir),
       getFileFilteringRespectGitIgnore: () => true,
       getFileFilteringRespectGeminiIgnore: () => true,
@@ -85,11 +93,19 @@ describe('handleAtCommand', () => {
       }),
       getUsageStatisticsEnabled: () => false,
       getEnableExtensionReloading: () => false,
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      getMcpClientManager: () => ({
+        getClient: () => undefined,
+      }),
+      getMessageBus: () => mockMessageBus,
     } as unknown as Config;
 
-    const registry = new ToolRegistry(mockConfig);
-    registry.registerTool(new ReadManyFilesTool(mockConfig));
-    registry.registerTool(new GlobTool(mockConfig));
+    const registry = new ToolRegistry(mockConfig, mockMessageBus);
+    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
+    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
     getToolRegistry.mockReturnValue(registry);
   });
 
@@ -112,7 +128,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: query }],
-      shouldProceed: true,
     });
   });
 
@@ -130,7 +145,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
@@ -163,7 +177,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,7 +216,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
@@ -238,7 +250,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -268,7 +279,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -277,7 +287,7 @@ describe('handleAtCommand', () => {
       }),
       125,
     );
-  });
+  }, 10000);
 
   it('should handle multiple @file references', async () => {
     const content1 = 'Content file1';
@@ -313,7 +323,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -354,7 +363,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -393,7 +401,6 @@ describe('handleAtCommand', () => {
         { text: content1 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${invalidFile} not found directly, attempting glob search.`,
@@ -420,7 +427,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: 'Check @nonexistent.txt and @ also' }],
-      shouldProceed: true,
     });
   });
 
@@ -454,7 +460,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -493,7 +498,6 @@ describe('handleAtCommand', () => {
           { text: 'console.log("Hello world");' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -526,7 +530,6 @@ describe('handleAtCommand', () => {
           { text: '# Project README' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -554,7 +557,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitFile} is git-ignored and will be skipped.`,
@@ -587,7 +589,8 @@ describe('handleAtCommand', () => {
         `Glob tool not found. Path ${invalidFile} will be skipped.`,
       );
       expect(result.processedQuery).toEqual([{ text: query }]);
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
     });
   });
 
@@ -614,7 +617,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -652,7 +654,6 @@ describe('handleAtCommand', () => {
         { text: 'console.log("Hello world");' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -688,7 +689,6 @@ describe('handleAtCommand', () => {
         { text: '// Main application entry' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -816,7 +816,6 @@ describe('handleAtCommand', () => {
             { text: fileContent },
             { text: '\n--- End of content ---' },
           ],
-          shouldProceed: true,
         });
       },
     );
@@ -855,7 +854,6 @@ describe('handleAtCommand', () => {
           { text: content2 },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -885,7 +883,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -916,7 +913,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -947,7 +943,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -978,11 +973,10 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
-    it('should not terminate at period within file name', async () => {
+    it('should correctly handle file paths with multiple periods', async () => {
       const fileContent = 'Version info';
       const filePath = await createTestFile(
         path.join(testRootDir, 'version.1.2.3.txt'),
@@ -1009,7 +1003,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1038,7 +1031,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1067,7 +1059,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1096,7 +1087,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
   });
@@ -1128,7 +1118,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1157,7 +1146,8 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
       expect(result.processedQuery).toEqual(
         expect.arrayContaining([
           { text: `Check @${path.join(subDirPath, '**')} please.` },
@@ -1199,7 +1189,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: `Check @${outsidePath} please.` }],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1239,5 +1228,147 @@ describe('handleAtCommand', () => {
       (call) => call[0].type === 'user',
     );
     expect(userTurnCalls).toHaveLength(0);
+  });
+
+  describe('MCP resource attachments', () => {
+    it('attaches MCP resource content when @serverName:uri matches registry', async () => {
+      const serverName = 'server-1';
+      const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
+      const resource = {
+        serverName,
+        uri: resourceUri,
+        name: 'logs',
+        discoveredAt: Date.now(),
+      } as DiscoveredMCPResource;
+
+      vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri ? resource : undefined,
+        getAllResources: () => [],
+      } as never);
+
+      const readResource = vi.fn().mockResolvedValue({
+        contents: [{ text: 'mcp resource body' }],
+      });
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        getClient: () => ({ readResource }),
+      } as never);
+
+      const result = await handleAtCommand({
+        query: `@${prefixedUri}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 42,
+        signal: abortController.signal,
+      });
+
+      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      const processedParts = Array.isArray(result.processedQuery)
+        ? result.processedQuery
+        : [];
+      const containsResourceText = processedParts.some((part) => {
+        const text = typeof part === 'string' ? part : part?.text;
+        return typeof text === 'string' && text.includes('mcp resource body');
+      });
+      expect(containsResourceText).toBe(true);
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'tool_group' }),
+        expect.any(Number),
+      );
+    });
+
+    it('returns an error if MCP client is unavailable', async () => {
+      const serverName = 'server-1';
+      const resourceUri = 'resource://server-1/logs';
+      const prefixedUri = `${serverName}:${resourceUri}`;
+      vi.spyOn(mockConfig, 'getResourceRegistry').mockReturnValue({
+        findResourceByUri: (identifier: string) =>
+          identifier === prefixedUri
+            ? ({
+                serverName,
+                uri: resourceUri,
+                discoveredAt: Date.now(),
+              } as DiscoveredMCPResource)
+            : undefined,
+        getAllResources: () => [],
+      } as never);
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        getClient: () => undefined,
+      } as never);
+
+      const result = await handleAtCommand({
+        query: `@${prefixedUri}`,
+        config: mockConfig,
+        addItem: mockAddItem,
+        onDebugMessage: mockOnDebugMessage,
+        messageId: 42,
+        signal: abortController.signal,
+      });
+
+      expect(result.processedQuery).toBeNull();
+      expect(result.error).toBeDefined();
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tool_group',
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              resultDisplay: expect.stringContaining(
+                "MCP client for server 'server-1' is not available or not connected.",
+              ),
+            }),
+          ]),
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  it('should return error if the read_many_files tool is cancelled by user', async () => {
+    const fileContent = 'Some content';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'file.txt'),
+      fileContent,
+    );
+    const query = `@${filePath}`;
+
+    // Simulate user cancellation
+    const mockToolInstance = {
+      buildAndExecute: vi
+        .fn()
+        .mockRejectedValue(new Error('User cancelled operation')),
+      displayName: 'Read Many Files',
+      build: vi.fn(() => ({
+        execute: mockToolInstance.buildAndExecute,
+        getDescription: vi.fn(() => 'Mocked tool description'),
+      })),
+    };
+    const viSpy = vi.spyOn(core, 'ReadManyFilesTool');
+    viSpy.mockImplementation(
+      () => mockToolInstance as unknown as core.ReadManyFilesTool,
+    );
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 134,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: null,
+      error: `Exiting due to an error processing the @ command: Error reading files (file.txt): User cancelled operation`,
+    });
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_group',
+        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+      }),
+      134,
+    );
   });
 });

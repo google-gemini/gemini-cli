@@ -9,6 +9,7 @@ import { join, dirname, basename } from 'node:path';
 import type { CommandModule } from 'yargs';
 import { fileURLToPath } from 'node:url';
 import { debugLogger } from '@google/gemini-cli-core';
+import { exitCli } from '../utils.js';
 
 interface NewArgs {
   path: string;
@@ -100,5 +101,6 @@ export const newCommand: CommandModule = {
       path: args['path'] as string,
       template: args['template'] as string | undefined,
     });
+    await exitCli();
   },
 };

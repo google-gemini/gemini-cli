@@ -118,6 +118,7 @@ jobs:
           GITHUB_RUN_ID: '${{ github.run_id }}'
           LOG_CONTENT: '${{ env.LOG_CONTENT }}'
           TARGET_REF: '${{ github.event.inputs.ref }}'
+          ENVIRONMENT: '${{ github.event.inputs.environment }}'
         continue-on-error: true
         run: |
           git checkout "${TARGET_REF}"

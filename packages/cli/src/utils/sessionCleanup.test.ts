@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type Config,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';
@@ -44,27 +48,51 @@ function createTestSessions(): SessionInfo[] {
   return [
     {
       id: 'current123',
+      file: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
+      startTime: now.toISOString(),
       lastUpdated: now.toISOString(),
+      messageCount: 5,
+      displayName: 'Current session',
+      firstUserMessage: 'Current session',
       isCurrentSession: true,
+      index: 1,
     },
     {
       id: 'recent456',
+      file: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-18T15-45-00-recent45.json`,
+      startTime: oneWeekAgo.toISOString(),
       lastUpdated: oneWeekAgo.toISOString(),
+      messageCount: 10,
+      displayName: 'Recent session',
+      firstUserMessage: 'Recent session',
       isCurrentSession: false,
+      index: 2,
     },
     {
       id: 'old789abc',
+      file: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab`,
       fileName: `${SESSION_FILE_PREFIX}2025-01-10T09-15-00-old789ab.json`,
+      startTime: twoWeeksAgo.toISOString(),
       lastUpdated: twoWeeksAgo.toISOString(),
+      messageCount: 3,
+      displayName: 'Old session',
+      firstUserMessage: 'Old session',
       isCurrentSession: false,
+      index: 3,
     },
     {
       id: 'ancient12',
+      file: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1`,
       fileName: `${SESSION_FILE_PREFIX}2024-12-25T12-00-00-ancient1.json`,
+      startTime: oneMonthAgo.toISOString(),
       lastUpdated: oneMonthAgo.toISOString(),
+      messageCount: 15,
+      displayName: 'Ancient session',
+      firstUserMessage: 'Ancient session',
       isCurrentSession: false,
+      index: 4,
     },
   ];
 }
@@ -72,6 +100,8 @@ function createTestSessions(): SessionInfo[] {
 describe('Session Cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(debugLogger, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     // By default, return all test sessions as valid
     const sessions = createTestSessions();
     mockGetAllSessionFiles.mockResolvedValue(
@@ -126,20 +156,16 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await cleanupExpiredSessions(config, settings);
 
       expect(result.disabled).toBe(true);
       expect(result.scanned).toBe(0);
       expect(result.deleted).toBe(0);
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining(
           'Session cleanup disabled: Error: Invalid retention period format',
         ),
       );
-
-      errorSpy.mockRestore();
     });
 
     it('should delete sessions older than maxAge', async () => {
@@ -310,8 +336,6 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       // Mock getSessionFiles to throw an error
       mockGetAllSessionFiles.mockRejectedValue(
         new Error('Directory access failed'),
@@ -321,11 +345,9 @@ describe('Session Cleanup', () => {
 
       expect(result.disabled).toBe(false);
       expect(result.failed).toBe(1);
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         'Session cleanup failed: Directory access failed',
       );
-
-      errorSpy.mockRestore();
     });
 
     it('should respect minRetention configuration', async () => {
@@ -373,7 +395,9 @@ describe('Session Cleanup', () => {
       );
       mockFs.unlink.mockResolvedValue(undefined);
 
-      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
 
       await cleanupExpiredSessions(config, settings);
 
@@ -409,27 +433,51 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session5d',
+          file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
+          firstUserMessage: '5 days',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session8d',
+          file: `${SESSION_FILE_PREFIX}8d`,
           fileName: `${SESSION_FILE_PREFIX}8d.json`,
+          startTime: eightDaysAgo.toISOString(),
           lastUpdated: eightDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '8 days old',
+          firstUserMessage: '8 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session15d',
+          file: `${SESSION_FILE_PREFIX}15d`,
           fileName: `${SESSION_FILE_PREFIX}15d.json`,
+          startTime: fifteenDaysAgo.toISOString(),
           lastUpdated: fifteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '15 days old',
+          firstUserMessage: '15 days',
           isCurrentSession: false,
+          index: 4,
         },
       ];
 
@@ -507,27 +555,51 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session1d',
+          file: `${SESSION_FILE_PREFIX}1d`,
           fileName: `${SESSION_FILE_PREFIX}1d.json`,
+          startTime: oneDayAgo.toISOString(),
           lastUpdated: oneDayAgo.toISOString(),
+          messageCount: 1,
+          displayName: '1 day old',
+          firstUserMessage: '1 day',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session7d',
+          file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
+          firstUserMessage: '7 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session13d',
+          file: `${SESSION_FILE_PREFIX}13d`,
           fileName: `${SESSION_FILE_PREFIX}13d.json`,
+          startTime: thirteenDaysAgo.toISOString(),
           lastUpdated: thirteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '13 days old',
+          firstUserMessage: '13 days',
           isCurrentSession: false,
+          index: 4,
         },
       ];
 
@@ -579,9 +651,15 @@ describe('Session Cleanup', () => {
       const sessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current (newest)',
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
       ];
 
@@ -590,9 +668,15 @@ describe('Session Cleanup', () => {
         const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         sessions.push({
           id: `session${i}`,
+          file: `${SESSION_FILE_PREFIX}${i}d`,
           fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
+          startTime: daysAgo.toISOString(),
           lastUpdated: daysAgo.toISOString(),
+          messageCount: 1,
+          displayName: `${i} days old`,
+          firstUserMessage: `${i} days`,
           isCurrentSession: false,
+          index: i + 1,
         });
       }
 
@@ -693,33 +777,63 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
+          file: `${SESSION_FILE_PREFIX}current`,
           fileName: `${SESSION_FILE_PREFIX}current.json`,
+          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
           isCurrentSession: true,
+          index: 1,
         },
         {
           id: 'session3d',
+          file: `${SESSION_FILE_PREFIX}3d`,
           fileName: `${SESSION_FILE_PREFIX}3d.json`,
+          startTime: threeDaysAgo.toISOString(),
           lastUpdated: threeDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '3 days old',
+          firstUserMessage: '3 days',
           isCurrentSession: false,
+          index: 2,
         },
         {
           id: 'session5d',
+          file: `${SESSION_FILE_PREFIX}5d`,
           fileName: `${SESSION_FILE_PREFIX}5d.json`,
+          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
+          firstUserMessage: '5 days',
           isCurrentSession: false,
+          index: 3,
         },
         {
           id: 'session7d',
+          file: `${SESSION_FILE_PREFIX}7d`,
           fileName: `${SESSION_FILE_PREFIX}7d.json`,
+          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
+          firstUserMessage: '7 days',
           isCurrentSession: false,
+          index: 4,
         },
         {
           id: 'session12d',
+          file: `${SESSION_FILE_PREFIX}12d`,
           fileName: `${SESSION_FILE_PREFIX}12d.json`,
+          startTime: twelveDaysAgo.toISOString(),
           lastUpdated: twelveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '12 days old',
+          firstUserMessage: '12 days',
           isCurrentSession: false,
+          index: 5,
         },
       ];
 
@@ -859,21 +973,17 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await cleanupExpiredSessions(config, settings);
 
       expect(result.disabled).toBe(true);
       expect(result.scanned).toBe(0);
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining(
           input === '0d'
             ? 'Invalid retention period: 0d. Value must be greater than 0'
             : `Invalid retention period format: ${input}`,
         ),
       );
-
-      errorSpy.mockRestore();
     });
 
     // Test special case - empty string
@@ -890,18 +1000,14 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await cleanupExpiredSessions(config, settings);
 
       expect(result.disabled).toBe(true);
       expect(result.scanned).toBe(0);
       // Empty string means no valid retention method specified
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Either maxAge or maxCount must be specified'),
       );
-
-      errorSpy.mockRestore();
     });
 
     // Test edge cases
@@ -962,17 +1068,13 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await cleanupExpiredSessions(config, settings);
 
       expect(result.disabled).toBe(true);
       expect(result.scanned).toBe(0);
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Either maxAge or maxCount must be specified'),
       );
-
-      errorSpy.mockRestore();
     });
 
     it('should validate maxCount range', async () => {
@@ -988,17 +1090,13 @@ describe('Session Cleanup', () => {
         },
       };
 
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const result = await cleanupExpiredSessions(config, settings);
 
       expect(result.disabled).toBe(true);
       expect(result.scanned).toBe(0);
-      expect(errorSpy).toHaveBeenCalledWith(
+      expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('maxCount must be at least 1'),
       );
-
-      errorSpy.mockRestore();
     });
 
     describe('maxAge format validation', () => {
@@ -1015,21 +1113,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format: 30'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject invalid maxAge format - invalid unit', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1043,21 +1134,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format: 30x'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject invalid maxAge format - no number', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1071,21 +1155,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format: d'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject invalid maxAge format - decimal number', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1099,21 +1176,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format: 1.5d'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject invalid maxAge format - negative number', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1127,21 +1197,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format: -5d'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should accept valid maxAge format - hours', async () => {
         const config = createMockConfig();
         const settings: Settings = {
@@ -1242,23 +1305,16 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining(
             'maxAge cannot be less than minRetention (1d)',
           ),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject maxAge less than custom minRetention', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1273,23 +1329,16 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining(
             'maxAge cannot be less than minRetention (3d)',
           ),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should accept maxAge equal to minRetention', async () => {
         const config = createMockConfig();
         const settings: Settings = {
@@ -1417,21 +1466,14 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('maxCount must be at least 1'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should accept valid maxCount in normal range', async () => {
         const config = createMockConfig();
         const settings: Settings = {
@@ -1491,22 +1533,15 @@ describe('Session Cleanup', () => {
           },
         };
 
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
         // Should fail on first validation error (maxAge format)
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format'),
         );
-
-        errorSpy.mockRestore();
       });
-
       it('should reject if maxAge is invalid even when maxCount is valid', async () => {
         const config = createMockConfig({
           getDebugMode: vi.fn().mockReturnValue(true),
@@ -1522,20 +1557,14 @@ describe('Session Cleanup', () => {
         };
 
         // The validation logic rejects invalid maxAge format even if maxCount is valid
-        const errorSpy = vi
-          .spyOn(console, 'error')
-          .mockImplementation(() => {});
-
         const result = await cleanupExpiredSessions(config, settings);
 
         // Should reject due to invalid maxAge format
         expect(result.disabled).toBe(true);
         expect(result.scanned).toBe(0);
-        expect(errorSpy).toHaveBeenCalledWith(
+        expect(debugLogger.warn).toHaveBeenCalledWith(
           expect.stringContaining('Invalid retention period format'),
         );
-
-        errorSpy.mockRestore();
       });
     });
 

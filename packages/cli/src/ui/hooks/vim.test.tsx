@@ -36,10 +36,11 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 const createKey = (partial: Partial<Key>): Key => ({
   name: partial.name || '',
   sequence: partial.sequence || '',
-  ctrl: partial.ctrl || false,
-  meta: partial.meta || false,
   shift: partial.shift || false,
-  paste: partial.paste || false,
+  alt: partial.alt || false,
+  ctrl: partial.ctrl || false,
+  cmd: partial.cmd || false,
+  insertable: partial.insertable || false,
   ...partial,
 });
 
@@ -58,15 +59,18 @@ const createMockTextBufferState = (
     selectionAnchor: null,
     viewportWidth: 80,
     viewportHeight: 24,
+    transformationsByLine: lines.map(() => []),
     visualLayout: {
       visualLines: lines,
       logicalToVisualMap: lines.map((_, i) => [[i, 0]]),
       visualToLogicalMap: lines.map((_, i) => [i, 0]),
+      transformedToLogicalMaps: lines.map(() => []),
+      visualToTransformedMap: [],
     },
+    pastedContent: {},
     ...partial,
   };
 };
-
 // Test constants
 const TEST_SEQUENCES = {
   ESCAPE: createKey({ sequence: '\u001b', name: 'escape' }),
@@ -173,6 +177,10 @@ describe('useVim hook', () => {
           cursorState.pos = [row, col - 1];
         }
       }),
+      // Additional properties for transformations
+      transformedToLogicalMaps: lines.map(() => []),
+      visualToTransformedMap: [],
+      transformationsByLine: lines.map(() => []),
     };
   };
 

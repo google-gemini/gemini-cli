@@ -10,16 +10,19 @@ import type {
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
+  SerializableConfirmationDetails,
   ToolResultDisplay,
+  RetrieveUserQuotaResponse,
+  SkillDefinition,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary };
+export type { ThoughtSummary, SkillDefinition };
 
 export enum AuthState {
-  // Attemtping to authenticate or re-authenticate
+  // Attempting to authenticate or re-authenticate
   Unauthenticated = 'unauthenticated',
   // Auth dialog is open for user to select auth method
   Updating = 'updating',
@@ -27,6 +30,8 @@ export enum AuthState {
   AwaitingApiKeyInput = 'awaiting_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
+  // Waiting for the user to restart after a Google login
+  AwaitingGoogleLoginRestart = 'awaiting_google_login_restart',
 }
 
 // Only defining the state enum needed by the UI
@@ -59,7 +64,11 @@ export interface ToolCallEvent {
   name: string;
   args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails
+    | undefined;
+  correlationId?: string;
 }
 
 export interface IndividualToolCallDisplay {
@@ -68,10 +77,14 @@ export interface IndividualToolCallDisplay {
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: ToolCallStatus;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails
+    | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
+  correlationId?: string;
 }
 
 export interface CompressionProps {
@@ -80,6 +93,11 @@ export interface CompressionProps {
   newTokenCount: number | null;
   compressionStatus: CompressionStatus | null;
 }
+
+/**
+ * For use when you want no icon.
+ */
+export const emptyIcon = '  ';
 
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
@@ -103,6 +121,8 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  icon?: string;
+  color?: string;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -124,6 +144,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
+  userEmail?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -134,6 +155,7 @@ export type HistoryItemHelp = HistoryItemBase & {
 export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
+  quotas?: RetrieveUserQuotaResponse;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {
@@ -142,6 +164,11 @@ export type HistoryItemModelStats = HistoryItemBase & {
 
 export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
+};
+
+export type HistoryItemModel = HistoryItemBase & {
+  type: 'model';
+  model: string;
 };
 
 export type HistoryItemQuit = HistoryItemBase & {
@@ -191,6 +218,22 @@ export type HistoryItemToolsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
+export type HistoryItemSkillsList = HistoryItemBase & {
+  type: 'skills_list';
+  skills: SkillDefinition[];
+  showDescriptions: boolean;
+};
+
+export type AgentDefinitionJson = Pick<
+  AgentDefinition,
+  'name' | 'displayName' | 'description' | 'kind'
+>;
+
+export type HistoryItemAgentsList = HistoryItemBase & {
+  type: 'agents_list';
+  agents: AgentDefinitionJson[];
+};
+
 // JSON-friendly types for using as a simple data model showing info about an
 // MCP Server.
 export interface JsonMcpTool {
@@ -209,20 +252,49 @@ export interface JsonMcpPrompt {
   description?: string;
 }
 
+export interface JsonMcpResource {
+  serverName: string;
+  name?: string;
+  uri?: string;
+  mimeType?: string;
+  description?: string;
+}
+
 export type HistoryItemMcpStatus = HistoryItemBase & {
   type: 'mcp_status';
   servers: Record<string, MCPServerConfig>;
   tools: JsonMcpTool[];
   prompts: JsonMcpPrompt[];
+  resources: JsonMcpResource[];
   authStatus: Record<
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
+  >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
   >;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
+};
+
+export type HistoryItemHooksList = HistoryItemBase & {
+  type: 'hooks_list';
+  hooks: Array<{
+    config: { command?: string; type: string; timeout?: number };
+    source: string;
+    eventName: string;
+    matcher?: string;
+    sequential?: boolean;
+    enabled: boolean;
+  }>;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
@@ -243,12 +315,16 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
   | HistoryItemExtensionsList
   | HistoryItemToolsList
+  | HistoryItemSkillsList
+  | HistoryItemAgentsList
   | HistoryItemMcpStatus
-  | HistoryItemChatList;
+  | HistoryItemChatList
+  | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -268,8 +344,11 @@ export enum MessageType {
   COMPRESSION = 'compression',
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
+  SKILLS_LIST = 'skills_list',
+  AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  HOOKS_LIST = 'hooks_list',
 }
 
 // Simplified message structure for internal feedback
@@ -289,6 +368,7 @@ export type Message =
       selectedAuthType: string;
       gcpProject: string;
       ideClient: string;
+      userEmail?: string;
       content?: string; // Optional content, not really used for ABOUT
     }
   | {
@@ -353,14 +433,6 @@ export type SlashCommandProcessorResult =
     }
   | SubmitPromptResult;
 
-export interface ShellConfirmationRequest {
-  commands: string[];
-  onConfirm: (
-    outcome: ToolConfirmationOutcome,
-    approvedCommands?: string[],
-  ) => void;
-}
-
 export interface ConfirmationRequest {
   prompt: ReactNode;
   onConfirm: (confirm: boolean) => void;
@@ -368,4 +440,11 @@ export interface ConfirmationRequest {
 
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+}
+
+export interface ActiveHook {
+  name: string;
+  eventName: string;
+  index?: number;
+  total?: number;
 }

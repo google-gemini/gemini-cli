@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import os from 'node:os';
+import process from 'node:process';
 import * as crypto from 'node:crypto';
 
 export const GEMINI_DIR = '.gemini';
@@ -19,12 +20,32 @@ export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
+ * Returns the home directory.
+ * If GEMINI_CLI_HOME environment variable is set, it returns its value.
+ * Otherwise, it returns the user's home directory.
+ */
+export function homedir(): string {
+  const envHome = process.env['GEMINI_CLI_HOME'];
+  if (envHome) {
+    return envHome;
+  }
+  return os.homedir();
+}
+
+/**
+ * Returns the operating system's default directory for temporary files.
+ */
+export function tmpdir(): string {
+  return os.tmpdir();
+}
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
  */
 export function tildeifyPath(path: string): string {
-  const homeDir = os.homedir();
+  const homeDir = homedir();
   if (path.startsWith(homeDir)) {
     return path.replace(homeDir, '~');
   }
@@ -233,7 +254,7 @@ export function shortenPath(filePath: string, maxLen: number = 35): string {
 
 /**
  * Calculates the relative path from a root directory to a target path.
- * Ensures both paths are resolved before calculating.
+ * If targetPath is relative, it is returned as-is.
  * Returns '.' if the target path is the same as the root directory.
  *
  * @param targetPath The absolute or relative path to make relative.
@@ -244,10 +265,11 @@ export function makeRelative(
   targetPath: string,
   rootDirectory: string,
 ): string {
-  const resolvedTargetPath = path.resolve(targetPath);
+  if (!path.isAbsolute(targetPath)) {
+    return targetPath;
+  }
   const resolvedRootDirectory = path.resolve(rootDirectory);
-
-  const relativePath = path.relative(resolvedRootDirectory, resolvedTargetPath);
+  const relativePath = path.relative(resolvedRootDirectory, targetPath);
 
   // If the paths are the same, path.relative returns '', return '.' instead
   return relativePath || '.';

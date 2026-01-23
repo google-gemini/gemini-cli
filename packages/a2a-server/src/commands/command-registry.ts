@@ -4,29 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ListExtensionsCommand } from './list-extensions.js';
-import type { Config } from '@google/gemini-cli-core';
+import { MemoryCommand } from './memory.js';
+import { debugLogger } from '@google/gemini-cli-core';
+import { ExtensionsCommand } from './extensions.js';
+import { InitCommand } from './init.js';
+import { RestoreCommand } from './restore.js';
+import type { Command } from './types.js';
 
-export interface Command {
-  readonly names: string[];
-  execute(config: Config, args: string[]): Promise<unknown>;
-}
-
-class CommandRegistry {
+export class CommandRegistry {
   private readonly commands = new Map<string, Command>();
 
   constructor() {
-    this.register(new ListExtensionsCommand());
+    this.initialize();
+  }
+
+  initialize() {
+    this.commands.clear();
+    this.register(new ExtensionsCommand());
+    this.register(new RestoreCommand());
+    this.register(new InitCommand());
+    this.register(new MemoryCommand());
   }
 
   register(command: Command) {
-    for (const name of command.names) {
-      this.commands.set(name, command);
+    if (this.commands.has(command.name)) {
+      debugLogger.warn(`Command ${command.name} already registered. Skipping.`);
+      return;
+    }
+
+    this.commands.set(command.name, command);
+
+    for (const subCommand of command.subCommands ?? []) {
+      this.register(subCommand);
     }
   }
 
   get(commandName: string): Command | undefined {
     return this.commands.get(commandName);
+  }
+
+  getAllCommands(): Command[] {
+    return [...this.commands.values()];
   }
 }
 

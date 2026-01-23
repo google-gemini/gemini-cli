@@ -8,6 +8,8 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type SlashCommand, CommandKind } from '../commands/types.js';
+import { KEYBOARD_SHORTCUTS_URL } from '../constants.js';
+import { sanitizeForListDisplay } from '../utils/textUtils.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -76,7 +78,8 @@ export const Help: React.FC<Help> = ({ commands }) => (
             {command.kind === CommandKind.MCP_PROMPT && (
               <Text color={theme.text.secondary}> [MCP]</Text>
             )}
-            {command.description && ' - ' + command.description}
+            {command.description &&
+              ' - ' + sanitizeForListDisplay(command.description, 100)}
           </Text>
           {command.subCommands &&
             command.subCommands
@@ -87,7 +90,8 @@ export const Help: React.FC<Help> = ({ commands }) => (
                     {'   '}
                     {subCommand.name}
                   </Text>
-                  {subCommand.description && ' - ' + subCommand.description}
+                  {subCommand.description &&
+                    ' - ' + sanitizeForListDisplay(subCommand.description, 100)}
                 </Text>
               ))}
         </Box>
@@ -138,7 +142,13 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+        Ctrl+S
+      </Text>{' '}
+      - Enter selection mode to copy text
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+X
       </Text>{' '}
       - Open input in external editor
     </Text>
@@ -162,6 +172,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Page Up/Down
+      </Text>{' '}
+      - Scroll page up/down
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Shift+Tab
       </Text>{' '}
       - Toggle auto-accepting edits
@@ -176,7 +192,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}
       <Text bold color={theme.text.accent}>
-        docs/cli/keyboard-shortcuts.md
+        {KEYBOARD_SHORTCUTS_URL}
       </Text>
     </Text>
   </Box>

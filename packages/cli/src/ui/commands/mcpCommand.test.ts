@@ -13,10 +13,10 @@ import {
   getMCPServerStatus,
   getMCPDiscoveryState,
   DiscoveredMCPTool,
+  type MessageBus,
 } from '@google/gemini-cli-core';
 
 import type { CallableTool } from '@google/genai';
-import { Type } from '@google/genai';
 import { MessageType } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -37,6 +37,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+const mockMessageBus = {
+  publish: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+} as unknown as MessageBus;
+
 // Helper function to create a mock DiscoveredMCPTool
 const createMockMCPTool = (
   name: string,
@@ -50,8 +56,14 @@ const createMockMCPTool = (
     } as unknown as CallableTool,
     serverName,
     name,
-    description || `Description for ${name}`,
-    { type: Type.OBJECT, properties: {} },
+    description || 'Mock tool description',
+    { type: 'object', properties: {} },
+    mockMessageBus,
+    undefined, // trust
+    undefined, // nameOverride
+    undefined, // cliConfig
+    undefined, // extensionName
+    undefined, // extensionId
   );
 
 describe('mcpCommand', () => {
@@ -62,6 +74,8 @@ describe('mcpCommand', () => {
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
     getPromptRegistry: ReturnType<typeof vi.fn>;
     getGeminiClient: ReturnType<typeof vi.fn>;
+    getMcpClientManager: ReturnType<typeof vi.fn>;
+    getResourceRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -83,11 +97,18 @@ describe('mcpCommand', () => {
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
-      getPromptRegistry: vi.fn().mockResolvedValue({
+      getPromptRegistry: vi.fn().mockReturnValue({
         getAllPrompts: vi.fn().mockReturnValue([]),
         getPromptsByServer: vi.fn().mockReturnValue([]),
       }),
       getGeminiClient: vi.fn(),
+      getMcpClientManager: vi.fn().mockImplementation(() => ({
+        getBlockedMcpServers: vi.fn(),
+        getMcpServers: vi.fn(),
+      })),
+      getResourceRegistry: vi.fn().mockReturnValue({
+        getAllResources: vi.fn().mockReturnValue([]),
+      }),
     };
 
     mockContext = createMockCommandContext({
@@ -136,6 +157,10 @@ describe('mcpCommand', () => {
       };
 
       mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
+      mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
+        getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      });
     });
 
     it('should display configured MCP servers with status indicators and their tools', async () => {
@@ -164,6 +189,30 @@ describe('mcpCommand', () => {
         getAllTools: vi.fn().mockReturnValue(allTools),
       });
 
+      const resourcesByServer: Record<
+        string,
+        Array<{ name: string; uri: string }>
+      > = {
+        server1: [
+          {
+            name: 'Server1 Resource',
+            uri: 'file:///server1/resource1.txt',
+          },
+        ],
+        server2: [],
+        server3: [],
+      };
+      mockConfig.getResourceRegistry = vi.fn().mockReturnValue({
+        getAllResources: vi.fn().mockReturnValue(
+          Object.entries(resourcesByServer).flatMap(([serverName, resources]) =>
+            resources.map((entry) => ({
+              serverName,
+              ...entry,
+            })),
+          ),
+        ),
+      });
+
       await mcpCommand.action!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -175,8 +224,13 @@ describe('mcpCommand', () => {
             description: tool.description,
             schema: tool.schema,
           })),
+          resources: expect.arrayContaining([
+            expect.objectContaining({
+              serverName: 'server1',
+              uri: 'file:///server1/resource1.txt',
+            }),
+          ]),
         }),
-        expect.any(Number),
       );
     });
 
@@ -191,7 +245,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: true,
         }),
-        expect.any(Number),
       );
     });
 
@@ -206,7 +259,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: false,
         }),
-        expect.any(Number),
       );
     });
   });

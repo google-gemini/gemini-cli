@@ -4,70 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import {
+  renderWithProviders,
+  createMockSettings,
+} from '../../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
-import { Text } from 'ink';
-import type React from 'react';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
-import type {
-  Config,
-  ToolCallConfirmationDetails,
-} from '@google/gemini-cli-core';
-import { TOOL_STATUS } from '../../constants.js';
-import { ConfigContext } from '../../contexts/ConfigContext.js';
-
-// Mock child components to isolate ToolGroupMessage behavior
-vi.mock('./ToolMessage.js', () => ({
-  ToolMessage: function MockToolMessage({
-    callId,
-    name,
-    description,
-    status,
-    emphasis,
-  }: {
-    callId: string;
-    name: string;
-    description: string;
-    status: ToolCallStatus;
-    emphasis: string;
-  }) {
-    // Use the same constants as the real component
-    const statusSymbolMap: Record<ToolCallStatus, string> = {
-      [ToolCallStatus.Success]: TOOL_STATUS.SUCCESS,
-      [ToolCallStatus.Pending]: TOOL_STATUS.PENDING,
-      [ToolCallStatus.Executing]: TOOL_STATUS.EXECUTING,
-      [ToolCallStatus.Confirming]: TOOL_STATUS.CONFIRMING,
-      [ToolCallStatus.Canceled]: TOOL_STATUS.CANCELED,
-      [ToolCallStatus.Error]: TOOL_STATUS.ERROR,
-    };
-    const statusSymbol = statusSymbolMap[status] || '?';
-    return (
-      <Text>
-        MockTool[{callId}]: {statusSymbol} {name} - {description} ({emphasis})
-      </Text>
-    );
-  },
-}));
-
-vi.mock('./ToolConfirmationMessage.js', () => ({
-  ToolConfirmationMessage: function MockToolConfirmationMessage({
-    confirmationDetails,
-  }: {
-    confirmationDetails: ToolCallConfirmationDetails;
-  }) {
-    const displayText =
-      confirmationDetails?.type === 'info'
-        ? (confirmationDetails as { prompt: string }).prompt
-        : confirmationDetails?.title || 'confirm';
-    return <Text>MockConfirmation: {displayText}</Text>;
-  },
-}));
+import { Scrollable } from '../shared/Scrollable.js';
 
 describe('<ToolGroupMessage />', () => {
-  const mockConfig: Config = {} as Config;
-
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},
   ): IndividualToolCallDisplay => ({
@@ -87,19 +34,16 @@ describe('<ToolGroupMessage />', () => {
     isFocused: true,
   };
 
-  // Helper to wrap component with required providers
-  const renderWithProviders = (component: React.ReactElement) =>
-    render(
-      <ConfigContext.Provider value={mockConfig}>
-        {component}
-      </ConfigContext.Provider>,
-    );
-
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
       const toolCalls = [createToolCall()];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -128,6 +72,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -150,6 +99,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -166,6 +120,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -194,6 +153,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -221,6 +185,11 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           availableTerminalHeight={10}
         />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -234,6 +203,11 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           isFocused={false}
         />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -253,6 +227,11 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           terminalWidth={40}
         />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -261,6 +240,99 @@ describe('<ToolGroupMessage />', () => {
     it('renders empty tool calls array', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={[]} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
+          },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders header when scrolled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: '1',
+          name: 'tool-1',
+          description:
+            'Description 1. This is a long description that will need to be truncated if the terminal width is small.',
+          resultDisplay: 'line1\nline2\nline3\nline4\nline5',
+        }),
+        createToolCall({
+          callId: '2',
+          name: 'tool-2',
+          description: 'Description 2',
+          resultDisplay: 'line1\nline2',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
+        </Scrollable>,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders tool call with outputFile', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-output-file',
+          name: 'tool-with-file',
+          description: 'Tool that saved output to file',
+          status: ToolCallStatus.Success,
+          outputFile: '/path/to/output.txt',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders two tool groups where only the last line of the previous group is visible', () => {
+      const toolCalls1 = [
+        createToolCall({
+          callId: '1',
+          name: 'tool-1',
+          description: 'Description 1',
+          resultDisplay: 'line1\nline2\nline3\nline4\nline5',
+        }),
+      ];
+      const toolCalls2 = [
+        createToolCall({
+          callId: '2',
+          name: 'tool-2',
+          description: 'Description 2',
+          resultDisplay: 'line1',
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls1} />
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
+        </Scrollable>,
+        {
+          uiState: {
+            pendingHistoryItems: [
+              { type: 'tool_group', tools: toolCalls1 },
+              { type: 'tool_group', tools: toolCalls2 },
+            ],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -272,6 +344,11 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls = [createToolCall({ status: ToolCallStatus.Pending })];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       // The snapshot will capture the visual appearance including border color
       expect(lastFrame()).toMatchSnapshot();
@@ -287,6 +364,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -303,6 +385,11 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -331,6 +418,11 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           availableTerminalHeight={20}
         />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -365,8 +457,75 @@ describe('<ToolGroupMessage />', () => {
       ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
       );
       // Should only show confirmation for the first tool
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders confirmation with permanent approval enabled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'confirm-tool',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm Tool',
+            prompt: 'Do you want to proceed?',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+      const settings = createMockSettings({
+        security: { enablePermanentToolApproval: true },
+      });
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          settings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toContain('Allow for all future sessions');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders confirmation with permanent approval disabled', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'confirm-tool',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm Tool',
+            prompt: 'Do you want to proceed?',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+      const settings = createMockSettings({
+        security: { enablePermanentToolApproval: false },
+      });
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          settings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).not.toContain('Allow for all future sessions');
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });

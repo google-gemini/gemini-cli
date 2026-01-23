@@ -6,22 +6,26 @@
 
 import { useState, useCallback } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import type { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
-import { type HistoryItem, MessageType } from '../types.js';
+import type {
+  LoadableSettingScope,
+  LoadedSettings,
+} from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import { MessageType } from '../types.js';
 import process from 'node:process';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
   closeThemeDialog: () => void;
-  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
+  handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
 export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
-  addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
@@ -63,12 +67,12 @@ export const useThemeCommand = (
 
   const closeThemeDialog = useCallback(() => {
     // Re-apply the saved theme to revert any preview changes from highlighting
-    applyTheme(loadedSettings.merged.ui?.theme);
+    applyTheme(loadedSettings.merged.ui.theme);
     setIsThemeDialogOpen(false);
   }, [applyTheme, loadedSettings]);
 
   const handleThemeSelect = useCallback(
-    (themeName: string, scope: SettingScope) => {
+    (themeName: string, scope: LoadableSettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
@@ -84,10 +88,10 @@ export const useThemeCommand = (
           return;
         }
         loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
-        if (loadedSettings.merged.ui?.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.ui?.customThemes);
+        if (loadedSettings.merged.ui.customThemes) {
+          themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }
-        applyTheme(loadedSettings.merged.ui?.theme); // Apply the current theme
+        applyTheme(loadedSettings.merged.ui.theme); // Apply the current theme
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog

@@ -60,4 +60,15 @@ describe('Help Component', () => {
     expect(output).not.toContain('hidden-child');
     unmount();
   });
+
+  it('should render keyboard shortcuts', () => {
+    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
+
+    expect(output).toContain('Keyboard Shortcuts:');
+    expect(output).toContain('Ctrl+C');
+    expect(output).toContain('Ctrl+S');
+    expect(output).toContain('Page Up/Down');
+    unmount();
+  });
 });

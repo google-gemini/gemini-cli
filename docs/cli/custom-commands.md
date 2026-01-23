@@ -1,4 +1,4 @@
-# Custom Commands
+# Custom commands
 
 Custom commands let you save and reuse your favorite or most frequently used
 prompts as personal shortcuts within Gemini CLI. You can create commands that
@@ -9,9 +9,9 @@ all your projects, streamlining your workflow and ensuring consistency.
 
 Gemini CLI discovers commands from two locations, loaded in a specific order:
 
-1.  **User Commands (Global):** Located in `~/.gemini/commands/`. These commands
+1.  **User commands (global):** Located in `~/.gemini/commands/`. These commands
     are available in any project you are working on.
-2.  **Project Commands (Local):** Located in
+2.  **Project commands (local):** Located in
     `<your-project-root>/.gemini/commands/`. These commands are specific to the
     current project and can be checked into version control to be shared with
     your team.
@@ -30,7 +30,7 @@ separator (`/` or `\`) being converted to a colon (`:`).
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced
   command `/git:commit`.
 
-## TOML File Format (v1)
+## TOML file format (v1)
 
 Your command definition files must be written in the TOML format and use the
 `.toml` file extension.
@@ -50,7 +50,7 @@ Your command definition files must be written in the TOML format and use the
 ## Handling arguments
 
 Custom commands support two powerful methods for handling arguments. The CLI
-automatically chooses the correct method based on the content of your command\'s
+automatically chooses the correct method based on the content of your command's
 `prompt`.
 
 ### 1. Context-aware injection with `{{args}}`
@@ -60,7 +60,7 @@ replace that placeholder with the text the user typed after the command name.
 
 The behavior of this injection depends on where it is used:
 
-**A. Raw injection (outside Shell commands)**
+**A. Raw injection (outside shell commands)**
 
 When used in the main body of the prompt, the arguments are injected exactly as
 the user typed them.
@@ -77,7 +77,7 @@ prompt = "Please provide a code fix for the issue described here: {{args}}."
 The model receives:
 `Please provide a code fix for the issue described here: "Button is misaligned".`
 
-**B. Using arguments in Shell commands (inside `!{...}` blocks)**
+**B. Using arguments in shell commands (inside `!{...}` blocks)**
 
 When you use `{{args}}` inside a shell injection block (`!{...}`), the arguments
 are automatically **shell-escaped** before replacement. This allows you to
@@ -96,13 +96,13 @@ Search Results:
 """
 ```
 
-When you run `/grep-code It\'s complicated`:
+When you run `/grep-code It's complicated`:
 
 1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
-2. Outside: The first `{{args}}` is replaced raw with `It\'s complicated`.
+2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
 3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on
    Linux: `"It\'s complicated"`).
-4. The command executed is `grep -r "It\'s complicated" .`.
+4. The command executed is `grep -r "It's complicated" .`.
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
 
@@ -129,13 +129,13 @@ format and behavior.
 # In: <project>/.gemini/commands/changelog.toml
 # Invoked via: /changelog 1.2.0 added "Support for default argument parsing."
 
-description = "Adds a new entry to the project\'s CHANGELOG.md file."
+description = "Adds a new entry to the project's CHANGELOG.md file."
 prompt = """
 # Task: Update Changelog
 
 You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
 
-**The user\'s raw command is appended below your instructions.**
+**The user's raw command is appended below your instructions.**
 
 Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
 
@@ -147,7 +147,7 @@ The command follows this format: `/changelog <version> <type> <message>`
 1. Read the `CHANGELOG.md` file.
 2. Find the section for the specified `<version>`.
 3. Add the `<message>` under the correct `<type>` heading.
-4. If the version or type section doesn\'t exist, create it.
+4. If the version or type section doesn't exist, create it.
 5. Adhere strictly to the "Keep a Changelog" format.
 """
 ```
@@ -156,7 +156,7 @@ When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the
 model will be the original prompt followed by two newlines and the command you
 typed.
 
-### 3. Executing Shell commands with `!{...}`
+### 3. Executing shell commands with `!{...}`
 
 You can make your commands dynamic by executing shell commands directly within
 your `prompt` and injecting their output. This is ideal for gathering context
@@ -241,7 +241,7 @@ operate on specific files.
 **Example (`review.toml`):**
 
 This command injects the content of a _fixed_ best practices file
-(`docs/best-practices.md`) and uses the user\'s arguments to provide context for
+(`docs/best-practices.md`) and uses the user's arguments to provide context for
 the review.
 
 ```toml
@@ -293,7 +293,7 @@ practice.
 description = "Asks the model to refactor the current context into a pure function."
 
 prompt = """
-Please analyze the code I\'ve provided in the current context.
+Please analyze the code I've provided in the current context.
 Refactor it into a pure function.
 
 Your response should include:
@@ -302,7 +302,7 @@ Your response should include:
 """
 ```
 
-**3. Run the Command:**
+**3. Run the command:**
 
 That's it! You can now run your command in the CLI. First, you might add a file
 to the context, and then invoke your command:

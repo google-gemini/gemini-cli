@@ -6,6 +6,8 @@
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface SelectionListItem<T> {
   key: string;
@@ -25,6 +27,7 @@ export interface UseSelectionListOptions<T> {
   onHighlight?: (value: T) => void;
   isFocused?: boolean;
   showNumbers?: boolean;
+  wrapAround?: boolean;
 }
 
 export interface UseSelectionListResult {
@@ -38,6 +41,7 @@ interface SelectionListState {
   pendingHighlight: boolean;
   pendingSelect: boolean;
   items: BaseSelectionItem[];
+  wrapAround: boolean;
 }
 
 type SelectionListAction =
@@ -58,7 +62,11 @@ type SelectionListAction =
     }
   | {
       type: 'INITIALIZE';
-      payload: { initialIndex: number; items: BaseSelectionItem[] };
+      payload: {
+        initialIndex: number;
+        items: BaseSelectionItem[];
+        wrapAround: boolean;
+      };
     }
   | {
       type: 'CLEAR_PENDING_FLAGS';
@@ -73,6 +81,7 @@ const findNextValidIndex = (
   currentIndex: number,
   direction: 'up' | 'down',
   items: BaseSelectionItem[],
+  wrapAround = true,
 ): number => {
   const len = items.length;
   if (len === 0) return currentIndex;
@@ -81,12 +90,33 @@ const findNextValidIndex = (
   const step = direction === 'down' ? 1 : -1;
 
   for (let i = 0; i < len; i++) {
-    // Calculate the next index, wrapping around if necessary.
-    // We add `len` before the modulo to ensure a positive result in JS for negative steps.
-    nextIndex = (nextIndex + step + len) % len;
+    const candidateIndex = nextIndex + step;
+
+    if (wrapAround) {
+      // Calculate the next index, wrapping around if necessary.
+      // We add `len` before the modulo to ensure a positive result in JS for negative steps.
+      nextIndex = (candidateIndex + len) % len;
+    } else {
+      if (candidateIndex < 0 || candidateIndex >= len) {
+        // Out of bounds and wrapping is disabled
+        return currentIndex;
+      }
+      nextIndex = candidateIndex;
+    }
 
     if (!items[nextIndex]?.disabled) {
       return nextIndex;
+    }
+
+    if (!wrapAround) {
+      // If the item is disabled and we're not wrapping, we continue searching
+      // in the same direction, but we must stop if we hit the bounds.
+      if (
+        (direction === 'down' && nextIndex === len - 1) ||
+        (direction === 'up' && nextIndex === 0)
+      ) {
+        return currentIndex;
+      }
     }
   }
 
@@ -105,7 +135,7 @@ const computeInitialIndex = (
 
   if (initialKey !== undefined) {
     for (let i = 0; i < items.length; i++) {
-      if (items[i]!.key === initialKey && !items[i]!.disabled) {
+      if (items[i].key === initialKey && !items[i].disabled) {
         return i;
       }
     }
@@ -118,7 +148,7 @@ const computeInitialIndex = (
   }
 
   if (items[targetIndex]?.disabled) {
-    const nextValid = findNextValidIndex(targetIndex, 'down', items);
+    const nextValid = findNextValidIndex(targetIndex, 'down', items, true);
     targetIndex = nextValid;
   }
 
@@ -146,8 +176,13 @@ function selectionListReducer(
     }
 
     case 'MOVE_UP': {
-      const { items } = state;
-      const newIndex = findNextValidIndex(state.activeIndex, 'up', items);
+      const { items, wrapAround } = state;
+      const newIndex = findNextValidIndex(
+        state.activeIndex,
+        'up',
+        items,
+        wrapAround,
+      );
       if (newIndex !== state.activeIndex) {
         return { ...state, activeIndex: newIndex, pendingHighlight: true };
       }
@@ -155,8 +190,13 @@ function selectionListReducer(
     }
 
     case 'MOVE_DOWN': {
-      const { items } = state;
-      const newIndex = findNextValidIndex(state.activeIndex, 'down', items);
+      const { items, wrapAround } = state;
+      const newIndex = findNextValidIndex(
+        state.activeIndex,
+        'down',
+        items,
+        wrapAround,
+      );
       if (newIndex !== state.activeIndex) {
         return { ...state, activeIndex: newIndex, pendingHighlight: true };
       }
@@ -168,7 +208,7 @@ function selectionListReducer(
     }
 
     case 'INITIALIZE': {
-      const { initialIndex, items } = action.payload;
+      const { initialIndex, items, wrapAround } = action.payload;
       const activeKey =
         initialIndex === state.initialIndex &&
         state.activeIndex !== state.initialIndex
@@ -184,6 +224,7 @@ function selectionListReducer(
         initialIndex,
         activeIndex: targetIndex,
         pendingHighlight: false,
+        wrapAround,
       };
     }
 
@@ -197,7 +238,7 @@ function selectionListReducer(
 
     default: {
       const exhaustiveCheck: never = action;
-      console.error(`Unknown selection list action: ${exhaustiveCheck}`);
+      debugLogger.warn(`Unknown selection list action: ${exhaustiveCheck}`);
       return state;
     }
   }
@@ -211,7 +252,7 @@ function areBaseItemsEqual(
   if (a.length !== b.length) return false;
 
   for (let i = 0; i < a.length; i++) {
-    if (a[i]!.key !== b[i]!.key || a[i]!.disabled !== b[i]!.disabled) {
+    if (a[i].key !== b[i].key || a[i].disabled !== b[i].disabled) {
       return false;
     }
   }
@@ -243,6 +284,7 @@ export function useSelectionList<T>({
   onHighlight,
   isFocused = true,
   showNumbers = false,
+  wrapAround = true,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
   const baseItems = toBaseItems(items);
 
@@ -252,12 +294,14 @@ export function useSelectionList<T>({
     pendingHighlight: false,
     pendingSelect: false,
     items: baseItems,
+    wrapAround,
   });
   const numberInputRef = useRef('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
 
   const prevBaseItemsRef = useRef(baseItems);
   const prevInitialIndexRef = useRef(initialIndex);
+  const prevWrapAroundRef = useRef(wrapAround);
 
   // Initialize/synchronize state when initialIndex or items change
   useEffect(() => {
@@ -266,14 +310,16 @@ export function useSelectionList<T>({
       baseItems,
     );
     const initialIndexChanged = prevInitialIndexRef.current !== initialIndex;
+    const wrapAroundChanged = prevWrapAroundRef.current !== wrapAround;
 
-    if (baseItemsChanged || initialIndexChanged) {
+    if (baseItemsChanged || initialIndexChanged || wrapAroundChanged) {
       dispatch({
         type: 'INITIALIZE',
-        payload: { initialIndex, items: baseItems },
+        payload: { initialIndex, items: baseItems, wrapAround },
       });
       prevBaseItemsRef.current = baseItems;
       prevInitialIndexRef.current = initialIndex;
+      prevWrapAroundRef.current = wrapAround;
     }
   });
 
@@ -282,7 +328,7 @@ export function useSelectionList<T>({
     let needsClear = false;
 
     if (state.pendingHighlight && items[state.activeIndex]) {
-      onHighlight?.(items[state.activeIndex]!.value);
+      onHighlight?.(items[state.activeIndex].value);
       needsClear = true;
     }
 
@@ -318,7 +364,7 @@ export function useSelectionList<T>({
   const itemsLength = items.length;
   const handleKeypress = useCallback(
     (key: Key) => {
-      const { sequence, name } = key;
+      const { sequence } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       // Clear number input buffer on non-numeric key press
@@ -327,17 +373,17 @@ export function useSelectionList<T>({
         numberInputRef.current = '';
       }
 
-      if (name === 'k' || name === 'up') {
+      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
         return;
       }
 
-      if (name === 'j' || name === 'down') {
+      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({ type: 'MOVE_DOWN' });
         return;
       }
 
-      if (name === 'return') {
+      if (keyMatchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
         return;
       }

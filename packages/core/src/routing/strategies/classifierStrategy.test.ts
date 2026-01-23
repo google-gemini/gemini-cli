@@ -15,20 +15,22 @@ import {
 } from '../../utils/messageInspectors.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
+import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 vi.mock('../../core/baseLlmClient.js');
-vi.mock('../../utils/promptIdContext.js');
 
 describe('ClassifierStrategy', () => {
   let strategy: ClassifierStrategy;
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,12 +41,37 @@ describe('ClassifierStrategy', () => {
       request: [{ text: 'simple task' }],
       signal: new AbortController().signal,
     };
-    mockConfig = {} as Config;
+
+    mockResolvedConfig = {
+      model: 'classifier',
+      generateContentConfig: {},
+    } as unknown as ResolvedModelConfig;
+    mockConfig = {
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
+      },
+      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      getPreviewFeatures: () => false,
+      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
+    } as unknown as Config;
     mockBaseLlmClient = {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
 
-    vi.mocked(promptIdContext.getStore).mockReturnValue('test-prompt-id');
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
+  });
+
+  it('should return null if numerical routing is enabled', async () => {
+    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters', async () => {
@@ -60,14 +87,7 @@ describe('ClassifierStrategy', () => {
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        config: expect.objectContaining({
-          temperature: 0,
-          maxOutputTokens: 1024,
-          thinkingConfig: {
-            thinkingBudget: 512,
-          },
-        }),
+        modelConfigKey: { model: mockResolvedConfig.model },
         promptId: 'test-prompt-id',
       }),
     );
@@ -128,7 +148,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier API call fails', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const testError = new Error('API Failure');
     vi.mocked(mockBaseLlmClient.generateJson).mockRejectedValue(testError);
@@ -146,7 +166,7 @@ describe('ClassifierStrategy', () => {
 
   it('should return null if the classifier returns a malformed JSON object', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const malformedApiResponse = {
       reasoning: 'This is a simple task.',
@@ -248,9 +268,9 @@ describe('ClassifierStrategy', () => {
 
   it('should use a fallback promptId if not found in context', async () => {
     const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
+      .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
-    vi.mocked(promptIdContext.getStore).mockReturnValue(undefined);
+    vi.spyOn(promptIdContext, 'getStore').mockReturnValue(undefined);
     const mockApiResponse = {
       reasoning: 'Simple.',
       model_choice: 'flash',
@@ -269,9 +289,35 @@ describe('ClassifierStrategy', () => {
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'Could not find promptId in context. This is unexpected. Using a fallback ID:',
+        'Could not find promptId in context for classifier-router. This is unexpected. Using a fallback ID:',
       ),
     );
     consoleWarnSpy.mockRestore();
+  });
+
+  it('should respect requestedModel from context in resolveClassifierModel', async () => {
+    const requestedModel = DEFAULT_GEMINI_MODEL; // Pro model
+    const mockApiResponse = {
+      reasoning: 'Choice is flash',
+      model_choice: 'flash',
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const contextWithRequestedModel = {
+      ...mockContext,
+      requestedModel,
+    } as RoutingContext;
+
+    const decision = await strategy.route(
+      contextWithRequestedModel,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    // Since requestedModel is Pro, and choice is flash, it should resolve to Flash
+    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });

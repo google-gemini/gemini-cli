@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 
 interface WarningMessageProps {
@@ -20,11 +20,11 @@ export const WarningMessage: React.FC<WarningMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row" marginTop={1}>
       <Box width={prefixWidth}>
-        <Text color={Colors.AccentYellow}>{prefix}</Text>
+        <Text color={theme.status.warning}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={Colors.AccentYellow}>
-          <RenderInline text={text} />
+        <Text wrap="wrap">
+          <RenderInline text={text} defaultColor={theme.status.warning} />
         </Text>
       </Box>
     </Box>

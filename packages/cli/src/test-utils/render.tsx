@@ -7,18 +7,34 @@
 import { render as inkRender } from 'ink-testing-library';
 import { Box } from 'ink';
 import type React from 'react';
-import { act } from 'react';
+import { vi } from 'vitest';
+import { act, useState } from 'react';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
-import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
+import { MouseProvider } from '../ui/contexts/MouseContext.js';
+import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
+import { StreamingContext } from '../ui/contexts/StreamingContext.js';
+import {
+  type UIActions,
+  UIActionsContext,
+} from '../ui/contexts/UIActionsContext.js';
+import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
+import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+import { FakePersistentState } from './persistentStateFake.js';
+
+export const persistentStateMock = new FakePersistentState();
+
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (
@@ -62,11 +78,28 @@ export const render = (
   };
 };
 
+export const simulateClick = async (
+  stdin: ReturnType<typeof inkRender>['stdin'],
+  col: number,
+  row: number,
+  button: 0 | 1 | 2 = 0, // 0 for left, 1 for middle, 2 for right
+) => {
+  // Terminal mouse events are 1-based, so convert if necessary.
+  const mouseEventString = `\x1b[<${button};${col};${row}M`;
+  await act(async () => {
+    stdin.write(mouseEventString);
+  });
+};
+
 const mockConfig = {
   getModel: () => 'gemini-pro',
   getTargetDir: () =>
     '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
   getDebugMode: () => false,
+  isTrustedFolder: () => true,
+  getIdeMode: () => false,
+  getEnableInteractiveShell: () => true,
+  getPreviewFeatures: () => false,
 };
 
 const configProxy = new Proxy(mockConfig, {
@@ -84,7 +117,7 @@ export const mockSettings = new LoadedSettings(
   { path: '', settings: {}, originalSettings: {} },
   { path: '', settings: {}, originalSettings: {} },
   true,
-  new Set(),
+  [],
 );
 
 export const createMockSettings = (
@@ -97,7 +130,7 @@ export const createMockSettings = (
     { path: '', settings, originalSettings: settings },
     { path: '', settings: {}, originalSettings: {} },
     true,
-    new Set(),
+    [],
   );
 };
 
@@ -108,7 +141,50 @@ const baseMockUiState = {
   streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
+  terminalHeight: 40,
   currentModel: 'gemini-pro',
+  terminalBackgroundColor: undefined,
+};
+
+const mockUIActions: UIActions = {
+  handleThemeSelect: vi.fn(),
+  closeThemeDialog: vi.fn(),
+  handleThemeHighlight: vi.fn(),
+  handleAuthSelect: vi.fn(),
+  setAuthState: vi.fn(),
+  onAuthError: vi.fn(),
+  handleEditorSelect: vi.fn(),
+  exitEditorDialog: vi.fn(),
+  exitPrivacyNotice: vi.fn(),
+  closeSettingsDialog: vi.fn(),
+  closeModelDialog: vi.fn(),
+  openAgentConfigDialog: vi.fn(),
+  closeAgentConfigDialog: vi.fn(),
+  openPermissionsDialog: vi.fn(),
+  openSessionBrowser: vi.fn(),
+  closeSessionBrowser: vi.fn(),
+  handleResumeSession: vi.fn(),
+  handleDeleteSession: vi.fn(),
+  closePermissionsDialog: vi.fn(),
+  setShellModeActive: vi.fn(),
+  vimHandleInput: vi.fn(),
+  handleIdePromptComplete: vi.fn(),
+  handleFolderTrustSelect: vi.fn(),
+  setConstrainHeight: vi.fn(),
+  onEscapePromptChange: vi.fn(),
+  refreshStatic: vi.fn(),
+  handleFinalSubmit: vi.fn(),
+  handleClearScreen: vi.fn(),
+  handleProQuotaChoice: vi.fn(),
+  handleValidationChoice: vi.fn(),
+  setQueueErrorMessage: vi.fn(),
+  popAllMessages: vi.fn(),
+  handleApiKeySubmit: vi.fn(),
+  handleApiKeyCancel: vi.fn(),
+  setBannerVisible: vi.fn(),
+  setEmbeddedShellFocused: vi.fn(),
+  setAuthContext: vi.fn(),
+  handleRestart: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -118,17 +194,26 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
-    kittyProtocolEnabled = true,
+    mouseEventsEnabled = false,
     config = configProxy as unknown as Config,
+    useAlternateBuffer = true,
+    uiActions,
+    persistentState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    kittyProtocolEnabled?: boolean;
+    mouseEventsEnabled?: boolean;
     config?: Config;
+    useAlternateBuffer?: boolean;
+    uiActions?: Partial<UIActions>;
+    persistentState?: {
+      get?: typeof persistentStateMock.get;
+      set?: typeof persistentStateMock.set;
+    };
   } = {},
-): ReturnType<typeof render> => {
+): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
@@ -147,8 +232,28 @@ export const renderWithProviders = (
     },
   ) as UIState;
 
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
+
+  persistentStateMock.mockClear();
+
   const terminalWidth = width ?? baseState.terminalWidth;
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  let finalSettings = settings;
+  if (useAlternateBuffer !== undefined) {
+    finalSettings = createMockSettings({
+      ...settings.merged,
+      ui: {
+        ...settings.merged.ui,
+        useAlternateBuffer,
+      },
+    });
+  }
+
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
 
   const finalUiState = {
     ...baseState,
@@ -156,22 +261,38 @@ export const renderWithProviders = (
     mainAreaWidth,
   };
 
-  return render(
+  const finalUIActions = { ...mockUIActions, ...uiActions };
+
+  const allToolCalls = (finalUiState.pendingHistoryItems || [])
+    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
+    .flatMap((item) => item.tools);
+
+  const renderResult = render(
     <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={settings}>
+      <SettingsContext.Provider value={finalSettings}>
         <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={settings}>
+          <VimModeProvider settings={finalSettings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                <Box
-                  width={terminalWidth}
-                  flexShrink={0}
-                  flexGrow={0}
-                  flexDirection="column"
-                >
-                  {component}
-                </Box>
-              </KeypressProvider>
+              <StreamingContext.Provider value={finalUiState.streamingState}>
+                <UIActionsContext.Provider value={finalUIActions}>
+                  <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+                    <KeypressProvider>
+                      <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                        <ScrollProvider>
+                          <Box
+                            width={terminalWidth}
+                            flexShrink={0}
+                            flexGrow={0}
+                            flexDirection="column"
+                          >
+                            {component}
+                          </Box>
+                        </ScrollProvider>
+                      </MouseProvider>
+                    </KeypressProvider>
+                  </ToolActionsProvider>
+                </UIActionsContext.Provider>
+              </StreamingContext.Provider>
             </ShellFocusContext.Provider>
           </VimModeProvider>
         </UIStateContext.Provider>
@@ -179,6 +300,8 @@ export const renderWithProviders = (
     </ConfigContext.Provider>,
     terminalWidth,
   );
+
+  return { ...renderResult, simulateClick };
 };
 
 export function renderHook<Result, Props>(
@@ -235,4 +358,66 @@ export function renderHook<Result, Props>(
   }
 
   return { result, rerender, unmount };
+}
+
+export function renderHookWithProviders<Result, Props>(
+  renderCallback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    wrapper?: React.ComponentType<{ children: React.ReactNode }>;
+    // Options for renderWithProviders
+    shellFocus?: boolean;
+    settings?: LoadedSettings;
+    uiState?: Partial<UIState>;
+    width?: number;
+    mouseEventsEnabled?: boolean;
+    config?: Config;
+    useAlternateBuffer?: boolean;
+  } = {},
+): {
+  result: { current: Result };
+  rerender: (props?: Props) => void;
+  unmount: () => void;
+} {
+  const result = { current: undefined as unknown as Result };
+
+  let setPropsFn: ((props: Props) => void) | undefined;
+
+  function TestComponent({ initialProps }: { initialProps: Props }) {
+    const [props, setProps] = useState(initialProps);
+    setPropsFn = setProps;
+    result.current = renderCallback(props);
+    return null;
+  }
+
+  const Wrapper = options.wrapper || (({ children }) => <>{children}</>);
+
+  let renderResult: ReturnType<typeof render>;
+
+  act(() => {
+    renderResult = renderWithProviders(
+      <Wrapper>
+        <TestComponent initialProps={options.initialProps as Props} />
+      </Wrapper>,
+      options,
+    );
+  });
+
+  function rerender(newProps?: Props) {
+    act(() => {
+      if (setPropsFn && newProps) {
+        setPropsFn(newProps);
+      }
+    });
+  }
+
+  return {
+    result,
+    rerender,
+    unmount: () => {
+      act(() => {
+        renderResult.unmount();
+      });
+    },
+  };
 }

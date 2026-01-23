@@ -35,10 +35,17 @@ import {
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 // Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn();
+const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
 const mockSetVimMode = vi.fn();
+
+vi.mock('../contexts/UIStateContext.js', () => ({
+  useUIState: () => ({
+    mainAreaWidth: 100, // Fixed width for consistent snapshots
+  }),
+}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -48,6 +55,7 @@ enum TerminalKeys {
   LEFT_ARROW = '\u001B[D',
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
+  BACKSPACE = '\u0008',
 }
 
 const createMockSettings = (
@@ -97,7 +105,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -234,7 +242,7 @@ const renderDialog = (
   },
 ) =>
   render(
-    <KeypressProvider kittyProtocolEnabled={false}>
+    <KeypressProvider>
       <SettingsDialog
         settings={settings}
         onSelect={onSelect}
@@ -246,7 +254,12 @@ const renderDialog = (
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
-    mockToggleVimEnabled.mockResolvedValue(true);
+    vi.clearAllMocks();
+    vi.spyOn(
+      terminalCapabilityManager,
+      'isKittyProtocolEnabled',
+    ).mockReturnValue(true);
+    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
@@ -296,6 +309,23 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Setting Descriptions', () => {
+    it('should render descriptions for settings that have them', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = renderDialog(settings, onSelect);
+
+      const output = lastFrame();
+      // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
+      expect(output).toContain('Vim Mode');
+      expect(output).toContain('Enable Vim keybindings');
+      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
+      expect(output).toContain('Enable Auto Update');
+      expect(output).toContain('Enable automatic updates.');
+    });
+  });
+
   describe('Settings Navigation', () => {
     it.each([
       {
@@ -319,16 +349,16 @@ describe('SettingsDialog', () => {
 
       // Navigate down
       act(() => {
-        stdin.write(down as string);
+        stdin.write(down);
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Enable Auto Update');
       });
 
       // Navigate up
       act(() => {
-        stdin.write(up as string);
+        stdin.write(up);
       });
 
       await waitFor(() => {
@@ -351,7 +381,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
-        expect(lastFrame()).toContain('Codebase Investigator Max Num Turns');
+        expect(lastFrame()).toContain('Hook Notifications');
       });
 
       unmount();
@@ -367,17 +397,17 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
-      // Wait for initial render and verify we're on Vim Mode (first setting)
+      // Wait for initial render and verify we're on Preview Features (first setting)
       await waitFor(() => {
-        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Preview Features (e.g., models)');
       });
 
-      // Navigate to Disable Auto Update setting and verify we're there
+      // Navigate to Vim Mode setting and verify we're there
       act(() => {
         stdin.write(TerminalKeys.DOWN_ARROW as string);
       });
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Toggle the setting
@@ -397,10 +427,10 @@ describe('SettingsDialog', () => {
       });
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-        new Set<string>(['general.disableAutoUpdate']),
+        new Set<string>(['general.vimMode']),
         expect.objectContaining({
           general: expect.objectContaining({
-            disableAutoUpdate: true,
+            vimMode: true,
           }),
         }),
         expect.any(LoadedSettings),
@@ -457,20 +487,6 @@ describe('SettingsDialog', () => {
 
         unmount();
       });
-    });
-
-    it('should toggle setting with Space key', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount } = renderDialog(settings, onSelect);
-
-      // Press Space to toggle current setting
-      act(() => {
-        stdin.write(' '); // Space key
-      });
-
-      unmount();
     });
 
     it('should handle vim mode setting specially', async () => {
@@ -571,7 +587,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify the dialog is rendered properly
@@ -679,7 +695,7 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount } = render(
         <VimModeProvider settings={settings}>
-          <KeypressProvider kittyProtocolEnabled={false}>
+          <KeypressProvider>
             <SettingsDialog settings={settings} onSelect={onSelect} />
           </KeypressProvider>
         </VimModeProvider>,
@@ -1062,7 +1078,7 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       const { stdin, unmount, rerender } = render(
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
       );
@@ -1087,7 +1103,7 @@ describe('SettingsDialog', () => {
         {},
       );
       rerender(
-        <KeypressProvider kittyProtocolEnabled={false}>
+        <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
         </KeypressProvider>,
       );
@@ -1099,6 +1115,126 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
+      });
+
+      unmount();
+    });
+  });
+
+  describe('Search Functionality', () => {
+    it('should display text entered in search', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Wait for initial render and verify that search is not active
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('> Search:');
+      });
+      expect(lastFrame()).toContain('Search to filter');
+
+      // Press '/' to enter search mode
+      act(() => {
+        stdin.write('/');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('/');
+        expect(lastFrame()).not.toContain('Search to filter');
+      });
+
+      unmount();
+    });
+
+    it('should show search query and filter settings as user types', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('yolo');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('yolo');
+        expect(lastFrame()).toContain('Disable YOLO Mode');
+      });
+
+      unmount();
+    });
+
+    it('should exit search settings when Escape is pressed', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('vim');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vim');
+      });
+
+      // Press Escape
+      act(() => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+
+      await waitFor(() => {
+        // onSelect is called with (settingName, scope).
+        // undefined settingName means "close dialog"
+        expect(onSelect).toHaveBeenCalledWith(undefined, expect.anything());
+      });
+
+      unmount();
+    });
+
+    it('should handle backspace to modify search query', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      act(() => {
+        stdin.write('vimm');
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vimm');
+      });
+
+      // Press backspace
+      act(() => {
+        stdin.write(TerminalKeys.BACKSPACE);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('vim');
+        expect(lastFrame()).toContain('Vim Mode');
+        expect(lastFrame()).not.toContain('Hook Notifications');
+      });
+
+      unmount();
+    });
+
+    it('should display nothing when search yields no results', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame, stdin, unmount } = renderDialog(settings, onSelect);
+
+      // Type a search query that won't match any settings
+      act(() => {
+        stdin.write('nonexistentsetting');
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('nonexistentsetting');
+        expect(lastFrame()).toContain('');
+        expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1125,7 +1261,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
           },
@@ -1136,7 +1272,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
           },
@@ -1149,7 +1285,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: true,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {
@@ -1172,7 +1308,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1210,7 +1346,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1232,7 +1368,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: true,
+              enableFuzzySearch: false,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1271,7 +1407,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: false,
+            enableAutoUpdate: true,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
           },
@@ -1282,7 +1418,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              disableLoadingPhrases: false,
+              enableLoadingPhrases: true,
               screenReader: false,
             },
           },
@@ -1295,7 +1431,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {

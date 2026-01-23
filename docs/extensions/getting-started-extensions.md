@@ -1,4 +1,4 @@
-# Getting Started with Gemini CLI Extensions
+# Getting started with Gemini CLI extensions
 
 This guide will walk you through creating your first Gemini CLI extension.
 You'll learn how to set up a new extension, add a custom tool via an MCP server,
@@ -10,7 +10,7 @@ file.
 Before you start, make sure you have the Gemini CLI installed and a basic
 understanding of Node.js and TypeScript.
 
-## Step 1: Create a New Extension
+## Step 1: Create a new extension
 
 The easiest way to start is by using one of the built-in templates. We'll use
 the `mcp-server` example as our foundation.
@@ -32,7 +32,7 @@ my-first-extension/
 └── tsconfig.json
 ```
 
-## Step 2: Understand the Extension Files
+## Step 2: Understand the extension files
 
 Let's look at the key files in your new extension.
 
@@ -124,7 +124,7 @@ These are standard configuration files for a TypeScript project. The
 `package.json` file defines dependencies and a `build` script, and
 `tsconfig.json` configures the TypeScript compiler.
 
-## Step 3: Build and Link Your Extension
+## Step 3: Build and link your extension
 
 Before you can use the extension, you need to compile the TypeScript code and
 link the extension to your Gemini CLI installation for local development.
@@ -158,7 +158,7 @@ link the extension to your Gemini CLI installation for local development.
 Now, restart your Gemini CLI session. The new `fetch_posts` tool will be
 available. You can test it by asking: "fetch posts".
 
-## Step 4: Add a Custom Command
+## Step 4: Add a custom command
 
 Custom commands provide a way to create shortcuts for complex prompts. Let's add
 a command that searches for a pattern in your code.
@@ -186,7 +186,7 @@ a command that searches for a pattern in your code.
 After saving the file, restart the Gemini CLI. You can now run
 `/fs:grep-code "some pattern"` to use your new command.
 
-## Step 5: Add a Custom `GEMINI.md`
+## Step 5: Add a custom `GEMINI.md`
 
 You can provide persistent context to the model by adding a `GEMINI.md` file to
 your extension. This is useful for giving the model instructions on how to
@@ -222,9 +222,45 @@ need this for extensions built to expose commands and prompts.
 Restart the CLI again. The model will now have the context from your `GEMINI.md`
 file in every session where the extension is active.
 
-## Step 6: Releasing Your Extension
+## (Optional) Step 6: Add an Agent Skill
 
-Once you are happy with your extension, you can share it with others. The two
+_Note: This is an experimental feature enabled via `experimental.skills`._
+
+[Agent Skills](../cli/skills.md) let you bundle specialized expertise and
+procedural workflows. Unlike `GEMINI.md`, which provides persistent context,
+skills are activated only when needed, saving context tokens.
+
+1.  Create a `skills` directory and a subdirectory for your skill:
+
+    ```bash
+    mkdir -p skills/security-audit
+    ```
+
+2.  Create a `skills/security-audit/SKILL.md` file:
+
+    ```markdown
+    ---
+    name: security-audit
+    description:
+      Expertise in auditing code for security vulnerabilities. Use when the user
+      asks to "check for security issues" or "audit" their changes.
+    ---
+
+    # Security Auditor
+
+    You are an expert security researcher. When auditing code:
+
+    1. Look for common vulnerabilities (OWASP Top 10).
+    2. Check for hardcoded secrets or API keys.
+    3. Suggest remediation steps for any findings.
+    ```
+
+Skills bundled with your extension are automatically discovered and can be
+activated by the model during a session when it identifies a relevant task.
+
+## Step 7: Release your extension
+
+Once you're happy with your extension, you can share it with others. The two
 primary ways of releasing extensions are via a Git repository or through GitHub
 Releases. Using a public Git repository is the simplest method.
 
@@ -239,6 +275,7 @@ You've successfully created a Gemini CLI extension! You learned how to:
 - Add custom tools with an MCP server.
 - Create convenient custom commands.
 - Provide persistent context to the model.
+- Bundle specialized Agent Skills.
 - Link your extension for local development.
 
 From here, you can explore more advanced features and build powerful new

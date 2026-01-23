@@ -7,16 +7,22 @@
 import { vi } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual =
-    (await importOriginal()) as typeof import('node:child_process');
+  const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     execSync: vi.fn(),
     spawnSync: vi.fn(() => ({ status: 0 })),
   };
 });
-vi.mock('fs');
-vi.mock('os');
+vi.mock('node:fs');
+vi.mock('node:os');
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
@@ -25,12 +31,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+import { homedir as pathsHomedir } from '../utils/paths.js';
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
 
   beforeEach(() => {
     vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
+    vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
   });
 
   afterEach(() => {
@@ -43,6 +51,13 @@ describe('ide-installer', () => {
       { ide: IDE_DEFINITIONS.firebasestudio },
     ])('returns a VsCodeInstaller for "$ide.name"', ({ ide }) => {
       const installer = getIdeInstaller(ide);
+
+      expect(installer).not.toBeNull();
+      expect(installer?.install).toEqual(expect.any(Function));
+    });
+
+    it('returns an AntigravityInstaller for "antigravity"', () => {
+      const installer = getIdeInstaller(IDE_DEFINITIONS.antigravity);
 
       expect(installer).not.toBeNull();
       expect(installer?.install).toEqual(expect.any(Function));
@@ -186,5 +201,61 @@ describe('ide-installer', () => {
         },
       );
     });
+  });
+});
+
+describe('AntigravityInstaller', () => {
+  function setup({
+    execSync = () => '',
+    platform = 'linux' as NodeJS.Platform,
+  }: {
+    execSync?: () => string;
+    platform?: NodeJS.Platform;
+  } = {}) {
+    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+    const installer = getIdeInstaller(IDE_DEFINITIONS.antigravity, platform)!;
+
+    return { installer };
+  }
+
+  it('installs the extension using the alias', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
+    const { installer } = setup({});
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'agy',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: false },
+    );
+  });
+
+  it('returns a failure message if the alias is not set', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    const { installer } = setup({});
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain(
+      'ANTIGRAVITY_CLI_ALIAS environment variable not set',
+    );
+  });
+
+  it('returns a failure message if the command is not found', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'not-a-command');
+    const { installer } = setup({
+      execSync: () => {
+        throw new Error('Command not found');
+      },
+    });
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('not-a-command not found');
   });
 });

@@ -12,9 +12,11 @@ import type {
   ModelRoutingEvent,
   ModelSlashCommandEvent,
   AgentFinishEvent,
+  RecoveryAttemptEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
+import { sanitizeHookName } from './sanitize.js';
 
 const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
@@ -33,11 +35,16 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+const EVENT_HOOK_CALL_COUNT = 'gemini_cli.hook_call.count';
+const EVENT_HOOK_CALL_LATENCY = 'gemini_cli.hook_call.latency';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
 const AGENT_DURATION_MS = 'gemini_cli.agent.duration';
 const AGENT_TURNS = 'gemini_cli.agent.turns';
+const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
+const AGENT_RECOVERY_ATTEMPT_DURATION =
+  'gemini_cli.agent.recovery_attempt.duration';
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
@@ -175,6 +182,16 @@ const COUNTER_DEFINITIONS = {
       terminate_reason: string;
     },
   },
+  [AGENT_RECOVERY_ATTEMPT_COUNT]: {
+    description: 'Counts agent recovery attempts.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (agentRecoveryAttemptCounter = c),
+    attributes: {} as {
+      agent_name: string;
+      reason: string;
+      success: boolean;
+    },
+  },
   [FLICKER_FRAME_COUNT]: {
     description:
       'Counts UI frames that flicker (render taller than the terminal).',
@@ -187,6 +204,16 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
+  },
+  [EVENT_HOOK_CALL_COUNT]: {
+    description: 'Counts hook calls, tagged by hook event name and success.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (hookCallCounter = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
+    },
   },
 } as const;
 
@@ -244,6 +271,15 @@ const HISTOGRAM_DEFINITIONS = {
       agent_name: string;
     },
   },
+  [AGENT_RECOVERY_ATTEMPT_DURATION]: {
+    description: 'Duration of agent recovery attempts in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (agentRecoveryAttemptDurationHistogram = h),
+    attributes: {} as {
+      agent_name: string;
+    },
+  },
   [GEN_AI_CLIENT_TOKEN_USAGE]: {
     description: 'Number of input and output tokens used.',
     unit: 'token',
@@ -272,6 +308,17 @@ const HISTOGRAM_DEFINITIONS = {
       'server.address'?: string;
       'server.port'?: number;
       'error.type'?: string;
+    },
+  },
+  [EVENT_HOOK_CALL_LATENCY]: {
+    description: 'Latency of hook calls in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (c: Histogram) => (hookCallLatencyHistogram = c),
+    attributes: {} as {
+      hook_event_name: string;
+      hook_name: string;
+      success: boolean;
     },
   },
 } as const;
@@ -478,9 +525,13 @@ let modelSlashCommandCallCounter: Counter | undefined;
 let agentRunCounter: Counter | undefined;
 let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
+let agentRecoveryAttemptCounter: Counter | undefined;
+let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
+let hookCallCounter: Counter | undefined;
+let hookCallLatencyHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -728,16 +779,29 @@ export function recordModelRoutingMetrics(
   )
     return;
 
-  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+  const attributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
-  });
+    'routing.failed': event.failed,
+  };
+
+  if (event.reasoning) {
+    attributes['routing.reasoning'] = event.reasoning;
+  }
+  if (event.enable_numerical_routing !== undefined) {
+    attributes['routing.enable_numerical_routing'] =
+      event.enable_numerical_routing;
+  }
+  if (event.classifier_threshold) {
+    attributes['routing.classifier_threshold'] = event.classifier_threshold;
+  }
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, attributes);
 
   if (event.failed) {
     modelRoutingFailureCounter.add(1, {
-      ...baseMetricDefinition.getCommonAttributes(config),
-      'routing.decision_source': event.decision_source,
+      ...attributes,
       'routing.error_message': event.error_message,
     });
   }
@@ -769,6 +833,32 @@ export function recordAgentRunMetrics(
   });
 
   agentTurnsHistogram.record(event.turn_count, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+  });
+}
+
+export function recordRecoveryAttemptMetrics(
+  config: Config,
+  event: RecoveryAttemptEvent,
+): void {
+  if (
+    !agentRecoveryAttemptCounter ||
+    !agentRecoveryAttemptDurationHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const commonAttributes = baseMetricDefinition.getCommonAttributes(config);
+
+  agentRecoveryAttemptCounter.add(1, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+    reason: event.reason,
+    success: event.success,
+  });
+
+  agentRecoveryAttemptDurationHistogram.record(event.duration_ms, {
     ...commonAttributes,
     agent_name: event.agent_name,
   });
@@ -835,7 +925,7 @@ export function getConventionAttributes(event: {
 function getGenAiProvider(authType?: string): GenAiProviderName {
   switch (authType) {
     case AuthType.USE_VERTEX_AI:
-    case AuthType.CLOUD_SHELL:
+    case AuthType.COMPUTE_ADC:
     case AuthType.LOGIN_WITH_GOOGLE:
       return GenAiProviderName.GCP_VERTEX_AI;
     case AuthType.USE_GEMINI:
@@ -1110,4 +1200,28 @@ export function recordApiResponseMetrics(
       ...attributes.genAiAttributes,
     });
   }
+}
+
+export function recordHookCallMetrics(
+  config: Config,
+  hookEventName: string,
+  hookName: string,
+  durationMs: number,
+  success: boolean,
+): void {
+  if (!hookCallCounter || !hookCallLatencyHistogram || !isMetricsInitialized)
+    return;
+
+  // Always sanitize hook names in metrics (metrics are aggregated and exposed)
+  const sanitizedHookName = sanitizeHookName(hookName);
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    hook_event_name: hookEventName,
+    hook_name: sanitizedHookName,
+    success,
+  };
+
+  hookCallCounter.add(1, metricAttributes);
+  hookCallLatencyHistogram.record(durationMs, metricAttributes);
 }

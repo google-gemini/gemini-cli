@@ -6,16 +6,27 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { coreEvents } from '@google/gemini-cli-core';
 import {
   profiler,
+  DebugProfiler,
   ACTION_TIMESTAMP_CAPACITY,
   FRAME_TIMESTAMP_CAPACITY,
 } from './DebugProfiler.js';
+import { render } from '../../test-utils/render.js';
+import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { FixedDeque } from 'mnemonist';
+import { debugState } from '../debug.js';
+import { act } from 'react';
+
+vi.mock('../contexts/UIStateContext.js', () => ({
+  useUIState: vi.fn(),
+}));
 
 describe('DebugProfiler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    profiler.profilersActive = 1;
     profiler.numFrames = 0;
     profiler.totalIdleFrames = 0;
     profiler.lastFrameStartTime = 0;
@@ -29,12 +40,14 @@ describe('DebugProfiler', () => {
       Array,
       ACTION_TIMESTAMP_CAPACITY,
     );
+    debugState.debugNumAnimatedComponents = 0;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     profiler.actionTimestamps.clear();
     profiler.possiblyIdleFrameTimestamps.clear();
+    debugState.debugNumAnimatedComponents = 0;
   });
 
   it('should not exceed action timestamp capacity', () => {
@@ -192,5 +205,103 @@ describe('DebugProfiler', () => {
     profiler.checkForIdleFrames();
 
     expect(profiler.totalIdleFrames).toBe(0);
+  });
+
+  it('should not report frames as idle if debugNumAnimatedComponents > 0', async () => {
+    const startTime = Date.now();
+    vi.setSystemTime(startTime);
+    debugState.debugNumAnimatedComponents = 1;
+
+    for (let i = 0; i < 5; i++) {
+      profiler.reportFrameRendered();
+      vi.advanceTimersByTime(20);
+    }
+
+    vi.advanceTimersByTime(1000);
+    profiler.checkForIdleFrames();
+
+    expect(profiler.totalIdleFrames).toBe(0);
+  });
+});
+
+describe('DebugProfiler Component', () => {
+  beforeEach(() => {
+    // Reset the mock implementation before each test
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: false,
+      constrainHeight: false,
+    } as unknown as UIState);
+
+    // Mock process.stdin and stdout
+    // We need to be careful not to break the test runner's own output
+    // So we might want to skip mocking them if they are not strictly needed for the simple render test
+    // or mock them safely.
+    // For now, let's assume the component uses them in useEffect.
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return null when showDebugProfiler is false', () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: false,
+      constrainHeight: false,
+    } as unknown as UIState);
+    const { lastFrame } = render(<DebugProfiler />);
+    expect(lastFrame()).toBe('');
+  });
+
+  it('should render stats when showDebugProfiler is true', () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: true,
+      constrainHeight: false,
+    } as unknown as UIState);
+    profiler.numFrames = 10;
+    profiler.totalIdleFrames = 5;
+    profiler.totalFlickerFrames = 2;
+
+    const { lastFrame } = render(<DebugProfiler />);
+    const output = lastFrame();
+
+    expect(output).toContain('Renders: 10 (total)');
+    expect(output).toContain('5 (idle)');
+    expect(output).toContain('2 (flicker)');
+  });
+
+  it('should report an action when a CoreEvent is emitted', async () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: true,
+      constrainHeight: false,
+    } as unknown as UIState);
+
+    const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+
+    const { unmount } = render(<DebugProfiler />);
+
+    act(() => {
+      coreEvents.emitModelChanged('new-model');
+    });
+
+    expect(reportActionSpy).toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should report an action when an AppEvent is emitted', async () => {
+    vi.mocked(useUIState).mockReturnValue({
+      showDebugProfiler: true,
+      constrainHeight: false,
+    } as unknown as UIState);
+
+    const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+
+    const { unmount } = render(<DebugProfiler />);
+
+    act(() => {
+      appEvents.emit(AppEvent.SelectionWarning);
+    });
+
+    expect(reportActionSpy).toHaveBeenCalled();
+    unmount();
   });
 });

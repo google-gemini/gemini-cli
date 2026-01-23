@@ -45,8 +45,10 @@ export interface ToolInvocation<
   toolLocations(): ToolLocation[];
 
   /**
-   * Determines if the tool should prompt for confirmation before execution.
-   * @returns Confirmation details or false if no confirmation is needed.
+   * Checks if the tool call should be confirmed by the user before execution.
+   *
+   * @param abortSignal An AbortSignal that can be used to cancel the confirmation request.
+   * @returns A ToolCallConfirmationDetails object if confirmation is required, or false if not.
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
@@ -66,6 +68,14 @@ export interface ToolInvocation<
 }
 
 /**
+ * Options for policy updates that can be customized by tool invocations.
+ */
+export interface PolicyUpdateOptions {
+  commandPrefix?: string | string[];
+  mcpName?: string;
+}
+
+/**
  * A convenience base class for ToolInvocation.
  */
 export abstract class BaseToolInvocation<
@@ -75,9 +85,10 @@ export abstract class BaseToolInvocation<
 {
   constructor(
     readonly params: TParams,
-    protected readonly messageBus?: MessageBus,
+    protected readonly messageBus: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
+    readonly _serverName?: string,
   ) {}
 
   abstract getDescription(): string;
@@ -89,26 +100,59 @@ export abstract class BaseToolInvocation<
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.messageBus) {
-      const decision = await this.getMessageBusDecision(abortSignal);
-      if (decision === 'ALLOW') {
-        return false;
-      }
+    const decision = await this.getMessageBusDecision(abortSignal);
+    if (decision === 'ALLOW') {
+      return false;
+    }
 
-      if (decision === 'DENY') {
-        throw new Error(
-          `Tool execution for "${
-            this._toolDisplayName || this._toolName
-          }" denied by policy.`,
-        );
-      }
+    if (decision === 'DENY') {
+      throw new Error(
+        `Tool execution for "${
+          this._toolDisplayName || this._toolName
+        }" denied by policy.`,
+      );
+    }
 
-      if (decision === 'ASK_USER') {
-        return this.getConfirmationDetails(abortSignal);
+    if (decision === 'ASK_USER') {
+      return this.getConfirmationDetails(abortSignal);
+    }
+
+    // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
+    return this.getConfirmationDetails(abortSignal);
+  }
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * Subclasses can override this to provide additional options like
+   * commandPrefix (for shell) or mcpName (for MCP tools).
+   */
+  protected getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return undefined;
+  }
+
+  /**
+   * Helper method to publish a policy update when user selects
+   * ProceedAlways or ProceedAlwaysAndSave.
+   */
+  protected async publishPolicyUpdate(
+    outcome: ToolConfirmationOutcome,
+  ): Promise<void> {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlways ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+    ) {
+      if (this._toolName) {
+        const options = this.getPolicyUpdateOptions(outcome);
+        void this.messageBus.publish({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: this._toolName,
+          persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          ...options,
+        });
       }
     }
-    // When no message bus, use default confirmation flow
-    return this.getConfirmationDetails(abortSignal);
   }
 
   /**
@@ -128,14 +172,7 @@ export abstract class BaseToolInvocation<
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
       prompt: this.getDescription(),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          if (this.messageBus && this._toolName) {
-            this.messageBus.publish({
-              type: MessageBusType.UPDATE_POLICY,
-              toolName: this._toolName,
-            });
-          }
-        }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;
@@ -144,16 +181,21 @@ export abstract class BaseToolInvocation<
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
   ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
-    if (!this.messageBus) {
+    if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
       return Promise.resolve('ALLOW');
     }
 
     const correlationId = randomUUID();
-    const toolCall = {
-      name: this._toolName || this.constructor.name,
-      args: this.params as Record<string, unknown>,
+    const request: ToolConfirmationRequest = {
+      type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      correlationId,
+      toolCall: {
+        name: this._toolName,
+        args: this.params as Record<string, unknown>,
+      },
+      serverName: this._serverName,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -162,18 +204,19 @@ export abstract class BaseToolInvocation<
         return;
       }
 
-      let timeoutId: NodeJS.Timeout | undefined;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const cleanup = () => {
         if (timeoutId) {
           clearTimeout(timeoutId);
-          timeoutId = undefined;
+          timeoutId = null;
+        }
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
         }
         abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus?.unsubscribe(
-          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          responseHandler,
-        );
       };
 
       const abortHandler = () => {
@@ -199,7 +242,7 @@ export abstract class BaseToolInvocation<
         }
       };
 
-      abortSignal.addEventListener('abort', abortHandler);
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       timeoutId = setTimeout(() => {
         cleanup();
@@ -210,15 +253,15 @@ export abstract class BaseToolInvocation<
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         responseHandler,
       );
-
-      const request: ToolConfirmationRequest = {
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall,
-        correlationId,
+      unsubscribe = () => {
+        this.messageBus?.unsubscribe(
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          responseHandler,
+        );
       };
 
       try {
-        this.messageBus.publish(request);
+        void this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
         resolve('ALLOW');
@@ -303,9 +346,9 @@ export abstract class DeclarativeTool<
     readonly description: string,
     readonly kind: Kind,
     readonly parameterSchema: unknown,
+    readonly messageBus: MessageBus,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
-    readonly messageBus?: MessageBus,
     readonly extensionName?: string,
     readonly extensionId?: string,
   ) {}
@@ -379,7 +422,7 @@ export abstract class DeclarativeTool<
    * A convenience method that builds and executes the tool in one step.
    * Never throws.
    * @param params The raw, untrusted parameters from the model.
-   * @params abortSignal a signal to abort.
+   * @param abortSignal a signal to abort.
    * @returns The result of the tool execution.
    */
   async validateBuildAndExecute(
@@ -458,7 +501,7 @@ export abstract class BaseDeclarativeTool<
 
   protected abstract createInvocation(
     params: TParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<TParams, TResult>;
@@ -554,7 +597,7 @@ export function hasCycleInSchema(schema: object): boolean {
 
     if ('$ref' in node && typeof node.$ref === 'string') {
       const ref = node.$ref;
-      if (ref === '#/' || pathRefs.has(ref)) {
+      if (ref === '#' || ref === '#/' || pathRefs.has(ref)) {
         // A ref to just '#/' is always a cycle.
         return true; // Cycle detected!
       }
@@ -610,9 +653,11 @@ export interface Todo {
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  filePath: string;
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  isNewFile?: boolean;
 }
 
 export interface DiffStat {
@@ -654,6 +699,8 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  rootCommands: string[];
+  commands?: string[];
 }
 
 export interface ToolMcpConfirmationDetails {
@@ -682,6 +729,7 @@ export type ToolCallConfirmationDetails =
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
+  ProceedAlwaysAndSave = 'proceed_always_and_save',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
@@ -697,6 +745,7 @@ export enum Kind {
   Execute = 'execute',
   Think = 'think',
   Fetch = 'fetch',
+  Communicate = 'communicate',
   Other = 'other',
 }
 

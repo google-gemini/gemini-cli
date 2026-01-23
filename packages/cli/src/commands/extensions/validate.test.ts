@@ -5,13 +5,25 @@
  */
 
 import * as fs from 'node:fs';
-import { describe, it, expect, vi, type MockInstance } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import { handleValidate, validateCommand } from './validate.js';
 import yargs from 'yargs';
 import { createExtension } from '../../test-utils/createExtension.js';
 import path from 'node:path';
 import * as os from 'node:os';
 import { debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('../utils.js', () => ({
+  exitCli: vi.fn(),
+}));
 
 describe('extensions validate command', () => {
   it('should fail if no path is provided', () => {

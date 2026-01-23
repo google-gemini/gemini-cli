@@ -10,6 +10,9 @@ import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { Banner } from './Banner.js';
+import { useBanner } from '../hooks/useBanner.js';
+import { useTips } from '../hooks/useTips.js';
 
 interface AppHeaderProps {
   version: string;
@@ -18,16 +21,27 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly } = useUIState();
+  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+
+  const { bannerText } = useBanner(bannerData, config);
+  const { showTips } = useTips();
 
   return (
     <Box flexDirection="column">
-      {!(settings.merged.ui?.hideBanner || config.getScreenReader()) && (
-        <Header version={version} nightly={nightly} />
+      {!(settings.merged.ui.hideBanner || config.getScreenReader()) && (
+        <>
+          <Header version={version} nightly={nightly} />
+          {bannerVisible && bannerText && (
+            <Banner
+              width={mainAreaWidth}
+              bannerText={bannerText}
+              isWarning={bannerData.warningText !== ''}
+            />
+          )}
+        </>
       )}
-      {!(settings.merged.ui?.hideTips || config.getScreenReader()) && (
-        <Tips config={config} />
-      )}
+      {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
+        showTips && <Tips config={config} />}
     </Box>
   );
 };
