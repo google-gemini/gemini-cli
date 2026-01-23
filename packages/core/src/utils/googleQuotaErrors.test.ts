@@ -102,40 +102,21 @@ describe('classifyGoogleError', () => {
     expect((result as TerminalQuotaError).cause).toBe(apiError);
   });
 
-  it('should return TerminalQuotaError for daily quota violations in ErrorInfo', () => {
-    const apiError: GoogleApiError = {
-      code: 429,
-      message: 'Quota exceeded',
-      details: [
-        {
-          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
-          reason: 'QUOTA_EXCEEDED',
-          domain: 'googleapis.com',
-          metadata: {
-            quota_limit: 'RequestsPerDay_PerProject_PerUser',
-          },
-        },
-      ],
-    };
-    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
-    const result = classifyGoogleError(new Error());
-    expect(result).toBeInstanceOf(TerminalQuotaError);
-  });
-
-  it('should return TerminalQuotaError for long retry delays', () => {
+  it('should return RetryableQuotaError for long retry delays', () => {
     const apiError: GoogleApiError = {
       code: 429,
       message: 'Too many requests',
       details: [
         {
           '@type': 'type.googleapis.com/google.rpc.RetryInfo',
-          retryDelay: '301s', // > 5 minutes
+          retryDelay: '301s', // Any delay is now retryable
         },
       ],
     };
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
-    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(301000);
   });
 
   it('should return RetryableQuotaError for short retry delays', () => {
