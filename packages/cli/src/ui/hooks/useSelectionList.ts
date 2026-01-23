@@ -29,6 +29,7 @@ export interface UseSelectionListOptions<T> {
   isFocused?: boolean;
   showNumbers?: boolean;
   wrapAround?: boolean;
+  focusKey?: string;
 }
 
 export interface UseSelectionListResult {
@@ -286,6 +287,7 @@ export function useSelectionList<T>({
   isFocused = true,
   showNumbers = false,
   wrapAround = true,
+  focusKey,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
   const baseItems = toBaseItems(items);
 
@@ -303,6 +305,25 @@ export function useSelectionList<T>({
   const prevBaseItemsRef = useRef(baseItems);
   const prevInitialIndexRef = useRef(initialIndex);
   const prevWrapAroundRef = useRef(wrapAround);
+  const lastProcessedFocusKeyRef = useRef<string | undefined>(undefined);
+
+  // Handle programmatic focus changes via focusKey
+  useEffect(() => {
+    if (focusKey === undefined) {
+      lastProcessedFocusKeyRef.current = undefined;
+      return;
+    }
+
+    if (focusKey === lastProcessedFocusKeyRef.current) return;
+
+    const index = items.findIndex(
+      (item) => item.key === focusKey && !item.disabled,
+    );
+    if (index !== -1) {
+      lastProcessedFocusKeyRef.current = focusKey;
+      dispatch({ type: 'SET_ACTIVE_INDEX', payload: { index } });
+    }
+  }, [focusKey, items]);
 
   // Initialize/synchronize state when initialIndex or items change
   useEffect(() => {

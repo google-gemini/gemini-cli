@@ -832,6 +832,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         items={selectionItems}
         onSelect={handleSelect}
         onHighlight={handleHighlight}
+        focusKey={isCustomOptionFocused ? 'other' : undefined}
         renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
