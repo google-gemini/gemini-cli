@@ -63,13 +63,16 @@ export const NewAgentsNotification = ({
           <Box
             flexDirection="column"
             marginTop={1}
-            marginBottom={1}
             borderStyle="single"
             padding={1}
           >
             {displayAgents.map((agent) => (
-              <Box key={agent.name} flexDirection="column" marginBottom={1}>
-                <Text bold>- {agent.name}</Text>
+              <Box key={agent.name}>
+                <Box flexShrink={0}>
+                  <Text bold color={theme.text.primary}>
+                    - {agent.name}:{' '}
+                  </Text>
+                </Box>
                 <Text color={theme.text.secondary}> {agent.description}</Text>
               </Box>
             ))}
