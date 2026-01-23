@@ -16,7 +16,7 @@ const GUI_EDITORS = [
   'zed',
   'antigravity',
 ] as const;
-const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs'] as const;
+const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
@@ -49,6 +49,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   zed: 'Zed',
   emacs: 'Emacs',
   antigravity: 'Antigravity',
+  hx: 'Helix',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -57,6 +58,14 @@ export function getEditorDisplayName(editor: EditorType): string {
 
 function isValidEditorType(editor: string): editor is EditorType {
   return EDITORS_SET.has(editor);
+}
+
+/**
+ * Escapes a string for use in an Emacs Lisp string literal.
+ * Wraps in double quotes and escapes backslashes and double quotes.
+ */
+function escapeELispString(str: string): string {
+  return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 interface DiffCommand {
@@ -92,7 +101,11 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
-  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  antigravity: {
+    win32: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
+    default: ['agy', 'antigravity'],
+  },
+  hx: { win32: ['hx'], default: ['hx'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -100,6 +113,16 @@ export function checkHasEditorType(editor: EditorType): boolean {
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
   return commands.some((cmd) => commandExists(cmd));
+}
+
+export function getEditorCommand(editor: EditorType): string {
+  const commandConfig = editorCommands[editor];
+  const commands =
+    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  return (
+    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
+    commands[commands.length - 1]
+  );
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -133,12 +156,7 @@ export function getDiffCommand(
   if (!isValidEditorType(editor)) {
     return null;
   }
-  const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  const command =
-    commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
-    commands[commands.length - 1];
+  const command = getEditorCommand(editor);
 
   switch (editor) {
     case 'vscode':
@@ -180,7 +198,15 @@ export function getDiffCommand(
     case 'emacs':
       return {
         command: 'emacs',
-        args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
+        args: [
+          '--eval',
+          `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
+        ],
+      };
+    case 'hx':
+      return {
+        command: 'hx',
+        args: ['--vsplit', '--', oldPath, newPath],
       };
     default:
       return null;

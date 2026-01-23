@@ -74,4 +74,13 @@ if (packageName === 'cli') {
   }
 }
 
+// Copy built-in skills for the core package.
+if (packageName === 'core') {
+  const builtinSkillsSource = path.join(sourceDir, 'skills', 'builtin');
+  const builtinSkillsTarget = path.join(targetDir, 'skills', 'builtin');
+  if (fs.existsSync(builtinSkillsSource)) {
+    fs.cpSync(builtinSkillsSource, builtinSkillsTarget, { recursive: true });
+  }
+}
+
 console.log('Successfully copied files.');

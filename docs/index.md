@@ -56,6 +56,8 @@ This documentation is organized into the following sections:
   commands with `/model`.
 - **[Sandbox](./cli/sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
+- **[Agent Skills](./cli/skills.md):** (Experimental) Extend the CLI with
+  specialized expertise and procedural workflows.
 - **[Settings](./cli/settings.md):** Configure various aspects of the CLI's
   behavior and appearance with `/settings`.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
@@ -73,6 +75,9 @@ This documentation is organized into the following sections:
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and
   exposes tools.
+- **[System Prompt Override](./cli/system-prompt.md):** Replace built-in system
+  instructions using `GEMINI_SYSTEM_MD`.
+
 - **[Policy Engine](./core/policy-engine.md):** Use the Policy Engine for
   fine-grained control over tool execution.
 

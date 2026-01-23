@@ -12,6 +12,8 @@ const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
   logicalToVisualMap: [[[0, 0]]],
   visualToLogicalMap: [[0, 0]],
+  transformedToLogicalMaps: [[]],
+  visualToTransformedMap: [],
 };
 
 // Helper to create test state
@@ -30,7 +32,9 @@ const createTestState = (
   selectionAnchor: null,
   viewportWidth: 80,
   viewportHeight: 24,
+  transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
+  pastedContent: {},
 });
 
 describe('vim-buffer-actions', () => {
@@ -901,7 +905,9 @@ describe('vim-buffer-actions', () => {
 
     it('should preserve undo stack in operations', () => {
       const state = createTestState(['hello'], 0, 0);
-      state.undoStack = [{ lines: ['previous'], cursorRow: 0, cursorCol: 0 }];
+      state.undoStack = [
+        { lines: ['previous'], cursorRow: 0, cursorCol: 0, pastedContent: {} },
+      ];
 
       const action = {
         type: 'vim_delete_char' as const,

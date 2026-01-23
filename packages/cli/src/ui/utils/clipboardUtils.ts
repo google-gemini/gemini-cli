@@ -5,6 +5,8 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
   debugLogger,
@@ -29,11 +31,161 @@ export const IMAGE_EXTENSIONS = [
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
+// Track which tool works on Linux to avoid redundant checks/failures
+let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
+
+// Helper to check the user's display server and whether they have a compatible clipboard tool installed
+function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
+  if (linuxClipboardTool !== null) {
+    return linuxClipboardTool;
+  }
+
+  let toolName: 'wl-paste' | 'xclip' | null = null;
+  const displayServer = process.env['XDG_SESSION_TYPE'];
+
+  if (displayServer === 'wayland') toolName = 'wl-paste';
+  else if (displayServer === 'x11') toolName = 'xclip';
+  else return null;
+
+  try {
+    // output is piped to stdio: 'ignore' to suppress the path printing to console
+    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
+    linuxClipboardTool = toolName;
+    return toolName;
+  } catch (e) {
+    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
+    return null;
+  }
+}
+
 /**
- * Checks if the system clipboard contains an image (macOS only for now)
+ * Helper to save command stdout to a file while preventing shell injections and race conditions
+ */
+async function saveFromCommand(
+  command: string,
+  args: string[],
+  destination: string,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args);
+    const fileStream = createWriteStream(destination);
+    let resolved = false;
+
+    const safeResolve = (value: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    };
+
+    child.stdout.pipe(fileStream);
+
+    child.on('error', (err) => {
+      debugLogger.debug(`Failed to spawn ${command}:`, err);
+      safeResolve(false);
+    });
+
+    fileStream.on('error', (err) => {
+      debugLogger.debug(`File stream error for ${destination}:`, err);
+      safeResolve(false);
+    });
+
+    child.on('close', async (code) => {
+      if (resolved) return;
+
+      if (code !== 0) {
+        debugLogger.debug(
+          `${command} exited with code ${code}. Args: ${args.join(' ')}`,
+        );
+        safeResolve(false);
+        return;
+      }
+
+      // Helper to check file size
+      const checkFile = async () => {
+        try {
+          const stats = await fs.stat(destination);
+          safeResolve(stats.size > 0);
+        } catch (e) {
+          debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+          safeResolve(false);
+        }
+      };
+
+      if (fileStream.writableFinished) {
+        await checkFile();
+      } else {
+        fileStream.on('finish', checkFile);
+        // In case finish never fires due to error (though error handler should catch it)
+        fileStream.on('close', async () => {
+          if (!resolved) await checkFile();
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Checks if the Wayland clipboard contains an image using wl-paste.
+ */
+async function checkWlPasteForImage() {
+  try {
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking wl-clipboard for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the X11 clipboard contains an image using xclip.
+ */
+async function checkXclipForImage() {
+  try {
+    const { stdout } = await spawnAsync('xclip', [
+      '-selection',
+      'clipboard',
+      '-t',
+      'TARGETS',
+      '-o',
+    ]);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking xclip for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the system clipboard contains an image (macOS, Windows, and Linux)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'linux') {
+    const tool = getUserLinuxClipboardTool();
+    if (tool === 'wl-paste') {
+      if (await checkWlPasteForImage()) return true;
+    } else if (tool === 'xclip') {
+      if (await checkXclipForImage()) return true;
+    }
+    return false;
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()',
+      ]);
+      return stdout.trim() === 'True';
+    } catch (error) {
+      debugLogger.warn('Error checking clipboard for image:', error);
+      return false;
+    }
+  }
+
   if (process.platform !== 'darwin') {
     return false;
   }
@@ -44,23 +196,62 @@ export async function clipboardHasImage(): Promise<boolean> {
     const imageRegex =
       /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
     return imageRegex.test(stdout);
-  } catch {
+  } catch (error) {
+    debugLogger.warn('Error checking clipboard for image:', error);
     return false;
   }
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS only for now)
+ * Saves clipboard content to a file using wl-paste (Wayland).
+ */
+async function saveFileWithWlPaste(tempFilePath: string) {
+  const success = await saveFromCommand(
+    'wl-paste',
+    ['--no-newline', '--type', 'image/png'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Saves clipboard content to a file using xclip (X11).
+ */
+const saveFileWithXclip = async (tempFilePath: string) => {
+  const success = await saveFromCommand(
+    'xclip',
+    ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+};
+
+/**
+ * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin') {
-    return null;
-  }
-
   try {
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
@@ -70,6 +261,55 @@ export async function saveClipboardImage(
 
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
+
+    if (process.platform === 'linux') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      const tool = getUserLinuxClipboardTool();
+
+      if (tool === 'wl-paste') {
+        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      if (tool === 'xclip') {
+        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      return null;
+    }
+
+    if (process.platform === 'win32') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      // The path is used directly in the PowerShell script.
+      const psPath = tempFilePath.replace(/'/g, "''");
+
+      const script = `
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        if ([System.Windows.Forms.Clipboard]::ContainsImage()) {
+          $image = [System.Windows.Forms.Clipboard]::GetImage()
+          $image.Save('${psPath}', [System.Drawing.Imaging.ImageFormat]::Png)
+          Write-Output "success"
+        }
+      `;
+
+      const { stdout } = await spawnAsync('powershell', [
+        '-NoProfile',
+        '-Command',
+        script,
+      ]);
+
+      if (stdout.trim() === 'success') {
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // File doesn't exist
+        }
+      }
+      return null;
+    }
 
     // AppleScript clipboard classes to try, in order of preference.
     // macOS converts clipboard images to these formats (WEBP/HEIC/HEIF not supported by osascript).

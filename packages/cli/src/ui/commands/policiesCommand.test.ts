@@ -62,7 +62,7 @@ describe('policiesCommand', () => {
       );
     });
 
-    it('should list active policies in correct format', async () => {
+    it('should list policies grouped by mode', async () => {
       const mockRules = [
         {
           decision: PolicyDecision.DENY,
@@ -72,6 +72,7 @@ describe('policiesCommand', () => {
         {
           decision: PolicyDecision.ALLOW,
           argsPattern: /safe/,
+          source: 'test.toml',
         },
         {
           decision: PolicyDecision.ASK_USER,
@@ -98,11 +99,20 @@ describe('policiesCommand', () => {
       const call = vi.mocked(mockContext.ui.addItem).mock.calls[0];
       const content = (call[0] as { text: string }).text;
 
+      expect(content).toContain('### Normal Mode Policies');
       expect(content).toContain(
-        '1. **DENY** tool: `dangerousTool` [Priority: 10]',
+        '### Auto Edit Mode Policies (combined with normal mode policies)',
       );
-      expect(content).toContain('2. **ALLOW** all tools (args match: `safe`)');
-      expect(content).toContain('3. **ASK_USER** all tools');
+      expect(content).toContain(
+        '### Yolo Mode Policies (combined with normal mode policies)',
+      );
+      expect(content).toContain(
+        '**DENY** tool: `dangerousTool` [Priority: 10]',
+      );
+      expect(content).toContain(
+        '**ALLOW** all tools (args match: `safe`) [Source: test.toml]',
+      );
+      expect(content).toContain('**ASK_USER** all tools');
     });
   });
 });

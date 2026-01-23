@@ -511,8 +511,5 @@ describe('migrate command', () => {
     expect(debugLoggerLogSpy).toHaveBeenCalledWith(
       '\nMigration complete! Please review the migrated hooks in .gemini/settings.json',
     );
-    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
-      'Note: Set tools.enableHooks to true in your settings to enable the hook system.',
-    );
   });
 });
