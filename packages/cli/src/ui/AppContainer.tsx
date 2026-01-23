@@ -959,7 +959,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (isSlash || (isIdle && isMcpReady)) {
         void submitQuery(submittedValue);
       } else {
-        if (isIdle && !isMcpReady) {
+        // Check messageQueue.length === 0 to only notify on the first queued item
+        if (isIdle && !isMcpReady && messageQueue.length === 0) {
           coreEvents.emitFeedback(
             'info',
             'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
@@ -969,7 +970,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
       addInput(submittedValue); // Track input for up-arrow history
     },
-    [addMessage, addInput, submitQuery, isMcpReady, streamingState],
+    [
+      addMessage,
+      addInput,
+      submitQuery,
+      isMcpReady,
+      streamingState,
+      messageQueue.length,
+    ],
   );
 
   const handleClearScreen = useCallback(() => {
