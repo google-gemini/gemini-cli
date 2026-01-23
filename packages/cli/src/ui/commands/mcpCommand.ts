@@ -23,6 +23,12 @@ import {
 } from '@google/gemini-cli-core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
+import {
+  McpServerEnablementManager,
+  normalizeServerId,
+  canLoadServer,
+} from '../../config/mcp/mcpServerEnablement.js';
+import { loadSettings } from '../../config/settings.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
@@ -241,6 +247,14 @@ const listAction = async (
     }
   }
 
+  // Get enablement state for all servers
+  const enablementManager = McpServerEnablementManager.getInstance();
+  const enablementState: HistoryItemMcpStatus['enablementState'] = {};
+  for (const serverName of serverNames) {
+    enablementState[serverName] =
+      await enablementManager.getDisplayState(serverName);
+  }
+
   const mcpStatusItem: HistoryItemMcpStatus = {
     type: MessageType.MCP_STATUS,
     servers: mcpServers,
@@ -263,6 +277,7 @@ const listAction = async (
       description: resource.description,
     })),
     authStatus,
+    enablementState,
     blockedServers: blockedMcpServers,
     discoveryInProgress,
     connectingServers,
@@ -346,6 +361,156 @@ const refreshCommand: SlashCommand = {
   },
 };
 
+async function handleEnableDisable(
+  context: CommandContext,
+  args: string,
+  enable: boolean,
+): Promise<MessageActionReturn> {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
+
+  const parts = args.trim().split(/\s+/);
+  const isSession = parts.includes('--session');
+  const serverName = parts.filter((p) => p !== '--session')[0];
+  const action = enable ? 'enable' : 'disable';
+
+  if (!serverName) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server name required. Usage: /mcp ${action} <server-name> [--session]`,
+    };
+  }
+
+  const name = normalizeServerId(serverName);
+
+  // Validate server exists
+  const servers = config.getMcpClientManager()?.getMcpServers() || {};
+  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
+  if (!normalizedServerNames.includes(name)) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
+    };
+  }
+
+  // Check if server is from an extension
+  const serverKey = Object.keys(servers).find(
+    (key) => normalizeServerId(key) === name,
+  );
+  const server = serverKey ? servers[serverKey] : undefined;
+  if (server?.extension) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: `Server '${serverName}' is provided by extension '${server.extension.name}'.\nUse '/extensions ${action} ${server.extension.name}' to manage this extension.`,
+    };
+  }
+
+  const manager = McpServerEnablementManager.getInstance();
+
+  if (enable) {
+    const settings = loadSettings();
+    const result = await canLoadServer(name, {
+      adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
+      allowedList: settings.merged.mcp?.allowed,
+      excludedList: settings.merged.mcp?.excluded,
+    });
+    if (
+      !result.allowed &&
+      (result.blockType === 'allowlist' || result.blockType === 'excludelist')
+    ) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: result.reason ?? 'Blocked by settings.',
+      };
+    }
+    if (isSession) {
+      manager.clearSessionDisable(name);
+    } else {
+      await manager.enable(name);
+    }
+    if (result.blockType === 'admin') {
+      context.ui.addItem(
+        {
+          type: 'warning',
+          text: 'MCP disabled by admin. Will load when enabled.',
+        },
+        Date.now(),
+      );
+    }
+  } else {
+    if (isSession) {
+      manager.disableForSession(name);
+    } else {
+      await manager.disable(name);
+    }
+  }
+
+  const msg = `MCP server '${name}' ${enable ? 'enabled' : 'disabled'}${isSession ? ' for this session' : ''}.`;
+
+  const mcpClientManager = config.getMcpClientManager();
+  if (mcpClientManager) {
+    context.ui.addItem(
+      { type: 'info', text: 'Restarting MCP servers...' },
+      Date.now(),
+    );
+    await mcpClientManager.restart();
+  }
+  if (config.getGeminiClient()?.isInitialized())
+    await config.getGeminiClient().setTools();
+  context.ui.reloadCommands();
+
+  return { type: 'message', messageType: 'info', content: msg };
+}
+
+async function getEnablementCompletion(
+  context: CommandContext,
+  partialArg: string,
+  showEnabled: boolean,
+): Promise<string[]> {
+  const { config } = context.services;
+  if (!config) return [];
+  const servers = Object.keys(
+    config.getMcpClientManager()?.getMcpServers() || {},
+  );
+  const manager = McpServerEnablementManager.getInstance();
+  const results: string[] = [];
+  for (const n of servers) {
+    const state = await manager.getDisplayState(n);
+    if (state.enabled === showEnabled && n.startsWith(partialArg)) {
+      results.push(n);
+    }
+  }
+  return results;
+}
+
+const enableCommand: SlashCommand = {
+  name: 'enable',
+  description: 'Enable a disabled MCP server',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (ctx, args) => handleEnableDisable(ctx, args, true),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
+};
+
+const disableCommand: SlashCommand = {
+  name: 'disable',
+  description: 'Disable an MCP server',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (ctx, args) => handleEnableDisable(ctx, args, false),
+  completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
@@ -357,6 +522,8 @@ export const mcpCommand: SlashCommand = {
     schemaCommand,
     authCommand,
     refreshCommand,
+    enableCommand,
+    disableCommand,
   ],
   action: async (context: CommandContext) => listAction(context),
 };
