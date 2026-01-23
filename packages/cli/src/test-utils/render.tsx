@@ -28,6 +28,13 @@ import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 
 import { type Config } from '@google/gemini-cli-core';
+import { FakePersistentState } from './persistentStateFake.js';
+
+export const persistentStateMock = new FakePersistentState();
+
+vi.mock('../utils/persistentState.js', () => ({
+  persistentState: persistentStateMock,
+}));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
 export const render = (
@@ -151,6 +158,8 @@ const mockUIActions: UIActions = {
   exitPrivacyNotice: vi.fn(),
   closeSettingsDialog: vi.fn(),
   closeModelDialog: vi.fn(),
+  openAgentConfigDialog: vi.fn(),
+  closeAgentConfigDialog: vi.fn(),
   openPermissionsDialog: vi.fn(),
   openSessionBrowser: vi.fn(),
   closeSessionBrowser: vi.fn(),
@@ -189,6 +198,7 @@ export const renderWithProviders = (
     config = configProxy as unknown as Config,
     useAlternateBuffer = true,
     uiActions,
+    persistentState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -198,6 +208,10 @@ export const renderWithProviders = (
     config?: Config;
     useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
+    persistentState?: {
+      get?: typeof persistentStateMock.get;
+      set?: typeof persistentStateMock.set;
+    };
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -217,6 +231,15 @@ export const renderWithProviders = (
       },
     },
   ) as UIState;
+
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
+
+  persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
   let finalSettings = settings;

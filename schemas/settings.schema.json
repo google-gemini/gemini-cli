@@ -1428,74 +1428,12 @@
           "default": false,
           "type": "boolean"
         },
-        "codebaseInvestigatorSettings": {
-          "title": "Codebase Investigator Settings",
-          "description": "Configuration for Codebase Investigator.",
-          "markdownDescription": "Configuration for Codebase Investigator.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Codebase Investigator",
-              "description": "Enable the Codebase Investigator agent.",
-              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            },
-            "maxNumTurns": {
-              "title": "Codebase Investigator Max Num Turns",
-              "description": "Maximum number of turns for the Codebase Investigator agent.",
-              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
-              "default": 10,
-              "type": "number"
-            },
-            "maxTimeMinutes": {
-              "title": "Max Time (Minutes)",
-              "description": "Maximum time for the Codebase Investigator agent (in minutes).",
-              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `3`",
-              "default": 3,
-              "type": "number"
-            },
-            "thinkingBudget": {
-              "title": "Thinking Budget",
-              "description": "The thinking budget for the Codebase Investigator agent.",
-              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
-              "default": 8192,
-              "type": "number"
-            },
-            "model": {
-              "title": "Model",
-              "description": "The model to use for the Codebase Investigator agent.",
-              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `auto`",
-              "default": "auto",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
           "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
-        },
-        "cliHelpAgentSettings": {
-          "title": "CLI Help Agent Settings",
-          "description": "Configuration for CLI Help Agent.",
-          "markdownDescription": "Configuration for CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable CLI Help Agent",
-              "description": "Enable the CLI Help Agent.",
-              "markdownDescription": "Enable the CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
         },
         "plan": {
           "title": "Plan",
