@@ -112,6 +112,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -156,6 +157,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -212,6 +214,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -274,6 +277,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -290,6 +294,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -326,6 +331,7 @@ describe('useToolExecutionScheduler', () => {
             invocation: createMockInvocation(),
           },
         ],
+        schedulerId: 'root',
       } as ToolCallsUpdateMessage);
     });
 
@@ -411,5 +417,104 @@ describe('useToolExecutionScheduler', () => {
 
     expect(completedResult).toEqual([completedToolCall]);
     expect(onComplete).toHaveBeenCalledWith([completedToolCall]);
+  });
+
+  it('setToolCallsForDisplay re-groups tools by schedulerId (Multi-Scheduler support)', () => {
+    const { result } = renderHook(() =>
+      useToolExecutionScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const callRoot = {
+      status: 'success' as const,
+      request: {
+        callId: 'call-root',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      response: {
+        callId: 'call-root',
+        responseParts: [],
+        resultDisplay: 'OK',
+        error: undefined,
+        errorType: undefined,
+      },
+      schedulerId: 'root',
+    };
+
+    const callSub = {
+      ...callRoot,
+      request: { ...callRoot.request, callId: 'call-sub' },
+      schedulerId: 'subagent-1',
+    };
+
+    // 1. Populate state with multiple schedulers
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [callRoot],
+        schedulerId: 'root',
+      } as ToolCallsUpdateMessage);
+
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [callSub],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    let [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(2);
+    expect(
+      toolCalls.find((t) => t.request.callId === 'call-root')?.schedulerId,
+    ).toBe('root');
+    expect(
+      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
+    ).toBe('subagent-1');
+
+    // 2. Call setToolCallsForDisplay (e.g., simulate a manual update or clear)
+    act(() => {
+      const [, , , setToolCalls] = result.current;
+      setToolCalls((prev) =>
+        prev.map((t) => ({ ...t, responseSubmittedToGemini: true })),
+      );
+    });
+
+    // 3. Verify that tools are still present and maintain their scheduler IDs
+    // The internal map should have been re-grouped.
+    [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls.every((t) => t.responseSubmittedToGemini)).toBe(true);
+
+    const updatedRoot = toolCalls.find((t) => t.request.callId === 'call-root');
+    const updatedSub = toolCalls.find((t) => t.request.callId === 'call-sub');
+
+    expect(updatedRoot?.schedulerId).toBe('root');
+    expect(updatedSub?.schedulerId).toBe('subagent-1');
+
+    // 4. Verify that a subsequent update to ONE scheduler doesn't wipe the other
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [{ ...callRoot, status: 'executing' }],
+        schedulerId: 'root',
+      } as ToolCallsUpdateMessage);
+    });
+
+    [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(2);
+    expect(
+      toolCalls.find((t) => t.request.callId === 'call-root')?.status,
+    ).toBe('executing');
+    expect(
+      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
+    ).toBe('subagent-1');
   });
 });

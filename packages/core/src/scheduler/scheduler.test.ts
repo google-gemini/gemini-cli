@@ -94,6 +94,8 @@ describe('Scheduler (Orchestrator)', () => {
     args: { foo: 'bar' },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
+    schedulerId: 'root',
+    parentCallId: undefined,
   };
 
   const req2: ToolCallRequestInfo = {
@@ -102,6 +104,8 @@ describe('Scheduler (Orchestrator)', () => {
     args: { foo: 'baz' },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
+    schedulerId: 'root',
+    parentCallId: undefined,
   };
 
   const mockTool = {
@@ -271,6 +275,8 @@ describe('Scheduler (Orchestrator)', () => {
             request: req1,
             tool: mockTool,
             invocation: mockInvocation,
+            schedulerId: 'root',
+            startTime: expect.any(Number),
           }),
         ]),
       );
@@ -769,6 +775,7 @@ describe('Scheduler (Orchestrator)', () => {
           config: mockConfig,
           messageBus: mockMessageBus,
           state: mockStateManager,
+          schedulerId: 'root',
         }),
       );
 

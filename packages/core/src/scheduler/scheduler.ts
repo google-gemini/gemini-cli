@@ -48,6 +48,8 @@ export interface SchedulerOptions {
   config: Config;
   messageBus: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
+  schedulerId?: string;
+  parentCallId?: string;
 }
 
 const createErrorResponse = (
@@ -85,6 +87,8 @@ export class Scheduler {
   private readonly config: Config;
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
+  private readonly schedulerId: string;
+  private readonly parentCallId?: string;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -94,7 +98,9 @@ export class Scheduler {
     this.config = options.config;
     this.messageBus = options.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.state = new SchedulerStateManager(this.messageBus);
+    this.schedulerId = options.schedulerId ?? 'root';
+    this.parentCallId = options.parentCallId;
+    this.state = new SchedulerStateManager(this.messageBus, this.schedulerId);
     this.executor = new ToolExecutor(this.config);
     this.modifier = new ToolModificationHandler();
 
@@ -228,16 +234,21 @@ export class Scheduler {
     try {
       const toolRegistry = this.config.getToolRegistry();
       const newCalls: ToolCall[] = requests.map((request) => {
+        const enrichedRequest: ToolCallRequestInfo = {
+          ...request,
+          schedulerId: this.schedulerId,
+          parentCallId: this.parentCallId,
+        };
         const tool = toolRegistry.getTool(request.name);
 
         if (!tool) {
           return this._createToolNotFoundErroredToolCall(
-            request,
+            enrichedRequest,
             toolRegistry.getAllToolNames(),
           );
         }
 
-        return this._validateAndCreateToolCall(request, tool);
+        return this._validateAndCreateToolCall(enrichedRequest, tool);
       });
 
       this.state.enqueue(newCalls);
@@ -263,6 +274,7 @@ export class Scheduler {
         ToolErrorType.TOOL_NOT_REGISTERED,
       ),
       durationMs: 0,
+      schedulerId: this.schedulerId,
     };
   }
 
@@ -278,6 +290,7 @@ export class Scheduler {
         tool,
         invocation,
         startTime: Date.now(),
+        schedulerId: this.schedulerId,
       };
     } catch (e) {
       return {
@@ -290,6 +303,7 @@ export class Scheduler {
           ToolErrorType.INVALID_TOOL_PARAMS,
         ),
         durationMs: 0,
+        schedulerId: this.schedulerId,
       };
     }
   }
@@ -411,6 +425,7 @@ export class Scheduler {
         state: this.state,
         modifier: this.modifier,
         getPreferredEditor: this.getPreferredEditor,
+        schedulerId: this.schedulerId,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;

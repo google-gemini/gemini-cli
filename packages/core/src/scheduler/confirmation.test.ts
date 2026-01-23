@@ -188,6 +188,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
 
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
@@ -217,6 +218,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
       await listenerPromise;
 
@@ -252,6 +254,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
 
       await waitForListener(MessageBusType.TOOL_CONFIRMATION_RESPONSE);
@@ -293,6 +296,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
 
       await listenerPromise1;
@@ -351,6 +355,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
 
       await listenerPromise;
@@ -397,6 +402,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
+        schedulerId: 'root',
       });
 
       const result = await promise;
@@ -420,6 +426,7 @@ describe('confirmation.ts', () => {
           state: mockState,
           modifier: mockModifier,
           getPreferredEditor,
+          schedulerId: 'root',
         }),
       ).rejects.toThrow(/lost during confirmation loop/);
     });
