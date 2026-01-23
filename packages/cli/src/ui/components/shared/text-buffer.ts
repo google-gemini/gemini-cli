@@ -701,6 +701,8 @@ export interface Transformation {
   logEnd: number;
   logicalText: string;
   collapsedText: string;
+  type: 'image' | 'paste';
+  id?: string; // For paste placeholders
 }
 export const imagePathRegex =
   /@((?:\\.|[^\s\r\n\\])+?\.(?:png|jpg|jpeg|gif|webp|svg|bmp))\b/gi;
@@ -749,11 +751,10 @@ export function calculateTransformationsForLine(
   }
 
   const transformations: Transformation[] = [];
-  let match: RegExpExecArray | null;
 
-  // Reset regex state to ensure clean matching from start of line
+  // 1. Detect image paths
   imagePathRegex.lastIndex = 0;
-
+  let match: RegExpExecArray | null;
   while ((match = imagePathRegex.exec(line)) !== null) {
     const logicalText = match[0];
     const logStart = cpLen(line.substring(0, match.index));
@@ -764,8 +765,29 @@ export function calculateTransformationsForLine(
       logEnd,
       logicalText,
       collapsedText: getTransformedImagePath(logicalText),
+      type: 'image',
     });
   }
+
+  // 2. Detect paste placeholders
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const logicalText = match[0];
+    const logStart = cpLen(line.substring(0, match.index));
+    const logEnd = logStart + cpLen(logicalText);
+
+    transformations.push({
+      logStart,
+      logEnd,
+      logicalText,
+      collapsedText: logicalText,
+      type: 'paste',
+      id: logicalText,
+    });
+  }
+
+  // Sort transformations by logStart to maintain consistency
+  transformations.sort((a, b) => a.logStart - b.logStart);
 
   transformationsCache.set(line, transformations);
 
@@ -812,24 +834,13 @@ function findAtomicPlaceholderForBackspace(
   cursorCol: number,
   transformations: Transformation[],
 ): AtomicPlaceholder | null {
-  // 1. Check paste placeholders (text-based)
-  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
-  let match;
-  while ((match = pasteRegex.exec(line)) !== null) {
-    const start = match.index;
-    const end = start + match[0].length;
-    if (cursorCol === end) {
-      return { start, end, type: 'paste', id: match[0] };
-    }
-  }
-
-  // 2. Check image transformations (logical bounds)
   for (const transform of transformations) {
     if (cursorCol === transform.logEnd) {
       return {
         start: transform.logStart,
         end: transform.logEnd,
-        type: 'image',
+        type: transform.type,
+        id: transform.id,
       };
     }
   }
@@ -845,28 +856,13 @@ function findAtomicPlaceholderForDelete(
   cursorCol: number,
   transformations: Transformation[],
 ): AtomicPlaceholder | null {
-  // 1. Check paste placeholders
-  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
-  let match;
-  while ((match = pasteRegex.exec(line)) !== null) {
-    const start = match.index;
-    if (cursorCol === start) {
-      return {
-        start,
-        end: start + match[0].length,
-        type: 'paste',
-        id: match[0],
-      };
-    }
-  }
-
-  // 2. Check image transformations
   for (const transform of transformations) {
     if (cursorCol === transform.logStart) {
       return {
         start: transform.logStart,
         end: transform.logEnd,
-        type: 'image',
+        type: transform.type,
+        id: transform.id,
       };
     }
   }
@@ -899,6 +895,7 @@ export function calculateTransformedLine(
     }
 
     const isExpanded =
+      transform.type === 'image' &&
       cursorIsOnThisLine &&
       cursorCol >= transform.logStart &&
       cursorCol <= transform.logEnd;
@@ -1293,9 +1290,28 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
   return { ...currentState, undoStack: newStack, redoStack: [] };
 };
 
+function generatePastedTextId(
+  content: string,
+  lineCount: number,
+  pastedContent: Record<string, string>,
+): string {
+  const base =
+    lineCount > LARGE_PASTE_LINE_THRESHOLD
+      ? `[Pasted Text: ${lineCount} lines]`
+      : `[Pasted Text: ${content.length} chars]`;
+
+  let id = base;
+  let suffix = 2;
+  while (pastedContent[id]) {
+    id = base.replace(']', ` #${suffix}]`);
+    suffix++;
+  }
+  return id;
+}
+
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
-  | { type: 'insert'; payload: string }
+  | { type: 'insert'; payload: string; isPaste?: boolean }
   | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
@@ -1414,6 +1430,25 @@ function textBufferReducerLogic(
       const currentLine = (r: number) => newLines[r] ?? '';
 
       let payload = action.payload;
+      let newPastedContent = nextState.pastedContent;
+
+      if (action.isPaste) {
+        // Normalize line endings for pastes
+        payload = payload.replace(/\r\n|\r/g, '\n');
+        const lineCount = payload.split('\n').length;
+        if (
+          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          payload.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          const id = generatePastedTextId(payload, lineCount, newPastedContent);
+          newPastedContent = {
+            ...newPastedContent,
+            [id]: payload,
+          };
+          payload = id;
+        }
+      }
+
       if (options.singleLine) {
         payload = payload.replace(/[\r\n]/g, '');
       }
@@ -1456,6 +1491,7 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
       };
     }
 
@@ -2186,64 +2222,20 @@ export function useTextBuffer({
     }
   }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
-  const addPastedContent = useCallback(
-    (content: string, lineCount: number): string => {
-      // content is already normalized by the caller
-      const base =
-        lineCount > LARGE_PASTE_LINE_THRESHOLD
-          ? `[Pasted Text: ${lineCount} lines]`
-          : `[Pasted Text: ${content.length} chars]`;
-
-      let id = base;
-      let suffix = 2;
-      while (pastedContent[id]) {
-        id = base.replace(']', ` #${suffix}]`);
-        suffix++;
-      }
-
-      dispatch({
-        type: 'add_pasted_content',
-        payload: { id, text: content },
-      });
-      return id;
-    },
-    [pastedContent],
-  );
-
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
       if (typeof ch !== 'string') {
         return;
       }
 
-      // Normalize line endings once at the entry point for pastes
-      const text = paste ? ch.replace(/\r\n|\r/g, '\n') : ch;
-
-      if (paste) {
-        const lineCount = text.split('\n').length;
-        if (
-          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
-          text.length > LARGE_PASTE_CHAR_THRESHOLD
-        ) {
-          const id = addPastedContent(text, lineCount);
-          dispatch({ type: 'insert', payload: id });
-          return;
-        }
-      }
-
-      if (!singleLine && /[\n\r]/.test(text)) {
-        dispatch({ type: 'insert', payload: text });
-        return;
-      }
-
-      let textToInsert = text;
+      let textToInsert = ch;
       const minLengthToInferAsDragDrop = 3;
       if (
-        text.length >= minLengthToInferAsDragDrop &&
+        ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
         paste
       ) {
-        let potentialPath = text.trim();
+        let potentialPath = ch.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
         if (quoteMatch) {
           potentialPath = quoteMatch[1];
@@ -2261,7 +2253,7 @@ export function useTextBuffer({
       for (const char of toCodePoints(textToInsert)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
-            dispatch({ type: 'insert', payload: currentText });
+            dispatch({ type: 'insert', payload: currentText, isPaste: paste });
             currentText = '';
           }
           dispatch({ type: 'backspace' });
@@ -2270,10 +2262,10 @@ export function useTextBuffer({
         }
       }
       if (currentText.length > 0) {
-        dispatch({ type: 'insert', payload: currentText });
+        dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive, singleLine, addPastedContent],
+    [isValidPath, shellModeActive],
   );
 
   const newline = useCallback((): void => {
@@ -2683,7 +2675,6 @@ export function useTextBuffer({
       visualLayout,
       setText,
       insert,
-      addPastedContent,
       newline,
       backspace,
       del,
@@ -2755,7 +2746,6 @@ export function useTextBuffer({
       visualLayout,
       setText,
       insert,
-      addPastedContent,
       newline,
       backspace,
       del,
@@ -2861,7 +2851,6 @@ export interface TextBuffer {
    * Insert a single character or string without newlines.
    */
   insert: (ch: string, opts?: { paste?: boolean }) => void;
-  addPastedContent: (text: string, lineCount: number) => string;
   newline: () => void;
   backspace: () => void;
   del: () => void;

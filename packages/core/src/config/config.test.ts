@@ -155,8 +155,8 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/delegate-to-agent-tool.js', () => ({
-  DelegateToAgentTool: vi.fn(),
+vi.mock('../agents/subagent-tool.js', () => ({
+  SubagentTool: vi.fn(),
 }));
 
 vi.mock('../resources/resource-registry.js', () => ({
@@ -274,10 +274,11 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
-    it('should not await MCP initialization', async () => {
+    it('should await MCP initialization in non-interactive mode', async () => {
       const config = new Config({
         ...baseParams,
         checkpointing: false,
+        // interactive defaults to false
       });
 
       const { McpClientManager } = await import(
@@ -295,7 +296,33 @@ describe('Server Config (config.ts)', () => {
 
       await config.initialize();
 
-      // Should return immediately, before MCP finishes (50ms delay)
+      // Should wait for MCP to finish
+      expect(mcpStarted).toBe(true);
+    });
+
+    it('should not await MCP initialization in interactive mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        interactive: true,
+      });
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should return immediately, before MCP finishes
       expect(mcpStarted).toBe(false);
 
       // Wait for it to eventually finish to avoid open handles
@@ -941,10 +968,14 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when codebaseInvestigatorSettings.enabled is true', async () => {
+    it('should register subagents as tools when agents.overrides.codebase_investigator.enabled is true', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: true },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
       };
       const config = new Config(params);
 
@@ -962,12 +993,15 @@ describe('Server Config (config.ts)', () => {
       AgentRegistryMock.prototype.getDefinition.mockReturnValue(
         mockAgentDefinition,
       );
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
+        mockAgentDefinition,
+      ]);
 
-      const DelegateToAgentToolMock = (
-        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
-          DelegateToAgentTool: Mock;
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
         }
-      ).DelegateToAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
@@ -977,8 +1011,8 @@ describe('Server Config (config.ts)', () => {
         }
       ).ToolRegistry.prototype.registerTool;
 
-      expect(DelegateToAgentToolMock).toHaveBeenCalledTimes(1);
-      expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
+      expect(SubAgentToolMock).toHaveBeenCalledTimes(1);
+      expect(SubAgentToolMock).toHaveBeenCalledWith(
         expect.anything(), // AgentRegistry
         config,
         expect.anything(), // MessageBus
@@ -986,33 +1020,32 @@ describe('Server Config (config.ts)', () => {
 
       const calls = registerToolMock.mock.calls;
       const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof DelegateToAgentToolMock,
+        (call) => call[0] instanceof SubAgentToolMock,
       );
       expect(registeredWrappers).toHaveLength(1);
     });
 
-    it('should not register subagents as tools when codebaseInvestigatorSettings.enabled is false', async () => {
+    it('should not register subagents as tools when agents are disabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: false },
-        cliHelpAgentSettings: { enabled: false },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: false },
+            cli_help: { enabled: false },
+          },
+        },
       };
       const config = new Config(params);
 
-      const DelegateToAgentToolMock = (
-        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
-          DelegateToAgentTool: Mock;
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
         }
-      ).DelegateToAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
-      expect(DelegateToAgentToolMock).not.toHaveBeenCalled();
-    });
-
-    it('should not set default codebase investigator model in config (defaults in registry)', () => {
-      const config = new Config(baseParams);
-      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
+      expect(SubAgentToolMock).not.toHaveBeenCalled();
     });
 
     describe('with minified tool class names', () => {
