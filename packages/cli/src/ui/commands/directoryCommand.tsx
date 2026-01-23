@@ -6,7 +6,6 @@
 
 import {
   isFolderTrustEnabled,
-  isWorkspaceTrusted,
   loadTrustedFolders,
 } from '../../config/trustedFolders.js';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
@@ -20,6 +19,7 @@ import {
   batchAddDirectories,
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
+import * as path from 'node:path';
 
 async function finishAddingDirectories(
   config: Config,
@@ -38,16 +38,18 @@ async function finishAddingDirectories(
     return;
   }
 
-  try {
-    if (config.shouldLoadMemoryFromIncludeDirectories()) {
-      await refreshServerHierarchicalMemory(config);
+  if (added.length > 0) {
+    try {
+      if (config.shouldLoadMemoryFromIncludeDirectories()) {
+        await refreshServerHierarchicalMemory(config);
+      }
+      addItem({
+        type: MessageType.INFO,
+        text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+      });
+    } catch (error) {
+      errors.push(`Error refreshing memory: ${(error as Error).message}`);
     }
-    addItem({
-      type: MessageType.INFO,
-      text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
-    });
-  } catch (error) {
-    errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
 
   if (added.length > 0) {
@@ -165,33 +167,22 @@ export const directoryCommand: SlashCommand = {
           return;
         }
 
-        if (
-          isFolderTrustEnabled(settings.merged) &&
-          isWorkspaceTrusted(settings.merged).isTrusted
-        ) {
+        if (isFolderTrustEnabled(settings.merged)) {
           const trustedFolders = loadTrustedFolders();
-          const untrustedDirs: string[] = [];
-          const undefinedTrustDirs: string[] = [];
+          const dirsToConfirm: string[] = [];
           const trustedDirs: string[] = [];
 
           for (const pathToAdd of pathsToProcess) {
-            const expandedPath = expandHomeDir(pathToAdd.trim());
+            const expandedPath = path.resolve(expandHomeDir(pathToAdd.trim()));
             const isTrusted = trustedFolders.isPathTrusted(expandedPath);
-            if (isTrusted === false) {
-              untrustedDirs.push(pathToAdd.trim());
-            } else if (isTrusted === undefined) {
-              undefinedTrustDirs.push(pathToAdd.trim());
-            } else {
+            // If explicitly trusted, add immediately.
+            // If undefined or explicitly untrusted (DO_NOT_TRUST), prompt for confirmation.
+            // This allows users to "upgrade" a DO_NOT_TRUST folder to trusted via the dialog.
+            if (isTrusted === true) {
               trustedDirs.push(pathToAdd.trim());
+            } else {
+              dirsToConfirm.push(pathToAdd.trim());
             }
-          }
-
-          if (untrustedDirs.length > 0) {
-            errors.push(
-              `The following directories are explicitly untrusted and cannot be added to a trusted workspace:\n- ${untrustedDirs.join(
-                '\n- ',
-              )}\nPlease use the permissions command to modify their trust level.`,
-            );
           }
 
           if (trustedDirs.length > 0) {
@@ -200,12 +191,12 @@ export const directoryCommand: SlashCommand = {
             errors.push(...result.errors);
           }
 
-          if (undefinedTrustDirs.length > 0) {
+          if (dirsToConfirm.length > 0) {
             return {
               type: 'custom_dialog',
               component: (
                 <MultiFolderTrustDialog
-                  folders={undefinedTrustDirs}
+                  folders={dirsToConfirm}
                   onComplete={context.ui.removeComponent}
                   trustedDirs={added}
                   errors={errors}
