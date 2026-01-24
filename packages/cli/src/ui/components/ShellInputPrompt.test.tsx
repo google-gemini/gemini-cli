@@ -78,6 +78,54 @@ describe('ShellInputPrompt', () => {
     expect(mockScrollPty).toHaveBeenCalledWith(1, direction);
   });
 
+  it.each([
+    ['pageup', -25],
+    ['pagedown', 25],
+  ])(
+    'handles page scroll %s (Ctrl+Shift+%s) with default size',
+    (key, expectedScroll) => {
+      render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+      const handler = mockUseKeypress.mock.calls[0][0];
+
+      handler({ name: key, shift: true, alt: false, ctrl: true, cmd: false });
+
+      expect(mockScrollPty).toHaveBeenCalledWith(1, expectedScroll);
+    },
+  );
+
+  it('respects scrollPageSize prop', () => {
+    render(
+      <ShellInputPrompt
+        activeShellPtyId={1}
+        focus={true}
+        scrollPageSize={10}
+      />,
+    );
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    // PageDown
+    handler({
+      name: 'pagedown',
+      shift: true,
+      alt: false,
+      ctrl: true,
+      cmd: false,
+    });
+    expect(mockScrollPty).toHaveBeenCalledWith(1, 10);
+
+    // PageUp
+    handler({
+      name: 'pageup',
+      shift: true,
+      alt: false,
+      ctrl: true,
+      cmd: false,
+    });
+    expect(mockScrollPty).toHaveBeenCalledWith(1, -10);
+  });
+
   it('does not handle input when not focused', () => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={false} />);
 

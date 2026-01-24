@@ -32,6 +32,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/textUtils.js', () => ({
+  pruneShellOutput: vi.fn((output) => `pruned: ${output}`),
+}));
+
 describe('toolMapping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -255,6 +259,49 @@ describe('toolMapping', () => {
 
       expect(displayTool.status).toBe(ToolCallStatus.Canceled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
+    });
+
+    it('prunes shell output for successful run_shell_command', () => {
+      const toolCall: SuccessfulToolCall = {
+        status: 'success',
+        request: { ...mockRequest, name: 'run_shell_command' },
+        tool: { ...mockTool, name: 'run_shell_command' },
+        invocation: mockInvocation,
+        response: { ...mockResponse, resultDisplay: 'long output' },
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.resultDisplay).toBe('pruned: long output');
+    });
+
+    it('prunes shell output for error run_shell_command', () => {
+      const toolCall: ToolCall = {
+        status: 'error',
+        request: { ...mockRequest, name: 'run_shell_command' },
+        response: { ...mockResponse, resultDisplay: 'long error output' },
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.resultDisplay).toBe('pruned: long error output');
+    });
+
+    it('does NOT prune output for other tools', () => {
+      const toolCall: SuccessfulToolCall = {
+        status: 'success',
+        request: { ...mockRequest, name: 'read_file' },
+        tool: { ...mockTool, name: 'read_file' },
+        invocation: mockInvocation,
+        response: { ...mockResponse, resultDisplay: 'long file content' },
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.resultDisplay).toBe('long file content');
     });
   });
 });

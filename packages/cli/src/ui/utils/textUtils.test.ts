@@ -8,15 +8,63 @@ import { describe, it, expect } from 'vitest';
 import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
+  AnsiOutput,
 } from '@google/gemini-cli-core';
 import {
   escapeAnsiCtrlCodes,
   stripUnsafeCharacters,
   getCachedStringWidth,
   sanitizeForListDisplay,
+  pruneShellOutput,
 } from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('pruneShellOutput', () => {
+    it('should return undefined if input is undefined', () => {
+      expect(pruneShellOutput(undefined, 5)).toBeUndefined();
+    });
+
+    it('should return original string if shorter than limit', () => {
+      const output = 'line1\nline2';
+      expect(pruneShellOutput(output, 5)).toBe(output);
+    });
+
+    it('should truncate string if longer than limit', () => {
+      const output = 'line1\nline2\nline3\nline4\nline5\nline6';
+      const expected = 'line2\nline3\nline4\nline5\nline6';
+      expect(pruneShellOutput(output, 5)).toBe(expected);
+    });
+
+    it('should return original AnsiOutput if shorter than limit', () => {
+      const output: AnsiOutput = ['line1', 'line2'];
+      expect(pruneShellOutput(output, 5)).toBe(output);
+    });
+
+    it('should truncate AnsiOutput if longer than limit', () => {
+      const output: AnsiOutput = [
+        'line1',
+        'line2',
+        'line3',
+        'line4',
+        'line5',
+        'line6',
+      ];
+      const expected: AnsiOutput = [
+        'line2',
+        'line3',
+        'line4',
+        'line5',
+        'line6',
+      ];
+      expect(pruneShellOutput(output, 5)).toEqual(expected);
+    });
+
+    it('should return original input if not string or array', () => {
+      const output = 123 as unknown as string;
+      expect(pruneShellOutput(output, 5)).toBe(output);
+    });
+  });
+
   describe('sanitizeForListDisplay', () => {
     it('should strip ANSI codes and replace newlines/tabs with spaces', () => {
       const input = '\u001b[31mLine 1\nLine 2\tTabbed\r\nEnd\u001b[0m';

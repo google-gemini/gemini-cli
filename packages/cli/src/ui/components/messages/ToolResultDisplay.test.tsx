@@ -191,4 +191,58 @@ describe('ToolResultDisplay', () => {
 
     expect(output).toMatchSnapshot();
   });
+
+  it('truncates ANSI output when maxLines is provided', () => {
+    const ansiResult: AnsiOutput = [
+      [
+        {
+          text: 'Line 1',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+      [
+        {
+          text: 'Line 2',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+      [
+        {
+          text: 'Line 3',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+    ];
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={ansiResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+        maxLines={2}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).not.toContain('Line 1');
+    expect(output).toContain('Line 2');
+    expect(output).toContain('Line 3');
+  });
 });

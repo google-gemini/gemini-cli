@@ -19,7 +19,7 @@ import type {
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { SHELL_COMMAND_NAME , SHELL_HISTORY_MAX_LINES } from '../constants.js';
+import { SHELL_COMMAND_NAME, SHELL_HISTORY_MAX_LINES } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
