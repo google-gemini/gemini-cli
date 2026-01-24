@@ -1042,7 +1042,15 @@ export const useGeminiStream = (
               if (Array.isArray(currentQuery)) {
                 currentQuery = [...currentQuery, { text: injectionText }];
               } else if (typeof currentQuery === 'string') {
-                currentQuery = currentQuery + injectionText;
+                currentQuery = [
+                  { text: currentQuery },
+                  { text: injectionText },
+                ] as Part[];
+              } else {
+                currentQuery = [
+                  currentQuery,
+                  { text: injectionText },
+                ] as Part[];
               }
               steeringInjectedInCurrentTurnRef.current = true;
             }
