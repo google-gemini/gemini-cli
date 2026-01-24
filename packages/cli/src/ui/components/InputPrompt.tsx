@@ -30,7 +30,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
@@ -141,7 +141,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId, history } = useUIState();
+  const { mainAreaWidth, activePtyId } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -525,12 +525,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText('');
           resetCompletionState();
           return;
-        } else if (history.length > 0) {
-          onSubmit('/rewind');
-          return;
         }
-        coreEvents.emitFeedback('info', 'Nothing to rewind to');
-        return;
       }
 
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
@@ -898,10 +893,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
-      onSubmit,
       activePtyId,
       setEmbeddedShellFocused,
-      history,
     ],
   );
 
