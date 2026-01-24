@@ -656,25 +656,21 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const prioritySubscribers = useRef<KeypressHandler[]>([]).current;
-  const normalSubscribers = useRef<KeypressHandler[]>([]).current;
+  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
 
   const subscribe = useCallback(
     (handler: KeypressHandler, priority = false) => {
-      const list = priority ? prioritySubscribers : normalSubscribers;
-      if (!list.includes(handler)) {
-        list.push(handler);
-      }
+      const set = priority ? prioritySubscribers : normalSubscribers;
+      set.add(handler);
     },
     [prioritySubscribers, normalSubscribers],
   );
 
   const unsubscribe = useCallback(
     (handler: KeypressHandler) => {
-      const pIdx = prioritySubscribers.indexOf(handler);
-      if (pIdx !== -1) prioritySubscribers.splice(pIdx, 1);
-      const nIdx = normalSubscribers.indexOf(handler);
-      if (nIdx !== -1) normalSubscribers.splice(nIdx, 1);
+      prioritySubscribers.delete(handler);
+      normalSubscribers.delete(handler);
     },
     [prioritySubscribers, normalSubscribers],
   );
@@ -682,16 +678,16 @@ export function KeypressProvider({
   const broadcast = useCallback(
     (key: Key) => {
       // Process priority subscribers first, in reverse order (stack behavior: last subscribed is first to handle)
-      for (let i = prioritySubscribers.length - 1; i >= 0; i--) {
-        const handler = prioritySubscribers[i];
+      const priorityHandlers = Array.from(prioritySubscribers).reverse();
+      for (const handler of priorityHandlers) {
         if (handler(key) === true) {
           return;
         }
       }
 
       // Then process normal subscribers, also in reverse order
-      for (let i = normalSubscribers.length - 1; i >= 0; i--) {
-        const handler = normalSubscribers[i];
+      const normalHandlers = Array.from(normalSubscribers).reverse();
+      for (const handler of normalHandlers) {
         if (handler(key) === true) {
           return;
         }
