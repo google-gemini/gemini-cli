@@ -76,12 +76,15 @@ interface DiffCommand {
 
 const execAsync = promisify(exec);
 
+function getCommandExistsCmd(cmd: string): string {
+  return process.platform === 'win32'
+    ? `where.exe ${cmd}`
+    : `command -v ${cmd}`;
+}
+
 function commandExists(cmd: string): boolean {
   try {
-    execSync(
-      process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`,
-      { stdio: 'ignore' },
-    );
+    execSync(getCommandExistsCmd(cmd), { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -90,9 +93,7 @@ function commandExists(cmd: string): boolean {
 
 async function commandExistsAsync(cmd: string): Promise<boolean> {
   try {
-    await execAsync(
-      process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`,
-    );
+    await execAsync(getCommandExistsCmd(cmd));
     return true;
   } catch {
     return false;
