@@ -144,6 +144,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       agentToolRegistry.sortTools();
+    } else {
+      // If no tools are explicitly configured, default to all available tools.
+      for (const toolName of parentToolRegistry.getAllToolNames()) {
+        // Check if the tool is a subagent to prevent recursion.
+        // We do not allow agents to call other agents.
+        if (allAgentNames.has(toolName)) {
+          debugLogger.warn(
+            `[LocalAgentExecutor] Skipping subagent tool '${toolName}' for agent '${definition.name}' to prevent recursion.`,
+          );
+          continue;
+        }
+
+        const tool = parentToolRegistry.getTool(toolName);
+        if (tool) {
+          agentToolRegistry.registerTool(tool);
+        }
+      }
+      agentToolRegistry.sortTools();
     }
 
     // Get the parent prompt ID from context
