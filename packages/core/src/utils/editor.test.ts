@@ -15,18 +15,23 @@ import {
 } from 'vitest';
 import {
   checkHasEditorType,
+  checkHasEditorTypeAsync,
   getDiffCommand,
   openDiff,
   allowEditorTypeInSandbox,
   isEditorAvailable,
+  isEditorAvailableAsync,
   detectFirstAvailableEditor,
+  detectFirstAvailableEditorAsync,
   resolveEditor,
+  resolveEditorAsync,
   type EditorType,
 } from './editor.js';
-import { execSync, spawn, spawnSync } from 'node:child_process';
+import { exec, execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
 vi.mock('child_process', () => ({
+  exec: vi.fn(),
   execSync: vi.fn(),
   spawn: vi.fn(),
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
@@ -666,6 +671,162 @@ describe('editor utils', () => {
       });
       vi.stubEnv('SANDBOX', 'sandbox');
       const result = resolveEditor(undefined);
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
+    });
+  });
+
+  // Helper to create a mock exec that simulates async behavior
+  const mockExecAsync = (implementation: (cmd: string) => boolean): void => {
+    (exec as unknown as Mock).mockImplementation(
+      (
+        cmd: string,
+        callback: (error: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (implementation(cmd)) {
+          callback(null, '/usr/bin/cmd', '');
+        } else {
+          callback(new Error('Command not found'), '', '');
+        }
+      },
+    );
+  };
+
+  describe('checkHasEditorTypeAsync', () => {
+    it('should return true if vim command exists', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockExecAsync((cmd) => cmd.includes('vim'));
+      expect(await checkHasEditorTypeAsync('vim')).toBe(true);
+    });
+
+    it('should return false if vim command does not exist', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockExecAsync(() => false);
+      expect(await checkHasEditorTypeAsync('vim')).toBe(false);
+    });
+
+    it('should check zed and zeditor commands in order', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockExecAsync((cmd) => cmd.includes('zeditor'));
+      expect(await checkHasEditorTypeAsync('zed')).toBe(true);
+    });
+  });
+
+  describe('isEditorAvailableAsync', () => {
+    it('should return false for undefined editor', async () => {
+      expect(await isEditorAvailableAsync(undefined)).toBe(false);
+    });
+
+    it('should return false for empty string editor', async () => {
+      expect(await isEditorAvailableAsync('')).toBe(false);
+    });
+
+    it('should return false for invalid editor type', async () => {
+      expect(await isEditorAvailableAsync('invalid-editor')).toBe(false);
+    });
+
+    it('should return true for vscode when installed and not in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('code'));
+      vi.stubEnv('SANDBOX', '');
+      expect(await isEditorAvailableAsync('vscode')).toBe(true);
+    });
+
+    it('should return false for vscode when not installed', async () => {
+      mockExecAsync(() => false);
+      expect(await isEditorAvailableAsync('vscode')).toBe(false);
+    });
+
+    it('should return false for vscode in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('code'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(await isEditorAvailableAsync('vscode')).toBe(false);
+    });
+
+    it('should return true for vim in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('vim'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(await isEditorAvailableAsync('vim')).toBe(true);
+    });
+  });
+
+  describe('detectFirstAvailableEditorAsync', () => {
+    it('should return undefined when no editors are installed', async () => {
+      mockExecAsync(() => false);
+      vi.stubEnv('SANDBOX', '');
+      expect(await detectFirstAvailableEditorAsync()).toBeUndefined();
+    });
+
+    it('should prioritize terminal editors over GUI editors', async () => {
+      mockExecAsync(
+        (cmd) =>
+          (cmd.includes('vim') && !cmd.includes('nvim')) ||
+          cmd.includes('code'),
+      );
+      vi.stubEnv('SANDBOX', '');
+      expect(await detectFirstAvailableEditorAsync()).toBe('vim');
+    });
+
+    it('should return vim in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('vim') && !cmd.includes('nvim'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(await detectFirstAvailableEditorAsync()).toBe('vim');
+    });
+
+    it('should skip GUI editors in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('code'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(await detectFirstAvailableEditorAsync()).toBeUndefined();
+    });
+  });
+
+  describe('resolveEditorAsync', () => {
+    it('should return the preferred editor when available', async () => {
+      mockExecAsync((cmd) => cmd.includes('vim'));
+      vi.stubEnv('SANDBOX', '');
+      const result = await resolveEditorAsync('vim');
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error when preferred editor is not installed', async () => {
+      mockExecAsync(() => false);
+      vi.stubEnv('SANDBOX', '');
+      const result = await resolveEditorAsync('vim');
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('Vim');
+      expect(result.error).toContain('not installed');
+    });
+
+    it('should return error when preferred GUI editor cannot be used in sandbox mode', async () => {
+      mockExecAsync((cmd) => cmd.includes('code'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      const result = await resolveEditorAsync('vscode');
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('VS Code');
+      expect(result.error).toContain('sandbox mode');
+    });
+
+    it('should auto-detect editor when no preference is set', async () => {
+      mockExecAsync((cmd) => cmd.includes('vim') && !cmd.includes('nvim'));
+      vi.stubEnv('SANDBOX', '');
+      const result = await resolveEditorAsync(undefined);
+      expect(result.editor).toBe('vim');
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error when no preference is set and no editors are available', async () => {
+      mockExecAsync(() => false);
+      vi.stubEnv('SANDBOX', '');
+      const result = await resolveEditorAsync(undefined);
+      expect(result.editor).toBeUndefined();
+      expect(result.error).toContain('No external editor');
+      expect(result.error).toContain('/editor');
+    });
+
+    it('should work with terminal editors in sandbox mode when no preference is set', async () => {
+      mockExecAsync((cmd) => cmd.includes('vim') && !cmd.includes('nvim'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      const result = await resolveEditorAsync(undefined);
       expect(result.editor).toBe('vim');
       expect(result.error).toBeUndefined();
     });

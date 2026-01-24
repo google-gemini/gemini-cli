@@ -12,7 +12,7 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import { resolveEditor, type EditorType } from '../utils/editor.js';
+import { resolveEditorAsync, type EditorType } from '../utils/editor.js';
 import { coreEvents } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision, ApprovalMode } from '../policy/types.js';
@@ -759,9 +759,10 @@ export class CoreToolScheduler {
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
 
-      // Use resolveEditor to check availability and auto-detect if needed
+      // Use resolveEditorAsync to check availability and auto-detect if needed
+      // Using async version to avoid blocking the event loop
       const preferredEditor = this.getPreferredEditor();
-      const resolution = resolveEditor(preferredEditor);
+      const resolution = await resolveEditorAsync(preferredEditor);
 
       if (!resolution.editor) {
         // No editor available - emit error feedback and cancel the operation

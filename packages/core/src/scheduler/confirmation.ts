@@ -21,7 +21,7 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import { resolveEditor, type EditorType } from '../utils/editor.js';
+import { resolveEditorAsync, type EditorType } from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -218,12 +218,13 @@ async function handleExternalModification(
 ): Promise<ExternalModificationResult> {
   const { state, modifier, getPreferredEditor } = deps;
 
-  // Use the new resolveEditor function which handles:
+  // Use the new resolveEditorAsync function which handles:
   // 1. Checking if preferred editor is available
   // 2. Auto-detecting an available editor if none is configured
   // 3. Providing helpful error messages
+  // Using async version to avoid blocking the event loop
   const preferredEditor = getPreferredEditor();
-  const resolution = resolveEditor(preferredEditor);
+  const resolution = await resolveEditorAsync(preferredEditor);
 
   if (!resolution.editor) {
     // No editor available - return failure with error message
