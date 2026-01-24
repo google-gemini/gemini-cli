@@ -938,7 +938,7 @@ describe('mapToDisplay', () => {
       name: 'validating',
       status: 'validating',
       extraProps: { tool: baseTool, invocation: baseInvocation },
-      expectedStatus: ToolCallStatus.Executing,
+      expectedStatus: ToolCallStatus.Pending,
       expectedName: baseTool.displayName,
       expectedDescription: baseInvocation.getDescription(),
     },
