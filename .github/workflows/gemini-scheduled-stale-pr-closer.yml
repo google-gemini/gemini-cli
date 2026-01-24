@@ -15,7 +15,7 @@ on:
 
 jobs:
   close-stale-prs:
-    if: "github.repository == 'google-gemini/gemini-cli'"
+    if: 'github.repository == ''google-gemini/gemini-cli'''
     runs-on: 'ubuntu-latest'
     permissions:
       pull-requests: 'write'
@@ -80,7 +80,8 @@ jobs:
               const maintainerPr = isMaintainer(pr.user.login, pr.author_association);
               const isBot = pr.user.type === 'Bot' || pr.user.login.endsWith('[bot]');
 
-              // Linked issue check
+              // Detection Logic for Linked Issues
+              // Check 1: Official GitHub "Closing Issue" link (GraphQL)
               const linkedIssueQuery = `query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo) {
                   pullRequest(number:$number) {
@@ -89,13 +90,21 @@ jobs:
                 }
               }`;
 
-              let hasLinkedIssue = false;
+              let hasClosingLink = false;
               try {
                 const res = await github.graphql(linkedIssueQuery, {
                   owner: context.repo.owner, repo: context.repo.repo, number: pr.number
                 });
-                hasLinkedIssue = res.repository.pullRequest.closingIssuesReferences.totalCount > 0;
+                hasClosingLink = res.repository.pullRequest.closingIssuesReferences.totalCount > 0;
               } catch (e) {}
+
+              // Check 2: Regex for mentions (e.g., "Related to #123", "Part of #123", "#123")
+              // We check for # followed by numbers or direct URLs to issues.
+              const body = pr.body || '';
+              const mentionRegex = /(?:#|https:\/\/github\.com\/[^\/]+\/[^\/]+\/issues\/)(\d+)/i;
+              const hasMentionLink = mentionRegex.test(body);
+
+              const hasLinkedIssue = hasClosingLink || hasMentionLink;
 
               // Logic for Closed PRs (Auto-Reopen)
               if (pr.state === 'closed' && context.eventName === 'pull_request' && context.payload.action === 'edited') {
@@ -127,7 +136,7 @@ jobs:
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: pr.number,
-                    body: "Hi there! Thank you for your contribution to Gemini CLI. \n\nTo improve our contribution process and better track changes, we now require all pull requests to be associated with an existing issue, as announced in our [recent discussion](https://github.com/google-gemini/gemini-cli/discussions/16706) and as detailed in our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md#1-link-to-an-existing-issue).\n\nThis pull request is being closed because it is not currently linked to an issue. **Once you have updated the description of this PR to link an issue (e.g., by adding `Fixes #123`), it will be automatically reopened.**\n\n**How to link an issue:**\nAdd a keyword followed by the issue number (e.g., `Fixes #123`) in the description of your pull request. For more details on supported keywords and how linking works, please refer to the [GitHub Documentation on linking pull requests to issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).\n\nThank you for your understanding and for being a part of our community!"
+                    body: "Hi there! Thank you for your contribution to Gemini CLI. \n\nTo improve our contribution process and better track changes, we now require all pull requests to be associated with an existing issue, as announced in our [recent discussion](https://github.com/google-gemini/gemini-cli/discussions/16706) and as detailed in our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md#1-link-to-an-existing-issue).\n\nThis pull request is being closed because it is not currently linked to an issue. **Once you have updated the description of this PR to link an issue (e.g., by adding `Fixes #123` or `Related to #123`), it will be automatically reopened.**\n\n**How to link an issue:**\nAdd a keyword followed by the issue number (e.g., `Fixes #123`) in the description of your pull request. For more details on supported keywords and how linking works, please refer to the [GitHub Documentation on linking pull requests to issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).\n\nThank you for your understanding and for being a part of our community!"
                   });
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
