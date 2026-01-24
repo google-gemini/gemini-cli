@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 2 * * *' # Every day at 2 AM UTC
   pull_request:
-    types: ['opened']
+    types: ['opened', 'edited']
   workflow_dispatch:
     inputs:
       dry_run:
@@ -61,30 +61,26 @@ jobs:
             // 2. Determine which PRs to check
             let prs = [];
             if (context.eventName === 'pull_request') {
-              // ONLY check the triggering PR
               const { data: pr } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.payload.pull_request.number
               });
               prs = [pr];
-              core.info(`Triggered by PR #${pr.number}. Checking only this PR.`);
             } else {
-              // Scheduled or manual: Check all open PRs
               prs = await github.paginate(github.rest.pulls.list, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 state: 'open',
                 per_page: 100
               });
-              core.info(`Scheduled run. Checking all ${prs.length} open pull requests.`);
             }
 
             for (const pr of prs) {
               const maintainerPr = isMaintainer(pr.user.login, pr.author_association);
               const isBot = pr.user.type === 'Bot' || pr.user.login.endsWith('[bot]');
 
-              // Linked issue check (Immediate Closure Logic)
+              // Linked issue check
               const linkedIssueQuery = `query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo) {
                   pullRequest(number:$number) {
@@ -101,14 +97,37 @@ jobs:
                 hasLinkedIssue = res.repository.pullRequest.closingIssuesReferences.totalCount > 0;
               } catch (e) {}
 
-              if (!maintainerPr && !hasLinkedIssue && !isBot) {
-                core.info(`PR #${pr.number} is missing a linked issue.`);
+              // Logic for Closed PRs (Auto-Reopen)
+              if (pr.state === 'closed' && context.eventName === 'pull_request' && context.payload.action === 'edited') {
+                if (hasLinkedIssue) {
+                  core.info(`PR #${pr.number} now has a linked issue. Reopening.`);
+                  if (!dryRun) {
+                    await github.rest.pulls.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: pr.number,
+                      state: 'open'
+                    });
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: pr.number,
+                      body: "Thank you for linking an issue! This pull request has been automatically reopened."
+                    });
+                  }
+                }
+                continue;
+              }
+
+              // Logic for Open PRs (Immediate Closure)
+              if (pr.state === 'open' && !maintainerPr && !hasLinkedIssue && !isBot) {
+                core.info(`PR #${pr.number} is missing a linked issue. Closing.`);
                 if (!dryRun) {
                   await github.rest.issues.createComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: pr.number,
-                    body: "Hi there! Thank you for your contribution to Gemini CLI. \n\nTo improve our contribution process and better track changes, we now require all pull requests to be associated with an existing issue, as announced in our [recent discussion](https://github.com/google-gemini/gemini-cli/discussions/16706) and as detailed in our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md#1-link-to-an-existing-issue).\n\nThis pull request is being closed because it is not currently linked to an issue. You can easily reopen this PR once you have linked it to an issue. \n\n**How to link an issue:**\nAdd a keyword followed by the issue number (e.g., Fixes #123) in the description of your pull request. For more details, see the [GitHub Documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).\n\nThank you for your understanding and for being a part of our community!"
+                    body: "Hi there! Thank you for your contribution to Gemini CLI. \n\nTo improve our contribution process and better track changes, we now require all pull requests to be associated with an existing issue, as announced in our [recent discussion](https://github.com/google-gemini/gemini-cli/discussions/16706) and as detailed in our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md#1-link-to-an-existing-issue).\n\nThis pull request is being closed because it is not currently linked to an issue. **Once you have updated the description of this PR to link an issue (e.g., by adding `Fixes #123`), it will be automatically reopened.**\n\n**How to link an issue:**\nAdd a keyword followed by the issue number (e.g., `Fixes #123`) in the description of your pull request. For more details on supported keywords and how linking works, please refer to the [GitHub Documentation on linking pull requests to issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).\n\nThank you for your understanding and for being a part of our community!"
                   });
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
@@ -120,9 +139,8 @@ jobs:
                 continue;
               }
 
-              // Staleness check (Only for scheduled runs or non-triggering PRs)
-              // If triggered by PR opened, we don't need to check staleness.
-              if (context.eventName !== 'pull_request') {
+              // Staleness check (Scheduled runs only)
+              if (pr.state === 'open' && context.eventName !== 'pull_request') {
                 const labels = pr.labels.map(l => l.name.toLowerCase());
                 if (labels.includes('help wanted') || labels.includes('🔒 maintainer only')) continue;
 
