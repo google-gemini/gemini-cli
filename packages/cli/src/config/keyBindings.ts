@@ -333,6 +333,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.NAVIGATION_DOWN,
       Command.DIALOG_NAVIGATION_UP,
       Command.DIALOG_NAVIGATION_DOWN,
+      Command.DIALOG_NEXT,
+      Command.DIALOG_PREV,
     ],
   },
   {

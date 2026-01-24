@@ -333,7 +333,7 @@ export function BaseSettingsDialog({
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
-          return;
+          return true;
         }
         if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
@@ -343,7 +343,7 @@ export function BaseSettingsDialog({
           } else if (newIndex >= scrollOffset + maxItemsToShow) {
             setScrollOffset(newIndex - maxItemsToShow + 1);
           }
-          return;
+          return true;
         }
 
         // Enter - toggle or start edit
@@ -356,19 +356,19 @@ export function BaseSettingsDialog({
             const initialValue = rawVal !== undefined ? String(rawVal) : '';
             startEditing(currentItem.key, initialValue);
           }
-          return;
+          return true;
         }
 
         // Ctrl+L - clear/reset to default (using only Ctrl+L to avoid Ctrl+C exit conflict)
         if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
           onItemClear(currentItem.key, currentItem);
-          return;
+          return true;
         }
 
         // Number keys for quick edit on number fields
         if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
           startEditing(currentItem.key, key.sequence);
-          return;
+          return true;
         }
       }
 
@@ -383,6 +383,8 @@ export function BaseSettingsDialog({
         onClose();
         return;
       }
+
+      return;
     },
     { isActive: true },
   );
@@ -562,6 +564,7 @@ export function BaseSettingsDialog({
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
               showNumbers={focusSection === 'scope'}
+              priority={focusSection === 'scope'}
             />
           </Box>
         )}

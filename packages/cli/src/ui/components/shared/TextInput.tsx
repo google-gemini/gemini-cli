@@ -40,19 +40,17 @@ export function TextInput({
 
   const handleKeyPress = useCallback(
     (key: Key) => {
-      // console.log(`TextInput handleKeyPress ${key.name} priority subscriber`);
-      if (key.name === 'escape') {
-        onCancel?.();
+      if (key.name === 'escape' && onCancel) {
+        onCancel();
         return true;
       }
 
-      if (key.name === 'return') {
-        onSubmit?.(text);
+      if (key.name === 'return' && onSubmit) {
+        onSubmit(text);
         return true;
       }
 
       const handled = handleInput(key);
-      // console.log(`TextInput handled: ${handled}`);
       return handled;
     },
     [handleInput, onCancel, onSubmit, text],

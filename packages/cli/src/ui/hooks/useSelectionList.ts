@@ -30,6 +30,7 @@ export interface UseSelectionListOptions<T> {
   showNumbers?: boolean;
   wrapAround?: boolean;
   focusKey?: string;
+  priority?: boolean;
 }
 
 export interface UseSelectionListResult {
@@ -288,6 +289,7 @@ export function useSelectionList<T>({
   showNumbers = false,
   wrapAround = true,
   focusKey,
+  priority,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
   const baseItems = toBaseItems(items);
 
@@ -401,7 +403,6 @@ export function useSelectionList<T>({
       }
 
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        // console.log(`useSelectionList handleKeypress ${key.name} normal subscriber`);
         dispatch({ type: 'MOVE_DOWN' });
         return true;
       }
@@ -463,7 +464,10 @@ export function useSelectionList<T>({
     [dispatch, itemsLength, showNumbers],
   );
 
-  useKeypress(handleKeypress, { isActive: !!(isFocused && itemsLength > 0) });
+  useKeypress(handleKeypress, {
+    isActive: !!(isFocused && itemsLength > 0),
+    priority,
+  });
 
   const setActiveIndex = (index: number) => {
     dispatch({

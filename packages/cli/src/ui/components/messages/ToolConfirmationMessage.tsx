@@ -74,10 +74,12 @@ export const ToolConfirmationMessage: React.FC<
 
   useKeypress(
     (key) => {
-      if (!isFocused) return;
+      if (!isFocused) return false;
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
+        return true;
       }
+      return false;
     },
     { isActive: isFocused },
   );

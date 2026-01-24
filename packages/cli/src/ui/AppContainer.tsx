@@ -1324,7 +1324,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setCopyModeEnabled(false);
         enableMouseEvents();
         // We don't want to process any other keys if we're in copy mode.
-        return;
+        return true;
       }
 
       // Debug log keystrokes if enabled
@@ -1335,7 +1335,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1344,13 +1344,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         cancelOngoingRequest?.();
 
         setCtrlCPressCount((prev) => prev + 1);
-        return;
+        return true;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
-          return;
+          return false;
         }
         setCtrlDPressCount((prev) => prev + 1);
-        return;
+        return true;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1361,8 +1361,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
+        return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
+        return true;
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
@@ -1370,6 +1372,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           refreshStatic();
           return newValue;
         });
+        return true;
       } else if (
         keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
@@ -1377,11 +1380,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
+        return true;
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+        return true;
       } else if (
         keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) &&
         activePtyId &&
@@ -1390,7 +1395,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (key.name === 'tab' && key.shift) {
           // Always change focus
           setEmbeddedShellFocused(false);
-          return;
+          return true;
         }
 
         const now = Date.now();
@@ -1410,10 +1415,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }
             setEmbeddedShellFocused(false);
           }, 100);
-          return;
+          return true;
         }
         handleWarning('Press Shift+Tab to focus out.');
+        return true;
       }
+      return false;
     },
     [
       constrainHeight,

@@ -656,15 +656,14 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
-  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const prioritySubscribers = useRef<KeypressHandler[]>([]).current;
+  const normalSubscribers = useRef<KeypressHandler[]>([]).current;
 
   const subscribe = useCallback(
     (handler: KeypressHandler, priority = false) => {
-      if (priority) {
-        prioritySubscribers.add(handler);
-      } else {
-        normalSubscribers.add(handler);
+      const list = priority ? prioritySubscribers : normalSubscribers;
+      if (!list.includes(handler)) {
+        list.push(handler);
       }
     },
     [prioritySubscribers, normalSubscribers],
@@ -672,28 +671,28 @@ export function KeypressProvider({
 
   const unsubscribe = useCallback(
     (handler: KeypressHandler) => {
-      prioritySubscribers.delete(handler);
-      normalSubscribers.delete(handler);
+      const pIdx = prioritySubscribers.indexOf(handler);
+      if (pIdx !== -1) prioritySubscribers.splice(pIdx, 1);
+      const nIdx = normalSubscribers.indexOf(handler);
+      if (nIdx !== -1) normalSubscribers.splice(nIdx, 1);
     },
     [prioritySubscribers, normalSubscribers],
   );
 
   const broadcast = useCallback(
     (key: Key) => {
-      // Process priority subscribers first, in reverse order (stack behavior)
-      const priorityHandlers = Array.from(prioritySubscribers).reverse();
-      for (const handler of priorityHandlers) {
+      // Process priority subscribers first, in reverse order (stack behavior: last subscribed is first to handle)
+      for (let i = prioritySubscribers.length - 1; i >= 0; i--) {
+        const handler = prioritySubscribers[i];
         if (handler(key) === true) {
-          // debugLogger.debug(`Key ${key.name} consumed by priority handler`);
           return;
         }
       }
 
       // Then process normal subscribers, also in reverse order
-      const normalHandlers = Array.from(normalSubscribers).reverse();
-      for (const handler of normalHandlers) {
+      for (let i = normalSubscribers.length - 1; i >= 0; i--) {
+        const handler = normalSubscribers[i];
         if (handler(key) === true) {
-          // debugLogger.debug(`Key ${key.name} consumed by normal handler`);
           return;
         }
       }

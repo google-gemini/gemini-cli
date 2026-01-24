@@ -21,12 +21,15 @@ export const LoginWithGoogleRestartDialog = ({
     (key) => {
       if (key.name === 'escape') {
         onDismiss();
+        return true;
       } else if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
           await runExitCleanup();
           process.exit(RELAUNCH_EXIT_CODE);
         }, 100);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

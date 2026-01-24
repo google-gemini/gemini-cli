@@ -2520,10 +2520,16 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.RETURN](key)) {
+        if (singleLine) {
+          return false;
+        }
         newline();
         return true;
       }
       if (keyMatchers[Command.NEWLINE](key)) {
+        if (singleLine) {
+          return false;
+        }
         newline();
         return true;
       }
@@ -2612,6 +2618,7 @@ export function useTextBuffer({
       cursorRow,
       cursorCol,
       lines,
+      singleLine,
     ],
   );
 

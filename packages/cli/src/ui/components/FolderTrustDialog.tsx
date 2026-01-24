@@ -59,7 +59,9 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     (key) => {
       if (key.name === 'escape') {
         handleExit();
+        return true;
       }
+      return false;
     },
     { isActive: !isRestarting },
   );
