@@ -20,8 +20,8 @@ import {
   type GeminiClient,
   SlashCommandStatus,
   makeFakeConfig,
+  coreEvents,
 } from '@google/gemini-cli-core';
-import { appEvents } from '../../utils/events.js';
 
 const {
   logSlashCommand,
@@ -156,11 +156,28 @@ describe('useSlashCommandProcessor', () => {
   });
 
   const setupProcessorHook = async (
-    builtinCommands: SlashCommand[] = [],
-    fileCommands: SlashCommand[] = [],
-    mcpCommands: SlashCommand[] = [],
-    setIsProcessing = vi.fn(),
+    options: {
+      builtinCommands?: SlashCommand[];
+      fileCommands?: SlashCommand[];
+      mcpCommands?: SlashCommand[];
+      setIsProcessing?: (isProcessing: boolean) => void;
+      refreshStatic?: () => void;
+      openAgentConfigDialog?: (
+        name: string,
+        displayName: string,
+        definition: unknown,
+      ) => void;
+    } = {},
   ) => {
+    const {
+      builtinCommands = [],
+      fileCommands = [],
+      mcpCommands = [],
+      setIsProcessing = vi.fn(),
+      refreshStatic = vi.fn(),
+      openAgentConfigDialog = vi.fn(),
+    } = options;
+
     mockBuiltinLoadCommands.mockResolvedValue(Object.freeze(builtinCommands));
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
     mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
@@ -177,7 +194,7 @@ describe('useSlashCommandProcessor', () => {
           mockAddItem,
           mockClearItems,
           mockLoadHistory,
-          vi.fn(), // refreshStatic
+          refreshStatic,
           vi.fn(), // toggleVimEnabled
           setIsProcessing,
           {
@@ -188,6 +205,7 @@ describe('useSlashCommandProcessor', () => {
             openSettingsDialog: vi.fn(),
             openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
+            openAgentConfigDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
             setDebugMessage: vi.fn(),
@@ -195,6 +213,7 @@ describe('useSlashCommandProcessor', () => {
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
+            setText: vi.fn(),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized
@@ -233,7 +252,9 @@ describe('useSlashCommandProcessor', () => {
           context.ui.clear();
         },
       });
-      const result = await setupProcessorHook([clearCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [clearCommand],
+      });
 
       await act(async () => {
         await result.current.handleSlashCommand('/clear');
@@ -250,7 +271,9 @@ describe('useSlashCommandProcessor', () => {
           context.ui.clear();
         },
       });
-      const result = await setupProcessorHook([clearCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [clearCommand],
+      });
 
       await act(async () => {
         await result.current.handleSlashCommand('/clear');
@@ -270,7 +293,9 @@ describe('useSlashCommandProcessor', () => {
 
     it('should call loadCommands and populate state after mounting', async () => {
       const testCommand = createTestCommand({ name: 'test' });
-      const result = await setupProcessorHook([testCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [testCommand],
+      });
 
       await waitFor(() => {
         expect(result.current.slashCommands).toHaveLength(1);
@@ -284,7 +309,9 @@ describe('useSlashCommandProcessor', () => {
 
     it('should provide an immutable array of commands to consumers', async () => {
       const testCommand = createTestCommand({ name: 'test' });
-      const result = await setupProcessorHook([testCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [testCommand],
+      });
 
       await waitFor(() => {
         expect(result.current.slashCommands).toHaveLength(1);
@@ -312,7 +339,10 @@ describe('useSlashCommandProcessor', () => {
         CommandKind.FILE,
       );
 
-      const result = await setupProcessorHook([builtinCommand], [fileCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [builtinCommand],
+        fileCommands: [fileCommand],
+      });
 
       await waitFor(() => {
         // The service should only return one command with the name 'override'
@@ -362,7 +392,9 @@ describe('useSlashCommandProcessor', () => {
           },
         ],
       };
-      const result = await setupProcessorHook([parentCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [parentCommand],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -396,7 +428,9 @@ describe('useSlashCommandProcessor', () => {
           },
         ],
       };
-      const result = await setupProcessorHook([parentCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [parentCommand],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -420,7 +454,9 @@ describe('useSlashCommandProcessor', () => {
 
     it('sets isProcessing to false if the the input is not a command', async () => {
       const setMockIsProcessing = vi.fn();
-      const result = await setupProcessorHook([], [], [], setMockIsProcessing);
+      const result = await setupProcessorHook({
+        setIsProcessing: setMockIsProcessing,
+      });
 
       await act(async () => {
         await result.current.handleSlashCommand('imnotacommand');
@@ -436,12 +472,10 @@ describe('useSlashCommandProcessor', () => {
         action: vi.fn().mockRejectedValue(new Error('oh no!')),
       });
 
-      const result = await setupProcessorHook(
-        [failCommand],
-        [],
-        [],
-        setMockIsProcessing,
-      );
+      const result = await setupProcessorHook({
+        builtinCommands: [failCommand],
+        setIsProcessing: setMockIsProcessing,
+      });
 
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
@@ -460,12 +494,10 @@ describe('useSlashCommandProcessor', () => {
         action: () => new Promise((resolve) => setTimeout(resolve, 50)),
       });
 
-      const result = await setupProcessorHook(
-        [command],
-        [],
-        [],
-        mockSetIsProcessing,
-      );
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+        setIsProcessing: mockSetIsProcessing,
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       const executionPromise = act(async () => {
@@ -507,7 +539,9 @@ describe('useSlashCommandProcessor', () => {
               .fn()
               .mockResolvedValue({ type: 'dialog', dialog: dialogType }),
           });
-          const result = await setupProcessorHook([command]);
+          const result = await setupProcessorHook({
+            builtinCommands: [command],
+          });
           await waitFor(() =>
             expect(result.current.slashCommands).toHaveLength(1),
           );
@@ -519,6 +553,43 @@ describe('useSlashCommandProcessor', () => {
           expect(mockFn).toHaveBeenCalled();
         },
       );
+
+      it('should handle "dialog: agentConfig" action with props', async () => {
+        const mockOpenAgentConfigDialog = vi.fn();
+        const agentDefinition = { name: 'test-agent' };
+        const commandName = 'agentconfigcmd';
+        const command = createTestCommand({
+          name: commandName,
+          action: vi.fn().mockResolvedValue({
+            type: 'dialog',
+            dialog: 'agentConfig',
+            props: {
+              name: 'test-agent',
+              displayName: 'Test Agent',
+              definition: agentDefinition,
+            },
+          }),
+        });
+
+        const result = await setupProcessorHook({
+          builtinCommands: [command],
+          openAgentConfigDialog: mockOpenAgentConfigDialog,
+        });
+
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        await act(async () => {
+          await result.current.handleSlashCommand(`/${commandName}`);
+        });
+
+        expect(mockOpenAgentConfigDialog).toHaveBeenCalledWith(
+          'test-agent',
+          'Test Agent',
+          agentDefinition,
+        );
+      });
     });
 
     it('should handle "load_history" action', async () => {
@@ -536,18 +607,40 @@ describe('useSlashCommandProcessor', () => {
           clientHistory: [{ role: 'user', parts: [{ text: 'old prompt' }] }],
         }),
       });
-      const result = await setupProcessorHook([command]);
+
+      const mockRefreshStatic = vi.fn();
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+        refreshStatic: mockRefreshStatic,
+      });
+
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
         await result.current.handleSlashCommand('/load');
       });
 
+      // ui.clear() is called which calls refreshStatic()
       expect(mockClearItems).toHaveBeenCalledTimes(1);
+      expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockAddItem).toHaveBeenCalledWith(
         { type: 'user', text: 'old prompt' },
         expect.any(Number),
       );
+    });
+
+    it('should call refreshStatic exactly once when ui.loadHistory is called', async () => {
+      const mockRefreshStatic = vi.fn();
+      const result = await setupProcessorHook({
+        refreshStatic: mockRefreshStatic,
+      });
+
+      await act(async () => {
+        result.current.commandContext.ui.loadHistory([]);
+      });
+
+      expect(mockLoadHistory).toHaveBeenCalled();
+      expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
     });
 
     it('should handle a "quit" action', async () => {
@@ -558,7 +651,9 @@ describe('useSlashCommandProcessor', () => {
         name: 'exit',
         action: quitAction,
       });
-      const result = await setupProcessorHook([command]);
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
 
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
@@ -581,7 +676,9 @@ describe('useSlashCommandProcessor', () => {
         CommandKind.FILE,
       );
 
-      const result = await setupProcessorHook([], [fileCommand]);
+      const result = await setupProcessorHook({
+        fileCommands: [fileCommand],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       let actionResult;
@@ -613,7 +710,9 @@ describe('useSlashCommandProcessor', () => {
         CommandKind.MCP_PROMPT,
       );
 
-      const result = await setupProcessorHook([], [], [mcpCommand]);
+      const result = await setupProcessorHook({
+        mcpCommands: [mcpCommand],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       let actionResult;
@@ -636,7 +735,9 @@ describe('useSlashCommandProcessor', () => {
   describe('Command Parsing and Matching', () => {
     it('should be case-sensitive', async () => {
       const command = createTestCommand({ name: 'test' });
-      const result = await setupProcessorHook([command]);
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -662,7 +763,9 @@ describe('useSlashCommandProcessor', () => {
         description: 'a command with an alias',
         action,
       });
-      const result = await setupProcessorHook([command]);
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -678,7 +781,9 @@ describe('useSlashCommandProcessor', () => {
     it('should handle extra whitespace around the command', async () => {
       const action = vi.fn();
       const command = createTestCommand({ name: 'test', action });
-      const result = await setupProcessorHook([command]);
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -691,7 +796,9 @@ describe('useSlashCommandProcessor', () => {
     it('should handle `?` as a command prefix', async () => {
       const action = vi.fn();
       const command = createTestCommand({ name: 'help', action });
-      const result = await setupProcessorHook([command]);
+      const result = await setupProcessorHook({
+        builtinCommands: [command],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
       await act(async () => {
@@ -720,7 +827,10 @@ describe('useSlashCommandProcessor', () => {
         CommandKind.FILE,
       );
 
-      const result = await setupProcessorHook([], [fileCommand], [mcpCommand]);
+      const result = await setupProcessorHook({
+        fileCommands: [fileCommand],
+        mcpCommands: [mcpCommand],
+      });
 
       await waitFor(() => {
         // The service should only return one command with the name 'override'
@@ -756,7 +866,10 @@ describe('useSlashCommandProcessor', () => {
 
       // The order of commands in the final loaded array is not guaranteed,
       // so the test must work regardless of which comes first.
-      const result = await setupProcessorHook([quitCommand], [exitCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [quitCommand],
+        fileCommands: [exitCommand],
+      });
 
       await waitFor(() => {
         expect(result.current.slashCommands).toHaveLength(2);
@@ -783,7 +896,10 @@ describe('useSlashCommandProcessor', () => {
         CommandKind.FILE,
       );
 
-      const result = await setupProcessorHook([quitCommand], [exitCommand]);
+      const result = await setupProcessorHook({
+        builtinCommands: [quitCommand],
+        fileCommands: [exitCommand],
+      });
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
 
       await act(async () => {
@@ -879,7 +995,9 @@ describe('useSlashCommandProcessor', () => {
         desc: 'command path when alias is used',
       },
     ])('should log $desc', async ({ command, expectedLog }) => {
-      const result = await setupProcessorHook(loggingTestCommands);
+      const result = await setupProcessorHook({
+        builtinCommands: loggingTestCommands,
+      });
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
       await act(async () => {
@@ -898,7 +1016,9 @@ describe('useSlashCommandProcessor', () => {
       { command: '/bogusbogusbogus', desc: 'bogus command' },
       { command: '/unknown', desc: 'unknown command' },
     ])('should not log for $desc', async ({ command }) => {
-      const result = await setupProcessorHook(loggingTestCommands);
+      const result = await setupProcessorHook({
+        builtinCommands: loggingTestCommands,
+      });
       await waitFor(() => expect(result.current.slashCommands).toBeDefined());
 
       await act(async () => {
@@ -924,7 +1044,7 @@ describe('useSlashCommandProcessor', () => {
     // We should not see a change until we fire an event.
     await waitFor(() => expect(result.current.slashCommands).toEqual([]));
     act(() => {
-      appEvents.emit('extensionsStarting');
+      coreEvents.emit('extensionsStarting');
     });
     await waitFor(() =>
       expect(result.current.slashCommands).toEqual([newCommand]),
