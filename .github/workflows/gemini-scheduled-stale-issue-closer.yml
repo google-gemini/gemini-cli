@@ -79,8 +79,14 @@ jobs:
                 continue;
               }
 
-              // Skip if it has a maintainer label
-              if (issue.labels.some(label => label.name.toLowerCase().includes('maintainer'))) {
+              // Skip if it has a maintainer, help wanted, or Public Roadmap label
+              const rawLabels = issue.labels.map((l) => l.name);
+              const lowercaseLabels = rawLabels.map((l) => l.toLowerCase());
+              if (
+                lowercaseLabels.some((l) => l.includes('maintainer')) ||
+                lowercaseLabels.includes('help wanted') ||
+                rawLabels.includes('🗓️ Public Roadmap')
+              ) {
                 continue;
               }
 
