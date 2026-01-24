@@ -225,6 +225,19 @@ export const useGeminiStream = (
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
+  const pendingSteeringMessageRef = useRef<string | null>(null);
+
+  const injectSteeringMessage = useCallback(
+    (message: string) => {
+      pendingSteeringMessageRef.current = message;
+      addItem({
+        type: MessageType.USER,
+        text: `[STEERING CORRECTION] ${message}`,
+      });
+    },
+    [addItem],
+  );
+
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
@@ -1015,8 +1028,21 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
+            let currentQuery = query;
+            const steeringMsg = pendingSteeringMessageRef.current;
+
+            if (steeringMsg && options?.isContinuation) {
+              const injectionText = `\n\n[USER INTERVENTION]: ${steeringMsg}`;
+              if (Array.isArray(currentQuery)) {
+                currentQuery = [...currentQuery, { text: injectionText }];
+              } else if (typeof currentQuery === 'string') {
+                currentQuery = currentQuery + injectionText;
+              }
+              pendingSteeringMessageRef.current = null;
+            }
+
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
+              currentQuery,
               userMessageTimestamp,
               abortSignal,
               prompt_id!,
@@ -1156,6 +1182,17 @@ export const useGeminiStream = (
       getPromptCount,
     ],
   );
+
+  useEffect(() => {
+    if (!isResponding) {
+      setRetryStatus(null);
+      if (pendingSteeringMessageRef.current) {
+        const msg = pendingSteeringMessageRef.current;
+        pendingSteeringMessageRef.current = null;
+        void submitQuery(`[STEERING CORRECTION] ${msg}`);
+      }
+    }
+  }, [isResponding, submitQuery]);
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
@@ -1434,5 +1471,6 @@ export const useGeminiStream = (
     loopDetectionConfirmationRequest,
     lastOutputTime,
     retryStatus,
+    injectSteeringMessage,
   };
 };

@@ -154,6 +154,7 @@ export interface UIState {
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
   adminSettingsChanged: boolean;
+  isSteeringMode: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

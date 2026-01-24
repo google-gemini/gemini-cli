@@ -201,6 +201,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
+  const [isSteeringMode, setIsSteeringMode] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -866,6 +867,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     loopDetectionConfirmationRequest,
     lastOutputTime,
     retryStatus,
+    injectSteeringMessage,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -969,6 +971,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
 
+      if (isSteeringMode) {
+        setIsSteeringMode(false);
+        if (!isIdle) {
+          injectSteeringMessage(submittedValue);
+          cancelHandlerRef.current(false);
+          return;
+        }
+        submittedValue = `[STEERING CORRECTION] ${submittedValue}`;
+      }
+
       if (isSlash || (isIdle && isMcpReady)) {
         void submitQuery(submittedValue);
       } else {
@@ -990,6 +1002,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isMcpReady,
       streamingState,
       messageQueue.length,
+      isSteeringMode,
+      injectSteeringMessage,
     ],
   );
 
@@ -1361,6 +1375,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
+      } else if (keyMatchers[Command.TOGGLE_STEERING_MODE](key)) {
+        setIsSteeringMode((prev) => !prev);
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
@@ -1721,6 +1737,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
       adminSettingsChanged,
+      isSteeringMode,
     }),
     [
       isThemeDialogOpen,
@@ -1820,6 +1837,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       settingsNonce,
       adminSettingsChanged,
+      isSteeringMode,
     ],
   );
 

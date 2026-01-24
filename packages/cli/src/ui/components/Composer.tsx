@@ -138,7 +138,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
           placeholder={
-            vimEnabled
+            uiState.isSteeringMode
+              ? '  STEERING MODE: Inject correction...'
+              : vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : uiState.shellModeActive
                 ? '  Type your shell command'

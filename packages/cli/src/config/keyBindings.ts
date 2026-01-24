@@ -83,6 +83,7 @@ export enum Command {
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
+  TOGGLE_STEERING_MODE = 'app.toggleSteeringMode',
 }
 
 /**
@@ -258,6 +259,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
+  [Command.TOGGLE_STEERING_MODE]: [{ key: 'o', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -365,6 +367,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
+      Command.TOGGLE_STEERING_MODE,
     ],
   },
 ];
@@ -453,4 +456,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
+  [Command.TOGGLE_STEERING_MODE]: 'Toggle steering mode to correct the agent.',
 };
