@@ -130,6 +130,7 @@ import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
+  STEERING_TEMPLATE,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { isSlashCommand } from './utils/commandUtils.js';
@@ -970,6 +971,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     (submittedValue: string) => {
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
+      let displayText: string | undefined;
 
       if (isSteeringMode) {
         setIsSteeringMode(false);
@@ -978,11 +980,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
           cancelHandlerRef.current(false);
           return;
         }
-        submittedValue = `[STEERING CORRECTION] ${submittedValue}`;
+        displayText = submittedValue;
+        submittedValue = STEERING_TEMPLATE(submittedValue);
       }
 
       if (isSlash || (isIdle && isMcpReady)) {
-        void submitQuery(submittedValue);
+        void submitQuery(submittedValue, undefined, undefined, displayText);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
         if (isIdle && !isMcpReady && messageQueue.length === 0) {

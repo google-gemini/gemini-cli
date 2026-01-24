@@ -64,7 +64,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
       {/* Render standard message types */}
       {itemForDisplay.type === 'user' && (
-        <UserMessage text={itemForDisplay.text} width={terminalWidth} />
+        <UserMessage
+          text={itemForDisplay.text}
+          displayText={itemForDisplay.displayText}
+          width={terminalWidth}
+        />
       )}
       {itemForDisplay.type === 'user_shell' && (
         <UserShellMessage text={itemForDisplay.text} />

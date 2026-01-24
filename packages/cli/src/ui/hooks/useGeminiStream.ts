@@ -62,7 +62,7 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
-import { SHELL_COMMAND_NAME } from '../constants.js';
+import { SHELL_COMMAND_NAME, STEERING_TEMPLATE } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import {
   useToolScheduler,
@@ -226,13 +226,17 @@ export const useGeminiStream = (
   const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
   const pendingSteeringMessageRef = useRef<string | null>(null);
+  const steeringInjectedInCurrentTurnRef = useRef(false);
 
   const injectSteeringMessage = useCallback(
     (message: string) => {
+      const formattedMessage = STEERING_TEMPLATE(message);
       pendingSteeringMessageRef.current = message;
+      steeringInjectedInCurrentTurnRef.current = false;
       addItem({
         type: MessageType.USER,
-        text: `[STEERING CORRECTION] ${message}`,
+        text: formattedMessage,
+        displayText: message,
       });
     },
     [addItem],
@@ -439,6 +443,7 @@ export const useGeminiStream = (
       userMessageTimestamp: number,
       abortSignal: AbortSignal,
       prompt_id: string,
+      displayText?: string,
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
@@ -505,7 +510,7 @@ export const useGeminiStream = (
         if (isAtCommand(trimmedQuery)) {
           // Add user's turn before @ command processing for correct UI ordering.
           addItem(
-            { type: MessageType.USER, text: trimmedQuery },
+            { type: MessageType.USER, text: trimmedQuery, displayText },
             userMessageTimestamp,
           );
 
@@ -526,7 +531,7 @@ export const useGeminiStream = (
         } else {
           // Normal query for Gemini
           addItem(
-            { type: MessageType.USER, text: trimmedQuery },
+            { type: MessageType.USER, text: trimmedQuery, displayText },
             userMessageTimestamp,
           );
           localQueryToSendToGemini = trimmedQuery;
@@ -997,6 +1002,7 @@ export const useGeminiStream = (
       query: PartListUnion,
       options?: { isContinuation: boolean },
       prompt_id?: string,
+      displayText?: string,
     ) =>
       runInDevTraceSpan(
         { name: 'submitQuery' },
@@ -1032,13 +1038,13 @@ export const useGeminiStream = (
             const steeringMsg = pendingSteeringMessageRef.current;
 
             if (steeringMsg && options?.isContinuation) {
-              const injectionText = `\n\n[USER INTERVENTION]: ${steeringMsg}`;
+              const injectionText = `\n\n${STEERING_TEMPLATE(steeringMsg)}`;
               if (Array.isArray(currentQuery)) {
                 currentQuery = [...currentQuery, { text: injectionText }];
               } else if (typeof currentQuery === 'string') {
                 currentQuery = currentQuery + injectionText;
               }
-              pendingSteeringMessageRef.current = null;
+              steeringInjectedInCurrentTurnRef.current = true;
             }
 
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
@@ -1046,6 +1052,7 @@ export const useGeminiStream = (
               userMessageTimestamp,
               abortSignal,
               prompt_id!,
+              displayText,
             );
 
             if (!shouldProceed || queryToSend === null) {
@@ -1184,15 +1191,20 @@ export const useGeminiStream = (
   );
 
   useEffect(() => {
-    if (!isResponding) {
-      setRetryStatus(null);
-      if (pendingSteeringMessageRef.current) {
+    if (
+      streamingState === StreamingState.Idle &&
+      pendingSteeringMessageRef.current
+    ) {
+      if (steeringInjectedInCurrentTurnRef.current) {
+        pendingSteeringMessageRef.current = null;
+        steeringInjectedInCurrentTurnRef.current = false;
+      } else {
         const msg = pendingSteeringMessageRef.current;
         pendingSteeringMessageRef.current = null;
-        void submitQuery(`[STEERING CORRECTION] ${msg}`);
+        void submitQuery(STEERING_TEMPLATE(msg), undefined, undefined, msg);
       }
     }
-  }, [isResponding, submitQuery]);
+  }, [streamingState, submitQuery]);
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
@@ -1372,6 +1384,7 @@ export const useGeminiStream = (
           isContinuation: true,
         },
         prompt_ids[0],
+        pendingSteeringMessageRef.current ?? undefined,
       );
     },
     [

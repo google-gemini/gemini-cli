@@ -12,10 +12,15 @@ import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.
 
 interface UserMessageProps {
   text: string;
+  displayText?: string;
   width: number;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
+export const UserMessage: React.FC<UserMessageProps> = ({
+  text,
+  displayText,
+  width,
+}) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
@@ -37,7 +42,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={textColor}>
-          {text}
+          {displayText ?? text}
         </Text>
       </Box>
     </Box>

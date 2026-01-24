@@ -141,10 +141,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             uiState.isSteeringMode
               ? '  STEERING MODE: Inject correction...'
               : vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
-              : uiState.shellModeActive
-                ? '  Type your shell command'
-                : '  Type your message or @path/to/file'
+                ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+                : uiState.shellModeActive
+                  ? '  Type your shell command'
+                  : '  Type your message or @path/to/file'
           }
           setQueueErrorMessage={uiActions.setQueueErrorMessage}
           streamingState={uiState.streamingState}

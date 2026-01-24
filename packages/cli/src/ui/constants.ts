@@ -37,3 +37,6 @@ export const SHELL_SILENT_WORKING_TITLE_DELAY_MS = 120000;
 export const KEYBOARD_SHORTCUTS_URL =
   'https://geminicli.com/docs/cli/keyboard-shortcuts/';
 export const LRU_BUFFER_PERF_CACHE_LIMIT = 20000;
+
+export const STEERING_TEMPLATE = (message: string) =>
+  `**STEERING CORRECTION:** ${message}\n\n**INSTRUCTIONS:**\n1. Recalibrate your internal state, goal, and plan based on this direction.\n2. If the direction is clear, proceed immediately to the next step of your **REVISED** plan.\n3. If your revised plan is now complete, stop and conclude the task. Only stop for clarification if absolutely necessary to avoid a critical error.`;
