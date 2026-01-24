@@ -237,7 +237,7 @@ export class FileCommandLoader implements ICommandLoader {
       // Sanitize each path segment to prevent ambiguity, replacing non-allowlisted characters with underscores.
       // Since ':' is our namespace separator, this ensures that colons do not cause naming conflicts.
       .map((segment) => {
-        let sanitized = segment.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        let sanitized = segment.replace(/[^\p{L}\p{N}_\-.]/gu, '_');
 
         // Truncate excessively long segments to prevent UI overflow
         if (sanitized.length > 50) {
