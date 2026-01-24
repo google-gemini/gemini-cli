@@ -15,7 +15,7 @@ on:
 
 jobs:
   close-stale-prs:
-    if: "github.repository == 'google-gemini/gemini-cli'"
+    if: 'github.repository == ''google-gemini/gemini-cli'''
     runs-on: 'ubuntu-latest'
     permissions:
       pull-requests: 'write'
@@ -41,6 +41,7 @@ jobs:
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+            // 1. Fetch maintainers for verification
             let maintainerLogins = new Set();
             try {
               const members = await github.paginate(github.rest.teams.listMembersInOrg, {
@@ -57,17 +58,33 @@ jobs:
               return ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
             };
 
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100
-            });
+            // 2. Determine which PRs to check
+            let prs = [];
+            if (context.eventName === 'pull_request') {
+              // ONLY check the triggering PR
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number
+              });
+              prs = [pr];
+              core.info(`Triggered by PR #${pr.number}. Checking only this PR.`);
+            } else {
+              // Scheduled or manual: Check all open PRs
+              prs = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100
+              });
+              core.info(`Scheduled run. Checking all ${prs.length} open pull requests.`);
+            }
 
             for (const pr of prs) {
               const maintainerPr = isMaintainer(pr.user.login, pr.author_association);
               const isBot = pr.user.type === 'Bot' || pr.user.login.endsWith('[bot]');
 
+              // Linked issue check (Immediate Closure Logic)
               const linkedIssueQuery = `query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo) {
                   pullRequest(number:$number) {
@@ -85,6 +102,7 @@ jobs:
               } catch (e) {}
 
               if (!maintainerPr && !hasLinkedIssue && !isBot) {
+                core.info(`PR #${pr.number} is missing a linked issue.`);
                 if (!dryRun) {
                   await github.rest.issues.createComment({
                     owner: context.repo.owner,
@@ -102,54 +120,59 @@ jobs:
                 continue;
               }
 
-              const labels = pr.labels.map(l => l.name.toLowerCase());
-              if (labels.includes('help wanted') || labels.includes('🔒 maintainer only')) continue;
+              // Staleness check (Only for scheduled runs or non-triggering PRs)
+              // If triggered by PR opened, we don't need to check staleness.
+              if (context.eventName !== 'pull_request') {
+                const labels = pr.labels.map(l => l.name.toLowerCase());
+                if (labels.includes('help wanted') || labels.includes('🔒 maintainer only')) continue;
 
-              let lastActivity = new Date(0);
-              try {
-                const reviews = await github.paginate(github.rest.pulls.listReviews, {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pr.number
-                });
-                for (const r of reviews) {
-                  if (isMaintainer(r.user.login, r.author_association)) {
-                    const d = new Date(r.submitted_at || r.updated_at);
-                    if (d > lastActivity) lastActivity = d;
-                  }
-                }
-                const comments = await github.paginate(github.rest.issues.listComments, {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number
-                });
-                for (const c of comments) {
-                  if (isMaintainer(c.user.login, c.author_association)) {
-                    const d = new Date(c.updated_at);
-                    if (d > lastActivity) lastActivity = d;
-                  }
-                }
-              } catch (e) {}
-
-              if (maintainerPr) {
-                const d = new Date(pr.created_at);
-                if (d > lastActivity) lastActivity = d;
-              }
-
-              if (lastActivity < thirtyDaysAgo) {
-                if (!dryRun) {
-                  await github.rest.issues.createComment({
+                let lastActivity = new Date(0);
+                try {
+                  const reviews = await github.paginate(github.rest.pulls.listReviews, {
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    issue_number: pr.number,
-                    body: "Hi there! Thank you for your contribution to Gemini CLI. We really appreciate the time and effort you've put into this pull request.\n\nTo keep our backlog manageable and ensure we're focusing on current priorities, we are closing pull requests that haven't seen maintainer activity for 30 days. Currently, the team is prioritizing work associated with **🔒 maintainer only** or **help wanted** issues.\n\nIf you believe this change is still critical, please feel free to comment with updated details. Otherwise, we encourage contributors to focus on open issues labeled as **help wanted**. Thank you for your understanding!"
+                    pull_number: pr.number
                   });
-                  await github.rest.pulls.update({
+                  for (const r of reviews) {
+                    if (isMaintainer(r.user.login, r.author_association)) {
+                      const d = new Date(r.submitted_at || r.updated_at);
+                      if (d > lastActivity) lastActivity = d;
+                    }
+                  }
+                  const comments = await github.paginate(github.rest.issues.listComments, {
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    pull_number: pr.number,
-                    state: 'closed'
+                    issue_number: pr.number
                   });
+                  for (const c of comments) {
+                    if (isMaintainer(c.user.login, c.author_association)) {
+                      const d = new Date(c.updated_at);
+                      if (d > lastActivity) lastActivity = d;
+                    }
+                  }
+                } catch (e) {}
+
+                if (maintainerPr) {
+                  const d = new Date(pr.created_at);
+                  if (d > lastActivity) lastActivity = d;
+                }
+
+                if (lastActivity < thirtyDaysAgo) {
+                  core.info(`PR #${pr.number} is stale.`);
+                  if (!dryRun) {
+                    await github.rest.issues.createComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: pr.number,
+                      body: "Hi there! Thank you for your contribution to Gemini CLI. We really appreciate the time and effort you've put into this pull request.\n\nTo keep our backlog manageable and ensure we're focusing on current priorities, we are closing pull requests that haven't seen maintainer activity for 30 days. Currently, the team is prioritizing work associated with **🔒 maintainer only** or **help wanted** issues.\n\nIf you believe this change is still critical, please feel free to comment with updated details. Otherwise, we encourage contributors to focus on open issues labeled as **help wanted**. Thank you for your understanding!"
+                    });
+                    await github.rest.pulls.update({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: pr.number,
+                      state: 'closed'
+                    });
+                  }
                 }
               }
             }
