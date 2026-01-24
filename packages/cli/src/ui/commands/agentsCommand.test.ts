@@ -340,11 +340,12 @@ describe('agentsCommand', () => {
   });
 
   describe('config sub-command', () => {
-    it('should open agent config dialog for a valid agent', async () => {
+    it('should return dialog action for a valid agent', async () => {
       const mockDefinition = {
         name: 'test-agent',
         displayName: 'Test Agent',
         description: 'test desc',
+        kind: 'local',
       };
       mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
         getDiscoveredDefinition: vi.fn().mockReturnValue(mockDefinition),
@@ -357,19 +358,22 @@ describe('agentsCommand', () => {
 
       const result = await configCommand!.action!(mockContext, 'test-agent');
 
-      expect(mockContext.ui.openAgentConfigDialog).not.toHaveBeenCalled();
       expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          "Configuration for 'test-agent' will be available in the next update.",
+        type: 'dialog',
+        dialog: 'agentConfig',
+        props: {
+          name: 'test-agent',
+          displayName: 'Test Agent',
+          definition: mockDefinition,
+        },
       });
     });
 
-    it('should use name if displayName is missing', async () => {
+    it('should use name as displayName if displayName is missing', async () => {
       const mockDefinition = {
         name: 'test-agent',
         description: 'test desc',
+        kind: 'local',
       };
       mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
         getDiscoveredDefinition: vi.fn().mockReturnValue(mockDefinition),
@@ -381,10 +385,13 @@ describe('agentsCommand', () => {
       const result = await configCommand!.action!(mockContext, 'test-agent');
 
       expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content:
-          "Configuration for 'test-agent' will be available in the next update.",
+        type: 'dialog',
+        dialog: 'agentConfig',
+        props: {
+          name: 'test-agent',
+          displayName: 'test-agent', // Falls back to name
+          definition: mockDefinition,
+        },
       });
     });
 
