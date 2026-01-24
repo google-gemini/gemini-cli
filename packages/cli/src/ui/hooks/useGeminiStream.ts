@@ -1393,7 +1393,7 @@ export const useGeminiStream = (
           isContinuation: true,
         },
         prompt_ids[0],
-        pendingSteeringMessageRef.current ?? undefined,
+        undefined,
       );
     },
     [
