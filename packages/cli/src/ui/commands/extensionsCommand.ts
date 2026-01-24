@@ -29,6 +29,10 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import {
+  McpServerEnablementManager,
+  normalizeServerId,
+} from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
 
@@ -381,6 +385,57 @@ async function enableAction(context: CommandContext, args: string) {
       type: MessageType.INFO,
       text: `Extension "${name}" enabled for the scope "${scope}"`,
     });
+
+    // Auto-enable any disabled MCP servers for this extension
+    const extension = extensionManager
+      .getExtensions()
+      .find((e) => e.name === name);
+
+    if (extension?.mcpServers) {
+      const mcpEnablementManager = McpServerEnablementManager.getInstance();
+      const mcpClientManager = context.services.config?.getMcpClientManager();
+      const enabledServers: string[] = [];
+
+      for (const serverName of Object.keys(extension.mcpServers)) {
+        const normalizedName = normalizeServerId(serverName);
+        const state =
+          await mcpEnablementManager.getDisplayState(normalizedName);
+
+        let wasDisabled = false;
+        if (state.isPersistentDisabled) {
+          await mcpEnablementManager.enable(normalizedName);
+          wasDisabled = true;
+        }
+        if (state.isSessionDisabled) {
+          mcpEnablementManager.clearSessionDisable(normalizedName);
+          wasDisabled = true;
+        }
+
+        if (wasDisabled) {
+          enabledServers.push(serverName);
+
+          // Restart server to bring it online (use original key, not normalized)
+          if (mcpClientManager) {
+            try {
+              await mcpClientManager.restartServer(serverName);
+            } catch (error) {
+              // Show warning but continue with other servers
+              context.ui.addItem({
+                type: MessageType.WARNING,
+                text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
+              });
+            }
+          }
+        }
+      }
+
+      if (enabledServers.length > 0) {
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: `Re-enabled MCP servers: ${enabledServers.join(', ')}`,
+        });
+      }
+    }
   }
 }
 
