@@ -124,6 +124,91 @@ describe('AskUserTool', () => {
       });
       expect(result).toBeNull();
     });
+
+    it('should return error if choice type has no options', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Pick one?',
+            header: 'Choice',
+            type: QuestionType.CHOICE,
+          },
+        ],
+      });
+      expect(result).toContain("type='choice' requires 'options'");
+    });
+
+    it('should return error if type is omitted and options missing (defaults to choice)', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Pick one?',
+            header: 'Choice',
+            // type omitted, defaults to 'choice'
+            // options missing
+          },
+        ],
+      });
+      expect(result).toContain("type='choice' requires 'options'");
+    });
+
+    it('should accept text type without options', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Enter your name?',
+            header: 'Name',
+            type: QuestionType.TEXT,
+          },
+        ],
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should accept yesno type without options', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Do you want to proceed?',
+            header: 'Confirm',
+            type: QuestionType.YESNO,
+          },
+        ],
+      });
+      expect(result).toBeNull();
+    });
+
+    it('should return error if option has empty label', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Pick one?',
+            header: 'Choice',
+            options: [
+              { label: '', description: 'Empty label' },
+              { label: 'B', description: 'Option B' },
+            ],
+          },
+        ],
+      });
+      expect(result).toContain("'label' is required");
+    });
+
+    it('should return error if option is missing description', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Pick one?',
+            header: 'Choice',
+            options: [
+              { label: 'A' } as { label: string; description: string },
+              { label: 'B', description: 'Option B' },
+            ],
+          },
+        ],
+      });
+      expect(result).toContain("must have required property 'description'");
+    });
   });
 
   it('should publish ASK_USER_REQUEST and wait for response', async () => {

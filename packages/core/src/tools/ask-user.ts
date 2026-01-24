@@ -39,6 +39,7 @@ export class AskUserTool extends BaseDeclarativeTool<
       {
         type: 'object',
         required: ['questions'],
+        additionalProperties: false,
         properties: {
           questions: {
             type: 'array',
@@ -47,6 +48,7 @@ export class AskUserTool extends BaseDeclarativeTool<
             items: {
               type: 'object',
               required: ['question', 'header'],
+              additionalProperties: false,
               properties: {
                 question: {
                   type: 'string',
@@ -62,28 +64,30 @@ export class AskUserTool extends BaseDeclarativeTool<
                 type: {
                   type: 'string',
                   enum: ['choice', 'text', 'yesno'],
+                  default: 'choice',
                   description:
-                    "Question type. 'choice' (default) shows selectable options, 'text' shows a free-form text input, 'yesno' shows a binary Yes/No choice.",
+                    "Question type. Defaults to 'choice' if omitted. Use 'choice' for multiple-choice questions (REQUIRES 'options' array). Use 'text' for free-form text input (ignores 'options'). Use 'yesno' for Yes/No confirmation (ignores 'options', auto-generates Yes/No choices).",
                 },
                 options: {
                   type: 'array',
                   description:
-                    "Required for 'choice' type, ignored for 'text' and 'yesno'. The available choices (2-4 options). Do NOT include an 'Other' option - one is automatically added for 'choice' type.",
+                    "The selectable choices. REQUIRED when type='choice' or type is omitted. IGNORED when type='text' or type='yesno'. Provide 2-4 options. An 'Other' option is automatically added.",
                   minItems: 2,
                   maxItems: 4,
                   items: {
                     type: 'object',
                     required: ['label', 'description'],
+                    additionalProperties: false,
                     properties: {
                       label: {
                         type: 'string',
                         description:
-                          'The display text for this option that the user will see and select. Should be concise (1-5 words) and clearly describe the choice.',
+                          'The display text for this option (1-5 words). Example: "OAuth 2.0"',
                       },
                       description: {
                         type: 'string',
                         description:
-                          'Explanation of what this option means or what will happen if chosen. Useful for providing context about trade-offs or implications.',
+                          'Brief explanation of this option. Example: "Industry standard, supports SSO"',
                       },
                     },
                   },
@@ -91,12 +95,12 @@ export class AskUserTool extends BaseDeclarativeTool<
                 multiSelect: {
                   type: 'boolean',
                   description:
-                    "Only applies to 'choice' type. Set to true to allow multiple selections.",
+                    "Only applies when type='choice'. Set to true to allow selecting multiple options.",
                 },
                 placeholder: {
                   type: 'string',
                   description:
-                    "Optional hint text for 'text' type input field.",
+                    "Only applies when type='text'. Hint text shown in the input field.",
                 },
               },
             },
@@ -105,6 +109,51 @@ export class AskUserTool extends BaseDeclarativeTool<
       },
       messageBus,
     );
+  }
+
+  protected override validateToolParamValues(
+    params: AskUserParams,
+  ): string | null {
+    if (!params.questions || params.questions.length === 0) {
+      return 'At least one question is required.';
+    }
+
+    for (let i = 0; i < params.questions.length; i++) {
+      const q = params.questions[i];
+      const questionType = q.type ?? QuestionType.CHOICE;
+
+      // Validate that 'choice' type has options
+      if (questionType === QuestionType.CHOICE) {
+        if (!q.options || q.options.length < 2) {
+          return `Question ${i + 1}: type='choice' requires 'options' array with 2-4 items.`;
+        }
+        if (q.options.length > 4) {
+          return `Question ${i + 1}: 'options' array must have at most 4 items.`;
+        }
+      }
+
+      // Validate option structure if provided
+      if (q.options) {
+        for (let j = 0; j < q.options.length; j++) {
+          const opt = q.options[j];
+          if (
+            !opt.label ||
+            typeof opt.label !== 'string' ||
+            !opt.label.trim()
+          ) {
+            return `Question ${i + 1}, option ${j + 1}: 'label' is required and must be a non-empty string.`;
+          }
+          if (
+            opt.description === undefined ||
+            typeof opt.description !== 'string'
+          ) {
+            return `Question ${i + 1}, option ${j + 1}: 'description' is required and must be a string.`;
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   protected createInvocation(
