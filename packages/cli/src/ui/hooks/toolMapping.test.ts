@@ -265,7 +265,10 @@ describe('toolMapping', () => {
       const toolCall: SuccessfulToolCall = {
         status: 'success',
         request: { ...mockRequest, name: 'run_shell_command' },
-        tool: { ...mockTool, name: 'run_shell_command' },
+        tool: {
+          ...mockTool,
+          name: 'run_shell_command',
+        } as AnyDeclarativeTool,
         invocation: mockInvocation,
         response: { ...mockResponse, resultDisplay: 'long output' },
       };
@@ -293,7 +296,10 @@ describe('toolMapping', () => {
       const toolCall: SuccessfulToolCall = {
         status: 'success',
         request: { ...mockRequest, name: 'read_file' },
-        tool: { ...mockTool, name: 'read_file' },
+        tool: {
+          ...mockTool,
+          name: 'read_file',
+        } as AnyDeclarativeTool,
         invocation: mockInvocation,
         response: { ...mockResponse, resultDisplay: 'long file content' },
       };

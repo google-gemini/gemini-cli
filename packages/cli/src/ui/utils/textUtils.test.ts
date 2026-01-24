@@ -18,6 +18,20 @@ import {
   pruneShellOutput,
 } from './textUtils.js';
 
+const createMockAnsiOutput = (lines: string[]): AnsiOutput =>
+  lines.map((line) => [
+    {
+      text: line,
+      bold: false,
+      italic: false,
+      underline: false,
+      dim: false,
+      inverse: false,
+      fg: '',
+      bg: '',
+    },
+  ]);
+
 describe('textUtils', () => {
   describe('pruneShellOutput', () => {
     it('should return undefined if input is undefined', () => {
@@ -36,26 +50,26 @@ describe('textUtils', () => {
     });
 
     it('should return original AnsiOutput if shorter than limit', () => {
-      const output: AnsiOutput = ['line1', 'line2'];
+      const output: AnsiOutput = createMockAnsiOutput(['line1', 'line2']);
       expect(pruneShellOutput(output, 5)).toBe(output);
     });
 
     it('should truncate AnsiOutput if longer than limit', () => {
-      const output: AnsiOutput = [
+      const output: AnsiOutput = createMockAnsiOutput([
         'line1',
         'line2',
         'line3',
         'line4',
         'line5',
         'line6',
-      ];
-      const expected: AnsiOutput = [
+      ]);
+      const expected: AnsiOutput = createMockAnsiOutput([
         'line2',
         'line3',
         'line4',
         'line5',
         'line6',
-      ];
+      ]);
       expect(pruneShellOutput(output, 5)).toEqual(expected);
     });
 
