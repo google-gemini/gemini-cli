@@ -278,6 +278,21 @@ describe('directoryCommand', () => {
         expect(getDirectorySuggestions).toHaveBeenCalledWith('s');
         expect(results).toEqual(['docs/, src/']);
       });
+
+      it('should filter out existing directories from suggestions', async () => {
+        const existingPath = path.resolve(process.cwd(), 'existing');
+        vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue([
+          existingPath,
+        ]);
+        vi.mocked(getDirectorySuggestions).mockResolvedValue([
+          'existing/',
+          'new/',
+        ]);
+
+        const results = await completion(mockContext, 'ex');
+
+        expect(results).toEqual(['new/']);
+      });
     });
   });
 
@@ -286,10 +301,7 @@ describe('directoryCommand', () => {
 
     beforeEach(() => {
       vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(true);
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
-        isTrusted: true,
-        source: 'file',
-      });
+      // isWorkspaceTrusted is no longer checked, so we don't need to mock it returning true
       mockIsPathTrusted = vi.fn();
       const mockLoadedFolders = {
         isPathTrusted: mockIsPathTrusted,
@@ -319,20 +331,27 @@ describe('directoryCommand', () => {
       ]);
     });
 
-    it('should show an error for an untrusted directory', async () => {
+    it('should return a custom dialog for an explicitly untrusted directory (upgrade flow)', async () => {
       if (!addCommand?.action) throw new Error('No action');
-      mockIsPathTrusted.mockReturnValue(false);
+      mockIsPathTrusted.mockReturnValue(false); // DO_NOT_TRUST
       const newPath = path.normalize('/home/user/untrusted-project');
 
-      await addCommand.action(mockContext, newPath);
+      const result = await addCommand.action(mockContext, newPath);
 
-      expect(mockWorkspaceContext.addDirectories).not.toHaveBeenCalled();
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect(result).toEqual(
         expect.objectContaining({
-          type: MessageType.ERROR,
-          text: expect.stringContaining('explicitly untrusted'),
+          type: 'custom_dialog',
+          component: expect.objectContaining({
+            type: expect.any(Function), // React component for MultiFolderTrustDialog
+          }),
         }),
       );
+      if (!result) {
+        throw new Error('Command did not return a result');
+      }
+      const component = (result as OpenCustomDialogActionReturn)
+        .component as React.ReactElement<MultiFolderTrustDialogProps>;
+      expect(component.props.folders.includes(newPath)).toBeTruthy();
     });
 
     it('should return a custom dialog for a directory with undefined trust', async () => {
@@ -356,6 +375,25 @@ describe('directoryCommand', () => {
       const component = (result as OpenCustomDialogActionReturn)
         .component as React.ReactElement<MultiFolderTrustDialogProps>;
       expect(component.props.folders.includes(newPath)).toBeTruthy();
+    });
+
+    it('should prompt for directory even if workspace is untrusted', async () => {
+      if (!addCommand?.action) throw new Error('No action');
+      // Even if workspace is untrusted, we should still check directory trust
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      mockIsPathTrusted.mockReturnValue(undefined);
+      const newPath = path.normalize('/home/user/new-project');
+
+      const result = await addCommand.action(mockContext, newPath);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          type: 'custom_dialog',
+        }),
+      );
     });
   });
 
