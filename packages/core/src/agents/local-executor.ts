@@ -38,7 +38,7 @@ import type {
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
+import { AgentTerminateMode, DEFAULT_QUERY_STRING } from './types.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -110,10 +110,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       runtimeContext.getMessageBus(),
     );
     const parentToolRegistry = runtimeContext.getToolRegistry();
+    const allAgentNames = new Set(
+      runtimeContext.getAgentRegistry().getAllAgentNames(),
+    );
 
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
         if (typeof toolRef === 'string') {
+          // Check if the tool is a subagent to prevent recursion.
+          // We do not allow agents to call other agents.
+          if (allAgentNames.has(toolRef)) {
+            debugLogger.warn(
+              `[LocalAgentExecutor] Skipping subagent tool '${toolRef}' for agent '${definition.name}' to prevent recursion.`,
+            );
+            continue;
+          }
+
           // If the tool is referenced by name, retrieve it from the parent
           // registry and register it with the agent's isolated registry.
           const toolFromParent = parentToolRegistry.getTool(toolRef);
@@ -395,7 +407,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : 'Get Started!';
+        : DEFAULT_QUERY_STRING;
       let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
       while (true) {

@@ -101,7 +101,10 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
-  antigravity: { win32: ['agy.cmd'], default: ['agy'] },
+  antigravity: {
+    win32: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
+    default: ['agy', 'antigravity'],
+  },
   hx: { win32: ['hx'], default: ['hx'] },
 };
 
