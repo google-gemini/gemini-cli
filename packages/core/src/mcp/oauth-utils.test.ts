@@ -288,6 +288,22 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
       });
     });
+
+    it('should reject partial path segment matches', async () => {
+      // /api should not match /api-v2 (different path segment)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...mockResourceMetadata,
+            resource: 'https://example.com/api-v2',
+          }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthConfig('https://example.com/api'),
+      ).rejects.toThrow(/is not within scope of protected resource/);
+    });
   });
 
   describe('metadataToOAuthConfig', () => {
