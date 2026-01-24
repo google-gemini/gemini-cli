@@ -111,19 +111,6 @@ Body`);
       );
     });
 
-    it('should throw AgentLoadError if tools list includes forbidden tool', async () => {
-      const filePath = await writeAgentMarkdown(`---
-name: test-agent
-description: Test
-tools:
-  - delegate_to_agent
----
-Body`);
-      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        /tools list cannot include 'delegate_to_agent'/,
-      );
-    });
-
     it('should parse a valid remote agent markdown file', async () => {
       const filePath = await writeAgentMarkdown(`---
 kind: remote
