@@ -964,7 +964,8 @@ export class Config {
   }
 
   getUserTierName(): string | undefined {
-    return this.contentGenerator?.userTierName;
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
   }
 
   /**
