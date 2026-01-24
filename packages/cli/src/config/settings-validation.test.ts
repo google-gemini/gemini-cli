@@ -11,6 +11,8 @@ import {
   validateSettings,
   formatValidationError,
   settingsZodSchema,
+  detectSettingsTypos,
+  formatTypoWarnings,
 } from './settings-validation.js';
 import { z } from 'zod';
 
@@ -507,6 +509,105 @@ describe('settings-validation', () => {
       // Test that empty object is valid (all fields optional)
       const result = settingsZodSchema.safeParse({});
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('detectSettingsTypos', () => {
+    it('should detect typos in root-level settings', () => {
+      const settingsWithTypo = {
+        modl: 'gemini-pro', // typo for "model"
+      };
+
+      const warnings = detectSettingsTypos(settingsWithTypo);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].unknownKey).toBe('modl');
+      expect(warnings[0].suggestedKey).toBe('model');
+      expect(warnings[0].path).toBe('(root)');
+    });
+
+    it('should detect typos in nested settings', () => {
+      const settingsWithTypo = {
+        tools: {
+          exclud: ['some-tool'], // typo for "exclude"
+        },
+      };
+
+      const warnings = detectSettingsTypos(settingsWithTypo);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].unknownKey).toBe('exclud');
+      expect(warnings[0].suggestedKey).toBe('exclude');
+      expect(warnings[0].path).toBe('tools');
+    });
+
+    it('should not warn for completely unrelated keys', () => {
+      const settingsWithRandomKey = {
+        xyzRandomKey123: 'some-value', // not similar to any valid key
+      };
+
+      const warnings = detectSettingsTypos(settingsWithRandomKey);
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should detect multiple typos', () => {
+      const settingsWithTypos = {
+        modl: 'gemini-pro', // typo for "model" (distance 1)
+        tool: {}, // typo for "tools" (distance 1)
+      };
+
+      const warnings = detectSettingsTypos(settingsWithTypos);
+      expect(warnings).toHaveLength(2);
+      expect(warnings.some((w) => w.suggestedKey === 'model')).toBe(true);
+      expect(warnings.some((w) => w.suggestedKey === 'tools')).toBe(true);
+    });
+
+    it('should handle empty or invalid input', () => {
+      expect(detectSettingsTypos(null)).toHaveLength(0);
+      expect(detectSettingsTypos(undefined)).toHaveLength(0);
+      expect(detectSettingsTypos([])).toHaveLength(0);
+      expect(detectSettingsTypos('string')).toHaveLength(0);
+    });
+
+    it('should not warn for valid keys', () => {
+      const validSettings = {
+        model: 'gemini-pro',
+        theme: 'dark',
+        tools: {
+          exclude: ['some-tool'],
+        },
+      };
+
+      const warnings = detectSettingsTypos(validSettings);
+      expect(warnings).toHaveLength(0);
+    });
+  });
+
+  describe('formatTypoWarnings', () => {
+    it('should format warnings into readable message', () => {
+      const warnings = [
+        {
+          path: '(root)',
+          unknownKey: 'modl',
+          suggestedKey: 'model',
+          distance: 1,
+        },
+        {
+          path: 'tools',
+          unknownKey: 'exclud',
+          suggestedKey: 'exclude',
+          distance: 1,
+        },
+      ];
+
+      const message = formatTypoWarnings(warnings);
+      expect(message).toContain('Possible typos detected');
+      expect(message).toContain('"modl" - did you mean "model"');
+      expect(message).toContain(
+        '"tools.exclud" - did you mean "tools.exclude"',
+      );
+    });
+
+    it('should return empty string for no warnings', () => {
+      expect(formatTypoWarnings([])).toBe('');
     });
   });
 });
