@@ -159,9 +159,13 @@ async function initOauthClient(
     return client;
   }
 
-  client.on('tokens', async (tokens: Credentials) => {
-    await saveTokens(tokens);
-    await triggerPostAuthCallbacks(tokens);
+  client.on('tokens', (tokens: Credentials) => {
+    saveTokens(tokens).catch((err) => {
+      debugLogger.log(
+        'Failed to save tokens from event:',
+        getErrorMessage(err),
+      );
+    });
   });
 
   if (credentials) {
@@ -178,7 +182,7 @@ async function initOauthClient(
             await fetchAndCacheUserInfo(client);
           } catch (error) {
             // Non-fatal, continue with existing auth.
-            debugLogger.warn(
+            debugLogger.log(
               'Failed to fetch user info:',
               getErrorMessage(error),
             );
