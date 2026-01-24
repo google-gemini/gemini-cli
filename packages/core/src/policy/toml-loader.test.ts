@@ -173,6 +173,22 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse deny_message property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+deny_message = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should support modes property for Tier 2 and Tier 3 policies', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),
