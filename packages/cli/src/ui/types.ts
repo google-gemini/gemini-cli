@@ -145,6 +145,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   gcpProject: string;
   ideClient: string;
   userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -269,6 +270,14 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   authStatus: Record<
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
+  >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
   >;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;

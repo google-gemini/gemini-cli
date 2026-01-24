@@ -35,10 +35,6 @@ vi.mock('../telemetry/types.js', () => ({
   ToolCallEvent: vi.fn().mockImplementation((call) => ({ ...call })),
 }));
 
-vi.mock('../core/coreToolHookTriggers.js', () => ({
-  fireToolNotificationHook: vi.fn(),
-}));
-
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';

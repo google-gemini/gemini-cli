@@ -177,7 +177,6 @@ describe('InputPrompt', () => {
       transformationsByLine: [],
       getOffset: vi.fn().mockReturnValue(0),
       pastedContent: {},
-      addPastedContent: vi.fn().mockReturnValue('[Pasted Text: 6 lines]'),
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -1275,6 +1274,21 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should render correctly in plan mode', async () => {
+    props.approvalMode = ApprovalMode.PLAN;
+    const { stdout, unmount } = renderWithProviders(<InputPrompt {...props} />);
+
+    await waitFor(() => {
+      const frame = stdout.lastFrame();
+      // In plan mode it uses '>' but with success color.
+      // We check that it contains '>' and not '*' or '!'.
+      expect(frame).toContain('>');
+      expect(frame).not.toContain('*');
+      expect(frame).not.toContain('!');
+    });
+    unmount();
+  });
+
   it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
     props.buffer.text = '';
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
@@ -1825,6 +1839,7 @@ describe('InputPrompt', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('should prevent auto-submission immediately after an unsafe paste', async () => {
@@ -2007,7 +2022,9 @@ describe('InputPrompt', () => {
       await act(async () => {
         stdin.write('\x1B\x1B');
         vi.advanceTimersByTime(100);
+      });
 
+      await waitFor(() => {
         expect(props.onSubmit).toHaveBeenCalledWith('/rewind');
       });
       unmount();

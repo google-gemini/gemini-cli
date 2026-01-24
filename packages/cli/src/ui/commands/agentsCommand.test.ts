@@ -218,6 +218,21 @@ describe('agentsCommand', () => {
     });
   });
 
+  it('should show an error if config is not available for enable', async () => {
+    const contextWithoutConfig = createMockCommandContext({
+      services: { config: null },
+    });
+    const enableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'enable',
+    );
+    const result = await enableCommand!.action!(contextWithoutConfig, 'test');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    });
+  });
+
   it('should disable an agent successfully', async () => {
     const reloadSpy = vi.fn().mockResolvedValue(undefined);
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
@@ -306,6 +321,139 @@ describe('agentsCommand', () => {
       type: 'message',
       messageType: 'error',
       content: 'Usage: /agents disable <agent-name>',
+    });
+  });
+
+  it('should show an error if config is not available for disable', async () => {
+    const contextWithoutConfig = createMockCommandContext({
+      services: { config: null },
+    });
+    const disableCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'disable',
+    );
+    const result = await disableCommand!.action!(contextWithoutConfig, 'test');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    });
+  });
+
+  describe('config sub-command', () => {
+    it('should return dialog action for a valid agent', async () => {
+      const mockDefinition = {
+        name: 'test-agent',
+        displayName: 'Test Agent',
+        description: 'test desc',
+        kind: 'local',
+      };
+      mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+        getDiscoveredDefinition: vi.fn().mockReturnValue(mockDefinition),
+      });
+
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      expect(configCommand).toBeDefined();
+
+      const result = await configCommand!.action!(mockContext, 'test-agent');
+
+      expect(result).toEqual({
+        type: 'dialog',
+        dialog: 'agentConfig',
+        props: {
+          name: 'test-agent',
+          displayName: 'Test Agent',
+          definition: mockDefinition,
+        },
+      });
+    });
+
+    it('should use name as displayName if displayName is missing', async () => {
+      const mockDefinition = {
+        name: 'test-agent',
+        description: 'test desc',
+        kind: 'local',
+      };
+      mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+        getDiscoveredDefinition: vi.fn().mockReturnValue(mockDefinition),
+      });
+
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      const result = await configCommand!.action!(mockContext, 'test-agent');
+
+      expect(result).toEqual({
+        type: 'dialog',
+        dialog: 'agentConfig',
+        props: {
+          name: 'test-agent',
+          displayName: 'test-agent', // Falls back to name
+          definition: mockDefinition,
+        },
+      });
+    });
+
+    it('should show error if agent is not found', async () => {
+      mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+        getDiscoveredDefinition: vi.fn().mockReturnValue(undefined),
+      });
+
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      const result = await configCommand!.action!(mockContext, 'non-existent');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: "Agent 'non-existent' not found.",
+      });
+    });
+
+    it('should show usage error if no agent name provided', async () => {
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      const result = await configCommand!.action!(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: /agents config <agent-name>',
+      });
+    });
+
+    it('should show an error if config is not available', async () => {
+      const contextWithoutConfig = createMockCommandContext({
+        services: { config: null },
+      });
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      const result = await configCommand!.action!(contextWithoutConfig, 'test');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      });
+    });
+
+    it('should provide completions for discovered agents', async () => {
+      mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+        getAllDiscoveredAgentNames: vi
+          .fn()
+          .mockReturnValue(['agent1', 'agent2', 'other']),
+      });
+
+      const configCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      );
+      expect(configCommand?.completion).toBeDefined();
+
+      const completions = await configCommand!.completion!(mockContext, 'age');
+      expect(completions).toEqual(['agent1', 'agent2']);
     });
   });
 });
