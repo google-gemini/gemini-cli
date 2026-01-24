@@ -102,12 +102,8 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-<<<<<<< HEAD
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
-=======
 import { useMcpStatus } from './hooks/useMcpStatus.js';
-import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
->>>>>>> 12a5490bc (Allow prompt queueing during MCP initialization (#17395))
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import {
@@ -133,11 +129,8 @@ import {
   SHELL_ACTION_REQUIRED_TITLE_DELAY_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
-<<<<<<< HEAD
 import { useInactivityTimer } from './hooks/useInactivityTimer.js';
-=======
 import { isSlashCommand } from './utils/commandUtils.js';
->>>>>>> 12a5490bc (Allow prompt queueing during MCP initialization (#17395))
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {

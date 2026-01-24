@@ -274,8 +274,6 @@ export class McpClientManager {
       this.cliConfig.getMcpServerCommand(),
     );
 
-<<<<<<< HEAD
-=======
     if (Object.keys(servers).length === 0) {
       this.discoveryState = MCPDiscoveryState.COMPLETED;
       this.eventEmitter?.emit('mcp-client-update', this.clients);
@@ -287,7 +285,6 @@ export class McpClientManager {
       this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
     }
 
->>>>>>> 12a5490bc (Allow prompt queueing during MCP initialization (#17395))
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     await Promise.all(
       Object.entries(servers).map(([name, config]) =>
