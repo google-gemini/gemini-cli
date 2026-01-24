@@ -692,15 +692,17 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
-    const userInfo = (await response.json()) as { email?: string };
-    if (userInfo.email) {
+    const userInfo = (await response.json()) as { email?: unknown };
+    if (userInfo && typeof userInfo.email === 'string' && userInfo.email) {
       await userAccountManager.cacheGoogleAccount(userInfo.email);
       debugLogger.log('Cached Google Account:', userInfo.email);
     } else {
-      debugLogger.log('User info response did not contain an email address.');
+      debugLogger.log(
+        'User info response did not contain a valid email address.',
+      );
     }
   } catch (error) {
-    debugLogger.log('Error retrieving user info:', error);
+    debugLogger.log('Error retrieving user info:', getErrorMessage(error));
   }
 }
 
