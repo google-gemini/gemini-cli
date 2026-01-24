@@ -260,7 +260,33 @@ describe('OAuthUtils', () => {
 
       await expect(
         OAuthUtils.discoverOAuthConfig('https://example.com/mcp'),
-      ).rejects.toThrow(/does not match expected/);
+      ).rejects.toThrow(/is not within scope of protected resource/);
+    });
+
+    it('should succeed when resource metadata is a parent path of server URL', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ...mockResourceMetadata,
+              resource: 'https://example.com', // Parent path (no /mcp)
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(
+        'https://example.com/mcp',
+      );
+
+      expect(config).toEqual({
+        authorizationUrl: 'https://auth.example.com/authorize',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['read', 'write'],
+      });
     });
   });
 

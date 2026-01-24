@@ -51,6 +51,36 @@ export interface OAuthProtectedResourceMetadata {
 export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
 
 /**
+ * Checks if a requested resource URL is allowed by a configured resource URL.
+ * Matches if origins are equal and the requested path starts with the configured path.
+ *
+ * @see https://github.com/modelcontextprotocol/typescript-sdk/blob/main/packages/core/src/shared/authUtils.ts
+ */
+function checkResourceAllowed(
+  requestedResource: string,
+  configuredResource: string,
+): boolean {
+  const requested = new URL(requestedResource);
+  const configured = new URL(configuredResource);
+
+  // Origins must match (scheme, domain, port)
+  if (requested.origin !== configured.origin) {
+    return false;
+  }
+
+  // Check if requested path starts with configured path
+  // Add trailing slashes to avoid "/api123" matching "/api"
+  const requestedPath = requested.pathname.endsWith('/')
+    ? requested.pathname
+    : requested.pathname + '/';
+  const configuredPath = configured.pathname.endsWith('/')
+    ? configured.pathname
+    : configured.pathname + '/';
+
+  return requestedPath.startsWith(configuredPath);
+}
+
+/**
  * Utility class for common OAuth operations.
  */
 export class OAuthUtils {
@@ -254,13 +284,13 @@ export class OAuthUtils {
       }
 
       if (resourceMetadata) {
-        // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
-        // it is using as the prefix for the metadata request exactly matches the value
-        // of the resource metadata parameter in the protected resource metadata document.
+        // Validate that the server URL is within the scope of the advertised resource
         const expectedResource = this.buildResourceParameter(serverUrl);
-        if (resourceMetadata.resource !== expectedResource) {
+        if (
+          !checkResourceAllowed(expectedResource, resourceMetadata.resource)
+        ) {
           throw new ResourceMismatchError(
-            `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+            `Server ${expectedResource} is not within scope of protected resource ${resourceMetadata.resource}`,
           );
         }
       }
@@ -347,11 +377,11 @@ export class OAuthUtils {
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
 
     if (resourceMetadata && mcpServerUrl) {
-      // Validate resource parameter per RFC 9728 Section 7.3
+      // Validate that the server URL is within the scope of the advertised resource
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
-      if (resourceMetadata.resource !== expectedResource) {
+      if (!checkResourceAllowed(expectedResource, resourceMetadata.resource)) {
         throw new ResourceMismatchError(
-          `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+          `Server ${expectedResource} is not within scope of protected resource ${resourceMetadata.resource}`,
         );
       }
     }
