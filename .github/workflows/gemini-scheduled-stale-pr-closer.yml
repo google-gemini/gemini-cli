@@ -2,18 +2,154 @@ name: 'Gemini Scheduled Stale PR Closer'
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *' # Every day at 2 AM UTC
   pull_request:
-    types: [opened]
+    types: ['opened']
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode'
+        required: false
+        default: false
+        type: 'boolean'
 
 jobs:
   close-stale-prs:
-    if: github.repository == 'google-gemini/gemini-cli'
-    runs-on: ubuntu-latest
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    runs-on: 'ubuntu-latest'
     permissions:
-      pull-requests: write
-      issues: write
+      pull-requests: 'write'
+      issues: 'write'
     steps:
-      - name: Test
-        run: echo "test"
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@v1'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          owner: '${{ github.repository_owner }}'
+          repositories: 'gemini-cli'
+
+      - name: 'Process Stale PRs'
+        uses: 'actions/github-script@v7'
+        env:
+          DRY_RUN: '${{ inputs.dry_run }}'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const dryRun = process.env.DRY_RUN === 'true';
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            let maintainerLogins = new Set();
+            try {
+              const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                org: context.repo.owner,
+                team_slug: 'gemini-cli-maintainers'
+              });
+              maintainerLogins = new Set(members.map(m => m.login));
+            } catch (e) {
+              core.warning('Failed to fetch team members');
+            }
+
+            const isMaintainer = (login, assoc) => {
+              if (maintainerLogins.size > 0) return maintainerLogins.has(login);
+              return ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
+            };
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            for (const pr of prs) {
+              const maintainerPr = isMaintainer(pr.user.login, pr.author_association);
+              const isBot = pr.user.type === 'Bot' || pr.user.login.endsWith('[bot]');
+
+              const linkedIssueQuery = `query($owner:String!, $repo:String!, $number:Int!) {
+                repository(owner:$owner, name:$repo) {
+                  pullRequest(number:$number) {
+                    closingIssuesReferences(first: 1) { totalCount }
+                  }
+                }
+              }`;
+
+              let hasLinkedIssue = false;
+              try {
+                const res = await github.graphql(linkedIssueQuery, {
+                  owner: context.repo.owner, repo: context.repo.repo, number: pr.number
+                });
+                hasLinkedIssue = res.repository.pullRequest.closingIssuesReferences.totalCount > 0;
+              } catch (e) {}
+
+              if (!maintainerPr && !hasLinkedIssue && !isBot) {
+                if (!dryRun) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    body: "Hi there! Thank you for your contribution to Gemini CLI. \n\nTo improve our contribution process and better track changes, we now require all pull requests to be associated with an existing issue, as announced in our [recent discussion](https://github.com/google-gemini/gemini-cli/discussions/16706) and as detailed in our [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md#1-link-to-an-existing-issue).\n\nThis pull request is being closed because it is not currently linked to an issue. You can easily reopen this PR once you have linked it to an issue. \n\n**How to link an issue:**\nAdd a keyword followed by the issue number (e.g., Fixes #123) in the description of your pull request. For more details, see the [GitHub Documentation](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).\n\nThank you for your understanding and for being a part of our community!"
+                  });
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number,
+                    state: 'closed'
+                  });
+                }
+                continue;
+              }
+
+              const labels = pr.labels.map(l => l.name.toLowerCase());
+              if (labels.includes('help wanted') || labels.includes('🔒 maintainer only')) continue;
+
+              let lastActivity = new Date(0);
+              try {
+                const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number
+                });
+                for (const r of reviews) {
+                  if (isMaintainer(r.user.login, r.author_association)) {
+                    const d = new Date(r.submitted_at || r.updated_at);
+                    if (d > lastActivity) lastActivity = d;
+                  }
+                }
+                const comments = await github.paginate(github.rest.issues.listComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number
+                });
+                for (const c of comments) {
+                  if (isMaintainer(c.user.login, c.author_association)) {
+                    const d = new Date(c.updated_at);
+                    if (d > lastActivity) lastActivity = d;
+                  }
+                }
+              } catch (e) {}
+
+              if (maintainerPr) {
+                const d = new Date(pr.created_at);
+                if (d > lastActivity) lastActivity = d;
+              }
+
+              if (lastActivity < thirtyDaysAgo) {
+                if (!dryRun) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    body: "Hi there! Thank you for your contribution to Gemini CLI. We really appreciate the time and effort you've put into this pull request.\n\nTo keep our backlog manageable and ensure we're focusing on current priorities, we are closing pull requests that haven't seen maintainer activity for 30 days. Currently, the team is prioritizing work associated with **🔒 maintainer only** or **help wanted** issues.\n\nIf you believe this change is still critical, please feel free to comment with updated details. Otherwise, we encourage contributors to focus on open issues labeled as **help wanted**. Thank you for your understanding!"
+                  });
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number,
+                    state: 'closed'
+                  });
+                }
+              }
+            }
