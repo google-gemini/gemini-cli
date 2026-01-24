@@ -166,6 +166,45 @@ describe('AlternateBufferQuittingDisplay', () => {
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
   });
 
+  it('renders with a tool awaiting confirmation', () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const pendingHistoryItems: HistoryItemWithoutId[] = [
+      {
+        type: 'tool_group',
+        tools: [
+          {
+            callId: 'call4',
+            name: 'confirming_tool',
+            description: 'Confirming tool description',
+            status: ToolCallStatus.Confirming,
+            resultDisplay: undefined,
+            confirmationDetails: {
+              type: 'info',
+              title: 'Confirm Tool',
+              prompt: 'Confirm this action?',
+              onConfirm: async () => {},
+            },
+          },
+        ],
+      },
+    ];
+    const { lastFrame } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history: [],
+          pendingHistoryItems,
+        },
+      },
+    );
+    const output = lastFrame();
+    expect(output).toContain('Action Required (was prompted):');
+    expect(output).toContain('confirming_tool');
+    expect(output).toContain('Confirming tool description');
+    expect(output).toMatchSnapshot('with_confirming_tool');
+  });
+
   it('renders with user and gemini messages', () => {
     persistentStateMock.setData({ tipsShown: 0 });
     const history: HistoryItem[] = [
