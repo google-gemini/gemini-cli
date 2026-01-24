@@ -11,23 +11,14 @@ import type { AgentDefinition } from './types.js';
 import { coreEvents } from '../utils/events.js';
 import * as tomlLoader from './agentLoader.js';
 import { type Config } from '../config/config.js';
-import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 // Mock dependencies
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi.fn(),
-}));
-
-// Mock AcknowledgedAgentsService
-const mockAckService = vi.hoisted(() => ({
-  load: vi.fn().mockResolvedValue(undefined),
-  save: vi.fn().mockResolvedValue(undefined),
-  isAcknowledged: vi.fn().mockResolvedValue(false),
-  acknowledge: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('./acknowledgedAgents.js', () => ({
-  AcknowledgedAgentsService: vi.fn().mockImplementation(() => mockAckService),
 }));
 
 const MOCK_AGENT_WITH_HASH: AgentDefinition = {
@@ -50,8 +41,20 @@ const MOCK_AGENT_WITH_HASH: AgentDefinition = {
 describe('AgentRegistry Acknowledgement', () => {
   let registry: AgentRegistry;
   let config: Config;
+  let tempDir: string;
+  let originalGeminiCliHome: string | undefined;
+  let ackService: AcknowledgedAgentsService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Create a unique temp directory for each test
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-cli-test-'));
+
+    // Override GEMINI_CLI_HOME to point to the temp directory
+    originalGeminiCliHome = process.env['GEMINI_CLI_HOME'];
+    process.env['GEMINI_CLI_HOME'] = tempDir;
+
+    ackService = new AcknowledgedAgentsService();
+
     config = makeFakeConfig({
       folderTrust: true,
       trustedFolder: true,
@@ -61,7 +64,7 @@ describe('AgentRegistry Acknowledgement', () => {
     vi.spyOn(config, 'getFolderTrust').mockReturnValue(true);
     vi.spyOn(config, 'getProjectRoot').mockReturnValue('/project');
     vi.spyOn(config, 'getAcknowledgedAgentsService').mockReturnValue(
-      mockAckService as unknown as AcknowledgedAgentsService,
+      ackService,
     );
 
     // We cannot easily spy on storage.getProjectAgentsDir if it's a property/getter unless we cast to any or it's a method
@@ -84,17 +87,23 @@ describe('AgentRegistry Acknowledgement', () => {
         return { agents: [], errors: [] };
       },
     );
-    mockAckService.isAcknowledged.mockResolvedValue(false);
-    vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+
+    // Restore environment variable
+    if (originalGeminiCliHome) {
+      process.env['GEMINI_CLI_HOME'] = originalGeminiCliHome;
+    } else {
+      delete process.env['GEMINI_CLI_HOME'];
+    }
+
+    // Clean up temp directory
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   it('should not register unacknowledged project agents and emit event', async () => {
-    mockAckService.isAcknowledged.mockResolvedValue(false);
-
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
 
     await registry.initialize();
@@ -104,6 +113,9 @@ describe('AgentRegistry Acknowledgement', () => {
   });
 
   it('should register acknowledged project agents', async () => {
+    // Acknowledge the agent explicitly
+    await ackService.acknowledge('/project', 'ProjectAgent', 'hash123');
+
     vi.mocked(tomlLoader.loadAgentsFromDirectory).mockImplementation(
       async (dir) => {
         if (dir === '/project/.gemini/agents') {
@@ -115,7 +127,6 @@ describe('AgentRegistry Acknowledgement', () => {
         return { agents: [], errors: [] };
       },
     );
-    mockAckService.isAcknowledged.mockResolvedValue(true);
 
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
 
@@ -148,11 +159,11 @@ describe('AgentRegistry Acknowledgement', () => {
   it('acknowledgeAgent should acknowledge and register agent', async () => {
     await registry.acknowledgeAgent(MOCK_AGENT_WITH_HASH);
 
-    expect(mockAckService.acknowledge).toHaveBeenCalledWith(
-      '/project',
-      'ProjectAgent',
-      'hash123',
-    );
+    // Verify against real service state
+    expect(
+      await ackService.isAcknowledged('/project', 'ProjectAgent', 'hash123'),
+    ).toBe(true);
+
     expect(registry.getDefinition('ProjectAgent')).toBeDefined();
   });
 });

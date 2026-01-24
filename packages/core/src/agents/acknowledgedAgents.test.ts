@@ -4,53 +4,50 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import * as fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { Storage } from '../config/storage.js';
-
-vi.mock('node:fs/promises');
-vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
-}));
-vi.mock('../config/storage.js');
+import * as path from 'node:path';
+import * as os from 'node:os';
 
 describe('AcknowledgedAgentsService', () => {
-  const MOCK_PATH = '/mock/path/acknowledged_agents.json';
+  let tempDir: string;
+  let originalGeminiCliHome: string | undefined;
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(Storage.getAcknowledgedAgentsPath).mockReturnValue(MOCK_PATH);
+  beforeEach(async () => {
+    // Create a unique temp directory for each test
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-cli-test-'));
+
+    // Override GEMINI_CLI_HOME to point to the temp directory
+    originalGeminiCliHome = process.env['GEMINI_CLI_HOME'];
+    process.env['GEMINI_CLI_HOME'] = tempDir;
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
+    // Restore environment variable
+    if (originalGeminiCliHome) {
+      process.env['GEMINI_CLI_HOME'] = originalGeminiCliHome;
+    } else {
+      delete process.env['GEMINI_CLI_HOME'];
+    }
+
+    // Clean up temp directory
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   it('should acknowledge an agent and save to disk', async () => {
     const service = new AcknowledgedAgentsService();
-
-    // Mock mkdir to succeed
-    vi.mocked(existsSync).mockReturnValue(false); // Dir doesn't exist initially
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
 
     await service.acknowledge('/project', 'AgentA', 'hash1');
 
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      MOCK_PATH,
-      expect.stringContaining('"AgentA": "hash1"'),
-      'utf-8',
-    );
+    // Verify file exists and content
+    const content = await fs.readFile(ackPath, 'utf-8');
+    expect(content).toContain('"AgentA": "hash1"');
   });
 
   it('should return true for acknowledged agent', async () => {
     const service = new AcknowledgedAgentsService();
-
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
     await service.acknowledge('/project', 'AgentA', 'hash1');
 
@@ -66,13 +63,16 @@ describe('AcknowledgedAgentsService', () => {
   });
 
   it('should load acknowledged agents from disk', async () => {
+    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
     const data = {
       '/project': {
         AgentLoaded: 'hashLoaded',
       },
     };
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(data));
+
+    // Ensure directory exists
+    await fs.mkdir(path.dirname(ackPath), { recursive: true });
+    await fs.writeFile(ackPath, JSON.stringify(data), 'utf-8');
 
     const service = new AcknowledgedAgentsService();
 
@@ -82,8 +82,9 @@ describe('AcknowledgedAgentsService', () => {
   });
 
   it('should handle load errors gracefully', async () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(fs.readFile).mockRejectedValue(new Error('Read error'));
+    // Create a directory where the file should be to cause a read error (EISDIR)
+    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
+    await fs.mkdir(ackPath, { recursive: true });
 
     const service = new AcknowledgedAgentsService();
 
