@@ -109,6 +109,27 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should allow tools listed in allowedTools', async () => {
+      engine = new PolicyEngine({ allowedTools: ['read_file'] });
+
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should allow shell commands listed in allowedTools', async () => {
+      engine = new PolicyEngine({ allowedTools: ['ShellTool(git status)'] });
+
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'git status' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should match unqualified tool names with qualified rules when serverName is provided', async () => {
       const rules: PolicyRule[] = [
         {

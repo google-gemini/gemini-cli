@@ -26,6 +26,7 @@ export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   coreTools?: string[];
+  allowedTools?: string[];
   excludeTools?: string[];
   telemetry?: TelemetrySettings;
   showMemoryUsage?: boolean;

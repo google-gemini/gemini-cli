@@ -154,6 +154,7 @@ describe('loadSettings', () => {
     const settings = {
       showMemoryUsage: true,
       coreTools: ['tool1', 'tool2'],
+      allowedTools: ['tool3', 'tool4'],
       mcpServers: {
         server1: {
           command: 'cmd',
@@ -169,6 +170,7 @@ describe('loadSettings', () => {
     const result = loadSettings(mockWorkspaceDir);
     expect(result.showMemoryUsage).toBe(true);
     expect(result.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.allowedTools).toEqual(['tool3', 'tool4']);
     expect(result.mcpServers).toHaveProperty('server1');
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
   });
