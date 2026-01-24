@@ -20,7 +20,7 @@ import {
   type AskUserResponse,
 } from '../confirmation-bus/types.js';
 import { randomUUID } from 'node:crypto';
-import { ASK_USER_TOOL_NAME } from './tool-names.js';
+import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 
 export interface AskUserParams {
   questions: Question[];
@@ -33,7 +33,7 @@ export class AskUserTool extends BaseDeclarativeTool<
   constructor(messageBus: MessageBus) {
     super(
       ASK_USER_TOOL_NAME,
-      'Ask User',
+      ASK_USER_DISPLAY_NAME,
       'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
       Kind.Communicate,
       {
