@@ -17,8 +17,17 @@ import type { CommandContext, OpenCustomDialogActionReturn } from './types.js';
 import { MessageType } from '../types.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import * as trustedFolders from '../../config/trustedFolders.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn((p) => p),
+  };
+});
 
 vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
   const actual =
@@ -42,6 +51,7 @@ describe('directoryCommand', () => {
 
   beforeEach(() => {
     mockWorkspaceContext = {
+      targetDir: '/test/dir',
       addDirectory: vi.fn(),
       addDirectories: vi.fn().mockReturnValue({ added: [], failed: [] }),
       getDirectories: vi
@@ -209,6 +219,27 @@ describe('directoryCommand', () => {
       );
       expect(mockWorkspaceContext.addDirectory).not.toHaveBeenCalledWith(
         existingPath,
+      );
+    });
+
+    it('should show an info message for an already added directory specified as a relative path', async () => {
+      const existingPath = path.normalize('/home/user/project1');
+      const relativePath = './project1';
+      const absoluteRelativePath = path.resolve('/test/dir', relativePath);
+
+      vi.mocked(fs.realpathSync).mockImplementation((p) => {
+        if (p === absoluteRelativePath) return existingPath;
+        return p as string;
+      });
+
+      if (!addCommand?.action) throw new Error('No action');
+      await addCommand.action(mockContext, relativePath);
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `The following directories are already in the workspace:\n- ${relativePath}`,
+        }),
       );
     });
 
