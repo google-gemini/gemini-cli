@@ -96,6 +96,8 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  /** Workspace directories added during the session via /dir add */
+  directories?: string[];
 }
 
 /**
@@ -482,6 +484,23 @@ export class ChatRecordingService {
       });
     } catch (error) {
       debugLogger.error('Error saving summary to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
+   * Records workspace directories to the session file.
+   * Called when directories are added via /dir add.
+   */
+  recordDirectories(directories: readonly string[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.directories = [...directories];
+      });
+    } catch (error) {
+      debugLogger.error('Error saving directories to chat history.', error);
       // Don't throw - we want graceful degradation
     }
   }
