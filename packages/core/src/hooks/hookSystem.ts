@@ -81,39 +81,13 @@ export interface AfterModelHookResult {
 }
 
 /**
- * Serializable representation of tool confirmation details for hooks.
- * Excludes function properties like onConfirm that can't be serialized.
- */
-interface SerializableConfirmationDetails {
-  type: 'edit' | 'exec' | 'mcp' | 'info';
-  title: string;
-  // Edit-specific fields
-  fileName?: string;
-  filePath?: string;
-  fileDiff?: string;
-  originalContent?: string | null;
-  newContent?: string;
-  isModifying?: boolean;
-  // Exec-specific fields
-  command?: string;
-  rootCommand?: string;
-  // MCP-specific fields
-  serverName?: string;
-  toolName?: string;
-  toolDisplayName?: string;
-  // Info-specific fields
-  prompt?: string;
-  urls?: string[];
-}
-
-/**
  * Converts ToolCallConfirmationDetails to a serializable format for hooks.
  * Excludes function properties (onConfirm, ideConfirmation) that can't be serialized.
  */
 function toSerializableDetails(
   details: ToolCallConfirmationDetails,
-): SerializableConfirmationDetails {
-  const base: SerializableConfirmationDetails = {
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     type: details.type,
     title: details.title,
   };
