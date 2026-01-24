@@ -1053,6 +1053,7 @@ export const useGeminiStream = (
                 ] as Part[];
               }
               steeringInjectedInCurrentTurnRef.current = true;
+              pendingSteeringMessageRef.current = null;
             }
 
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
