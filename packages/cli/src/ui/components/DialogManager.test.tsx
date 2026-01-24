@@ -58,6 +58,9 @@ vi.mock('./ModelDialog.js', () => ({
 vi.mock('./IdeTrustChangeDialog.js', () => ({
   IdeTrustChangeDialog: () => <Text>IdeTrustChangeDialog</Text>,
 }));
+vi.mock('./AgentConfigDialog.js', () => ({
+  AgentConfigDialog: () => <Text>AgentConfigDialog</Text>,
+}));
 
 describe('DialogManager', () => {
   const defaultProps = {
@@ -86,6 +89,10 @@ describe('DialogManager', () => {
     isEditorDialogOpen: false,
     showPrivacyNotice: false,
     isPermissionsDialogOpen: false,
+    isAgentConfigDialogOpen: false,
+    selectedAgentName: undefined,
+    selectedAgentDisplayName: undefined,
+    selectedAgentDefinition: undefined,
   };
 
   it('renders nothing by default', () => {
@@ -148,6 +155,23 @@ describe('DialogManager', () => {
     [{ isEditorDialogOpen: true }, 'EditorSettingsDialog'],
     [{ showPrivacyNotice: true }, 'PrivacyNotice'],
     [{ isPermissionsDialogOpen: true }, 'PermissionsModifyTrustDialog'],
+    [
+      {
+        isAgentConfigDialogOpen: true,
+        selectedAgentName: 'test-agent',
+        selectedAgentDisplayName: 'Test Agent',
+        selectedAgentDefinition: {
+          name: 'test-agent',
+          kind: 'local',
+          description: 'Test agent',
+          inputConfig: { inputSchema: {} },
+          promptConfig: { systemPrompt: 'test' },
+          modelConfig: { model: 'inherit' },
+          runConfig: { maxTimeMinutes: 5 },
+        },
+      },
+      'AgentConfigDialog',
+    ],
   ];
 
   it.each(testCases)(
