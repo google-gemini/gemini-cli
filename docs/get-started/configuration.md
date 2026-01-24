@@ -261,6 +261,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.showSpinner`** (boolean):
+  - **Description:** Show the spinner during operations.
+  - **Default:** `true`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
