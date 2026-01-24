@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mapCoreStatusToDisplayStatus, mapToDisplay } from './toolMapping.js';
 import {
-  debugLogger,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
   type ToolCallRequestInfo,
@@ -40,7 +39,7 @@ describe('toolMapping', () => {
 
   describe('mapCoreStatusToDisplayStatus', () => {
     it.each([
-      ['validating', ToolCallStatus.Executing],
+      ['validating', ToolCallStatus.Pending],
       ['awaiting_approval', ToolCallStatus.Confirming],
       ['executing', ToolCallStatus.Executing],
       ['success', ToolCallStatus.Success],
@@ -53,12 +52,10 @@ describe('toolMapping', () => {
       );
     });
 
-    it('logs warning and defaults to Error for unknown status', () => {
-      const result = mapCoreStatusToDisplayStatus('unknown_status' as Status);
-      expect(result).toBe(ToolCallStatus.Error);
-      expect(debugLogger.warn).toHaveBeenCalledWith(
-        'Unknown core status encountered: unknown_status',
-      );
+    it('throws error for unknown status due to checkExhaustive', () => {
+      expect(() =>
+        mapCoreStatusToDisplayStatus('unknown_status' as Status),
+      ).toThrow('unexpected value unknown_status!');
     });
   });
 

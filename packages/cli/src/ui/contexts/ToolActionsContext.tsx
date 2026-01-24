@@ -52,6 +52,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   props: ToolActionsProviderProps,
 ) => {
   const { children, config, toolCalls } = props;
+
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   useEffect(() => {
@@ -124,7 +125,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 
       debugLogger.warn(`ToolActions: No confirmation mechanism for ${callId}`);
     },
-    [config, toolCalls, ideClient],
+    [config, ideClient, toolCalls],
   );
 
   const cancel = useCallback(
