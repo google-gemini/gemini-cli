@@ -101,7 +101,7 @@ export const directoryCommand: SlashCommand = {
           const workspaceContext =
             context.services.config.getWorkspaceContext();
           const existingDirs = new Set(
-            workspaceContext.getDirectories().map((dir) => path.normalize(dir)),
+            workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
           );
 
           filteredSuggestions = suggestions.filter((s) => {
