@@ -40,5 +40,5 @@ jobs:
             If this is still relevant, you are welcome to reopen or leave a comment. Thanks for contributing!
           days-before-stale: 60
           days-before-close: 14
-          exempt-issue-labels: 'pinned,security'
-          exempt-pr-labels: 'pinned,security'
+          exempt-issue-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
+          exempt-pr-labels: 'pinned,security,🔒 maintainer only,help wanted,🗓️ Public Roadmap'
