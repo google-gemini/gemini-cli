@@ -32,15 +32,10 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import type { Config } from '../config/config.js';
 import type { EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
-import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 
 // Mock Dependencies
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
-}));
-
-vi.mock('../core/coreToolHookTriggers.js', () => ({
-  fireToolNotificationHook: vi.fn(),
 }));
 
 describe('confirmation.ts', () => {
@@ -140,14 +135,18 @@ describe('confirmation.ts', () => {
         configurable: true,
       });
 
+      const mockHookSystem = {
+        fireToolNotificationEvent: vi.fn().mockResolvedValue(undefined),
+      };
+      mockConfig = {
+        getEnableHooks: vi.fn().mockReturnValue(true),
+        getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
+      } as unknown as Mocked<Config>;
+
       mockModifier = {
         handleModifyWithEditor: vi.fn(),
         applyInlineModify: vi.fn(),
       } as unknown as Mocked<ToolModificationHandler>;
-
-      mockConfig = {
-        getEnableHooks: vi.fn().mockReturnValue(true),
-      } as unknown as Mocked<Config>;
 
       getPreferredEditor = vi.fn().mockReturnValue('vim');
 
@@ -263,8 +262,9 @@ describe('confirmation.ts', () => {
       });
       await promise;
 
-      expect(fireToolNotificationHook).toHaveBeenCalledWith(
-        mockMessageBus,
+      expect(
+        mockConfig.getHookSystem()?.fireToolNotificationEvent,
+      ).toHaveBeenCalledWith(
         expect.objectContaining({
           type: details.type,
           prompt: details.prompt,
