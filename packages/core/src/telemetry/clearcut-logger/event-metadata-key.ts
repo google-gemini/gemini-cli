@@ -542,4 +542,7 @@ export enum EventMetadataKey {
 
   // Logs the duration spent in an approval mode in milliseconds.
   GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
 }

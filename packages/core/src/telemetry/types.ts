@@ -889,6 +889,32 @@ export enum SlashCommandStatus {
   ERROR = 'error',
 }
 
+export const EVENT_REWIND = 'gemini_cli.rewind';
+export class RewindEvent implements BaseTelemetryEvent {
+  'event.name': 'rewind';
+  'event.timestamp': string;
+  outcome: string;
+
+  constructor(outcome: string) {
+    this['event.name'] = 'rewind';
+    this['event.timestamp'] = new Date().toISOString();
+    this.outcome = outcome;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_REWIND,
+      'event.timestamp': this['event.timestamp'],
+      outcome: this.outcome,
+    };
+  }
+
+  toLogBody(): string {
+    return `Rewind performed. Outcome: ${this.outcome}.`;
+  }
+}
+
 export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 export interface ChatCompressionEvent extends BaseTelemetryEvent {
   'event.name': 'chat_compression';
@@ -1577,6 +1603,7 @@ export type TelemetryEvent =
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
   | EditStrategyEvent
+  | RewindEvent
   | EditCorrectionEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
