@@ -47,9 +47,8 @@ export class TerminalCapabilityManager {
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
+  private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
-  private modifyOtherKeysSupported?: boolean;
-  private deviceAttributesSupported = false;
 
   private constructor() {}
 
@@ -186,7 +185,6 @@ export class TerminalCapabilityManager {
           );
           if (match) {
             deviceAttributesReceived = true;
-            this.deviceAttributesSupported = true;
             cleanup();
           }
         }
@@ -215,13 +213,7 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (
-        this.modifyOtherKeysSupported === true ||
-        // If device attributes were received it's safe to try enabling
-        // anyways, since it will be ignored if unsupported
-        (this.modifyOtherKeysSupported === undefined &&
-          this.deviceAttributesSupported)
-      ) {
+      } else if (this.modifyOtherKeysSupported) {
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.

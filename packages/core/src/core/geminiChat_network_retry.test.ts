@@ -16,18 +16,23 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 
 // Mock fs module
-vi.mock('node:fs', () => ({
-  default: {
-    mkdirSync: vi.fn(),
-    writeFileSync: vi.fn(),
-    readFileSync: vi.fn(() => {
-      const error = new Error('ENOENT');
-      (error as NodeJS.ErrnoException).code = 'ENOENT';
-      throw error;
-    }),
-    existsSync: vi.fn(() => false),
-  },
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      mkdirSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      readFileSync: vi.fn(() => {
+        const error = new Error('ENOENT');
+        (error as NodeJS.ErrnoException).code = 'ENOENT';
+        throw error;
+      }),
+      existsSync: vi.fn(() => false),
+    },
+  };
+});
 
 const { mockRetryWithBackoff } = vi.hoisted(() => ({
   mockRetryWithBackoff: vi.fn(),
