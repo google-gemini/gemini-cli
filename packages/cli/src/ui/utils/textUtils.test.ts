@@ -63,6 +63,11 @@ describe('textUtils', () => {
       const output = 123 as unknown as string;
       expect(pruneShellOutput(output, 5)).toBe(output);
     });
+
+    it('should correctly handle trailing newlines', () => {
+      const output = 'a\nb\n';
+      expect(pruneShellOutput(output, 1)).toBe('b\n');
+    });
   });
 
   describe('sanitizeForListDisplay', () => {

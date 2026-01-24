@@ -23,9 +23,24 @@ export function pruneShellOutput(
   if (output === undefined) return undefined;
 
   if (typeof output === 'string') {
-    const lines = output.split('\n');
-    if (lines.length <= maxLines) return output;
-    return lines.slice(-maxLines).join('\n');
+    if (maxLines <= 0) return '';
+
+    let searchEnd = output.length;
+    if (output.endsWith('\n')) {
+      searchEnd--;
+    }
+
+    let newlineCount = 0;
+    for (let i = searchEnd - 1; i >= 0; i--) {
+      if (output[i] === '\n') {
+        newlineCount++;
+        if (newlineCount === maxLines) {
+          return output.substring(i + 1);
+        }
+      }
+    }
+
+    return output;
   }
 
   if (Array.isArray(output)) {
