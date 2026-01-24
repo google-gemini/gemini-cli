@@ -101,8 +101,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
-import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -218,6 +217,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -815,12 +815,20 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const mcpInitialization = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
-    ]).catch((error) => {
-      debugLogger.error('Error initializing MCP clients:', error);
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
     });
+
+    if (!this.interactive) {
+      await mcpInitialization;
+    }
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -953,6 +961,10 @@ export class Config {
 
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
+  }
+
+  getUserTierName(): string | undefined {
+    return this.contentGenerator?.userTierName;
   }
 
   /**
@@ -1967,8 +1979,7 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    // Register DelegateToAgentTool if agents are enabled
-    this.registerDelegateToAgentTool(registry);
+    this.registerSubAgentTools(registry);
 
     await registry.discoverAllTools();
     registry.sortTools();
@@ -1976,27 +1987,36 @@ export class Config {
   }
 
   /**
-   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   * Registers SubAgentTools for all available agents.
    */
-  private registerDelegateToAgentTool(registry: ToolRegistry): void {
+  private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     if (
       this.isAgentsEnabled() ||
       agentsOverrides['codebase_investigator']?.enabled !== false ||
       agentsOverrides['cli_help']?.enabled !== false
     ) {
-      // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
-      const isAllowed =
-        !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
+      const definitions = this.agentRegistry.getAllDefinitions();
 
-      if (isAllowed) {
-        const delegateTool = new DelegateToAgentTool(
-          this.agentRegistry,
-          this,
-          this.getMessageBus(),
-        );
-        registry.registerTool(delegateTool);
+      for (const definition of definitions) {
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed) {
+          try {
+            const tool = new SubagentTool(
+              definition,
+              this,
+              this.getMessageBus(),
+            );
+            registry.registerTool(tool);
+          } catch (e: unknown) {
+            debugLogger.warn(
+              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+            );
+          }
+        }
       }
     }
   }
@@ -2092,7 +2112,7 @@ export class Config {
 
   private onAgentsRefreshed = async () => {
     if (this.toolRegistry) {
-      this.registerDelegateToAgentTool(this.toolRegistry);
+      this.registerSubAgentTools(this.toolRegistry);
     }
     // Propagate updates to the active chat session
     const client = this.getGeminiClient();

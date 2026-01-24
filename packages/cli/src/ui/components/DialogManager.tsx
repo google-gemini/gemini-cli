@@ -32,6 +32,7 @@ import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { AgentConfigDialog } from './AgentConfigDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -160,6 +161,31 @@ export const DialogManager = ({
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (
+    uiState.isAgentConfigDialogOpen &&
+    uiState.selectedAgentName &&
+    uiState.selectedAgentDisplayName &&
+    uiState.selectedAgentDefinition
+  ) {
+    return (
+      <Box flexDirection="column">
+        <AgentConfigDialog
+          agentName={uiState.selectedAgentName}
+          displayName={uiState.selectedAgentDisplayName}
+          definition={uiState.selectedAgentDefinition}
+          settings={settings}
+          onClose={uiActions.closeAgentConfigDialog}
+          onSave={async () => {
+            // Reload agent registry to pick up changes
+            const agentRegistry = config?.getAgentRegistry();
+            if (agentRegistry) {
+              await agentRegistry.reload();
+            }
+          }}
+        />
+      </Box>
+    );
   }
   if (uiState.isAuthenticating) {
     return (
