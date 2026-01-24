@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
 import type { HookConfig } from './types.js';
-import type { Logger } from '@opentelemetry/api-logs';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator } from './hookAggregator.js';
@@ -18,7 +17,6 @@ import {
   SessionStartSource,
   type HookExecutionResult,
 } from './types.js';
-import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
@@ -54,7 +52,6 @@ vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
 describe('HookEventHandler', () => {
   let hookEventHandler: HookEventHandler;
   let mockConfig: Config;
-  let mockLogger: Logger;
   let mockHookPlanner: HookPlanner;
   let mockHookRunner: HookRunner;
   let mockHookAggregator: HookAggregator;
@@ -74,8 +71,6 @@ describe('HookEventHandler', () => {
       }),
     } as unknown as Config;
 
-    mockLogger = {} as Logger;
-
     mockHookPlanner = {
       createExecutionPlan: vi.fn(),
     } as unknown as HookPlanner;
@@ -91,11 +86,9 @@ describe('HookEventHandler', () => {
 
     hookEventHandler = new HookEventHandler(
       mockConfig,
-      mockLogger,
       mockHookPlanner,
       mockHookRunner,
       mockHookAggregator,
-      createMockMessageBus(),
     );
   });
 
