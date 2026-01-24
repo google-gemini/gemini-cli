@@ -8,7 +8,6 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
-import type { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
@@ -744,15 +743,10 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-    events?: EventEmitter,
   ): Promise<OAuthToken> {
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
-      if (events) {
-        events.emit(OAUTH_DISPLAY_MESSAGE_EVENT, message);
-      } else {
-        debugLogger.log(message);
-      }
+      coreEvents.emitFeedback('info', message);
     };
 
     // If no authorization URL is provided, try to discover OAuth configuration

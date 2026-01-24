@@ -117,6 +117,23 @@ vi.mock('../telemetry/loggers.js', () => ({
   logRecoveryAttempt: vi.fn(),
 }));
 
+vi.mock('../utils/schemaValidator.js', () => ({
+  SchemaValidator: {
+    validate: vi.fn().mockReturnValue(null),
+    validateSchema: vi.fn().mockReturnValue(null),
+  },
+}));
+
+vi.mock('../utils/filesearch/crawler.js', () => ({
+  crawl: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
+  ClearcutLogger: class {
+    log() {}
+  },
+}));
+
 vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../utils/promptIdContext.js')>();
@@ -439,6 +456,40 @@ describe('LocalAgentExecutor', () => {
       // LS should be present
       expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
       // Subagent should be filtered out
+      expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    it('should default to ALL tools (except subagents) when toolConfig is undefined', async () => {
+      const subAgentName = 'recursive-agent';
+      // Register tools in parent registry
+      // LS_TOOL_NAME is already registered in beforeEach
+      const otherTool = new MockTool({ name: 'other-tool' });
+      parentToolRegistry.registerTool(otherTool);
+      parentToolRegistry.registerTool(new MockTool({ name: subAgentName }));
+
+      // Mock the agent registry to return the subagent name
+      vi.spyOn(
+        mockConfig.getAgentRegistry(),
+        'getAllAgentNames',
+      ).mockReturnValue([subAgentName]);
+
+      // Create definition and force toolConfig to be undefined
+      const definition = createTestDefinition();
+      definition.toolConfig = undefined;
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // Should include standard tools
+      expect(agentRegistry.getTool(LS_TOOL_NAME)).toBeDefined();
+      expect(agentRegistry.getTool('other-tool')).toBeDefined();
+
+      // Should exclude subagent
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
     });
   });
