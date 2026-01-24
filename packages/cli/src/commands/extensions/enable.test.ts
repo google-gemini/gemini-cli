@@ -62,6 +62,18 @@ vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
 
+const mockEnablementInstance = vi.hoisted(() => ({
+  getDisplayState: vi.fn(),
+  enable: vi.fn(),
+  clearSessionDisable: vi.fn(),
+}));
+vi.mock('../../config/mcp/mcpServerEnablement.js', () => ({
+  McpServerEnablementManager: {
+    getInstance: () => mockEnablementInstance,
+  },
+  normalizeServerId: (id: string) => id.toLowerCase(),
+}));
+
 describe('extensions enable command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockExtensionManager = vi.mocked(ExtensionManager);
@@ -75,6 +87,10 @@ describe('extensions enable command', () => {
       .fn()
       .mockResolvedValue(undefined);
     mockExtensionManager.prototype.enableExtension = vi.fn();
+    mockExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+    mockEnablementInstance.getDisplayState.mockReset();
+    mockEnablementInstance.enable.mockReset();
+    mockEnablementInstance.clearSessionDisable.mockReset();
   });
 
   afterEach(() => {
@@ -132,6 +148,48 @@ describe('extensions enable command', () => {
       await expect(promise).rejects.toThrow(FatalConfigError);
       await expect(promise).rejects.toThrow('Enable failed');
 
+      mockCwd.mockRestore();
+    });
+
+    it('should auto-enable disabled MCP servers for the extension', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockEnablementInstance.getDisplayState.mockResolvedValue({
+        enabled: false,
+        isPersistentDisabled: true,
+        isSessionDisabled: false,
+      });
+      mockExtensionManager.prototype.getExtensions = vi
+        .fn()
+        .mockReturnValue([
+          { name: 'my-extension', mcpServers: { 'test-server': {} } },
+        ]);
+
+      await handleEnable({ name: 'my-extension' });
+
+      expect(mockEnablementInstance.enable).toHaveBeenCalledWith('test-server');
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        expect.stringContaining("MCP server 'test-server' was disabled"),
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should not call enable when MCP servers are already enabled', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockEnablementInstance.getDisplayState.mockResolvedValue({
+        enabled: true,
+        isPersistentDisabled: false,
+        isSessionDisabled: false,
+      });
+      mockExtensionManager.prototype.getExtensions = vi
+        .fn()
+        .mockReturnValue([
+          { name: 'my-extension', mcpServers: { 'test-server': {} } },
+        ]);
+
+      await handleEnable({ name: 'my-extension' });
+
+      expect(mockEnablementInstance.enable).not.toHaveBeenCalled();
       mockCwd.mockRestore();
     });
   });
