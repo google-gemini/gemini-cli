@@ -1,0 +1,19 @@
+name: 'Gemini Scheduled Stale PR Closer'
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  pull_request:
+    types: [opened]
+  workflow_dispatch:
+
+jobs:
+  close-stale-prs:
+    if: github.repository == 'google-gemini/gemini-cli'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Test
+        run: echo "test"
