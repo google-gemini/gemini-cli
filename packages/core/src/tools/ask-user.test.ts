@@ -87,7 +87,9 @@ describe('AskUserTool', () => {
           },
         ],
       });
-      expect(result).toContain('must NOT have fewer than 2 items');
+      expect(result).toContain(
+        "type='choice' requires 'options' array with 2-4 items",
+      );
     });
 
     it('should return error if options has more than 4 items', () => {
@@ -106,7 +108,7 @@ describe('AskUserTool', () => {
           },
         ],
       });
-      expect(result).toContain('must NOT have more than 4 items');
+      expect(result).toContain("'options' array must have at most 4 items");
     });
 
     it('should return null for valid params', () => {

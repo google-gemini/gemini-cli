@@ -39,7 +39,6 @@ export class AskUserTool extends BaseDeclarativeTool<
       {
         type: 'object',
         required: ['questions'],
-        additionalProperties: false,
         properties: {
           questions: {
             type: 'array',
@@ -48,7 +47,6 @@ export class AskUserTool extends BaseDeclarativeTool<
             items: {
               type: 'object',
               required: ['question', 'header'],
-              additionalProperties: false,
               properties: {
                 question: {
                   type: 'string',
@@ -66,18 +64,15 @@ export class AskUserTool extends BaseDeclarativeTool<
                   enum: ['choice', 'text', 'yesno'],
                   default: 'choice',
                   description:
-                    "Question type. Defaults to 'choice' if omitted. Use 'choice' for multiple-choice questions (REQUIRES 'options' array). Use 'text' for free-form text input (ignores 'options'). Use 'yesno' for Yes/No confirmation (ignores 'options', auto-generates Yes/No choices).",
+                    "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
                 },
                 options: {
                   type: 'array',
                   description:
-                    "The selectable choices. REQUIRED when type='choice' or type is omitted. IGNORED when type='text' or type='yesno'. Provide 2-4 options. An 'Other' option is automatically added.",
-                  minItems: 2,
-                  maxItems: 4,
+                    "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
                   items: {
                     type: 'object',
                     required: ['label', 'description'],
-                    additionalProperties: false,
                     properties: {
                       label: {
                         type: 'string',
