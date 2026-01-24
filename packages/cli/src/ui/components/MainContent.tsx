@@ -16,15 +16,20 @@ import { SCROLL_TO_ITEM_END } from './shared/VirtualizedList.js';
 import { ScrollableList } from './shared/ScrollableList.js';
 import { useMemo, memo, useCallback } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
+
+interface MainContentProps {
+  composerHeight: number;
+}
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
 // This threshold is arbitrary but should be high enough to never impact normal
 // usage.
-export const MainContent = () => {
+export const MainContent = ({ composerHeight }: MainContentProps) => {
   const { version } = useAppContext();
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -144,17 +149,26 @@ export const MainContent = () => {
   }
 
   return (
-    <>
-      <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...historyItems,
-        ]}
+    <Box flexGrow={1} flexShrink={1} flexDirection="column" overflow="hidden">
+      <MaxSizedBox
+        maxHeight={
+          availableTerminalHeight
+            ? availableTerminalHeight - composerHeight
+            : // HACK: Sometimes availableTerminalHeight is 0 on the first render.
+              1
+        }
       >
-        {(item) => item}
-      </Static>
-      {pendingItems}
-    </>
+        <Static
+          key={uiState.historyRemountKey}
+          items={[
+            <AppHeader key="app-header" version={version} />,
+            ...historyItems,
+          ]}
+        >
+          {(item) => item}
+        </Static>
+        {pendingItems}
+      </MaxSizedBox>
+    </Box>
   );
 };
