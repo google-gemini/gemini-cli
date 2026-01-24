@@ -15,7 +15,7 @@ on:
 
 jobs:
   close-stale-prs:
-    if: 'github.repository == ''google-gemini/gemini-cli'''
+    if: "github.repository == 'google-gemini/gemini-cli'"
     runs-on: 'ubuntu-latest'
     permissions:
       pull-requests: 'write'
