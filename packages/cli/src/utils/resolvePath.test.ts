@@ -13,9 +13,14 @@ vi.mock('node:os', () => ({
   homedir: vi.fn(),
 }));
 
-vi.mock('@google/gemini-cli-core', () => ({
-  homedir: () => os.homedir(),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: () => os.homedir(),
+  };
+});
 
 describe('resolvePath', () => {
   beforeEach(() => {

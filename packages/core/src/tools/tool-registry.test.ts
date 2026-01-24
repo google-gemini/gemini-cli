@@ -200,6 +200,7 @@ describe('ToolRegistry', () => {
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);
+    vi.mocked(fs.realpathSync).mockImplementation((path) => path as string);
     config = new Config(baseConfigParams);
     toolRegistry = new ToolRegistry(config, mockMessageBus);
     vi.spyOn(console, 'warn').mockImplementation(() => {});

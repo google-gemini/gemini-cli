@@ -26,6 +26,7 @@ describe('Flash Model Fallback Configuration', () => {
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);
+    vi.mocked(fs.realpathSync).mockImplementation((path) => path as string);
     config = new Config({
       sessionId: 'test-session',
       targetDir: '/test',
