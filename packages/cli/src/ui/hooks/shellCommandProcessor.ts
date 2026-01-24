@@ -19,7 +19,7 @@ import type {
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { SHELL_COMMAND_NAME } from '../constants.js';
+import { SHELL_COMMAND_NAME , SHELL_HISTORY_MAX_LINES } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -29,7 +29,6 @@ import { themeManager } from '../../ui/themes/theme-manager.js';
 import { pruneShellOutput } from '../utils/textUtils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
-const MAX_OUTPUT_LINES_HISTORY = 10;
 const MAX_OUTPUT_LENGTH = 10000;
 
 function addShellCommandToGeminiHistory(
@@ -288,7 +287,7 @@ export const useShellCommandProcessor = (
                 status: finalStatus,
                 resultDisplay: pruneShellOutput(
                   finalOutput,
-                  MAX_OUTPUT_LINES_HISTORY,
+                  SHELL_HISTORY_MAX_LINES,
                 ),
               };
 

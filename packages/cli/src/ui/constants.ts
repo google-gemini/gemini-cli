@@ -37,3 +37,9 @@ export const SHELL_SILENT_WORKING_TITLE_DELAY_MS = 120000;
 export const KEYBOARD_SHORTCUTS_URL =
   'https://geminicli.com/docs/cli/keyboard-shortcuts/';
 export const LRU_BUFFER_PERF_CACHE_LIMIT = 20000;
+
+// Max lines to show for active shell output when not focused
+export const ACTIVE_SHELL_MAX_LINES = 25;
+
+// Max lines to preserve in history for completed shell commands
+export const SHELL_HISTORY_MAX_LINES = 5;

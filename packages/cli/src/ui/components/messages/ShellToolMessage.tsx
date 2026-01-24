@@ -23,6 +23,7 @@ import {
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -153,13 +154,14 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
-          maxLines={10}
+          maxLines={isThisShellFocused ? undefined : ACTIVE_SHELL_MAX_LINES}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
             <ShellInputPrompt
               activeShellPtyId={activeShellPtyId ?? null}
               focus={embeddedShellFocused}
+              scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
             />
           </Box>
         )}
