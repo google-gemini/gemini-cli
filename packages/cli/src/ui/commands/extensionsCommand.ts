@@ -413,20 +413,21 @@ async function enableAction(context: CommandContext, args: string) {
 
         if (wasDisabled) {
           enabledServers.push(serverName);
-
-          // Restart server to bring it online (use original key, not normalized)
-          if (mcpClientManager) {
-            try {
-              await mcpClientManager.restartServer(serverName);
-            } catch (error) {
-              // Show warning but continue with other servers
-              context.ui.addItem({
-                type: MessageType.WARNING,
-                text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
-              });
-            }
-          }
         }
+      }
+
+      if (mcpClientManager && enabledServers.length > 0) {
+        const restartPromises = enabledServers.map(async (serverName) => {
+          try {
+            await mcpClientManager.restartServer(serverName);
+          } catch (error) {
+            context.ui.addItem({
+              type: MessageType.WARNING,
+              text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
+            });
+          }
+        });
+        await Promise.all(restartPromises);
       }
 
       if (enabledServers.length > 0) {
