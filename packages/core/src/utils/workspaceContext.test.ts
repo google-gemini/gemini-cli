@@ -177,6 +177,14 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(workspaceContext.isPathWithinWorkspace(pathInsideNFC)).toBe(true);
       expect(workspaceContext.isPathWithinWorkspace(pathInsideNFD)).toBe(true);
 
+      // Test with a root directory that is NFD
+      const workspaceContextNFD = new WorkspaceContext(
+        unicodeDirPath.normalize('NFD'),
+      );
+      expect(workspaceContextNFD.isPathWithinWorkspace(pathInsideNFC)).toBe(
+        true,
+      );
+
       const pathOutside = path.join(tempDir, '다른폴더', 'file.txt');
       expect(workspaceContext.isPathWithinWorkspace(pathOutside)).toBe(false);
     });

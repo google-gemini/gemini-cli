@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { homedir } from '@google/gemini-cli-core';
-import { normalizePath } from '@google/gemini-cli-core';
+import { homedir, normalizePath } from '@google/gemini-cli-core';
 
 export function resolvePath(p: string): string {
   if (!p) {
