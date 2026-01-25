@@ -273,17 +273,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
    */
   const handleInsertModeInput = useCallback(
     (normalizedKey: Key): boolean => {
-      // Handle escape key - check for double-escape to clear buffer first
+      // Handle escape key
       if (normalizedKey.name === 'escape') {
-        // Check for double-escape to clear buffer (works from INSERT mode too)
-        if (checkDoubleEscape()) {
-          buffer.setText('');
-          dispatch({ type: 'ESCAPE_TO_NORMAL' });
-          updateMode('NORMAL');
-          return true;
-        }
+        // Record escape timestamp for double-escape detection.
+        // Double-escape clearing is handled in NORMAL mode since the first
+        // escape switches to NORMAL, so the second escape is processed there.
+        checkDoubleEscape();
 
-        // Single escape: switch to NORMAL mode
+        // Switch to NORMAL mode
         // Vim behavior: move cursor left when exiting insert mode (unless at beginning of line)
         buffer.vimEscapeInsertMode();
         dispatch({ type: 'ESCAPE_TO_NORMAL' });
