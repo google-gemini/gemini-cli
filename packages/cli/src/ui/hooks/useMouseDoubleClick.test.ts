@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useMouseDoubleClick } from './useMouseDoubleClick.js';
 import * as MouseContext from '../contexts/MouseContext.js';
@@ -38,7 +39,7 @@ describe('useMouseDoubleClick', () => {
     });
   });
 
-  it('should detect double-click within threshold', () => {
+  it('should detect double-click within threshold', async () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
     const event1: MouseEvent = {
@@ -59,15 +60,16 @@ describe('useMouseDoubleClick', () => {
       ctrl: false,
       button: 'left',
     };
-
-    mouseCallback(event1);
-    vi.advanceTimersByTime(200);
-    mouseCallback(event2);
+    await act(async () => {
+      mouseCallback(event1);
+      vi.advanceTimersByTime(200);
+      mouseCallback(event2);
+    });
 
     expect(mockHandler).toHaveBeenCalledWith(event2, 9, 4);
   });
 
-  it('should NOT detect double-click if time exceeds threshold', () => {
+  it('should NOT detect double-click if time exceeds threshold', async () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
     const event1: MouseEvent = {
@@ -89,14 +91,16 @@ describe('useMouseDoubleClick', () => {
       button: 'left',
     };
 
-    mouseCallback(event1);
-    vi.advanceTimersByTime(500); // Threshold is 400ms
-    mouseCallback(event2);
+    await act(async () => {
+      mouseCallback(event1);
+      vi.advanceTimersByTime(500); // Threshold is 400ms
+      mouseCallback(event2);
+    });
 
     expect(mockHandler).not.toHaveBeenCalled();
   });
 
-  it('should NOT detect double-click if distance exceeds tolerance', () => {
+  it('should NOT detect double-click if distance exceeds tolerance', async () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
     const event1: MouseEvent = {
@@ -118,9 +122,11 @@ describe('useMouseDoubleClick', () => {
       button: 'left',
     };
 
-    mouseCallback(event1);
-    vi.advanceTimersByTime(200);
-    mouseCallback(event2);
+    await act(async () => {
+      mouseCallback(event1);
+      vi.advanceTimersByTime(200);
+      mouseCallback(event2);
+    });
 
     expect(mockHandler).not.toHaveBeenCalled();
   });

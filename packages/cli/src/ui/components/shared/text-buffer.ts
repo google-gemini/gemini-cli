@@ -586,6 +586,7 @@ interface UndoHistoryEntry {
   cursorRow: number;
   cursorCol: number;
   pastedContent: Record<string, string>;
+  expandedPasteInfo: Map<string, ExpandedPasteInfo>;
 }
 
 function calculateInitialCursorPosition(
@@ -838,6 +839,57 @@ export function getExpandedPasteAtLine(
     }
   }
   return null;
+}
+
+/**
+ * Surgery for expanded paste regions when lines are added or removed.
+ * Adjusts startLine indices and detaches any region that is partially or fully deleted.
+ */
+export function shiftExpandedRegions(
+  expandedPasteInfo: Map<string, ExpandedPasteInfo>,
+  changeStartLine: number,
+  lineDelta: number,
+  changeEndLine?: number, // Inclusive
+): Map<string, ExpandedPasteInfo> {
+  if (expandedPasteInfo.size === 0) return expandedPasteInfo;
+
+  const newInfo = new Map<string, ExpandedPasteInfo>();
+  const effectiveEndLine = changeEndLine ?? changeStartLine;
+
+  for (const [id, info] of expandedPasteInfo) {
+    const infoEndLine = info.startLine + info.lineCount - 1;
+
+    // 1. Check for overlap/intersection with the changed range
+    const isOverlapping =
+      changeStartLine <= infoEndLine && effectiveEndLine >= info.startLine;
+
+    if (isOverlapping) {
+      // If the change is a deletion (lineDelta < 0) that touches this region, we detach.
+      // If it's an insertion, we only detach if it's a multi-line insertion (lineDelta > 0)
+      // that isn't at the very start of the region (which would shift it).
+      // Regular character typing (lineDelta === 0) does NOT detach.
+      if (
+        lineDelta < 0 ||
+        (lineDelta > 0 &&
+          changeStartLine > info.startLine &&
+          changeStartLine <= infoEndLine)
+      ) {
+        continue; // Detach by not adding to newInfo
+      }
+    }
+
+    // 2. Shift regions that start at or after the change point
+    if (info.startLine >= changeStartLine) {
+      newInfo.set(id, {
+        ...info,
+        startLine: info.startLine + lineDelta,
+      });
+    } else {
+      newInfo.set(id, info);
+    }
+  }
+
+  return newInfo;
 }
 
 /**
@@ -1326,11 +1378,12 @@ export interface TextBufferState {
 const historyLimit = 100;
 
 export const pushUndo = (currentState: TextBufferState): TextBufferState => {
-  const snapshot = {
+  const snapshot: UndoHistoryEntry = {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
     pastedContent: { ...currentState.pastedContent },
+    expandedPasteInfo: new Map(currentState.expandedPasteInfo),
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -1518,6 +1571,7 @@ function textBufferReducerLogic(
       const before = cpSlice(lineContent, 0, newCursorCol);
       const after = cpSlice(lineContent, newCursorCol);
 
+      let lineDelta = 0;
       if (parts.length > 1) {
         newLines[newCursorRow] = before + parts[0];
         const remainingParts = parts.slice(1);
@@ -1528,12 +1582,19 @@ function textBufferReducerLogic(
           0,
           lastPartOriginal + after,
         );
+        lineDelta = parts.length - 1;
         newCursorRow = newCursorRow + parts.length - 1;
         newCursorCol = cpLen(lastPartOriginal);
       } else {
         newLines[newCursorRow] = before + parts[0] + after;
         newCursorCol = cpLen(before) + cpLen(parts[0]);
       }
+
+      const newExpandedInfo = shiftExpandedRegions(
+        nextState.expandedPasteInfo,
+        nextState.cursorRow,
+        lineDelta,
+      );
 
       return {
         ...nextState,
@@ -1542,6 +1603,7 @@ function textBufferReducerLogic(
         cursorCol: newCursorCol,
         preferredCol: null,
         pastedContent: newPastedContent,
+        expandedPasteInfo: newExpandedInfo,
       };
     }
 
@@ -1610,6 +1672,7 @@ function textBufferReducerLogic(
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
+      let lineDelta = 0;
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
         newLines[newCursorRow] =
@@ -1622,9 +1685,17 @@ function textBufferReducerLogic(
         const newCol = cpLen(prevLineContent);
         newLines[newCursorRow - 1] = prevLineContent + currentLineContentVal;
         newLines.splice(newCursorRow, 1);
+        lineDelta = -1;
         newCursorRow--;
         newCursorCol = newCol;
       }
+
+      const newExpandedInfo = shiftExpandedRegions(
+        nextState.expandedPasteInfo,
+        nextState.cursorRow + lineDelta, // shift based on the line that was removed
+        lineDelta,
+        nextState.cursorRow,
+      );
 
       return {
         ...nextState,
@@ -1632,6 +1703,7 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        expandedPasteInfo: newExpandedInfo,
       };
     }
 
@@ -1863,30 +1935,36 @@ function textBufferReducerLogic(
 
       // Standard delete logic
       const lineContent = currentLine(cursorRow);
+      let lineDelta = 0;
+      const nextState = pushUndoLocal(state);
+      const newLines = [...nextState.lines];
+
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndoLocal(state);
-        const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) +
           cpSlice(lineContent, cursorCol + 1);
-        return {
-          ...nextState,
-          lines: newLines,
-          preferredCol: null,
-        };
       } else if (cursorRow < lines.length - 1) {
-        const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
-        const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
-        return {
-          ...nextState,
-          lines: newLines,
-          preferredCol: null,
-        };
+        lineDelta = -1;
+      } else {
+        return state;
       }
-      return state;
+
+      const newExpandedInfo = shiftExpandedRegions(
+        nextState.expandedPasteInfo,
+        nextState.cursorRow,
+        lineDelta,
+        nextState.cursorRow + (lineDelta < 0 ? 1 : 0),
+      );
+
+      return {
+        ...nextState,
+        lines: newLines,
+        preferredCol: null,
+        expandedPasteInfo: newExpandedInfo,
+      };
     }
 
     case 'delete_word_left': {
@@ -2007,11 +2085,12 @@ function textBufferReducerLogic(
       const stateToRestore = state.undoStack[state.undoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
         pastedContent: { ...state.pastedContent },
+        expandedPasteInfo: new Map(state.expandedPasteInfo),
       };
       return {
         ...state,
@@ -2025,11 +2104,12 @@ function textBufferReducerLogic(
       const stateToRestore = state.redoStack[state.redoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
         pastedContent: { ...state.pastedContent },
+        expandedPasteInfo: new Map(state.expandedPasteInfo),
       };
       return {
         ...state,
@@ -2042,7 +2122,7 @@ function textBufferReducerLogic(
     case 'replace_range': {
       const { startRow, startCol, endRow, endCol, text } = action.payload;
       const nextState = pushUndoLocal(state);
-      return replaceRangeInternal(
+      const newState = replaceRangeInternal(
         nextState,
         startRow,
         startCol,
@@ -2050,6 +2130,23 @@ function textBufferReducerLogic(
         endCol,
         text,
       );
+
+      const oldLineCount = endRow - startRow + 1;
+      const newLineCount =
+        newState.lines.length - (nextState.lines.length - oldLineCount);
+      const lineDelta = newLineCount - oldLineCount;
+
+      const newExpandedInfo = shiftExpandedRegions(
+        nextState.expandedPasteInfo,
+        startRow,
+        lineDelta,
+        endRow,
+      );
+
+      return {
+        ...newState,
+        expandedPasteInfo: newExpandedInfo,
+      };
     }
 
     case 'move_to_offset': {
@@ -2118,8 +2215,14 @@ function textBufferReducerLogic(
           info.prefix + id + info.suffix,
         );
 
-        const newExpandedInfo = new Map(state.expandedPasteInfo);
-        newExpandedInfo.delete(id);
+        const lineDelta = 1 - info.lineCount;
+        const newExpandedInfo = shiftExpandedRegions(
+          state.expandedPasteInfo,
+          info.startLine,
+          lineDelta,
+          info.startLine + info.lineCount - 1,
+        );
+        newExpandedInfo.delete(id); // Already shifted, now remove self
 
         // Move cursor to end of collapsed placeholder
         const newCursorRow = info.startLine;
@@ -2174,7 +2277,14 @@ function textBufferReducerLogic(
 
         newLines.splice(lineIndex, 1, ...expandedLines);
 
-        const newExpandedInfo = new Map(state.expandedPasteInfo);
+        const lineDelta = expandedLines.length - 1;
+        const newExpandedInfo = shiftExpandedRegions(
+          state.expandedPasteInfo,
+          lineIndex,
+          lineDelta,
+          lineIndex,
+        );
+
         newExpandedInfo.set(id, {
           startLine: lineIndex,
           lineCount: expandedLines.length,
@@ -2250,9 +2360,6 @@ export function textBufferReducer(
   ) {
     const shouldResetPreferred =
       oldInside !== newInside || movedBetweenTransforms;
-    // Clear expanded paste info if lines changed (indices would be stale)
-    const shouldClearExpanded =
-      newState.lines !== state.lines && state.expandedPasteInfo.size > 0;
 
     return {
       ...newState,
@@ -2262,7 +2369,6 @@ export function textBufferReducer(
         newState.cursorCol,
       ]),
       transformationsByLine: newTransformedLines,
-      ...(shouldClearExpanded ? { expandedPasteInfo: new Map() } : {}),
     };
   }
 
@@ -2619,7 +2725,15 @@ export function useTextBuffer({
     // Expand paste placeholders so user sees full content in editor
     let expandedText = text;
     for (const [placeholder, content] of Object.entries(pastedContent)) {
-      expandedText = expandedText.replace(placeholder, content);
+      // Escape special regex characters in the placeholder (though placeholders are usually safe)
+      const escapedPlaceholder = placeholder.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&',
+      );
+      expandedText = expandedText.replace(
+        new RegExp(escapedPlaceholder, 'g'),
+        content,
+      );
     }
     fs.writeFileSync(filePath, expandedText, 'utf8');
 

@@ -642,11 +642,12 @@ describe('textBufferReducer', () => {
       expect(state).toBe(initialState);
     });
 
-    it('should clear expandedPasteInfo when lines change from other edits', () => {
-      // Start with an expanded paste
+    it('should preserve expandedPasteInfo when lines change from edits outside the region', () => {
+      // Start with an expanded paste at line 0 (3 lines long)
+      const placeholder = '[Pasted Text: 3 lines]';
       const expandedState = createStateWithTransformations({
-        lines: ['prefix line1', 'line2', 'line3 suffix'],
-        cursorRow: 0,
+        lines: ['line1', 'line2', 'line3', 'suffix'],
+        cursorRow: 3,
         cursorCol: 0,
         pastedContent: { [placeholder]: 'line1\nline2\nline3' },
         expandedPasteInfo: new Map([
@@ -655,8 +656,8 @@ describe('textBufferReducer', () => {
             {
               startLine: 0,
               lineCount: 3,
-              prefix: 'prefix ',
-              suffix: ' suffix',
+              prefix: '',
+              suffix: '',
             },
           ],
         ]),
@@ -664,14 +665,15 @@ describe('textBufferReducer', () => {
 
       expect(expandedState.expandedPasteInfo.size).toBe(1);
 
-      // Insert a newline - this changes lines and should clear expandedPasteInfo
+      // Insert a newline at the end - this changes lines but is OUTSIDE the expanded region
       const stateAfterInsert = textBufferReducer(expandedState, {
         type: 'insert',
         payload: '\n',
       });
 
-      // Lines changed, so expandedPasteInfo should be cleared
-      expect(stateAfterInsert.expandedPasteInfo.size).toBe(0);
+      // Lines changed, but expandedPasteInfo should be PRESERVED and optionally shifted (no shift here since edit is after)
+      expect(stateAfterInsert.expandedPasteInfo.size).toBe(1);
+      expect(stateAfterInsert.expandedPasteInfo.has(placeholder)).toBe(true);
     });
   });
 });
