@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import type * as fs from 'node:fs';
+import * as fs from 'node:fs';
 import {
   escapePath,
   unescapePath,
@@ -512,6 +512,17 @@ describe('resolveToRealPath', () => {
       expected: '/path/to/My Project',
     },
   ])('$description', ({ input, expected }) => {
+    expect(resolveToRealPath(input)).toBe(expected);
+  });
+
+  it('should return decoded path even if fs.realpathSync fails', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      throw new Error('File not found');
+    });
+
+    const input = 'file:///path/to/New%20Project';
+    const expected = '/path/to/New Project';
+
     expect(resolveToRealPath(input)).toBe(expected);
   });
 });

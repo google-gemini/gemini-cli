@@ -357,16 +357,22 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  */
 export function resolveToRealPath(path: string): string {
   let resolvedPath = path;
+
   try {
     if (resolvedPath.startsWith('file://')) {
       resolvedPath = fileURLToPath(resolvedPath);
     }
-    resolvedPath = decodeURIComponent(resolvedPath);
 
+    resolvedPath = decodeURIComponent(resolvedPath);
+  } catch (_e) {
+    // Ignore error (e.g. malformed URI), keep path from previous step
+  }
+
+  try {
     return fs.realpathSync(resolvedPath);
   } catch (_e) {
     // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the original path.
-    return path;
+    // In that case, we can fall back to the path processed.
+    return resolvedPath;
   }
 }
