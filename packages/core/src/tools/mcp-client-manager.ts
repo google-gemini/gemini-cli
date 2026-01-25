@@ -280,11 +280,6 @@ export class McpClientManager {
       return;
     }
 
-    // Set state synchronously before any await yields control
-    if (!this.discoveryPromise) {
-      this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
-    }
-
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     await Promise.all(
       Object.entries(servers).map(([name, config]) =>
