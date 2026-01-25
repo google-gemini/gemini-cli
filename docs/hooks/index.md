@@ -104,9 +104,8 @@ You can filter which specific tools or triggers fire your hook using the
 
 ## Configuration
 
-Hook definitions are configured in `settings.json`. Gemini CLI merges
-configurations from multiple layers in the following order of precedence
-(highest to lowest):
+Hooks are configured in `settings.json`. Gemini CLI merges configurations from
+multiple layers in the following order of precedence (highest to lowest):
 
 1.  **Project settings**: `.gemini/settings.json` in the current directory.
 2.  **User settings**: `~/.gemini/settings.json`.
@@ -126,8 +125,7 @@ configurations from multiple layers in the following order of precedence
             "name": "security-check",
             "type": "command",
             "command": "$GEMINI_PROJECT_DIR/.gemini/hooks/security.sh",
-            "timeout": 5000,
-            "sequential": false
+            "timeout": 5000
           }
         ]
       }
@@ -135,6 +133,18 @@ configurations from multiple layers in the following order of precedence
   }
 }
 ```
+
+#### Hook configuration fields
+
+| Field         | Type   | Required  | Description                                                          |
+| :------------ | :----- | :-------- | :------------------------------------------------------------------- |
+| `type`        | string | **Yes**   | The execution engine. Currently only `"command"` is supported.       |
+| `command`     | string | **Yes\*** | The shell command to execute. (Required when `type` is `"command"`). |
+| `name`        | string | No        | A friendly name for identifying the hook in logs and CLI commands.   |
+| `timeout`     | number | No        | Execution timeout in milliseconds (default: 60000).                  |
+| `description` | string | No        | A brief explanation of the hook's purpose.                           |
+
+---
 
 ### Environment variables
 
