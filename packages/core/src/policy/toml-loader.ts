@@ -500,7 +500,7 @@ export async function loadPoliciesFromToml(
             argsPattern,
             commandPattern,
             modes,
-            allowRedirection: (item).allow_redirection,
+            allowRedirection: item.allow_redirection,
           }),
         );
         rules.push(...parsedRules);
