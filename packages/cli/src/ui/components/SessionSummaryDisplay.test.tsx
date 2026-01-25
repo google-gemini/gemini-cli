@@ -82,6 +82,9 @@ describe('<SessionSummaryDisplay />', () => {
   });
 
   it('renders resume message when sessionId is provided', () => {
+    const originalArgv1 = process.argv[1];
+    process.argv[1] = '/path/to/gemini';
+
     useSessionStatsMock.mockReturnValue({
       stats: {
         sessionId: 'test-session-id',
@@ -101,5 +104,7 @@ describe('<SessionSummaryDisplay />', () => {
 
     expect(output).toContain('Resume this session by running');
     expect(output).toContain('gemini --resume');
+
+    process.argv[1] = originalArgv1;
   });
 });

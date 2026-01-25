@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import path from 'node:path';
 import { Box, Text } from 'ink';
 import { StatsDisplay } from './StatsDisplay.js';
 import { theme } from '../semantic-colors.js';
@@ -13,6 +14,12 @@ interface SessionSummaryDisplayProps {
   duration: string;
   sessionId?: string;
 }
+
+const getCliName = (): string => {
+  const scriptPath = process.argv[1] || '';
+  const baseName = path.basename(scriptPath, '.js');
+  return baseName || 'gemini';
+};
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
@@ -24,7 +31,7 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
           Resume this session by running{' '}
-          <Text color={theme.text.link}>gemini --resume</Text>
+          <Text color={theme.text.link}>{getCliName()} --resume</Text>
         </Text>
       </Box>
     )}
