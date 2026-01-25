@@ -23,7 +23,6 @@ import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
 import type { EditorType } from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
-import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export interface ConfirmationResult {
@@ -168,8 +167,8 @@ async function notifyHooks(
   deps: { config: Config; messageBus: MessageBus },
   details: ToolCallConfirmationDetails,
 ): Promise<void> {
-  if (deps.config.getEnableHooks()) {
-    await fireToolNotificationHook(deps.messageBus, {
+  if (deps.config.getHookSystem()) {
+    await deps.config.getHookSystem()?.fireToolNotificationEvent({
       ...details,
       // Pass no-op onConfirm to satisfy type definition; side-effects via
       // callbacks are disallowed.

@@ -188,8 +188,13 @@ describe('SchedulerStateManager', () => {
         errorType: undefined,
       };
 
+      vi.mocked(onUpdate).mockClear();
       stateManager.updateStatus(call.request.callId, 'success', response);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+
+      vi.mocked(onUpdate).mockClear();
       stateManager.finalizeCall(call.request.callId);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
 
       expect(stateManager.isActive).toBe(false);
       expect(stateManager.completedBatch).toHaveLength(1);
@@ -455,6 +460,7 @@ describe('SchedulerStateManager', () => {
         createValidatingCall('2'),
       ]);
 
+      vi.mocked(onUpdate).mockClear();
       stateManager.cancelAllQueued('Batch cancel');
 
       expect(stateManager.queueLength).toBe(0);
@@ -462,6 +468,13 @@ describe('SchedulerStateManager', () => {
       expect(
         stateManager.completedBatch.every((c) => c.status === 'cancelled'),
       ).toBe(true);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not notify if cancelAllQueued is called on an empty queue', () => {
+      vi.mocked(onUpdate).mockClear();
+      stateManager.cancelAllQueued('Batch cancel');
+      expect(onUpdate).not.toHaveBeenCalled();
     });
 
     it('should clear batch and notify', () => {
