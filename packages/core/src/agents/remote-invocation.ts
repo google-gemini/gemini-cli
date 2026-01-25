@@ -10,6 +10,7 @@ import {
   type ToolResult,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
+import { DEFAULT_QUERY_STRING } from './types.js';
 import type {
   RemoteAgentInputs,
   RemoteAgentDefinition,
@@ -89,7 +90,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    const query = params['query'];
+    const query = params['query'] ?? DEFAULT_QUERY_STRING;
     if (typeof query !== 'string') {
       throw new Error(
         `Remote agent '${definition.name}' requires a string 'query' input.`,
@@ -166,16 +167,16 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       });
 
       // Extract the output text
-      const resultData = response;
-      let outputText = '';
+      const outputText =
+        response.kind === 'task'
+          ? extractTaskText(response)
+          : response.kind === 'message'
+            ? extractMessageText(response)
+            : JSON.stringify(response);
 
-      if (resultData.kind === 'message') {
-        outputText = extractMessageText(resultData);
-      } else if (resultData.kind === 'task') {
-        outputText = extractTaskText(resultData);
-      } else {
-        outputText = JSON.stringify(resultData);
-      }
+      debugLogger.debug(
+        `[RemoteAgent] Response from ${this.definition.name}:\n${JSON.stringify(response, null, 2)}`,
+      );
 
       return {
         llmContent: [{ text: outputText }],

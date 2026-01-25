@@ -93,10 +93,10 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
 const triggerKey = (
   partialKey: Partial<{
     name: string;
-    ctrl: boolean;
-    meta: boolean;
     shift: boolean;
-    paste: boolean;
+    alt: boolean;
+    ctrl: boolean;
+    cmd: boolean;
     insertable: boolean;
     sequence: string;
   }>,
@@ -108,10 +108,10 @@ const triggerKey = (
 
   const key = {
     name: '',
-    ctrl: false,
-    meta: false,
     shift: false,
-    paste: false,
+    alt: false,
+    ctrl: false,
+    cmd: false,
     insertable: false,
     sequence: '',
     ...partialKey,
@@ -264,7 +264,13 @@ describe('SessionBrowser component', () => {
 
     // Type the query "query".
     for (const ch of ['q', 'u', 'e', 'r', 'y']) {
-      triggerKey({ sequence: ch, name: ch, ctrl: false, meta: false });
+      triggerKey({
+        sequence: ch,
+        name: ch,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+      });
     }
 
     await waitFor(() => {

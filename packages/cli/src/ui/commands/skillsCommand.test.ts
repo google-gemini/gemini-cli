@@ -10,7 +10,12 @@ import { MessageType, type HistoryItemSkillsList } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
 import type { Config, SkillDefinition } from '@google/gemini-cli-core';
-import { SettingScope, type LoadedSettings } from '../../config/settings.js';
+import {
+  SettingScope,
+  type LoadedSettings,
+  createTestMergedSettings,
+  type MergedSettings,
+} from '../../config/settings.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -46,6 +51,7 @@ describe('skillsCommand', () => {
           getSkillManager: vi.fn().mockReturnValue({
             getAllSkills: vi.fn().mockReturnValue(skills),
             getSkills: vi.fn().mockReturnValue(skills),
+            isAdminEnabled: vi.fn().mockReturnValue(true),
             getSkill: vi
               .fn()
               .mockImplementation(
@@ -54,7 +60,7 @@ describe('skillsCommand', () => {
           }),
         } as unknown as Config,
         settings: {
-          merged: { skills: { disabled: [] } },
+          merged: createTestMergedSettings({ skills: { disabled: [] } }),
           workspace: { path: '/workspace' },
           setValue: vi.fn(),
         } as unknown as LoadedSettings,
@@ -180,7 +186,11 @@ describe('skillsCommand', () => {
 
   describe('disable/enable', () => {
     beforeEach(() => {
-      context.services.settings.merged.skills = { disabled: [] };
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
+        skills: { enabled: true, disabled: [] },
+      });
       (
         context.services.settings as unknown as { workspace: { path: string } }
       ).workspace = {
@@ -224,7 +234,34 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" disabled by adding it to the disabled list in project (/workspace) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" disabled by adding it to the disabled list in workspace (/workspace) settings. You can run "/skills reload" to refresh your current instance.',
+        }),
+      );
+    });
+
+    it('should show reload guidance even if skill is already disabled', async () => {
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
+        skills: { enabled: true, disabled: ['skill1'] },
+      });
+      (
+        context.services.settings as unknown as {
+          workspace: { settings: { skills: { disabled: string[] } } };
+        }
+      ).workspace.settings = {
+        skills: { disabled: ['skill1'] },
+      };
+
+      await disableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Skill "skill1" is already disabled. You can run "/skills reload" to refresh your current instance.',
         }),
       );
     });
@@ -233,7 +270,14 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      context.services.settings.merged.skills = { disabled: ['skill1'] };
+      (
+        context.services.settings as unknown as { merged: MergedSettings }
+      ).merged = createTestMergedSettings({
+        skills: {
+          enabled: true,
+          disabled: ['skill1'],
+        },
+      });
       (
         context.services.settings as unknown as {
           workspace: { settings: { skills: { disabled: string[] } } };
@@ -252,7 +296,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in workspace (/workspace) and user (/user/settings.json) settings. You can run "/skills reload" to refresh your current instance.',
         }),
       );
     });
@@ -291,7 +335,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Skill "skill1" enabled by removing it from the disabled list in project (/workspace) and user (/user/settings.json) settings. Use "/skills reload" for it to take effect.',
+          text: 'Skill "skill1" enabled by removing it from the disabled list in workspace (/workspace) and user (/user/settings.json) settings. You can run "/skills reload" to refresh your current instance.',
         }),
       );
     });
@@ -307,6 +351,43 @@ describe('skillsCommand', () => {
           type: MessageType.ERROR,
           text: 'Skill "non-existent" not found.',
         }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during disable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const disableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'disable',
+      )!;
+      await disableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error if skills are disabled by admin during enable', async () => {
+      const skillManager = context.services.config!.getSkillManager();
+      vi.mocked(skillManager.isAdminEnabled).mockReturnValue(false);
+
+      const enableCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'enable',
+      )!;
+      await enableCmd.action!(context, 'skill1');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Agent skills are disabled by your admin.',
+        }),
+        expect.any(Number),
       );
     });
   });

@@ -44,6 +44,8 @@ export interface ContentGenerator {
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
   userTier?: UserTierId;
+
+  userTierName?: string;
 }
 
 export enum AuthType {
@@ -114,10 +116,10 @@ export async function createContentGenerator(
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
     if (gcConfig.fakeResponses) {
-      return new LoggingContentGenerator(
-        await FakeContentGenerator.fromFile(gcConfig.fakeResponses),
-        gcConfig,
+      const fakeGenerator = await FakeContentGenerator.fromFile(
+        gcConfig.fakeResponses,
       );
+      return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
     const model = resolveModel(
