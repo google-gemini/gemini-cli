@@ -307,11 +307,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false; // Let InputPrompt handle clipboard functionality
       }
 
-      // Let InputPrompt handle Ctrl+C for clearing input
-      if (normalizedKey.ctrl && normalizedKey.name === 'c') {
-        return false; // Let InputPrompt handle clear input
-      }
-
       // Let InputPrompt handle shell commands
       if (normalizedKey.sequence === '!' && buffer.text.length === 0) {
         return false;
@@ -438,6 +433,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       } catch (error) {
         // Handle malformed key inputs gracefully
         debugLogger.warn('Malformed key input in vim mode:', key, error);
+        return false;
+      }
+
+      // Let InputPrompt handle Ctrl+C for clearing input (works in all modes)
+      if (normalizedKey.ctrl && normalizedKey.name === 'c') {
         return false;
       }
 
@@ -798,11 +798,6 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               buffer.vimMoveRight(repeatCount);
               dispatch({ type: 'CLEAR_COUNT' });
               return true;
-            }
-
-            // Let InputPrompt handle Ctrl+C for clearing input
-            if (normalizedKey.ctrl && normalizedKey.name === 'c') {
-              return false; // Let InputPrompt handle clear input
             }
 
             // Unknown command, clear count and pending states
