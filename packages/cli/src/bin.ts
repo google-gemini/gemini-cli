@@ -11,21 +11,23 @@ import { debugLogger, ExitCodes } from '@google/gemini-cli-core';
 async function main() {
   const argv = await parseArguments(process.argv.slice(2));
   
+  const { config, settings, resumedSessionData } = await loadCliConfig(argv);
+
   // Decide between interactive and non-interactive early
   const isNonInteractive = !!(argv.prompt || argv.p || !process.stdin.isTTY || argv.outputFormat);
 
   if (isNonInteractive) {
-    // Lazy load non-interactive logic
     const { runNonInteractiveEntryPoint } = await import('./nonInteractiveEntryPoint.js');
-    await runNonInteractiveEntryPoint(argv);
+    await runNonInteractiveEntryPoint(config, settings, resumedSessionData);
   } else {
-    // Lazy load interactive logic (React/Ink)
+    // Interactive path - import heavy UI
     const { runInteractiveEntryPoint } = await import('./interactiveEntryPoint.js');
-    await runInteractiveEntryPoint(argv);
+    await runInteractiveEntryPoint(config, settings, resumedSessionData);
   }
 }
 
 main().catch((err) => {
   debugLogger.error('Fatal error in CLI:', err);
-  process.exit(ExitCodes.FATAL_INTERNAL_ERROR || 1);
+  // @ts-ignore
+  process.exit(ExitCodes?.FATAL_INTERNAL_ERROR || 1);
 });
