@@ -8,7 +8,6 @@ import path from 'node:path';
 import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
-import { execSync } from 'node:child_process';
 
 import type { CommandContext } from '../../ui/commands/types.js';
 import {
@@ -43,8 +42,14 @@ const REPO_DOWNLOAD_URL =
 const SOURCE_DIR = 'examples/workflows';
 
 // Verifies if github name is command-execution safe
-function isValidGitHubName(name: string): boolean {
-  return /^[a-zA-Z0-9_.-]+$/.test(name);
+function isValidGitHubOwner(name: string): boolean {
+  return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name);
+}
+
+// does the same for repo name
+function isValidGitHubRepoName(name: string): boolean {
+  if (name === '.' || name === '..') return false;
+  return /^[a-z0-9_.-]+$/i.test(name);
 }
 
 // Generate OS-specific commands to open the GitHub pages needed for setup.
@@ -69,27 +74,13 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
     ];
   }
 
-  //to check for fork
-  const forkUsername = repoInfo.owner;
-
-  let localGitUser: string | null = null;
-  try {
-    localGitUser = execSync('git config user.name', {
-      encoding: 'utf8',
-    }).trim();
-  } catch {
-    /* ignore */
-  }
-
   const isOwner =
-    forkUsername &&
-    localGitUser &&
-    forkUsername.toLowerCase() === localGitUser.toLowerCase();
+    repoInfo.owner &&
+    repoInfo.localUser &&
+    repoInfo.owner.toLowerCase() === repoInfo.localUser.toLowerCase();
 
   const isSafeRepo =
-    repoInfo &&
-    isValidGitHubName(repoInfo.owner) &&
-    isValidGitHubName(repoInfo.repo);
+    isValidGitHubOwner(repoInfo.owner) && isValidGitHubRepoName(repoInfo.repo);
 
   // Only push the URL if the fork exists and isn’t upstream
   if (isOwner && isSafeRepo) {
