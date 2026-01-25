@@ -1,0 +1,19 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as path from 'node:path';
+import { WorkspaceSnapshotTool } from '../tools/workspace-snapshot.js';
+import { DoctorTool } from '../tools/doctor.js';
+// ... other imports
+
+export class Config {
+  // ...
+  private registerCoreTools(toolRegistry: ToolRegistry, messageBus: MessageBus) {
+    // Existing tools...
+    toolRegistry.register(new WorkspaceSnapshotTool(this, messageBus));
+    toolRegistry.register(new DoctorTool(this, messageBus));
+  }
+}
