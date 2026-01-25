@@ -104,9 +104,8 @@ You can filter which specific tools or triggers fire your hook using the
 
 ## Configuration
 
-Hook definitions are configured in `settings.json`. Gemini CLI merges
-configurations from multiple layers in the following order of precedence
-(highest to lowest):
+Hooks are configured in `settings.json`. Gemini CLI merges configurations from
+multiple layers in the following order of precedence (highest to lowest):
 
 1.  **Project settings**: `.gemini/settings.json` in the current directory.
 2.  **User settings**: `~/.gemini/settings.json`.
@@ -135,7 +134,7 @@ configurations from multiple layers in the following order of precedence
 }
 ```
 
-#### Hook definition fields
+#### Hook configuration fields
 
 | Field         | Type   | Required  | Description                                                          |
 | :------------ | :----- | :-------- | :------------------------------------------------------------------- |
