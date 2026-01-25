@@ -25,7 +25,7 @@ export const GeneralistAgent = (
   displayName: 'Generalist Agent',
   description:
     "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
-  experimental: true,
+  experimental: false,
   inputConfig: {
     inputSchema: {
       type: 'object',
