@@ -4,8 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { escapePath, unescapePath, isSubpath, shortenPath } from './paths.js';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import type * as fs from 'node:fs';
+import {
+  escapePath,
+  unescapePath,
+  isSubpath,
+  shortenPath,
+  resolveToRealPath,
+} from './paths.js';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof fs>();
+  return {
+    ...(actual as object),
+    realpathSync: (p: string) => p,
+  };
+});
 
 describe('escapePath', () => {
   it.each([
@@ -470,5 +485,33 @@ describe('shortenPath', () => {
       expect(result).toBe('\\s...\\...\\file.txt');
       expect(result.length).toBeLessThanOrEqual(18);
     });
+  });
+});
+
+describe('resolveToRealPath', () => {
+  it.each([
+    {
+      description:
+        'should return path as-is if no special characters or protocol',
+      input: '/simple/path',
+      expected: '/simple/path',
+    },
+    {
+      description: 'should remove file:// protocol',
+      input: 'file:///path/to/file',
+      expected: '/path/to/file',
+    },
+    {
+      description: 'should decode URI components',
+      input: '/path/to/some%20folder',
+      expected: '/path/to/some folder',
+    },
+    {
+      description: 'should handle both file protocol and encoding',
+      input: 'file:///path/to/My%20Project',
+      expected: '/path/to/My Project',
+    },
+  ])('$description', ({ input, expected }) => {
+    expect(resolveToRealPath(input)).toBe(expected);
   });
 });

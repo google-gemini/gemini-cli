@@ -5,8 +5,7 @@
  */
 
 import * as fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
 import {
@@ -65,16 +64,6 @@ type ConnectionConfig = {
   authToken?: string;
   stdio?: StdioConfig;
 };
-
-function getRealPath(path: string): string {
-  try {
-    return fs.realpathSync(path);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the original path.
-    return path;
-  }
-}
 
 /**
  * Manages the connection to and interaction with the IDE server.
@@ -524,23 +513,12 @@ export class IdeClient {
 
     const ideWorkspacePaths = ideWorkspacePath
       .split(path.delimiter)
-      .map((p) => {
-        try {
-          if (p.startsWith('file://')) {
-            return fileURLToPath(p);
-          }
-          return decodeURIComponent(p);
-        } catch (e) {
-          logger.error('Failed to decode workspace path component:', e);
-          return '';
-        }
-      })
+      .map((p) => resolveToRealPath(p))
       .filter((e) => !!e);
-    const realCwd = getRealPath(cwd);
-    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
-      const idePath = getRealPath(workspacePath);
-      return isSubpath(idePath, realCwd);
-    });
+    const realCwd = resolveToRealPath(cwd);
+    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) =>
+      isSubpath(workspacePath, realCwd),
+    );
 
     if (!isWithinWorkspace) {
       return {

@@ -1165,11 +1165,11 @@ describe('getIdeServerHost', () => {
         expect(result.isValid).toBe(true);
       });
 
-      it('should return false for paths containing a literal % sign', () => {
+      it('should return true for paths containing a literal % sign', () => {
         const workspacePath = '/test/a%path';
         const cwd = '/test/a%path/sub-dir';
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
-        expect(result.isValid).toBe(false);
+        expect(result.isValid).toBe(true);
       });
 
       it.skipIf(process.platform !== 'win32')(
@@ -1182,6 +1182,40 @@ describe('getIdeServerHost', () => {
 
           expect(result.isValid).toBe(true);
         },
+      );
+    });
+  });
+
+  describe('validateWorkspacePath (sanitization)', () => {
+    it.each([
+      {
+        description: 'should return true for identical paths',
+        workspacePath: '/test/ws',
+        cwd: '/test/ws',
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has file:// protocol',
+        workspacePath: 'file:///test/ws',
+        cwd: '/test/ws',
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has encoded spaces',
+        workspacePath: '/test/my%20ws',
+        cwd: '/test/my ws',
+        expectedValid: true,
+      },
+      {
+        description:
+          'should return true when cwd needs normalization matching workspace',
+        workspacePath: '/test/my ws',
+        cwd: '/test/my%20ws',
+        expectedValid: true,
+      },
+    ])('$description', ({ workspacePath, cwd, expectedValid }) => {
+      expect(IdeClient.validateWorkspacePath(workspacePath, cwd)).toMatchObject(
+        { isValid: expectedValid },
       );
     });
   });
