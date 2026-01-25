@@ -48,7 +48,8 @@ This command completely removes the package from your system.
 
 ## Method 3: Homebrew
 
-If you installed the CLI globally using Homebrew (e.g., `brew install gemini-cli`), use the `brew uninstall` command to remove it.
+If you installed the CLI globally using Homebrew (e.g.,
+`brew install gemini-cli`), use the `brew uninstall` command to remove it.
 
 ```bash
 brew uninstall gemini-cli
@@ -56,7 +57,8 @@ brew uninstall gemini-cli
 
 ## Method 4: MacPorts
 
-If you installed the CLI globally using MacPorts (e.g., `sudo port install gemini-cli`), use the `port uninstall` command to remove it.
+If you installed the CLI globally using MacPorts (e.g.,
+`sudo port install gemini-cli`), use the `port uninstall` command to remove it.
 
 ```bash
 sudo port uninstall gemini-cli
