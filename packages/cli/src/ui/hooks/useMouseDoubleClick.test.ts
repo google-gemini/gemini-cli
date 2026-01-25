@@ -41,8 +41,24 @@ describe('useMouseDoubleClick', () => {
   it('should detect double-click within threshold', () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
-    const event1 = { name: 'left-press', col: 10, row: 5 };
-    const event2 = { name: 'left-press', col: 10, row: 5 };
+    const event1: MouseEvent = {
+      name: 'left-press',
+      col: 10,
+      row: 5,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
+    const event2: MouseEvent = {
+      name: 'left-press',
+      col: 10,
+      row: 5,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
 
     mouseCallback(event1);
     vi.advanceTimersByTime(200);
@@ -54,8 +70,24 @@ describe('useMouseDoubleClick', () => {
   it('should NOT detect double-click if time exceeds threshold', () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
-    const event1 = { name: 'left-press', col: 10, row: 5 };
-    const event2 = { name: 'left-press', col: 10, row: 5 };
+    const event1: MouseEvent = {
+      name: 'left-press',
+      col: 10,
+      row: 5,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
+    const event2: MouseEvent = {
+      name: 'left-press',
+      col: 10,
+      row: 5,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
 
     mouseCallback(event1);
     vi.advanceTimersByTime(500); // Threshold is 400ms
@@ -67,8 +99,24 @@ describe('useMouseDoubleClick', () => {
   it('should NOT detect double-click if distance exceeds tolerance', () => {
     renderHook(() => useMouseDoubleClick(mockContainerRef, mockHandler));
 
-    const event1 = { name: 'left-press', col: 10, row: 5 };
-    const event2 = { name: 'left-press', col: 15, row: 10 };
+    const event1: MouseEvent = {
+      name: 'left-press',
+      col: 10,
+      row: 5,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
+    const event2: MouseEvent = {
+      name: 'left-press',
+      col: 15,
+      row: 10,
+      shift: false,
+      meta: false,
+      ctrl: false,
+      button: 'left',
+    };
 
     mouseCallback(event1);
     vi.advanceTimersByTime(200);
