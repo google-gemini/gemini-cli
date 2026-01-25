@@ -4,33 +4,57 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  SettingScope,
-  isLoadableSettingScope,
-  type LoadedSettings,
-} from '../config/settings.js';
+import type { SettingScope, type LoadedSettings } from '../config/settings.js';
 
-export interface ModifiedScope {
-  scope: SettingScope;
-  path: string;
-}
+import {
+  type FeatureActionResult,
+  type FeatureToggleStrategy,
+  enableFeature,
+  disableFeature,
+} from './featureToggleUtils.js';
+
+export type { ModifiedScope } from './featureToggleUtils.js';
 
 export type SkillActionStatus = 'success' | 'no-op' | 'error';
 
 /**
  * Metadata representing the result of a skill settings operation.
  */
-export interface SkillActionResult {
-  status: SkillActionStatus;
+export interface SkillActionResult
+  extends Omit<FeatureActionResult, 'featureName'> {
   skillName: string;
-  action: 'enable' | 'disable';
-  /** Scopes where the skill's state was actually changed. */
-  modifiedScopes: ModifiedScope[];
-  /** Scopes where the skill was already in the desired state. */
-  alreadyInStateScopes: ModifiedScope[];
-  /** Error message if status is 'error'. */
-  error?: string;
 }
+
+const skillStrategy: FeatureToggleStrategy = {
+  needsEnabling: (settings, scope, skillName) => {
+    const scopeDisabled = settings.forScope(scope).settings.skills?.disabled;
+    return !!scopeDisabled?.includes(skillName);
+  },
+  enable: (settings, scope, skillName) => {
+    const currentScopeDisabled =
+      settings.forScope(scope).settings.skills?.disabled ?? [];
+    const newDisabled = currentScopeDisabled.filter(
+      (name) => name !== skillName,
+    );
+    settings.setValue(scope, 'skills.disabled', newDisabled);
+  },
+  isExplicitlyDisabled: (settings, scope, skillName) => {
+    const currentScopeDisabled =
+      settings.forScope(scope).settings.skills?.disabled ?? [];
+    return currentScopeDisabled.includes(skillName);
+  },
+  disable: (settings, scope, skillName) => {
+    const currentScopeDisabled =
+      settings.forScope(scope).settings.skills?.disabled ?? [];
+    // The generic utility checks isExplicitlyDisabled before calling this,
+    // but just to be safe and idempotent, we check or we assume the utility did its job.
+    // The utility does check isExplicitlyDisabled first.
+    // So we can blindly add it, but since we are modifying an array, pushing is fine.
+    // However, if we assume purely that we must disable it:
+    const newDisabled = [...currentScopeDisabled, skillName];
+    settings.setValue(scope, 'skills.disabled', newDisabled);
+  },
+};
 
 /**
  * Enables a skill by removing it from all writable disabled lists (User and Workspace).
@@ -39,51 +63,10 @@ export function enableSkill(
   settings: LoadedSettings,
   skillName: string,
 ): SkillActionResult {
-  const writableScopes = [SettingScope.Workspace, SettingScope.User];
-  const foundInDisabledScopes: ModifiedScope[] = [];
-  const alreadyEnabledScopes: ModifiedScope[] = [];
-
-  for (const scope of writableScopes) {
-    if (isLoadableSettingScope(scope)) {
-      const scopePath = settings.forScope(scope).path;
-      const scopeDisabled = settings.forScope(scope).settings.skills?.disabled;
-      if (scopeDisabled?.includes(skillName)) {
-        foundInDisabledScopes.push({ scope, path: scopePath });
-      } else {
-        alreadyEnabledScopes.push({ scope, path: scopePath });
-      }
-    }
-  }
-
-  if (foundInDisabledScopes.length === 0) {
-    return {
-      status: 'no-op',
-      skillName,
-      action: 'enable',
-      modifiedScopes: [],
-      alreadyInStateScopes: alreadyEnabledScopes,
-    };
-  }
-
-  const modifiedScopes: ModifiedScope[] = [];
-  for (const { scope, path } of foundInDisabledScopes) {
-    if (isLoadableSettingScope(scope)) {
-      const currentScopeDisabled =
-        settings.forScope(scope).settings.skills?.disabled ?? [];
-      const newDisabled = currentScopeDisabled.filter(
-        (name) => name !== skillName,
-      );
-      settings.setValue(scope, 'skills.disabled', newDisabled);
-      modifiedScopes.push({ scope, path });
-    }
-  }
-
+  const result = enableFeature(settings, skillName, skillStrategy);
   return {
-    status: 'success',
-    skillName,
-    action: 'enable',
-    modifiedScopes,
-    alreadyInStateScopes: alreadyEnabledScopes,
+    ...result,
+    skillName: result.featureName,
   };
 }
 
@@ -95,57 +78,9 @@ export function disableSkill(
   skillName: string,
   scope: SettingScope,
 ): SkillActionResult {
-  if (!isLoadableSettingScope(scope)) {
-    return {
-      status: 'error',
-      skillName,
-      action: 'disable',
-      modifiedScopes: [],
-      alreadyInStateScopes: [],
-      error: `Invalid settings scope: ${scope}`,
-    };
-  }
-
-  const scopePath = settings.forScope(scope).path;
-  const currentScopeDisabled =
-    settings.forScope(scope).settings.skills?.disabled ?? [];
-
-  if (currentScopeDisabled.includes(skillName)) {
-    return {
-      status: 'no-op',
-      skillName,
-      action: 'disable',
-      modifiedScopes: [],
-      alreadyInStateScopes: [{ scope, path: scopePath }],
-    };
-  }
-
-  // Check if it's already disabled in the other writable scope
-  const otherScope =
-    scope === SettingScope.Workspace
-      ? SettingScope.User
-      : SettingScope.Workspace;
-  const alreadyDisabledInOther: ModifiedScope[] = [];
-
-  if (isLoadableSettingScope(otherScope)) {
-    const otherScopeDisabled =
-      settings.forScope(otherScope).settings.skills?.disabled;
-    if (otherScopeDisabled?.includes(skillName)) {
-      alreadyDisabledInOther.push({
-        scope: otherScope,
-        path: settings.forScope(otherScope).path,
-      });
-    }
-  }
-
-  const newDisabled = [...currentScopeDisabled, skillName];
-  settings.setValue(scope, 'skills.disabled', newDisabled);
-
+  const result = disableFeature(settings, skillName, scope, skillStrategy);
   return {
-    status: 'success',
-    skillName,
-    action: 'disable',
-    modifiedScopes: [{ scope, path: scopePath }],
-    alreadyInStateScopes: alreadyDisabledInOther,
+    ...result,
+    skillName: result.featureName,
   };
 }
