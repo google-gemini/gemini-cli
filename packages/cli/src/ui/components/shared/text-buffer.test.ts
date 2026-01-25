@@ -532,6 +532,148 @@ describe('textBufferReducer', () => {
       expect(state.cursorCol).toBe(5);
     });
   });
+
+  describe('toggle_paste_expansion action', () => {
+    const placeholder = '[Pasted Text: 6 lines]';
+    const content = 'line1\nline2\nline3\nline4\nline5\nline6';
+
+    it('should expand a placeholder correctly', () => {
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: ['prefix ' + placeholder + ' suffix'],
+        cursorRow: 0,
+        cursorCol: 0,
+        pastedContent: { [placeholder]: content },
+      });
+
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: placeholder },
+      };
+
+      const state = textBufferReducer(stateWithPlaceholder, action);
+
+      expect(state.lines).toEqual([
+        'prefix line1',
+        'line2',
+        'line3',
+        'line4',
+        'line5',
+        'line6 suffix',
+      ]);
+      expect(state.expandedPasteInfo.has(placeholder)).toBe(true);
+      const info = state.expandedPasteInfo.get(placeholder);
+      expect(info).toEqual({
+        startLine: 0,
+        lineCount: 6,
+        prefix: 'prefix ',
+        suffix: ' suffix',
+      });
+      // Cursor should be at the end of expanded content (before suffix)
+      expect(state.cursorRow).toBe(5);
+      expect(state.cursorCol).toBe(5); // length of 'line6'
+    });
+
+    it('should collapse an expanded placeholder correctly', () => {
+      const expandedState = createStateWithTransformations({
+        lines: [
+          'prefix line1',
+          'line2',
+          'line3',
+          'line4',
+          'line5',
+          'line6 suffix',
+        ],
+        cursorRow: 5,
+        cursorCol: 5,
+        pastedContent: { [placeholder]: content },
+        expandedPasteInfo: new Map([
+          [
+            placeholder,
+            {
+              startLine: 0,
+              lineCount: 6,
+              prefix: 'prefix ',
+              suffix: ' suffix',
+            },
+          ],
+        ]),
+      });
+
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: placeholder },
+      };
+
+      const state = textBufferReducer(expandedState, action);
+
+      expect(state.lines).toEqual(['prefix ' + placeholder + ' suffix']);
+      expect(state.expandedPasteInfo.has(placeholder)).toBe(false);
+      // Cursor should be at the end of the collapsed placeholder
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(('prefix ' + placeholder).length);
+    });
+
+    it('should expand single-line content correctly', () => {
+      const singleLinePlaceholder = '[Pasted Text: 10 chars]';
+      const singleLineContent = 'some text';
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: [singleLinePlaceholder],
+        cursorRow: 0,
+        cursorCol: 0,
+        pastedContent: { [singleLinePlaceholder]: singleLineContent },
+      });
+
+      const state = textBufferReducer(stateWithPlaceholder, {
+        type: 'toggle_paste_expansion',
+        payload: { id: singleLinePlaceholder },
+      });
+
+      expect(state.lines).toEqual(['some text']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should return current state if placeholder ID not found in pastedContent', () => {
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: 'unknown' },
+      };
+      const state = textBufferReducer(initialState, action);
+      expect(state).toBe(initialState);
+    });
+
+    it('should clear expandedPasteInfo when lines change from other edits', () => {
+      // Start with an expanded paste
+      const expandedState = createStateWithTransformations({
+        lines: ['prefix line1', 'line2', 'line3 suffix'],
+        cursorRow: 0,
+        cursorCol: 0,
+        pastedContent: { [placeholder]: 'line1\nline2\nline3' },
+        expandedPasteInfo: new Map([
+          [
+            placeholder,
+            {
+              startLine: 0,
+              lineCount: 3,
+              prefix: 'prefix ',
+              suffix: ' suffix',
+            },
+          ],
+        ]),
+      });
+
+      expect(expandedState.expandedPasteInfo.size).toBe(1);
+
+      // Insert a newline - this changes lines and should clear expandedPasteInfo
+      const stateAfterInsert = textBufferReducer(expandedState, {
+        type: 'insert',
+        payload: '\n',
+      });
+
+      // Lines changed, so expandedPasteInfo should be cleared
+      expect(stateAfterInsert.expandedPasteInfo.size).toBe(0);
+    });
+  });
 });
 
 const getBufferState = (result: { current: TextBuffer }) => {

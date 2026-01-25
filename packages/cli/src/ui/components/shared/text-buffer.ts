@@ -1320,15 +1320,7 @@ export interface TextBufferState {
   viewportHeight: number;
   visualLayout: VisualLayout;
   pastedContent: Record<string, string>;
-  expandedPasteInfo: Map<
-    string,
-    {
-      startLine: number;
-      lineCount: number;
-      prefix: string;
-      suffix: string;
-    }
-  >;
+  expandedPasteInfo: Map<string, ExpandedPasteInfo>;
 }
 
 const historyLimit = 100;
@@ -2258,6 +2250,10 @@ export function textBufferReducer(
   ) {
     const shouldResetPreferred =
       oldInside !== newInside || movedBetweenTransforms;
+    // Clear expanded paste info if lines changed (indices would be stale)
+    const shouldClearExpanded =
+      newState.lines !== state.lines && state.expandedPasteInfo.size > 0;
+
     return {
       ...newState,
       preferredCol: shouldResetPreferred ? null : newState.preferredCol,
@@ -2266,6 +2262,7 @@ export function textBufferReducer(
         newState.cursorCol,
       ]),
       transformationsByLine: newTransformedLines,
+      ...(shouldClearExpanded ? { expandedPasteInfo: new Map() } : {}),
     };
   }
 
@@ -2619,7 +2616,12 @@ export function useTextBuffer({
   const openInExternalEditor = useCallback(async (): Promise<void> => {
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
-    fs.writeFileSync(filePath, text, 'utf8');
+    // Expand paste placeholders so user sees full content in editor
+    let expandedText = text;
+    for (const [placeholder, content] of Object.entries(pastedContent)) {
+      expandedText = expandedText.replace(placeholder, content);
+    }
+    fs.writeFileSync(filePath, expandedText, 'utf8');
 
     let command: string | undefined = undefined;
     const args = [filePath];
@@ -2674,7 +2676,7 @@ export function useTextBuffer({
         /* ignore */
       }
     }
-  }, [text, stdin, setRawMode, getPreferredEditor]);
+  }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
 
   const handleInput = useCallback(
     (key: Key): void => {
@@ -3191,15 +3193,7 @@ export interface TextBuffer {
   /**
    * The current expanded paste info map (read-only).
    */
-  expandedPasteInfo: Map<
-    string,
-    {
-      startLine: number;
-      lineCount: number;
-      prefix: string;
-      suffix: string;
-    }
-  >;
+  expandedPasteInfo: Map<string, ExpandedPasteInfo>;
 
   // Vim-specific operations
   /**
