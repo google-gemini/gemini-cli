@@ -1,5 +1,28 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`AlternateBufferQuittingDisplay > renders with a tool awaiting confirmation > with_confirming_tool 1`] = `
+"
+ ███         █████████
+░░░███      ███░░░░░███
+  ░░░███   ███     ░░░
+    ░░░███░███
+     ███░ ░███    █████
+   ███░   ░░███  ░░███
+ ███░      ░░█████████
+░░░         ░░░░░░░░░
+
+Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. Create GEMINI.md files to customize your interactions with Gemini.
+4. /help for more information.
+
+Action Required (was prompted):
+
+?  confirming_tool Confirming tool description
+"
+`;
+
 exports[`AlternateBufferQuittingDisplay > renders with active and pending tool messages > with_history_and_pending 1`] = `
 "
  ███         █████████
@@ -22,10 +45,6 @@ Tips for getting started:
 ╰─────────────────────────────────────────────────────────────────────────────╯
 ╭─────────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool2 Description for tool 2                                             │
-│                                                                             │
-╰─────────────────────────────────────────────────────────────────────────────╯
-╭─────────────────────────────────────────────────────────────────────────────╮
-│ o  tool3 Description for tool 3                                             │
 │                                                                             │
 ╰─────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -89,11 +108,7 @@ Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
 3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information.
-╭─────────────────────────────────────────────────────────────────────────────╮
-│ o  tool3 Description for tool 3                                             │
-│                                                                             │
-╰─────────────────────────────────────────────────────────────────────────────╯"
+4. /help for more information."
 `;
 
 exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages > with_user_gemini_messages 1`] = `
