@@ -6,7 +6,7 @@
 
 import { getBoundingBox, type DOMElement } from 'ink';
 import type React from 'react';
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 
 const DOUBLE_CLICK_THRESHOLD_MS = 400;
@@ -18,13 +18,16 @@ export const useMouseDoubleClick = (
   options: { isActive?: boolean } = {},
 ) => {
   const { isActive = true } = options;
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
   const lastClickRef = useRef<{
     time: number;
     col: number;
     row: number;
   } | null>(null);
 
-  useMouse(
+  const onMouse = useCallback(
     (event: MouseEvent) => {
       if (event.name !== 'left-press' || !containerRef.current) return;
 
@@ -54,7 +57,7 @@ export const useMouseDoubleClick = (
           relativeY >= 0 &&
           relativeY < height
         ) {
-          handler(event, relativeX, relativeY);
+          handlerRef.current(event, relativeX, relativeY);
         }
         lastClickRef.current = null; // Reset after double-click
       } else {
@@ -62,6 +65,8 @@ export const useMouseDoubleClick = (
         lastClickRef.current = { time: now, col: event.col, row: event.row };
       }
     },
-    { isActive },
+    [containerRef],
   );
+
+  useMouse(onMouse, { isActive });
 };
