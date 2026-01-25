@@ -45,7 +45,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
-    "diff": "^7.0.0",
+    "diff": "^8.0.3",
     "fast-levenshtein": "^2.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
@@ -83,7 +83,6 @@
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
-    "@types/diff": "^7.0.2",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
