@@ -2780,11 +2780,14 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdin, stdout, unmount } = renderWithProviders(<TestWrapper />, {
-        mouseEventsEnabled: true,
-        useAlternateBuffer: true,
-        uiActions,
-      });
+      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+        <TestWrapper />,
+        {
+          mouseEventsEnabled: true,
+          useAlternateBuffer: true,
+          uiActions,
+        },
+      );
 
       // 1. Verify initial placeholder
       await waitFor(() => {
@@ -2792,12 +2795,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to expand
-      await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`);
-      });
-      await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`);
-      });
+      await simulateClick(stdin, 5, 2);
+      await simulateClick(stdin, 5, 2);
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
@@ -2805,12 +2804,8 @@ describe('InputPrompt', () => {
       });
 
       // Simulate double-click to collapse
-      await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`);
-      });
-      await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`);
-      });
+      await simulateClick(stdin, 5, 2);
+      await simulateClick(stdin, 5, 2);
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
