@@ -850,10 +850,14 @@ export function shiftExpandedRegions(
   changeStartLine: number,
   lineDelta: number,
   changeEndLine?: number, // Inclusive
-): Map<string, ExpandedPasteInfo> {
-  if (expandedPasteInfo.size === 0) return expandedPasteInfo;
-
+): {
+  newInfo: Map<string, ExpandedPasteInfo>;
+  detachedIds: Set<string>;
+} {
   const newInfo = new Map<string, ExpandedPasteInfo>();
+  const detachedIds = new Set<string>();
+  if (expandedPasteInfo.size === 0) return { newInfo, detachedIds };
+
   const effectiveEndLine = changeEndLine ?? changeStartLine;
 
   for (const [id, info] of expandedPasteInfo) {
@@ -874,6 +878,7 @@ export function shiftExpandedRegions(
           changeStartLine > info.startLine &&
           changeStartLine <= infoEndLine)
       ) {
+        detachedIds.add(id);
         continue; // Detach by not adding to newInfo
       }
     }
@@ -889,7 +894,7 @@ export function shiftExpandedRegions(
     }
   }
 
-  return newInfo;
+  return { newInfo, detachedIds };
 }
 
 /**
@@ -1525,7 +1530,7 @@ function textBufferReducerLogic(
     }
 
     case 'insert': {
-      const nextState = pushUndoLocal(detachExpandedPaste(state));
+      const nextState = detachExpandedPaste(pushUndoLocal(state));
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1590,11 +1595,15 @@ function textBufferReducerLogic(
         newCursorCol = cpLen(before) + cpLen(parts[0]);
       }
 
-      const newExpandedInfo = shiftExpandedRegions(
+      const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
         nextState.expandedPasteInfo,
         nextState.cursorRow,
         lineDelta,
       );
+
+      for (const id of detachedIds) {
+        delete newPastedContent[id];
+      }
 
       return {
         ...nextState,
@@ -1619,7 +1628,8 @@ function textBufferReducerLogic(
     }
 
     case 'backspace': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol, lines, transformationsByLine } =
         currentState;
 
@@ -1635,7 +1645,7 @@ function textBufferReducerLogic(
       );
 
       if (placeholder) {
-        const nextState = pushUndoLocal(currentState);
+        const nextState = currentState;
         const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(newLines[cursorRow], 0, placeholder.start) +
@@ -1665,7 +1675,7 @@ function textBufferReducerLogic(
       }
 
       // Standard backspace logic
-      const nextState = pushUndoLocal(currentState);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1690,12 +1700,17 @@ function textBufferReducerLogic(
         newCursorCol = newCol;
       }
 
-      const newExpandedInfo = shiftExpandedRegions(
+      const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
         nextState.expandedPasteInfo,
         nextState.cursorRow + lineDelta, // shift based on the line that was removed
         lineDelta,
         nextState.cursorRow,
       );
+
+      const newPastedContent = { ...nextState.pastedContent };
+      for (const id of detachedIds) {
+        delete newPastedContent[id];
+      }
 
       return {
         ...nextState,
@@ -1703,6 +1718,7 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
         expandedPasteInfo: newExpandedInfo,
       };
     }
@@ -1891,7 +1907,8 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol, lines, transformationsByLine } =
         currentState;
 
@@ -1904,7 +1921,7 @@ function textBufferReducerLogic(
       );
 
       if (placeholder) {
-        const nextState = pushUndoLocal(currentState);
+        const nextState = currentState;
         const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(newLines[cursorRow], 0, placeholder.start) +
@@ -1936,7 +1953,7 @@ function textBufferReducerLogic(
       // Standard delete logic
       const lineContent = currentLine(cursorRow);
       let lineDelta = 0;
-      const nextState = pushUndoLocal(currentState);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
 
       if (cursorCol < currentLineLen(cursorRow)) {
@@ -1952,27 +1969,34 @@ function textBufferReducerLogic(
         return currentState;
       }
 
-      const newExpandedInfo = shiftExpandedRegions(
+      const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
         nextState.expandedPasteInfo,
         nextState.cursorRow,
         lineDelta,
         nextState.cursorRow + (lineDelta < 0 ? 1 : 0),
       );
 
+      const newPastedContent = { ...nextState.pastedContent };
+      for (const id of detachedIds) {
+        delete newPastedContent[id];
+      }
+
       return {
         ...nextState,
         lines: newLines,
         preferredCol: null,
+        pastedContent: newPastedContent,
         expandedPasteInfo: newExpandedInfo,
       };
     }
 
     case 'delete_word_left': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol } = currentState;
       if (cursorCol === 0 && cursorRow === 0) return currentState;
 
-      const nextState = pushUndoLocal(currentState);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
       let newCursorRow = cursorRow;
       let newCursorCol = cursorCol;
@@ -2008,7 +2032,8 @@ function textBufferReducerLogic(
     }
 
     case 'delete_word_right': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       const lineLen = cpLen(lineContent);
@@ -2017,7 +2042,7 @@ function textBufferReducerLogic(
         return currentState;
       }
 
-      const nextState = pushUndoLocal(currentState);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
 
       if (cursorCol >= lineLen) {
@@ -2040,11 +2065,12 @@ function textBufferReducerLogic(
     }
 
     case 'kill_line_right': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndoLocal(currentState);
+        const nextState = currentState;
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
         return {
@@ -2053,7 +2079,7 @@ function textBufferReducerLogic(
         };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
-        const nextState = pushUndoLocal(currentState);
+        const nextState = currentState;
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
@@ -2068,10 +2094,11 @@ function textBufferReducerLogic(
     }
 
     case 'kill_line_left': {
-      const currentState = detachExpandedPaste(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
       const { cursorRow, cursorCol } = currentState;
       if (cursorCol > 0) {
-        const nextState = pushUndoLocal(currentState);
+        const nextState = currentState;
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
@@ -2140,15 +2167,21 @@ function textBufferReducerLogic(
         newState.lines.length - (nextState.lines.length - oldLineCount);
       const lineDelta = newLineCount - oldLineCount;
 
-      const newExpandedInfo = shiftExpandedRegions(
+      const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
         nextState.expandedPasteInfo,
         startRow,
         lineDelta,
         endRow,
       );
 
+      const newPastedContent = { ...newState.pastedContent };
+      for (const id of detachedIds) {
+        delete newPastedContent[id];
+      }
+
       return {
         ...newState,
+        pastedContent: newPastedContent,
         expandedPasteInfo: newExpandedInfo,
       };
     }
@@ -2207,12 +2240,13 @@ function textBufferReducerLogic(
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
+      const nextState = pushUndoLocal(state);
       const { id } = action.payload;
-      const info = state.expandedPasteInfo.get(id);
+      const info = nextState.expandedPasteInfo.get(id);
 
       if (info) {
         // COLLAPSE: Restore original line with placeholder
-        const newLines = [...state.lines];
+        const newLines = [...nextState.lines];
         newLines.splice(
           info.startLine,
           info.lineCount,
@@ -2220,43 +2254,63 @@ function textBufferReducerLogic(
         );
 
         const lineDelta = 1 - info.lineCount;
-        const newExpandedInfo = shiftExpandedRegions(
-          state.expandedPasteInfo,
+        const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
+          nextState.expandedPasteInfo,
           info.startLine,
           lineDelta,
           info.startLine + info.lineCount - 1,
         );
         newExpandedInfo.delete(id); // Already shifted, now remove self
 
+        const newPastedContent = { ...nextState.pastedContent };
+        for (const detachedId of detachedIds) {
+          if (detachedId !== id) {
+            delete newPastedContent[detachedId];
+          }
+        }
+
         // Move cursor to end of collapsed placeholder
         const newCursorRow = info.startLine;
         const newCursorCol = cpLen(info.prefix) + cpLen(id);
 
         return {
-          ...state,
+          ...nextState,
           lines: newLines,
           cursorRow: newCursorRow,
           cursorCol: newCursorCol,
           preferredCol: null,
+          pastedContent: newPastedContent,
           expandedPasteInfo: newExpandedInfo,
         };
       } else {
         // EXPAND: Replace placeholder with content
-        const content = state.pastedContent[id];
-        if (!content) return state;
+        const content = nextState.pastedContent[id];
+        if (!content) return nextState;
 
-        // Find line containing placeholder
-        const lineIndex = state.lines.findIndex((line) => line.includes(id));
-        if (lineIndex === -1) return state;
+        // Find line and position containing exactly this placeholder
+        let lineIndex = -1;
+        let placeholderStart = -1;
+        for (let i = 0; i < nextState.lines.length; i++) {
+          const transforms = nextState.transformationsByLine[i] ?? [];
+          const transform = transforms.find(
+            (t) => t.type === 'paste' && t.id === id,
+          );
+          if (transform) {
+            lineIndex = i;
+            placeholderStart = transform.logStart;
+            break;
+          }
+        }
 
-        const line = state.lines[lineIndex];
-        const placeholderStart = line.indexOf(id);
-        const prefix = line.slice(0, placeholderStart);
-        const suffix = line.slice(placeholderStart + id.length);
+        if (lineIndex === -1) return nextState;
+
+        const line = nextState.lines[lineIndex];
+        const prefix = cpSlice(line, 0, placeholderStart);
+        const suffix = cpSlice(line, placeholderStart + cpLen(id));
 
         // Split content into lines
         const contentLines = content.split('\n');
-        const newLines = [...state.lines];
+        const newLines = [...nextState.lines];
 
         let expandedLines: string[];
         if (contentLines.length === 1) {
@@ -2274,12 +2328,17 @@ function textBufferReducerLogic(
         newLines.splice(lineIndex, 1, ...expandedLines);
 
         const lineDelta = expandedLines.length - 1;
-        const newExpandedInfo = shiftExpandedRegions(
-          state.expandedPasteInfo,
+        const { newInfo: newExpandedInfo, detachedIds } = shiftExpandedRegions(
+          nextState.expandedPasteInfo,
           lineIndex,
           lineDelta,
           lineIndex,
         );
+
+        const newPastedContent = { ...nextState.pastedContent };
+        for (const detachedId of detachedIds) {
+          delete newPastedContent[detachedId];
+        }
 
         newExpandedInfo.set(id, {
           startLine: lineIndex,
@@ -2294,11 +2353,12 @@ function textBufferReducerLogic(
         const newCursorCol = cpLen(lastExpandedLine) - cpLen(suffix);
 
         return {
-          ...state,
+          ...nextState,
           lines: newLines,
           cursorRow: newCursorRow,
           cursorCol: newCursorCol,
           preferredCol: null,
+          pastedContent: newPastedContent,
           expandedPasteInfo: newExpandedInfo,
         };
       }
@@ -2711,18 +2771,10 @@ export function useTextBuffer({
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
-    let expandedText = text;
-    for (const [placeholder, content] of Object.entries(pastedContent)) {
-      // Escape special regex characters in the placeholder (though placeholders are usually safe)
-      const escapedPlaceholder = placeholder.replace(
-        /[.*+?^${}()|[\]\\]/g,
-        '\\$&',
-      );
-      expandedText = expandedText.replace(
-        new RegExp(escapedPlaceholder, 'g'),
-        content,
-      );
-    }
+    const expandedText = text.replace(
+      PASTED_TEXT_PLACEHOLDER_REGEX,
+      (match) => pastedContent[match] || match,
+    );
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
     let command: string | undefined = undefined;

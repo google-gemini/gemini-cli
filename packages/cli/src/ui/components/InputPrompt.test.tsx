@@ -2761,7 +2761,9 @@ describe('InputPrompt', () => {
                 ],
               ],
           visualScrollRow: 0,
-          visualToLogicalMap: currentLines.map((_, i) => [i, 0]),
+          visualToLogicalMap: currentLines.map(
+            (_, i) => [i, 0] as [number, number],
+          ),
           visualToTransformedMap: currentLines.map(() => 0),
           getLogicalPositionFromVisual: vi.fn().mockReturnValue({
             row: 0,
@@ -2786,7 +2788,7 @@ describe('InputPrompt', () => {
 
       // 1. Verify initial placeholder
       await waitFor(() => {
-        expect(stdout.lastFrame()).toContain(id);
+        expect(stdout.lastFrame()).toMatchSnapshot();
       });
 
       // Simulate double-click to expand
@@ -2799,9 +2801,7 @@ describe('InputPrompt', () => {
 
       // 2. Verify expanded content is visible
       await waitFor(() => {
-        expect(stdout.lastFrame()).toContain('line1');
-        expect(stdout.lastFrame()).toContain('line10');
-        expect(stdout.lastFrame()).not.toContain(id);
+        expect(stdout.lastFrame()).toMatchSnapshot();
       });
 
       // Simulate double-click to collapse
@@ -2814,8 +2814,7 @@ describe('InputPrompt', () => {
 
       // 3. Verify placeholder is restored
       await waitFor(() => {
-        expect(stdout.lastFrame()).toContain(id);
-        expect(stdout.lastFrame()).not.toContain('line1');
+        expect(stdout.lastFrame()).toMatchSnapshot();
       });
 
       unmount();

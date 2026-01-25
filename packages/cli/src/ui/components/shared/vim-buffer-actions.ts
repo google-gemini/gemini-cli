@@ -106,7 +106,7 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -136,7 +136,7 @@ export function handleVimAction(
       }
 
       if (startRow !== cursorRow || startCol !== cursorCol) {
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return replaceRangeInternal(
           nextState,
           startRow,
@@ -189,7 +189,7 @@ export function handleVimAction(
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -212,7 +212,7 @@ export function handleVimAction(
       if (totalLines === 1 || linesToDelete >= totalLines) {
         // If there's only one line, or we're deleting all remaining lines,
         // clear the content but keep one empty line (text editors should never be completely empty)
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return {
           ...nextState,
           lines: [''],
@@ -222,7 +222,7 @@ export function handleVimAction(
         };
       }
 
-      const nextState = pushUndo(detachExpandedPaste(state));
+      const nextState = detachExpandedPaste(pushUndo(state));
       const newLines = [...nextState.lines];
       newLines.splice(cursorRow, linesToDelete);
 
@@ -244,7 +244,7 @@ export function handleVimAction(
       if (lines.length === 0) return state;
 
       const linesToChange = Math.min(count, lines.length - cursorRow);
-      const nextState = pushUndo(detachExpandedPaste(state));
+      const nextState = detachExpandedPaste(pushUndo(state));
 
       const { startOffset, endOffset } = getLineRangeOffsets(
         cursorRow,
@@ -270,7 +270,7 @@ export function handleVimAction(
     case 'vim_change_to_end_of_line': {
       const currentLine = lines[cursorRow] || '';
       if (cursorCol < cpLen(currentLine)) {
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -293,7 +293,7 @@ export function handleVimAction(
           // Change N characters to the left
           const startCol = Math.max(0, cursorCol - count);
           return replaceRangeInternal(
-            pushUndo(detachExpandedPaste(state)),
+            detachExpandedPaste(pushUndo(state)),
             cursorRow,
             startCol,
             cursorRow,
@@ -309,7 +309,7 @@ export function handleVimAction(
             if (totalLines === 1) {
               const currentLine = state.lines[0] || '';
               return replaceRangeInternal(
-                pushUndo(detachExpandedPaste(state)),
+                detachExpandedPaste(pushUndo(state)),
                 0,
                 0,
                 0,
@@ -317,7 +317,7 @@ export function handleVimAction(
                 '',
               );
             } else {
-              const nextState = pushUndo(detachExpandedPaste(state));
+              const nextState = detachExpandedPaste(pushUndo(state));
               const { startOffset, endOffset } = getLineRangeOffsets(
                 cursorRow,
                 linesToChange,
@@ -345,7 +345,7 @@ export function handleVimAction(
             if (state.lines.length === 1) {
               const currentLine = state.lines[0] || '';
               return replaceRangeInternal(
-                pushUndo(detachExpandedPaste(state)),
+                detachExpandedPaste(pushUndo(state)),
                 0,
                 0,
                 0,
@@ -355,7 +355,7 @@ export function handleVimAction(
             } else {
               const startRow = Math.max(0, cursorRow - count + 1);
               const linesToChange = cursorRow - startRow + 1;
-              const nextState = pushUndo(detachExpandedPaste(state));
+              const nextState = detachExpandedPaste(pushUndo(state));
               const { startOffset, endOffset } = getLineRangeOffsets(
                 startRow,
                 linesToChange,
@@ -393,7 +393,7 @@ export function handleVimAction(
           // Right
           // Change N characters to the right
           return replaceRangeInternal(
-            pushUndo(detachExpandedPaste(state)),
+            detachExpandedPaste(pushUndo(state)),
             cursorRow,
             cursorCol,
             cursorRow,
@@ -625,7 +625,7 @@ export function handleVimAction(
 
       if (cursorCol < lineLength) {
         const deleteCount = Math.min(count, lineLength - cursorCol);
-        const nextState = pushUndo(detachExpandedPaste(state));
+        const nextState = detachExpandedPaste(pushUndo(state));
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -657,7 +657,7 @@ export function handleVimAction(
 
     case 'vim_open_line_below': {
       const { cursorRow, lines } = state;
-      const nextState = pushUndo(detachExpandedPaste(state));
+      const nextState = detachExpandedPaste(pushUndo(state));
 
       // Insert newline at end of current line
       const endOfLine = cpLen(lines[cursorRow] || '');
@@ -673,7 +673,7 @@ export function handleVimAction(
 
     case 'vim_open_line_above': {
       const { cursorRow } = state;
-      const nextState = pushUndo(detachExpandedPaste(state));
+      const nextState = detachExpandedPaste(pushUndo(state));
 
       // Insert newline at beginning of current line
       const resultState = replaceRangeInternal(
