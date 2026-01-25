@@ -2240,11 +2240,11 @@ function textBufferReducerLogic(
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
-      const nextState = pushUndoLocal(state);
       const { id } = action.payload;
-      const info = nextState.expandedPasteInfo.get(id);
+      const info = state.expandedPasteInfo.get(id);
 
       if (info) {
+        const nextState = pushUndoLocal(state);
         // COLLAPSE: Restore original line with placeholder
         const newLines = [...nextState.lines];
         newLines.splice(
@@ -2284,14 +2284,14 @@ function textBufferReducerLogic(
         };
       } else {
         // EXPAND: Replace placeholder with content
-        const content = nextState.pastedContent[id];
-        if (!content) return nextState;
+        const content = state.pastedContent[id];
+        if (!content) return state;
 
         // Find line and position containing exactly this placeholder
         let lineIndex = -1;
         let placeholderStart = -1;
-        for (let i = 0; i < nextState.lines.length; i++) {
-          const transforms = nextState.transformationsByLine[i] ?? [];
+        for (let i = 0; i < state.lines.length; i++) {
+          const transforms = state.transformationsByLine[i] ?? [];
           const transform = transforms.find(
             (t) => t.type === 'paste' && t.id === id,
           );
@@ -2302,7 +2302,9 @@ function textBufferReducerLogic(
           }
         }
 
-        if (lineIndex === -1) return nextState;
+        if (lineIndex === -1) return state;
+
+        const nextState = pushUndoLocal(state);
 
         const line = nextState.lines[lineIndex];
         const prefix = cpSlice(line, 0, placeholderStart);
