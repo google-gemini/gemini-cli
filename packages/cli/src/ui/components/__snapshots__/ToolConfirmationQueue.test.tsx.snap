@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolConfirmationQueue > renders the confirming tool with progress indicator 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                       1 of 3 │
+│                                                                              │
+│ ?  ls list files                                                             │
+│                                                                              │
+│ ls                                                                           │
+│                                                                              │
+│ Allow execution of: 'ls'?                                                    │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
