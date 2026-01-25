@@ -1,0 +1,42 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { Storage } from '../config/storage.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
+import type { AgentOverride, Config } from '../config/config.js';
+import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import { loadAgentsFromDirectory } from './agentLoader.js';
+import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { CliHelpAgent } from './cli-help-agent.js';
+import { GeneralistAgent } from './generalist-agent.js';
+import { ProjectPlannerAgent } from './project-planner.js';
+import { CodeReviewerAgent } from './code-reviewer.js';
+import { NFSModderAgent } from './nfs-modder.js';
+import { DesktopAgent } from './desktop-agent.js';
+import { A2AClientManager } from './a2a-client-manager.js';
+import { ADCHandler } from './remote-invocation.js';
+import { type z } from 'zod';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isAutoModel } from '../config/models.js';
+import {
+  type ModelConfig,
+  ModelConfigService,
+} from '../services/modelConfigService.js';
+
+// ... (rest of imports and logic)
+
+export class AgentRegistry {
+  // ...
+  private internalRegisterAgents(config: Config) {
+     this.register(GeneralistAgent(config));
+     this.register(CodebaseInvestigatorAgent(config));
+     this.register(CliHelpAgent(config));
+     this.register(ProjectPlannerAgent(config));
+     this.register(CodeReviewerAgent(config));
+     this.register(NFSModderAgent(config));
+     this.register(DesktopAgent(config));
+  }
+}
