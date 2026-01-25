@@ -897,7 +897,7 @@ export function shiftExpandedRegions(
  * This converts the expanded content to regular text that can no longer be collapsed.
  * Returns the state unchanged if cursor is not in an expanded region.
  */
-function detachExpandedPaste(state: TextBufferState): TextBufferState {
+export function detachExpandedPaste(state: TextBufferState): TextBufferState {
   const expandedId = getExpandedPasteAtLine(
     state.cursorRow,
     state.expandedPasteInfo,
@@ -1635,7 +1635,7 @@ function textBufferReducerLogic(
       );
 
       if (placeholder) {
-        const nextState = pushUndoLocal(state);
+        const nextState = pushUndoLocal(currentState);
         const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(newLines[cursorRow], 0, placeholder.start) +
@@ -1665,7 +1665,7 @@ function textBufferReducerLogic(
       }
 
       // Standard backspace logic
-      const nextState = pushUndoLocal(state);
+      const nextState = pushUndoLocal(currentState);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1904,7 +1904,7 @@ function textBufferReducerLogic(
       );
 
       if (placeholder) {
-        const nextState = pushUndoLocal(state);
+        const nextState = pushUndoLocal(currentState);
         const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(newLines[cursorRow], 0, placeholder.start) +
@@ -1936,7 +1936,7 @@ function textBufferReducerLogic(
       // Standard delete logic
       const lineContent = currentLine(cursorRow);
       let lineDelta = 0;
-      const nextState = pushUndoLocal(state);
+      const nextState = pushUndoLocal(currentState);
       const newLines = [...nextState.lines];
 
       if (cursorCol < currentLineLen(cursorRow)) {
@@ -1949,7 +1949,7 @@ function textBufferReducerLogic(
         newLines.splice(cursorRow + 1, 1);
         lineDelta = -1;
       } else {
-        return state;
+        return currentState;
       }
 
       const newExpandedInfo = shiftExpandedRegions(
@@ -1968,10 +1968,11 @@ function textBufferReducerLogic(
     }
 
     case 'delete_word_left': {
-      const { cursorRow, cursorCol } = state;
-      if (cursorCol === 0 && cursorRow === 0) return state;
+      const currentState = detachExpandedPaste(state);
+      const { cursorRow, cursorCol } = currentState;
+      if (cursorCol === 0 && cursorRow === 0) return currentState;
 
-      const nextState = pushUndoLocal(state);
+      const nextState = pushUndoLocal(currentState);
       const newLines = [...nextState.lines];
       let newCursorRow = cursorRow;
       let newCursorCol = cursorCol;
@@ -2007,15 +2008,16 @@ function textBufferReducerLogic(
     }
 
     case 'delete_word_right': {
-      const { cursorRow, cursorCol, lines } = state;
+      const currentState = detachExpandedPaste(state);
+      const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       const lineLen = cpLen(lineContent);
 
       if (cursorCol >= lineLen && cursorRow === lines.length - 1) {
-        return state;
+        return currentState;
       }
 
-      const nextState = pushUndoLocal(state);
+      const nextState = pushUndoLocal(currentState);
       const newLines = [...nextState.lines];
 
       if (cursorCol >= lineLen) {
@@ -2038,10 +2040,11 @@ function textBufferReducerLogic(
     }
 
     case 'kill_line_right': {
-      const { cursorRow, cursorCol, lines } = state;
+      const currentState = detachExpandedPaste(state);
+      const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndoLocal(state);
+        const nextState = pushUndoLocal(currentState);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
         return {
@@ -2050,7 +2053,7 @@ function textBufferReducerLogic(
         };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
-        const nextState = pushUndoLocal(state);
+        const nextState = pushUndoLocal(currentState);
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
@@ -2061,13 +2064,14 @@ function textBufferReducerLogic(
           preferredCol: null,
         };
       }
-      return state;
+      return currentState;
     }
 
     case 'kill_line_left': {
-      const { cursorRow, cursorCol } = state;
+      const currentState = detachExpandedPaste(state);
+      const { cursorRow, cursorCol } = currentState;
       if (cursorCol > 0) {
-        const nextState = pushUndoLocal(state);
+        const nextState = pushUndoLocal(currentState);
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
@@ -2078,7 +2082,7 @@ function textBufferReducerLogic(
           preferredCol: null,
         };
       }
-      return state;
+      return currentState;
     }
 
     case 'undo': {
@@ -2228,12 +2232,6 @@ function textBufferReducerLogic(
         const newCursorRow = info.startLine;
         const newCursorCol = cpLen(info.prefix) + cpLen(id);
 
-        const newTransformations = calculateTransformations(newLines);
-        const newVisualLayout = calculateLayout(newLines, state.viewportWidth, [
-          newCursorRow,
-          newCursorCol,
-        ]);
-
         return {
           ...state,
           lines: newLines,
@@ -2241,8 +2239,6 @@ function textBufferReducerLogic(
           cursorCol: newCursorCol,
           preferredCol: null,
           expandedPasteInfo: newExpandedInfo,
-          transformationsByLine: newTransformations,
-          visualLayout: newVisualLayout,
         };
       } else {
         // EXPAND: Replace placeholder with content
@@ -2297,12 +2293,6 @@ function textBufferReducerLogic(
         const lastExpandedLine = expandedLines[expandedLines.length - 1];
         const newCursorCol = cpLen(lastExpandedLine) - cpLen(suffix);
 
-        const newTransformations = calculateTransformations(newLines);
-        const newVisualLayout = calculateLayout(newLines, state.viewportWidth, [
-          newCursorRow,
-          newCursorCol,
-        ]);
-
         return {
           ...state,
           lines: newLines,
@@ -2310,8 +2300,6 @@ function textBufferReducerLogic(
           cursorCol: newCursorCol,
           preferredCol: null,
           expandedPasteInfo: newExpandedInfo,
-          transformationsByLine: newTransformations,
-          visualLayout: newVisualLayout,
         };
       }
     }

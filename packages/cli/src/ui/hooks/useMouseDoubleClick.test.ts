@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useMouseDoubleClick } from './useMouseDoubleClick.js';
@@ -37,6 +37,11 @@ describe('useMouseDoubleClick', () => {
     vi.spyOn(MouseContext, 'useMouse').mockImplementation((callback) => {
       mouseCallback = callback;
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('should detect double-click within threshold', async () => {
