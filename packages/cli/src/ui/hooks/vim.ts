@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useReducer, useEffect } from 'react';
+import { useCallback, useReducer, useEffect, useRef, useMemo } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import type { VimKeyBinding } from '../../config/settingsSchema.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -16,6 +18,8 @@ export type VimMode = 'NORMAL' | 'INSERT';
 const DIGIT_MULTIPLIER = 10;
 const DEFAULT_COUNT = 1;
 const DIGIT_1_TO_9 = /^[1-9]$/;
+const DEFAULT_KEY_SEQUENCE_TIMEOUT_MS = 200; // Default timeout for key sequences
+const DOUBLE_ESCAPE_TIMEOUT_MS = 500; // Timeout for double-escape to clear input
 
 // Command types
 const CMD_TYPES = {
@@ -129,6 +133,31 @@ const vimReducer = (state: VimState, action: VimAction): VimState => {
 export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
+  const settings = useSettings();
+
+  // Get configured key bindings for insert mode escape sequences
+  const insertModeBindings = useMemo((): VimKeyBinding[] => {
+    const vimKeyBindings = settings?.merged?.general?.vimKeyBindings as
+      | { insertMode?: VimKeyBinding[] }
+      | undefined;
+    const bindings = vimKeyBindings?.insertMode;
+    if (Array.isArray(bindings)) {
+      return bindings.filter(
+        (b): b is VimKeyBinding =>
+          b &&
+          Array.isArray(b.keys) &&
+          b.keys.length >= 2 &&
+          b.action === 'escape',
+      );
+    }
+    return [];
+  }, [settings?.merged?.general]);
+
+  // Track key sequence history for escape sequence detection
+  const keyHistoryRef = useRef<Array<{ key: string; timestamp: number }>>([]);
+
+  // Track escape key timestamps for double-escape detection (shared across modes)
+  const escapeHistoryRef = useRef<number[]>([]);
 
   // Sync vim mode from context to local state
   useEffect(() => {
@@ -149,6 +178,28 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     () => state.count || DEFAULT_COUNT,
     [state.count],
   );
+
+  /**
+   * Checks if double-escape was pressed within timeout window.
+   * Used to clear input buffer quickly in both INSERT and NORMAL modes.
+   * @returns true if double-escape detected, false otherwise
+   */
+  const checkDoubleEscape = useCallback((): boolean => {
+    const now = Date.now();
+    escapeHistoryRef.current.push(now);
+
+    // Keep only escapes within timeout window
+    escapeHistoryRef.current = escapeHistoryRef.current.filter(
+      (timestamp) => now - timestamp <= DOUBLE_ESCAPE_TIMEOUT_MS,
+    );
+
+    // Check if we have 2+ escapes within timeout
+    if (escapeHistoryRef.current.length >= 2) {
+      escapeHistoryRef.current = [];
+      return true;
+    }
+    return false;
+  }, []);
 
   /** Executes common commands to eliminate duplication in dot (.) repeat command */
   const executeCommand = useCallback(
@@ -241,19 +292,107 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   );
 
   /**
+   * Checks if the current key history matches any configured escape sequence
+   * @param history - Array of recent key presses with timestamps
+   * @param bindings - Configured key bindings to check against
+   * @returns The matched binding or null if no match
+   */
+  const checkEscapeSequence = useCallback(
+    (
+      history: Array<{ key: string; timestamp: number }>,
+      bindings: VimKeyBinding[],
+    ): VimKeyBinding | null => {
+      for (const binding of bindings) {
+        const keys = binding.keys;
+        const timeout = binding.timeout ?? DEFAULT_KEY_SEQUENCE_TIMEOUT_MS;
+
+        // Check if we have enough keys in history
+        if (history.length < keys.length) continue;
+
+        // Get the last N keys from history where N is the binding length
+        const recentKeys = history.slice(-keys.length);
+
+        // Check if all keys match
+        const keysMatch = keys.every((k, i) => recentKeys[i]?.key === k);
+        if (!keysMatch) continue;
+
+        // Check if all keys were pressed within the timeout window
+        const firstKeyTime = recentKeys[0]?.timestamp ?? 0;
+        const lastKeyTime = recentKeys[recentKeys.length - 1]?.timestamp ?? 0;
+        if (lastKeyTime - firstKeyTime > timeout * (keys.length - 1)) continue;
+
+        return binding;
+      }
+      return null;
+    },
+    [],
+  );
+
+  /**
    * Handles key input in INSERT mode
    * @param normalizedKey - The normalized key input
    * @returns boolean indicating if the key was handled
    */
   const handleInsertModeInput = useCallback(
     (normalizedKey: Key): boolean => {
-      // Handle escape key immediately - switch to NORMAL mode on any escape
+      // Handle escape key - check for double-escape to clear buffer first
       if (normalizedKey.name === 'escape') {
+        // Check for double-escape to clear buffer (works from INSERT mode too)
+        if (checkDoubleEscape()) {
+          buffer.setText('');
+          dispatch({ type: 'ESCAPE_TO_NORMAL' });
+          updateMode('NORMAL');
+          keyHistoryRef.current = [];
+          return true;
+        }
+
+        // Single escape: switch to NORMAL mode
         // Vim behavior: move cursor left when exiting insert mode (unless at beginning of line)
         buffer.vimEscapeInsertMode();
         dispatch({ type: 'ESCAPE_TO_NORMAL' });
         updateMode('NORMAL');
+        keyHistoryRef.current = [];
         return true;
+      }
+
+      // Handle configurable escape sequences (e.g., jj, jk)
+      if (
+        insertModeBindings.length > 0 &&
+        normalizedKey.sequence?.length === 1
+      ) {
+        const now = Date.now();
+        keyHistoryRef.current.push({
+          key: normalizedKey.sequence,
+          timestamp: now,
+        });
+
+        // Keep only the last N keys where N is the max binding length
+        const maxBindingLength = Math.max(
+          ...insertModeBindings.map((b) => b.keys.length),
+        );
+        if (keyHistoryRef.current.length > maxBindingLength) {
+          keyHistoryRef.current =
+            keyHistoryRef.current.slice(-maxBindingLength);
+        }
+
+        // Check if any escape sequence matches
+        const matchedBinding = checkEscapeSequence(
+          keyHistoryRef.current,
+          insertModeBindings,
+        );
+
+        if (matchedBinding) {
+          // Delete the characters that were already inserted (all but the last one)
+          const charsToDelete = matchedBinding.keys.length - 1;
+          for (let i = 0; i < charsToDelete; i++) {
+            buffer.backspace();
+          }
+          buffer.vimEscapeInsertMode();
+          dispatch({ type: 'ESCAPE_TO_NORMAL' });
+          updateMode('NORMAL');
+          keyHistoryRef.current = [];
+          return true;
+        }
       }
 
       // In INSERT mode, let InputPrompt handle completion keys and special commands
@@ -270,6 +409,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Let InputPrompt handle Ctrl+V for clipboard image pasting
       if (normalizedKey.ctrl && normalizedKey.name === 'v') {
         return false; // Let InputPrompt handle clipboard functionality
+      }
+
+      // Let InputPrompt handle Ctrl+C for clearing input
+      if (normalizedKey.ctrl && normalizedKey.name === 'c') {
+        return false; // Let InputPrompt handle clear input
       }
 
       // Let InputPrompt handle shell commands
@@ -298,7 +442,15 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       buffer.handleInput(normalizedKey);
       return true; // Handled by vim
     },
-    [buffer, dispatch, updateMode, onSubmit],
+    [
+      buffer,
+      dispatch,
+      updateMode,
+      onSubmit,
+      insertModeBindings,
+      checkEscapeSequence,
+      checkDoubleEscape,
+    ],
   );
 
   /**
@@ -408,14 +560,22 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        // If in NORMAL mode, allow escape to pass through to other handlers
-        // if there's no pending operation.
+        // Handle escape key in NORMAL mode
         if (normalizedKey.name === 'escape') {
           if (state.pendingOperator) {
             dispatch({ type: 'CLEAR_PENDING_STATES' });
+            escapeHistoryRef.current = []; // Clear escape history when clearing operator
             return true; // Handled by vim
           }
-          return false; // Pass through to other handlers
+
+          // Check for double-escape to clear buffer
+          if (checkDoubleEscape()) {
+            buffer.setText('');
+            return true;
+          }
+
+          // First escape in NORMAL mode - pass through for UI feedback
+          return false;
         }
 
         // Handle count input (numbers 1-9, and 0 if count > 0)
@@ -752,6 +912,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
               return true;
             }
 
+            // Let InputPrompt handle Ctrl+C for clearing input
+            if (normalizedKey.ctrl && normalizedKey.name === 'c') {
+              return false; // Let InputPrompt handle clear input
+            }
+
             // Unknown command, clear count and pending states
             dispatch({ type: 'CLEAR_PENDING_STATES' });
             return true; // Still handled by vim to prevent other handlers
@@ -776,6 +941,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       buffer,
       executeCommand,
       updateMode,
+      checkDoubleEscape,
     ],
   );
 
