@@ -16,18 +16,11 @@ import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  DEFAULT_GEMINI_MODEL,
-  GEMINI_MODEL_ALIAS_AUTO,
-  PREVIEW_GEMINI_FLASH_MODEL,
-  isPreviewModel,
-  isAutoModel,
-} from '../config/models.js';
+import { isAutoModel } from '../config/models.js';
 import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -45,6 +38,8 @@ export function getModelConfigAlias<TOutput extends z.ZodTypeAny>(
 export class AgentRegistry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly agents = new Map<string, AgentDefinition<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
 
   constructor(private readonly config: Config) {}
 
@@ -73,6 +68,7 @@ export class AgentRegistry {
     A2AClientManager.getInstance().clearCache();
     await this.config.reloadAgents();
     this.agents.clear();
+    this.allDefinitions.clear();
     await this.loadAgents();
     coreEvents.emitAgentsRefreshed();
   }
@@ -85,6 +81,8 @@ export class AgentRegistry {
   }
 
   private async loadAgents(): Promise<void> {
+    this.agents.clear();
+    this.allDefinitions.clear();
     this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
@@ -144,68 +142,8 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
-    const cliHelpSettings = this.config.getCliHelpAgentSettings();
-    const agentsSettings = this.config.getAgentsSettings();
-    const agentsOverrides = agentsSettings.overrides ?? {};
-
-    // Only register the agent if it's enabled in the settings and not explicitly disabled via overrides.
-    if (
-      investigatorSettings?.enabled &&
-      !agentsOverrides[CodebaseInvestigatorAgent.name]?.disabled
-    ) {
-      let model;
-      const settingsModel = investigatorSettings.model;
-      // Check if the user explicitly set a model in the settings.
-      if (settingsModel && settingsModel !== GEMINI_MODEL_ALIAS_AUTO) {
-        model = settingsModel;
-      } else {
-        // Use Preview Flash model if the main model is any of the preview models
-        // If the main model is not preview model, use default pro model.
-        model = isPreviewModel(this.config.getModel())
-          ? PREVIEW_GEMINI_FLASH_MODEL
-          : DEFAULT_GEMINI_MODEL;
-      }
-
-      const agentDef = {
-        ...CodebaseInvestigatorAgent,
-        modelConfig: {
-          ...CodebaseInvestigatorAgent.modelConfig,
-          model,
-          generateContentConfig: {
-            ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig,
-            thinkingConfig: {
-              ...CodebaseInvestigatorAgent.modelConfig.generateContentConfig
-                ?.thinkingConfig,
-              thinkingBudget:
-                investigatorSettings.thinkingBudget ??
-                CodebaseInvestigatorAgent.modelConfig.generateContentConfig
-                  ?.thinkingConfig?.thinkingBudget,
-            },
-          },
-        },
-        runConfig: {
-          ...CodebaseInvestigatorAgent.runConfig,
-          maxTimeMinutes:
-            investigatorSettings.maxTimeMinutes ??
-            CodebaseInvestigatorAgent.runConfig.maxTimeMinutes,
-          maxTurns:
-            investigatorSettings.maxNumTurns ??
-            CodebaseInvestigatorAgent.runConfig.maxTurns,
-        },
-      };
-      this.registerLocalAgent(agentDef);
-    }
-
-    // Register the CLI help agent if it's explicitly enabled and not explicitly disabled via overrides.
-    if (
-      cliHelpSettings.enabled &&
-      !agentsOverrides[CliHelpAgent.name]?.disabled
-    ) {
-      this.registerLocalAgent(CliHelpAgent(this.config));
-    }
-
-    // Register the generalist agent.
+    this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
+    this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
   }
 
@@ -251,6 +189,8 @@ export class AgentRegistry {
       return;
     }
 
+    this.allDefinitions.set(definition.name, definition);
+
     const settingsOverrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
 
@@ -280,12 +220,8 @@ export class AgentRegistry {
     const isExperimental = definition.experimental === true;
     let isEnabled = !isExperimental;
 
-    if (overrides) {
-      if (overrides.disabled !== undefined) {
-        isEnabled = !overrides.disabled;
-      } else if (overrides.enabled !== undefined) {
-        isEnabled = overrides.enabled;
-      }
+    if (overrides && overrides.enabled !== undefined) {
+      isEnabled = overrides.enabled;
     }
 
     return isEnabled;
@@ -308,6 +244,8 @@ export class AgentRegistry {
       );
       return;
     }
+
+    this.allDefinitions.set(definition.name, definition);
 
     const overrides =
       this.config.getAgentsSettings().overrides?.[definition.name];
@@ -421,7 +359,8 @@ export class AgentRegistry {
   /**
    * Retrieves an agent definition by name.
    */
-  getDefinition(name: string): AgentDefinition | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getDefinition(name: string): AgentDefinition<any> | undefined {
     return this.agents.get(name);
   }
 
@@ -440,20 +379,17 @@ export class AgentRegistry {
   }
 
   /**
-   * Generates a description for the delegate_to_agent tool.
-   * Unlike getDirectoryContext() which is for system prompts,
-   * this is formatted for tool descriptions.
+   * Returns a list of all discovered agent names, regardless of whether they are enabled.
    */
-  getToolDescription(): string {
-    if (this.agents.size === 0) {
-      return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
-    }
+  getAllDiscoveredAgentNames(): string[] {
+    return Array.from(this.allDefinitions.keys());
+  }
 
-    const agentDescriptions = Array.from(this.agents.entries())
-      .map(([name, def]) => `- **${name}**: ${def.description}`)
-      .join('\n');
-
-    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
+  /**
+   * Retrieves a discovered agent definition by name.
+   */
+  getDiscoveredDefinition(name: string): AgentDefinition | undefined {
+    return this.allDefinitions.get(name);
   }
 
   /**
@@ -469,20 +405,23 @@ export class AgentRegistry {
     context += `Sub-agents are specialized expert agents that you can use to assist you in
       the completion of all or part of a task.
 
-      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
-      exists that has expertise relevant to your task.
+      Each sub-agent is available as a tool of the same name.
 
-      For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
-      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+      You MUST always delegate tasks to the sub-agent with the
+      relevant expertise, if one is available.
 
-      The following are the available sub-agents:\n\n`;
+      The following tools can be used to start sub-agents:\n\n`;
 
-    for (const [name, def] of this.agents) {
-      context += `- **${name}**: ${def.description}\n`;
+    for (const [name] of this.agents) {
+      context += `- ${name}\n`;
     }
+
+    context += `Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
+
+    For example:
+    - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
+    - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
+
     return context;
   }
 }

@@ -28,9 +28,13 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
   name: 'MockAgent',
   description: 'A mock agent.',
   inputConfig: {
-    inputs: {
-      task: { type: 'string', required: true, description: 'task' },
-      priority: { type: 'number', required: false, description: 'prio' },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'task' },
+        priority: { type: 'number', description: 'prio' },
+      },
+      required: ['task'],
     },
   },
   modelConfig: {

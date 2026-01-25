@@ -133,6 +133,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -213,6 +214,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -264,6 +266,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow('Test error');
@@ -317,6 +320,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
@@ -376,6 +380,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -449,6 +454,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -525,6 +531,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -608,6 +615,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -770,6 +778,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -819,6 +828,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
 
       await client.connect();
@@ -855,6 +865,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
 
       await client.connect();
@@ -910,6 +921,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
         onToolsUpdatedSpy,
       );
 
@@ -980,6 +992,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
 
       await client.connect();
@@ -1050,6 +1063,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
         onToolsUpdatedSpy,
       );
 
@@ -1062,6 +1076,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
         onToolsUpdatedSpy,
       );
 
@@ -1108,10 +1123,13 @@ describe('mcp-client', () => {
               if (options?.signal?.aborted) {
                 return reject(new Error('Operation aborted'));
               }
-              options?.signal?.addEventListener('abort', () => {
-                reject(new Error('Operation aborted'));
-              });
-              // Intentionally do not resolve immediately to simulate lag
+              options?.signal?.addEventListener(
+                'abort',
+                () => {
+                  reject(new Error('Operation aborted'));
+                },
+                { once: true },
+              );
             }),
         ),
         listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
@@ -1144,6 +1162,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
 
       await client.connect();
@@ -1208,6 +1227,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
         onToolsUpdatedSpy,
       );
 
@@ -1755,6 +1775,7 @@ describe('connectToMcpServer with OAuth', () => {
     );
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
@@ -1800,6 +1821,7 @@ describe('connectToMcpServer with OAuth', () => {
     );
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
       false,
@@ -1855,6 +1877,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
 
     await expect(
       connectToMcpServer(
+        '0.0.1',
         'test-server',
         { url: 'http://test-server', type: 'http' },
         false,
@@ -1874,6 +1897,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
 
     await expect(
       connectToMcpServer(
+        '0.0.1',
         'test-server',
         { url: 'http://test-server', type: 'sse' },
         false,
@@ -1892,6 +1916,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       .mockResolvedValueOnce(undefined);
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { url: 'http://test-server' },
       false,
@@ -1914,6 +1939,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
 
     await expect(
       connectToMcpServer(
+        '0.0.1',
         'test-server',
         { url: 'http://test-server' },
         false,
@@ -1931,6 +1957,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       .mockResolvedValueOnce(undefined);
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { url: 'http://test-server' },
       false,
@@ -2001,6 +2028,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       .mockResolvedValueOnce(undefined);
 
     const client = await connectToMcpServer(
+      '0.0.1',
       'test-server',
       { url: 'http://test-server', oauth: { enabled: true } },
       false,

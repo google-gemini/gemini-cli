@@ -49,7 +49,6 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -67,7 +66,10 @@ import {
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
 } from '../telemetry/types.js';
-import type { FallbackModelHandler } from '../fallback/types.js';
+import type {
+  FallbackModelHandler,
+  ValidationHandler,
+} from '../fallback/types.js';
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
@@ -99,8 +101,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { setGlobalProxy } from '../utils/fetch.js';
-import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -141,14 +142,6 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
-export interface CodebaseInvestigatorSettings {
-  enabled?: boolean;
-  maxNumTurns?: number;
-  maxTimeMinutes?: number;
-  thinkingBudget?: number;
-  model?: string;
-}
-
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -165,10 +158,6 @@ export interface ResolvedExtensionSetting {
   source?: string;
 }
 
-export interface CliHelpAgentSettings {
-  enabled?: boolean;
-}
-
 export interface AgentRunConfig {
   maxTimeMinutes?: number;
   maxTurns?: number;
@@ -177,7 +166,6 @@ export interface AgentRunConfig {
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
-  disabled?: boolean;
   enabled?: boolean;
 }
 
@@ -229,6 +217,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -289,8 +278,21 @@ export interface SandboxConfig {
   image: string;
 }
 
+/**
+ * Callbacks for checking MCP server enablement status.
+ * These callbacks are provided by the CLI package to bridge
+ * the enablement state to the core package.
+ */
+export interface McpEnablementCallbacks {
+  /** Check if a server is disabled for the current session only */
+  isSessionDisabled: (serverId: string) => boolean;
+  /** Check if a server is enabled in the file-based configuration */
+  isFileEnabled: (serverId: string) => Promise<boolean>;
+}
+
 export interface ConfigParameters {
   sessionId: string;
+  clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -304,6 +306,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
@@ -365,8 +368,6 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
-  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -375,14 +376,15 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  rawOutput?: boolean;
+  acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
-  hooks?: { [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] };
-  projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
-    disabled?: string[];
-  };
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
+  disabledHooks?: string[];
+  projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -416,6 +418,7 @@ export class Config {
   private agentRegistry!: AgentRegistry;
   private skillManager!: SkillManager;
   private sessionId: string;
+  private clientVersion: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -436,6 +439,7 @@ export class Config {
   private readonly mcpEnabled: boolean;
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -477,6 +481,7 @@ export class Config {
   private readonly _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
+  validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -507,8 +512,6 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -516,6 +519,8 @@ export class Config {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly rawOutput: boolean;
+  private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -554,6 +559,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.clientVersion = params.clientVersion ?? 'unknown';
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -572,6 +578,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -625,10 +632,9 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
-    this.disableLLMCorrection = params.disableLLMCorrection ?? false;
+    this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
-    this.enableEventDrivenScheduler =
-      params.enableEventDrivenScheduler ?? false;
+    this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? false;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
@@ -677,24 +683,9 @@ export class Config {
       ? false
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
-    this.enableHooks = params.enableHooks ?? false;
-    this.disabledHooks =
-      (params.hooks && 'disabled' in params.hooks
-        ? params.hooks.disabled
-        : undefined) ?? [];
+    this.enableHooks = params.enableHooks ?? true;
+    this.disabledHooks = params.disabledHooks ?? [];
 
-    this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
-      thinkingBudget:
-        params.codebaseInvestigatorSettings?.thinkingBudget ??
-        DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model,
-    };
-    this.cliHelpAgentSettings = {
-      enabled: params.cliHelpAgentSettings?.enabled ?? true,
-    };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -720,10 +711,11 @@ export class Config {
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.rawOutput = params.rawOutput ?? false;
+    this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
     if (params.hooks) {
-      const { disabled: _, ...restOfHooks } = params.hooks;
-      this.hooks = restOfHooks;
+      this.hooks = params.hooks;
     }
     if (params.projectHooks) {
       this.projectHooks = params.projectHooks;
@@ -794,6 +786,11 @@ export class Config {
     }
     this.initialized = true;
 
+    // Add pending directories to workspace context
+    for (const dir of this.pendingIncludeDirectories) {
+      this.workspaceContext.addDirectory(dir);
+    }
+
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
@@ -811,18 +808,27 @@ export class Config {
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
+      this.clientVersion,
       this.toolRegistry,
       this,
       this.eventEmitter,
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const mcpInitialization = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
-    ]).catch((error) => {
-      debugLogger.error('Error initializing MCP clients:', error);
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
     });
+
+    if (!this.interactive) {
+      await mcpInitialization;
+    }
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -957,6 +963,11 @@ export class Config {
     return this.contentGenerator?.userTier;
   }
 
+  getUserTierName(): string | undefined {
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
+  }
+
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
@@ -1066,6 +1077,14 @@ export class Config {
 
   getFallbackModelHandler(): FallbackModelHandler | undefined {
     return this.fallbackModelHandler;
+  }
+
+  setValidationHandler(handler: ValidationHandler): void {
+    this.validationHandler = handler;
+  }
+
+  getValidationHandler(): ValidationHandler | undefined {
+    return this.validationHandler;
   }
 
   resetTurn(): void {
@@ -1244,6 +1263,10 @@ export class Config {
     return this.mcpEnabled;
   }
 
+  getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {
+    return this.mcpEnablementCallbacks;
+  }
+
   getExtensionsEnabled(): boolean {
     return this.extensionsEnabled;
   }
@@ -1383,6 +1406,14 @@ export class Config {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getRawOutput(): boolean {
+    return this.rawOutput;
+  }
+
+  getAcceptRawOutputRisk(): boolean {
+    return this.acceptRawOutputRisk;
   }
 
   getPendingIncludeDirectories(): string[] {
@@ -1659,6 +1690,23 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getNumericalRoutingEnabled(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+
+    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
+      ?.boolValue;
+  }
+
+  async getClassifierThreshold(): Promise<number | undefined> {
+    await this.ensureExperimentsLoaded();
+
+    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    if (flag?.intValue !== undefined) {
+      return parseInt(flag.intValue, 10);
+    }
+    return flag?.floatValue;
+  }
+
   async getBannerTextNoCapacityIssues(): Promise<string> {
     await this.ensureExperimentsLoaded();
     return (
@@ -1867,14 +1915,6 @@ export class Config {
     return this.enableHooksUI;
   }
 
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
-    return this.codebaseInvestigatorSettings;
-  }
-
-  getCliHelpAgentSettings(): CliHelpAgentSettings {
-    return this.cliHelpAgentSettings;
-  }
-
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 
@@ -1940,8 +1980,7 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    // Register DelegateToAgentTool if agents are enabled
-    this.registerDelegateToAgentTool(registry);
+    this.registerSubAgentTools(registry);
 
     await registry.discoverAllTools();
     registry.sortTools();
@@ -1949,26 +1988,36 @@ export class Config {
   }
 
   /**
-   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   * Registers SubAgentTools for all available agents.
    */
-  private registerDelegateToAgentTool(registry: ToolRegistry): void {
+  private registerSubAgentTools(registry: ToolRegistry): void {
+    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled ||
-      this.getCliHelpAgentSettings().enabled
+      agentsOverrides['codebase_investigator']?.enabled !== false ||
+      agentsOverrides['cli_help']?.enabled !== false
     ) {
-      // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
-      const isAllowed =
-        !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
+      const definitions = this.agentRegistry.getAllDefinitions();
 
-      if (isAllowed) {
-        const delegateTool = new DelegateToAgentTool(
-          this.agentRegistry,
-          this,
-          this.getMessageBus(),
-        );
-        registry.registerTool(delegateTool);
+      for (const definition of definitions) {
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed) {
+          try {
+            const tool = new SubagentTool(
+              definition,
+              this,
+              this.getMessageBus(),
+            );
+            registry.registerTool(tool);
+          } catch (e: unknown) {
+            debugLogger.warn(
+              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+            );
+          }
+        }
       }
     }
   }
@@ -1990,9 +2039,7 @@ export class Config {
   /**
    * Get project-specific hooks configuration
    */
-  getProjectHooks():
-    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
-    | undefined {
+  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.projectHooks;
   }
 
@@ -2066,7 +2113,7 @@ export class Config {
 
   private onAgentsRefreshed = async () => {
     if (this.toolRegistry) {
-      this.registerDelegateToAgentTool(this.toolRegistry);
+      this.registerSubAgentTools(this.toolRegistry);
     }
     // Propagate updates to the active chat session
     const client = this.getGeminiClient();
