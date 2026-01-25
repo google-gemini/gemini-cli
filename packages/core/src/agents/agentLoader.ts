@@ -10,10 +10,7 @@ import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
 import type { AgentDefinition } from './types.js';
-import {
-  isValidToolName,
-  DELEGATE_TO_AGENT_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 
 /**
@@ -217,15 +214,6 @@ export async function parseAgentMarkdown(
 
   // Local agent validation
   // Validate tools
-  if (
-    frontmatter.tools &&
-    frontmatter.tools.includes(DELEGATE_TO_AGENT_TOOL_NAME)
-  ) {
-    throw new AgentLoadError(
-      filePath,
-      `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
-    );
-  }
 
   // Construct the local agent definition
   const agentDef: FrontmatterLocalAgentDefinition = {

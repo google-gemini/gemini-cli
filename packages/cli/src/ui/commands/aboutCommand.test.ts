@@ -39,6 +39,7 @@ describe('aboutCommand', () => {
         config: {
           getModel: vi.fn(),
           getIdeMode: vi.fn().mockReturnValue(true),
+          getUserTierName: vi.fn().mockReturnValue(undefined),
         },
         settings: {
           merged: {
@@ -97,6 +98,7 @@ describe('aboutCommand', () => {
       gcpProject: 'test-gcp-project',
       ideClient: 'test-ide',
       userEmail: 'test-email@example.com',
+      tier: undefined,
     });
   });
 
@@ -153,6 +155,23 @@ describe('aboutCommand', () => {
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: '',
+      }),
+    );
+  });
+
+  it('should display the tier when getUserTierName returns a value', async () => {
+    vi.mocked(mockContext.services.config!.getUserTierName).mockReturnValue(
+      'Enterprise Tier',
+    );
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: 'Enterprise Tier',
       }),
     );
   });
