@@ -10,6 +10,14 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { formatDuration } from '../utils/formatters.js';
 
 vi.mock('../utils/formatters.js');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    sessionId: 'test-session-id',
+  };
+});
 
 describe('quitCommand', () => {
   beforeEach(() => {
@@ -47,6 +55,7 @@ describe('quitCommand', () => {
         {
           type: 'quit',
           duration: '1h 0m 0s',
+          sessionId: 'test-session-id',
           id: expect.any(Number),
         },
       ],

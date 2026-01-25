@@ -175,6 +175,7 @@ export type HistoryItemModel = HistoryItemBase & {
 export type HistoryItemQuit = HistoryItemBase & {
   type: 'quit';
   duration: string;
+  sessionId?: string;
 };
 
 export type HistoryItemToolGroup = HistoryItemBase & {

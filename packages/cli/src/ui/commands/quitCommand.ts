@@ -6,6 +6,7 @@
 
 import { formatDuration } from '../utils/formatters.js';
 import { CommandKind, type SlashCommand } from './types.js';
+import { sessionId } from '@google/gemini-cli-core';
 
 export const quitCommand: SlashCommand = {
   name: 'quit',
@@ -23,12 +24,14 @@ export const quitCommand: SlashCommand = {
       messages: [
         {
           type: 'user',
-          text: `/quit`, // Keep it consistent, even if /exit was used
+          text: `/quit`,
+          // Keep it consistent, even if /exit was used
           id: now - 1,
         },
         {
           type: 'quit',
           duration: formatDuration(wallDuration),
+          sessionId,
           id: now,
         },
       ],
