@@ -5,6 +5,8 @@
  */
 
 import { EventEmitter } from 'node:events';
+import type { McpClient } from '../tools/mcp-client.js';
+import type { ExtensionEvents } from './extensionLoader.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -115,6 +117,7 @@ export enum CoreEvent {
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
+  McpClientUpdate = 'mcp-client-update',
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
@@ -123,13 +126,14 @@ export enum CoreEvent {
   RetryAttempt = 'retry-attempt',
 }
 
-export interface CoreEvents {
+export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];

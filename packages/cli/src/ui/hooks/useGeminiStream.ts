@@ -31,7 +31,6 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
-  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -960,25 +959,6 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
-
-          const discoveryState = config
-            .getMcpClientManager()
-            ?.getDiscoveryState();
-          const mcpServerCount =
-            config.getMcpClientManager()?.getMcpServerCount() ?? 0;
-          if (
-            !options?.isContinuation &&
-            typeof query === 'string' &&
-            !isSlashCommand(query.trim()) &&
-            mcpServerCount > 0 &&
-            discoveryState !== MCPDiscoveryState.COMPLETED
-          ) {
-            coreEvents.emitFeedback(
-              'info',
-              'Waiting for MCP servers to initialize... Slash commands are still available.',
-            );
-            return;
-          }
 
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;

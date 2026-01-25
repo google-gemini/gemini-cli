@@ -245,6 +245,7 @@ export class McpClientManager {
         if (currentPromise === this.discoveryPromise) {
           this.discoveryPromise = undefined;
           this.discoveryState = MCPDiscoveryState.COMPLETED;
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
         }
       })
       .catch(() => {}); // Prevents unhandled rejection from the .finally branch
@@ -272,6 +273,12 @@ export class McpClientManager {
       this.cliConfig.getMcpServers() || {},
       this.cliConfig.getMcpServerCommand(),
     );
+
+    if (Object.keys(servers).length === 0) {
+      this.discoveryState = MCPDiscoveryState.COMPLETED;
+      this.eventEmitter?.emit('mcp-client-update', this.clients);
+      return;
+    }
 
     this.eventEmitter?.emit('mcp-client-update', this.clients);
     await Promise.all(
