@@ -27,7 +27,7 @@ describe('safeRegexTest', () => {
   });
 
   it('should return false (timeout) for catastrophic backtracking (ReDoS)', () => {
-    const pattern = /(x+x+)+y/;
+    const pattern = /(x+x+)+y/; // codeql[javascript/redos]
     const input = 'x'.repeat(50);
 
     const start = Date.now();
@@ -63,7 +63,7 @@ describe('safeRegexTest', () => {
   });
 
   it('should respect custom timeout settings', () => {
-    const heavyPattern = /(x+x+)+y/;
+    const heavyPattern = /(x+x+)+y/; // codeql[javascript/redos]
     const heavyInput = 'x'.repeat(20);
     expect(safeRegexTest(heavyPattern, heavyInput, 1)).toBe(false);
   });
