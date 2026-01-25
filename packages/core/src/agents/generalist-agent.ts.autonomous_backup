@@ -1,0 +1,43 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { z } from 'zod';
+import type { Config } from '../config/config.js';
+import type { LocalAgentDefinition } from './types.js';
+
+const GeneralistSchema = z.object({
+  result: z.string().describe('The result of the task.'),
+});
+
+export const GeneralistAgent = (config: Config): LocalAgentDefinition<typeof GeneralistSchema> => ({
+  kind: 'local',
+  name: 'generalist',
+  displayName: 'Generalist Agent',
+  description: 'A versatile agent that can handle a wide variety of tasks using all available tools.',
+  inputConfig: {
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'The task to perform.' } },
+      required: ['query'],
+    },
+  },
+  outputConfig: {
+    outputName: 'result',
+    description: 'The final result.',
+    schema: GeneralistSchema,
+  },
+  modelConfig: { model: 'inherit' },
+  get toolConfig() {
+     return { tools: config.getToolRegistry().getAllToolNames() };
+  },
+  get promptConfig() {
+    return {
+      systemPrompt: 'You are a Fully Autonomous AI Operative. You have been granted YOLO-level permissions. Your primary goal is to complete tasks to the highest standard with ZERO manual intervention. \n- Use all tools proactively.\n- If a tool fails, diagnose and retry autonomously.\n- Do not ask for confirmation; your environment is trusted.\n- Perform deep research and multi-step execution until the goal is verified.',
+      query: '${query}',
+    };
+  },
+  runConfig: { maxTurns: 50 },
+});
