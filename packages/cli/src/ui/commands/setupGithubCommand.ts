@@ -8,6 +8,7 @@ import path from 'node:path';
 import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
+import { execSync } from 'node:child_process';
 
 import type { CommandContext } from '../../ui/commands/types.js';
 import {
@@ -40,6 +41,12 @@ export const GITHUB_COMMANDS_PATHS = [
 const REPO_DOWNLOAD_URL =
   'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli';
 const SOURCE_DIR = 'examples/workflows';
+
+// Verifies if github name is command-execution safe
+function isValidGitHubName(name: string): boolean {
+  return /^[a-zA-Z0-9_.-]+$/.test(name);
+}
+
 // Generate OS-specific commands to open the GitHub pages needed for setup.
 function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
@@ -48,11 +55,52 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Build a list of URLs to open
   const urlsToOpen = [readmeUrl];
 
-  const repoInfo = getGitHubRepoInfo();
-  if (repoInfo) {
+  let repoInfo: { owner: string; repo: string } | null = null;
+  try {
+    repoInfo = getGitHubRepoInfo();
+  } catch {
+    /* ignore */
+  }
+
+  if (!repoInfo) {
+    return [
+      `${openCmd} "${readmeUrl}"`,
+      `echo "\nℹ️  Gemini CLI: Could not determine repository info. Secrets page skipped."`,
+    ];
+  }
+
+  //to check for fork
+  const forkUsername = repoInfo.owner;
+
+  let localGitUser: string | null = null;
+  try {
+    localGitUser = execSync('git config user.name', {
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    /* ignore */
+  }
+
+  const isOwner =
+    forkUsername &&
+    localGitUser &&
+    forkUsername.toLowerCase() === localGitUser.toLowerCase();
+
+  const isSafeRepo =
+    repoInfo &&
+    isValidGitHubName(repoInfo.owner) &&
+    isValidGitHubName(repoInfo.repo);
+
+  // Only push the URL if the fork exists and isn’t upstream
+  if (isOwner && isSafeRepo) {
     urlsToOpen.push(
       `https://github.com/${repoInfo.owner}/${repoInfo.repo}/settings/secrets/actions`,
     );
+  } else {
+    return [
+      `${openCmd} "${readmeUrl}"`,
+      `echo "\nℹ️  Gemini CLI: Secrets page skipped. If this is a fork, ensure origin points to your fork and repository names are valid."`,
+    ];
   }
 
   // Create and join the individual commands
