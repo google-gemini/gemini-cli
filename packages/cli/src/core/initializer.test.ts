@@ -127,7 +127,7 @@ describe('initializer', () => {
   });
 
   it('should handle undefined auth type', async () => {
-    mockSettings.merged.security!.auth!.selectedType = undefined;
+    mockSettings.merged.security.auth.selectedType = undefined;
     const result = await initializeApp(
       mockConfig as unknown as Config,
       mockSettings,

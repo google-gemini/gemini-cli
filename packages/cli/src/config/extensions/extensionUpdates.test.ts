@@ -20,6 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
+import { createTestMergedSettings } from '../settings.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -245,8 +246,11 @@ describe('extensionUpdates', () => {
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        settings: { telemetry: {} } as any,
+
+        settings: createTestMergedSettings({
+          telemetry: { enabled: false },
+          experimental: { extensionConfig: true },
+        }),
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null, // Simulate non-interactive
       });

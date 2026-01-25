@@ -155,8 +155,12 @@ describe('Settings Repro', () => {
       experimental: {
         useModelRouter: false,
         enableSubagents: false,
-        codebaseInvestigatorSettings: {
-          enabled: true,
+      },
+      agents: {
+        overrides: {
+          codebase_investigator: {
+            enabled: true,
+          },
         },
       },
       ui: {

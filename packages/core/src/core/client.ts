@@ -25,6 +25,7 @@ import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
@@ -39,7 +40,10 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
-import type { DefaultHookOutput } from '../hooks/types.js';
+import type {
+  DefaultHookOutput,
+  AfterAgentHookOutput,
+} from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -58,6 +62,7 @@ import {
 import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
 
@@ -94,7 +99,13 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
+
+    coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
   }
+
+  private handleModelChanged = () => {
+    this.currentSequenceModel = null;
+  };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -133,10 +144,9 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireBeforeAgentEvent(partToString(request));
-    const hookOutput = hookResult?.finalOutput;
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -187,10 +197,9 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookResult = await this.config
+    const hookOutput = await this.config
       .getHookSystem()
       ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
-    const hookOutput = hookResult?.finalOutput;
 
     return hookOutput;
   }
@@ -240,6 +249,7 @@ export class GeminiClient {
 
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
   }
 
@@ -255,11 +265,16 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
   }
 
+  dispose() {
+    coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+  }
+
   async resumeChat(
     history: Content[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
+    this.updateTelemetryTokenCount();
   }
 
   getChatRecordingService(): ChatRecordingService | undefined {
@@ -537,6 +552,15 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    const compressed = await this.tryCompressChat(prompt_id, false);
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    }
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
     const estimatedRequestTokenCount = await calculateRequestTokenCount(
@@ -545,21 +569,12 @@ export class GeminiClient {
       modelForLimitCheck,
     );
 
-    const remainingTokenCount =
-      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
-
-    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+    if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
         value: { estimatedRequestTokenCount, remainingTokenCount },
       };
       return turn;
-    }
-
-    const compressed = await this.tryCompressChat(prompt_id, false);
-
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
     // Prevent context updates from being sent while a tool call is
@@ -628,9 +643,10 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
+    if (!signal.aborted && !this.currentSequenceModel) {
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    }
     this.currentSequenceModel = modelToUse;
-    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
-
     const resultStream = turn.run(modelConfigKey, request, linkedSignal);
     let isError = false;
     let isInvalidStream = false;
@@ -774,7 +790,10 @@ export class GeminiClient {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
             const requestArray = Array.isArray(request) ? request : [request];
-            request = [...requestArray, { text: additionalContext }];
+            request = [
+              ...requestArray,
+              { text: `<hook_context>${additionalContext}</hook_context>` },
+            ];
           }
         }
       }
@@ -800,26 +819,41 @@ export class GeminiClient {
           turn,
         );
 
-        if (hookOutput?.shouldStopExecution()) {
+        // Cast to AfterAgentHookOutput for access to shouldClearContext()
+        const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
+
+        if (afterAgentOutput?.shouldStopExecution()) {
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
-              reason: hookOutput.getEffectiveReason(),
-              systemMessage: hookOutput.systemMessage,
+              reason: afterAgentOutput.getEffectiveReason(),
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
+          // Clear context if requested (honor both stop + clear)
+          if (contextCleared) {
+            await this.resetChat();
+          }
           return turn;
         }
 
-        if (hookOutput?.isBlockingDecision()) {
-          const continueReason = hookOutput.getEffectiveReason();
+        if (afterAgentOutput?.isBlockingDecision()) {
+          const continueReason = afterAgentOutput.getEffectiveReason();
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
-              systemMessage: hookOutput.systemMessage,
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
+          // Clear context if requested
+          if (contextCleared) {
+            await this.resetChat();
+          }
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,
@@ -915,8 +949,29 @@ export class GeminiClient {
         // Pass the captured model to the centralized handler.
         handleFallback(this.config, currentAttemptModel, authType, error);
 
+      const onValidationRequiredCallback = async (
+        validationError: ValidationRequiredError,
+      ) => {
+        // Suppress validation dialog for background calls (e.g. prompt-completion)
+        // to prevent the dialog from appearing on startup or during typing.
+        if (modelConfigKey.model === 'prompt-completion') {
+          throw validationError;
+        }
+
+        const handler = this.config.getValidationHandler();
+        if (typeof handler !== 'function') {
+          throw validationError;
+        }
+        return handler(
+          validationError.validationLink,
+          validationError.validationDescription,
+          validationError.learnMoreUrl,
+        );
+      };
+
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
+        onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
         getAvailabilityContext,

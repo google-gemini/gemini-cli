@@ -1,5 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ToolConfirmationMessage > should display multiple commands for exec type when provided 1`] = `
+"echo "hello"
+ls -la
+whoami
+
+Allow execution of 3 commands?
+
+● 1. Allow once
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
 exports[`ToolConfirmationMessage > should display urls if prompt and url are different 1`] = `
 "fetch https://github.com/google/gemini-react/blob/main/README.md
 
@@ -26,11 +39,11 @@ Do you want to proceed?
 `;
 
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
-"╭──────────────────────╮
-│                      │
-│ No changes detected. │
-│                      │
-╰──────────────────────╯
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ No changes detected.                                                         │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Apply this change?
 
@@ -41,11 +54,11 @@ Apply this change?
 `;
 
 exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' > should show "allow always" when folder is trusted 1`] = `
-"╭──────────────────────╮
-│                      │
-│ No changes detected. │
-│                      │
-╰──────────────────────╯
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│ No changes detected.                                                         │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
 Apply this change?
 

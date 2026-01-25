@@ -83,7 +83,7 @@ System prompt content.`);
         AgentLoadError,
       );
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        'Invalid markdown format',
+        'Missing mandatory YAML frontmatter',
       );
     });
 
@@ -108,19 +108,6 @@ name: test-agent
 Body`);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
         /Validation failed/,
-      );
-    });
-
-    it('should throw AgentLoadError if tools list includes forbidden tool', async () => {
-      const filePath = await writeAgentMarkdown(`---
-name: test-agent
-description: Test
-tools:
-  - delegate_to_agent
----
-Body`);
-      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        /tools list cannot include 'delegate_to_agent'/,
       );
     });
 
@@ -245,17 +232,23 @@ Body`);
         },
         modelConfig: {
           model: 'inherit',
-          top_p: 0.95,
+          generateContentConfig: {
+            topP: 0.95,
+          },
         },
         runConfig: {
-          max_time_minutes: 5,
+          maxTimeMinutes: 5,
         },
         inputConfig: {
-          inputs: {
-            query: {
-              type: 'string',
-              required: false,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The task for the agent.',
+              },
             },
+            required: [],
           },
         },
       });
@@ -307,12 +300,15 @@ Body`);
         displayName: undefined,
         agentCardUrl: 'https://example.com/card',
         inputConfig: {
-          inputs: {
-            query: {
-              type: 'string',
-              description: 'The task for the agent.',
-              required: false,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The task for the agent.',
+              },
             },
+            required: [],
           },
         },
       });

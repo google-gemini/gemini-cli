@@ -10,10 +10,7 @@ import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
 import type { AgentDefinition } from './types.js';
-import {
-  isValidToolName,
-  DELEGATE_TO_AGENT_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 
 /**
@@ -163,7 +160,7 @@ export async function parseAgentMarkdown(
   if (!match) {
     throw new AgentLoadError(
       filePath,
-      'Invalid markdown format. File must start with YAML frontmatter enclosed in "---".',
+      'Invalid agent definition: Missing mandatory YAML frontmatter. Agent Markdown files MUST start with YAML frontmatter enclosed in triple-dashes "---" (e.g., ---\nname: my-agent\n---).',
     );
   }
 
@@ -217,15 +214,6 @@ export async function parseAgentMarkdown(
 
   // Local agent validation
   // Validate tools
-  if (
-    frontmatter.tools &&
-    frontmatter.tools.includes(DELEGATE_TO_AGENT_TOOL_NAME)
-  ) {
-    throw new AgentLoadError(
-      filePath,
-      `Validation failed: tools list cannot include '${DELEGATE_TO_AGENT_TOOL_NAME}'. Sub-agents cannot delegate to other agents.`,
-    );
-  }
 
   // Construct the local agent definition
   const agentDef: FrontmatterLocalAgentDefinition = {
@@ -247,12 +235,16 @@ export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
 ): AgentDefinition {
   const inputConfig = {
-    inputs: {
-      query: {
-        type: 'string' as const,
-        description: 'The task for the agent.',
-        required: false,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The task for the agent.',
+        },
       },
+      // query is not required because it defaults to "Get Started!" if not provided
+      required: [],
     },
   };
 
@@ -281,12 +273,14 @@ export function markdownToAgentDefinition(
     },
     modelConfig: {
       model: modelName,
-      temp: markdown.temperature ?? 1,
-      top_p: 0.95,
+      generateContentConfig: {
+        temperature: markdown.temperature ?? 1,
+        topP: 0.95,
+      },
     },
     runConfig: {
-      max_turns: markdown.max_turns,
-      max_time_minutes: markdown.timeout_mins || 5,
+      maxTurns: markdown.max_turns,
+      maxTimeMinutes: markdown.timeout_mins || 5,
     },
     toolConfig: markdown.tools
       ? {

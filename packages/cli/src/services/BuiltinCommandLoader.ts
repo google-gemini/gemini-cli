@@ -27,6 +27,7 @@ import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
+import { rewindCommand } from '../ui/commands/rewindCommand.js';
 import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
@@ -106,6 +107,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
+      rewindCommand,
       await ideCommand(),
       initCommand,
       ...(this.config?.getMcpEnabled() === false
@@ -139,7 +141,26 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
-      ...(this.config?.isSkillsSupportEnabled() ? [skillsCommand] : []),
+      ...(this.config?.isSkillsSupportEnabled()
+        ? this.config?.getSkillManager()?.isAdminEnabled() === false
+          ? [
+              {
+                name: 'skills',
+                description: 'Manage agent skills',
+                kind: CommandKind.BUILT_IN,
+                autoExecute: false,
+                subCommands: [],
+                action: async (
+                  _context: CommandContext,
+                ): Promise<MessageActionReturn> => ({
+                  type: 'message',
+                  messageType: 'error',
+                  content: 'Agent skills are disabled by your admin.',
+                }),
+              },
+            ]
+          : [skillsCommand]
+        : []),
       settingsCommand,
       vimCommand,
       setupGithubCommand,

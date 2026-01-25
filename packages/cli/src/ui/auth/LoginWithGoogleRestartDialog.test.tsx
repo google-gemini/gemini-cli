@@ -48,11 +48,10 @@ describe('LoginWithGoogleRestartDialog', () => {
 
     keypressHandler({
       name: 'escape',
-      sequence: '\u001b',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '\u001b',
     });
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -68,11 +67,10 @@ describe('LoginWithGoogleRestartDialog', () => {
 
       keypressHandler({
         name: keyName,
-        sequence: keyName,
-        ctrl: false,
-        meta: false,
         shift: false,
-        paste: false,
+        ctrl: false,
+        cmd: false,
+        sequence: keyName,
       });
 
       // Advance timers to trigger the setTimeout callback
