@@ -124,3 +124,6 @@ available combinations.
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
   the numbered radio option and confirm when the full number is entered.
+- `Double-click` on a paste placeholder (`[Pasted Text: X lines]`) in alternate
+  buffer mode: Expand to view full content inline. Double-click again to
+  collapse.
