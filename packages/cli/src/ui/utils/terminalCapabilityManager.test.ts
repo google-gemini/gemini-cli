@@ -277,7 +277,7 @@ describe('TerminalCapabilityManager', () => {
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
-    it('should NOT enable modifyOtherKeys from Device Attributes (DA1) alone', async () => {
+    it('should not enable modifyOtherKeys without explicit response', async () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 

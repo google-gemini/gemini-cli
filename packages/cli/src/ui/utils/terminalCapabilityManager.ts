@@ -47,8 +47,8 @@ export class TerminalCapabilityManager {
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
+  private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
-  private modifyOtherKeysSupported?: boolean;
 
   private constructor() {}
 
@@ -213,7 +213,7 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (this.modifyOtherKeysSupported === true) {
+      } else if (this.modifyOtherKeysSupported) {
         // Only enable modifyOtherKeys if we got an explicit positive response.
         // Some terminals print a stray 'm' character if they don't understand
         // the CSI > private mode sequence format used by modifyOtherKeys.
