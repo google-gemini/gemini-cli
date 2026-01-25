@@ -74,10 +74,20 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
     ];
   }
 
+  let localUser: string | undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+    localUser = require('node:child_process')
+      .execSync('git config user.name', { encoding: 'utf-8' })
+      .trim();
+  } catch {
+    // localUser will be undefined, and isOwner will be false.
+  }
+
   const isOwner =
     repoInfo.owner &&
-    repoInfo.localUser &&
-    repoInfo.owner.toLowerCase() === repoInfo.localUser.toLowerCase();
+    localUser &&
+    repoInfo.owner.toLowerCase() === localUser.toLowerCase();
 
   const isSafeRepo =
     isValidGitHubOwner(repoInfo.owner) && isValidGitHubRepoName(repoInfo.repo);
