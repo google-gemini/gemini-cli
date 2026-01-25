@@ -26,18 +26,6 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
-  return handlePolicyDrivenFallback(config, failedModel, authType, error);
-}
-
-/**
- * New fallback logic using the ModelAvailabilityService
- */
-async function handlePolicyDrivenFallback(
-  config: Config,
-  failedModel: string,
-  authType?: string,
-  error?: unknown,
-): Promise<string | boolean | null> {
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
     return null;
   }
@@ -143,7 +131,7 @@ async function processIntent(
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
-      config.setActiveModel(fallbackModel);
+      config.activateFallbackMode(fallbackModel);
       return true;
 
     case 'retry_once':

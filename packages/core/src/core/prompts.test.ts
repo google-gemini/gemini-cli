@@ -20,6 +20,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
+import { ApprovalMode } from '../policy/types.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -54,6 +55,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   let mockConfig: Config;
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
@@ -66,20 +68,65 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
       }),
+      getSkillManager: vi.fn().mockReturnValue({
+        getSkills: vi.fn().mockReturnValue([]),
+      }),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Config;
+  });
+
+  it('should include available_skills when provided in config', () => {
+    const skills = [
+      {
+        name: 'test-skill',
+        description: 'A test skill description',
+        location: '/path/to/test-skill/SKILL.md',
+        body: 'Skill content',
+      },
+    ];
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain(
+      "To activate a skill and receive its detailed instructions, you can call the `activate_skill` tool with the skill's name.",
+    );
+    expect(prompt).toContain('Skill Guidance');
+    expect(prompt).toContain('<available_skills>');
+    expect(prompt).toContain('<skill>');
+    expect(prompt).toContain('<name>test-skill</name>');
+    expect(prompt).toContain(
+      '<description>A test skill description</description>',
+    );
+    expect(prompt).toContain(
+      '<location>/path/to/test-skill/SKILL.md</location>',
+    );
+    expect(prompt).toContain('</skill>');
+    expect(prompt).toContain('</available_skills>');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Available Agent Skills');
+    expect(prompt).not.toContain('Skill Guidance');
+    expect(prompt).not.toContain('activate_skill');
   });
 
   it('should use chatty system prompt for preview model', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
-    expect(prompt).not.toContain('No Chitchat:');
+    expect(prompt).toContain('No Chitchat:');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -88,7 +135,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       PREVIEW_GEMINI_FLASH_MODEL,
     );
     const prompt = getCoreSystemPrompt(mockConfig);
-    expect(prompt).toContain('Do not call tools in silence');
+    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
+    expect(prompt).toContain('No Chitchat:');
+    expect(prompt).toMatchSnapshot();
   });
 
   it.each([
@@ -169,11 +218,15 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
         getPreviewFeatures: vi.fn().mockReturnValue(false),
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+        }),
+        getSkillManager: vi.fn().mockReturnValue({
+          getSkills: vi.fn().mockReturnValue([]),
         }),
       } as unknown as Config;
 
@@ -194,8 +247,47 @@ describe('Core System Prompt (prompts.ts)', () => {
           "Use 'search_file_content' and 'glob' search tools extensively",
         );
       }
+      expect(prompt).toMatchSnapshot();
     },
   );
+
+  describe('ApprovalMode in System Prompt', () => {
+    it('should include PLAN mode instructions', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Active Approval Mode: Plan');
+      expect(prompt).toMatchSnapshot();
+    });
+
+    it('should NOT include approval mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Active Approval Mode: Plan');
+      expect(prompt).toMatchSnapshot();
+    });
+
+    it('should only list available tools in PLAN mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      // Only enable glob and read_file, disable others (like web search)
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        'glob',
+        'read_file',
+      ]);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+
+      // Should include enabled tools
+      expect(prompt).toContain('`glob`');
+      expect(prompt).toContain('`read_file`');
+
+      // Should NOT include disabled tools
+      expect(prompt).not.toContain('`google_web_search`');
+      expect(prompt).not.toContain('`list_directory`');
+      expect(prompt).not.toContain('`search_file_content`');
+    });
+  });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
     it.each(['false', '0'])(

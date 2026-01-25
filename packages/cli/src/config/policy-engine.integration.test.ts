@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ApprovalMode,
   PolicyDecision,
@@ -12,6 +12,21 @@ import {
 } from '@google/gemini-cli-core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
+
+// Mock Storage to ensure tests are hermetic and don't read from user's home directory
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const Storage = actual.Storage;
+  // Monkey-patch static methods
+  Storage.getUserPoliciesDir = () => '/non-existent/user/policies';
+  Storage.getSystemPoliciesDir = () => '/non-existent/system/policies';
+
+  return {
+    ...actual,
+    Storage,
+  };
+});
 
 describe('Policy Engine Integration Tests', () => {
   describe('Policy configuration produces valid PolicyEngine config', () => {
@@ -270,6 +285,43 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should handle Plan mode correctly', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.PLAN,
+      );
+      const engine = new PolicyEngine(config);
+
+      // Read and search tools should be allowed
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'google_web_search' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'list_directory' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Other tools should be denied via catch all
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
+
+      // Unknown tools should be denied via catch-all
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should verify priority ordering works correctly in practice', async () => {

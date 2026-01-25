@@ -39,6 +39,7 @@ describe('aboutCommand', () => {
         config: {
           getModel: vi.fn(),
           getIdeMode: vi.fn().mockReturnValue(true),
+          getUserTierName: vi.fn().mockReturnValue(undefined),
         },
         settings: {
           merged: {
@@ -87,20 +88,18 @@ describe('aboutCommand', () => {
 
     await aboutCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ABOUT,
-        cliVersion: 'test-version',
-        osVersion: 'test-os',
-        sandboxEnv: 'no sandbox',
-        modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
-        gcpProject: 'test-gcp-project',
-        ideClient: 'test-ide',
-        userEmail: 'test-email@example.com',
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.ABOUT,
+      cliVersion: 'test-version',
+      osVersion: 'test-os',
+      sandboxEnv: 'no sandbox',
+      modelVersion: 'test-model',
+      selectedAuthType: 'test-auth',
+      gcpProject: 'test-gcp-project',
+      ideClient: 'test-ide',
+      userEmail: 'test-email@example.com',
+      tier: undefined,
+    });
   });
 
   it('should show the correct sandbox environment variable', async () => {
@@ -115,7 +114,6 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'gemini-sandbox',
       }),
-      expect.any(Number),
     );
   });
 
@@ -132,7 +130,6 @@ describe('aboutCommand', () => {
       expect.objectContaining({
         sandboxEnv: 'sandbox-exec (test-profile)',
       }),
-      expect.any(Number),
     );
   });
 
@@ -159,7 +156,23 @@ describe('aboutCommand', () => {
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
-      expect.any(Number),
+    );
+  });
+
+  it('should display the tier when getUserTierName returns a value', async () => {
+    vi.mocked(mockContext.services.config!.getUserTierName).mockReturnValue(
+      'Enterprise Tier',
+    );
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tier: 'Enterprise Tier',
+      }),
     );
   });
 });

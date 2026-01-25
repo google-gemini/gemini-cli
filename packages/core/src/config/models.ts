@@ -33,7 +33,7 @@ export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 export const DEFAULT_THINKING_MODE = 8192;
 
 /**
- * Resolves the requested model alias (e.g., 'auto', 'pro', 'flash', 'flash-lite')
+ * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
  * to a concrete model name, considering preview features.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
@@ -51,6 +51,7 @@ export function resolveModel(
     case DEFAULT_GEMINI_MODEL_AUTO: {
       return DEFAULT_GEMINI_MODEL;
     }
+    case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
       return previewFeaturesEnabled
         ? PREVIEW_GEMINI_MODEL
@@ -100,21 +101,6 @@ export function resolveClassifierModel(
   }
   return resolveModel(requestedModel, previewFeaturesEnabled);
 }
-
-/**
- * Determines the effective model to use.
- *
- * @param requestedModel The model that was originally requested.
- * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
- * @returns The effective model name.
- */
-export function getEffectiveModel(
-  requestedModel: string,
-  previewFeaturesEnabled: boolean | undefined,
-): string {
-  return resolveModel(requestedModel, previewFeaturesEnabled);
-}
-
 export function getDisplayString(
   model: string,
   previewFeaturesEnabled: boolean = false,
@@ -125,17 +111,15 @@ export function getDisplayString(
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
-      return `Manual (${
-        previewFeaturesEnabled ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL
-      })`;
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_MODEL
+        : DEFAULT_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
-      return `Manual (${
-        previewFeaturesEnabled
-          ? PREVIEW_GEMINI_FLASH_MODEL
-          : DEFAULT_GEMINI_FLASH_MODEL
-      })`;
+      return previewFeaturesEnabled
+        ? PREVIEW_GEMINI_FLASH_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     default:
-      return `Manual (${model})`;
+      return model;
   }
 }
 
@@ -161,6 +145,20 @@ export function isPreviewModel(model: string): boolean {
  */
 export function isGemini2Model(model: string): boolean {
   return /^gemini-2(\.|$)/.test(model);
+}
+
+/**
+ * Checks if the model is an auto model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is an auto model.
+ */
+export function isAutoModel(model: string): boolean {
+  return (
+    model === GEMINI_MODEL_ALIAS_AUTO ||
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === DEFAULT_GEMINI_MODEL_AUTO
+  );
 }
 
 /**

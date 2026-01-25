@@ -17,7 +17,8 @@ import type {
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/turn.js';
+import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -37,8 +38,10 @@ import type {
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
+import { AgentTerminateMode, DEFAULT_QUERY_STRING } from './types.js';
 import { templateString } from './utils.js';
+import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -64,6 +67,10 @@ type AgentTurnResult =
       terminateReason: AgentTerminateMode;
       finalResult: string | null;
     };
+
+export function createUnauthorizedToolError(toolName: string): string {
+  return `Unauthorized tool call: '${toolName}' is not available to this agent.`;
+}
 
 /**
  * Executes an agent loop based on an {@link AgentDefinition}.
@@ -98,18 +105,37 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
-    const agentToolRegistry = new ToolRegistry(runtimeContext);
+    const agentToolRegistry = new ToolRegistry(
+      runtimeContext,
+      runtimeContext.getMessageBus(),
+    );
     const parentToolRegistry = runtimeContext.getToolRegistry();
+    const allAgentNames = new Set(
+      runtimeContext.getAgentRegistry().getAllAgentNames(),
+    );
+
+    const registerToolByName = (toolName: string) => {
+      // Check if the tool is a subagent to prevent recursion.
+      // We do not allow agents to call other agents.
+      if (allAgentNames.has(toolName)) {
+        debugLogger.warn(
+          `[LocalAgentExecutor] Skipping subagent tool '${toolName}' for agent '${definition.name}' to prevent recursion.`,
+        );
+        return;
+      }
+
+      // If the tool is referenced by name, retrieve it from the parent
+      // registry and register it with the agent's isolated registry.
+      const tool = parentToolRegistry.getTool(toolName);
+      if (tool) {
+        agentToolRegistry.registerTool(tool);
+      }
+    };
 
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
         if (typeof toolRef === 'string') {
-          // If the tool is referenced by name, retrieve it from the parent
-          // registry and register it with the agent's isolated registry.
-          const toolFromParent = parentToolRegistry.getTool(toolRef);
-          if (toolFromParent) {
-            agentToolRegistry.registerTool(toolFromParent);
-          }
+          registerToolByName(toolRef);
         } else if (
           typeof toolRef === 'object' &&
           'name' in toolRef &&
@@ -120,9 +146,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // Note: Raw `FunctionDeclaration` objects in the config don't need to be
         // registered; their schemas are passed directly to the model later.
       }
-
-      agentToolRegistry.sortTools();
+    } else {
+      // If no tools are explicitly configured, default to all available tools.
+      for (const toolName of parentToolRegistry.getAllToolNames()) {
+        registerToolByName(toolName);
+      }
     }
+
+    agentToolRegistry.sortTools();
 
     // Get the parent prompt ID from context
     const parentPromptId = promptIdContext.getStore();
@@ -355,11 +386,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
-    const { max_time_minutes } = this.definition.runConfig;
+    const { maxTimeMinutes } = this.definition.runConfig;
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(new Error('Agent timed out.')),
-      max_time_minutes * 60 * 1000,
+      maxTimeMinutes * 60 * 1000,
     );
 
     // Combine the external signal with the internal timeout signal.
@@ -385,7 +416,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : 'Get Started!';
+        : DEFAULT_QUERY_STRING;
       let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
 
       while (true) {
@@ -448,13 +479,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+            finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${this.definition.runConfig.max_turns}).`;
+            finalResult = `Agent reached max turns limit (${this.definition.runConfig.maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -518,7 +549,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
@@ -550,7 +581,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     chat: GeminiChat,
     prompt_id: string,
   ): Promise<void> {
-    const model = this.definition.modelConfig.model;
+    const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
     const { newHistory, info } = await this.compressionService.compress(
       chat,
@@ -585,9 +616,44 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const modelConfigAlias = getModelConfigAlias(this.definition);
+
+    // Resolve the model config early to get the concrete model string (which may be `auto`).
+    const resolvedConfig =
+      this.runtimeContext.modelConfigService.getResolvedConfig({
+        model: modelConfigAlias,
+        overrideScope: this.definition.name,
+      });
+    const requestedModel = resolvedConfig.model;
+
+    let modelToUse: string;
+    if (isAutoModel(requestedModel)) {
+      // TODO(joshualitt): This try / catch is inconsistent with the routing
+      // behavior for the main agent. Ideally, we would have a universal
+      // policy for routing failure. Given routing failure does not necessarily
+      // mean generation will fail, we may want to share this logic with
+      // other places we use model routing.
+      try {
+        const routingContext: RoutingContext = {
+          history: chat.getHistory(/*curated=*/ true),
+          request: message.parts || [],
+          signal,
+          requestedModel,
+        };
+        const router = this.runtimeContext.getModelRouterService();
+        const decision = await router.route(routingContext);
+        modelToUse = decision.model;
+      } catch (error) {
+        debugLogger.warn(`Error during model routing: ${error}`);
+        modelToUse = DEFAULT_GEMINI_MODEL;
+      }
+    } else {
+      modelToUse = requestedModel;
+    }
+
     const responseStream = await chat.sendMessageStream(
       {
-        model: getModelConfigAlias(this.definition),
+        model: modelToUse,
         overrideScope: this.definition.name,
       },
       message.parts || [],
@@ -842,7 +908,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Handle standard tools
       if (!allowedToolNames.has(functionCall.name as string)) {
-        const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
+        const error = createUnauthorizedToolError(functionCall.name as string);
 
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
@@ -1068,7 +1134,7 @@ Important Rules:
   ): AgentTerminateMode | null {
     const { runConfig } = this.definition;
 
-    if (runConfig.max_turns && turnCounter >= runConfig.max_turns) {
+    if (runConfig.maxTurns && turnCounter >= runConfig.maxTurns) {
       return AgentTerminateMode.MAX_TURNS;
     }
 

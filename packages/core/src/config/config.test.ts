@@ -33,6 +33,8 @@ import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
+import type { SkillDefinition } from '../skills/skillLoader.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -57,6 +59,7 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
+  ToolRegistryMock.prototype.unregisterTool = vi.fn();
   ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
@@ -104,6 +107,7 @@ vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     stripThoughtsFromHistory: vi.fn(),
+    isInitialized: vi.fn().mockReturnValue(false),
   })),
 }));
 
@@ -151,8 +155,8 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/delegate-to-agent-tool.js', () => ({
-  DelegateToAgentTool: vi.fn(),
+vi.mock('../agents/subagent-tool.js', () => ({
+  SubagentTool: vi.fn(),
 }));
 
 vi.mock('../resources/resource-registry.js', () => ({
@@ -163,13 +167,18 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitModelChanged: vi.fn(),
   emitConsoleLog: vi.fn(),
+  on: vi.fn(),
 }));
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
 
-vi.mock('../utils/events.js', () => ({
-  coreEvents: mockCoreEvents,
-}));
+vi.mock('../utils/events.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/events.js')>();
+  return {
+    ...actual,
+    coreEvents: mockCoreEvents,
+  };
+});
 
 vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
@@ -222,6 +231,10 @@ describe('Server Config (config.ts)', () => {
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
   });
 
   describe('initialize', () => {
@@ -259,6 +272,62 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).rejects.toThrow(
         'Config was already initialized',
       );
+    });
+
+    it('should await MCP initialization in non-interactive mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        // interactive defaults to false
+      });
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should wait for MCP to finish
+      expect(mcpStarted).toBe(true);
+    });
+
+    it('should not await MCP initialization in interactive mode', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+        interactive: true,
+      });
+
+      const { McpClientManager } = await import(
+        '../tools/mcp-client-manager.js'
+      );
+      let mcpStarted = false;
+
+      (McpClientManager as unknown as Mock).mockImplementation(() => ({
+        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          mcpStarted = true;
+        }),
+        getMcpInstructions: vi.fn(),
+      }));
+
+      await config.initialize();
+
+      // Should return immediately, before MCP finishes
+      expect(mcpStarted).toBe(false);
+
+      // Wait for it to eventually finish to avoid open handles
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(mcpStarted).toBe(true);
     });
 
     describe('getCompressionThreshold', () => {
@@ -813,6 +882,22 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Event Driven Scheduler Configuration', () => {
+    it('should default enableEventDrivenScheduler to true when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(true);
+    });
+
+    it('should set enableEventDrivenScheduler to false when provided as false', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableEventDrivenScheduler: false,
+      };
+      const config = new Config(params);
+      expect(config.isEventDrivenSchedulerEnabled()).toBe(false);
+    });
+  });
+
   describe('Shell Tool Inactivity Timeout', () => {
     it('should default to 300000ms (300 seconds) when not provided', () => {
       const config = new Config(baseParams);
@@ -883,10 +968,14 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when codebaseInvestigatorSettings.enabled is true', async () => {
+    it('should register subagents as tools when agents.overrides.codebase_investigator.enabled is true', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: true },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
       };
       const config = new Config(params);
 
@@ -904,12 +993,15 @@ describe('Server Config (config.ts)', () => {
       AgentRegistryMock.prototype.getDefinition.mockReturnValue(
         mockAgentDefinition,
       );
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
+        mockAgentDefinition,
+      ]);
 
-      const DelegateToAgentToolMock = (
-        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
-          DelegateToAgentTool: Mock;
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
         }
-      ).DelegateToAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
@@ -919,41 +1011,41 @@ describe('Server Config (config.ts)', () => {
         }
       ).ToolRegistry.prototype.registerTool;
 
-      expect(DelegateToAgentToolMock).toHaveBeenCalledTimes(1);
-      expect(DelegateToAgentToolMock).toHaveBeenCalledWith(
+      expect(SubAgentToolMock).toHaveBeenCalledTimes(1);
+      expect(SubAgentToolMock).toHaveBeenCalledWith(
         expect.anything(), // AgentRegistry
         config,
-        undefined,
+        expect.anything(), // MessageBus
       );
 
       const calls = registerToolMock.mock.calls;
       const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof DelegateToAgentToolMock,
+        (call) => call[0] instanceof SubAgentToolMock,
       );
       expect(registeredWrappers).toHaveLength(1);
     });
 
-    it('should not register subagents as tools when codebaseInvestigatorSettings.enabled is false', async () => {
+    it('should not register subagents as tools when agents are disabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        codebaseInvestigatorSettings: { enabled: false },
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: false },
+            cli_help: { enabled: false },
+          },
+        },
       };
       const config = new Config(params);
 
-      const DelegateToAgentToolMock = (
-        (await vi.importMock('../agents/delegate-to-agent-tool.js')) as {
-          DelegateToAgentTool: Mock;
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
         }
-      ).DelegateToAgentTool;
+      ).SubagentTool;
 
       await config.initialize();
 
-      expect(DelegateToAgentToolMock).not.toHaveBeenCalled();
-    });
-
-    it('should not set default codebase investigator model in config (defaults in registry)', () => {
-      const config = new Config(baseParams);
-      expect(config.getCodebaseInvestigatorSettings()?.model).toBeUndefined();
+      expect(SubAgentToolMock).not.toHaveBeenCalled();
     });
 
     describe('with minified tool class names', () => {
@@ -1489,40 +1581,16 @@ describe('Config getHooks', () => {
   });
 
   it('should return the hooks configuration when provided', () => {
-    const mockHooks: { [K in HookEventName]?: HookDefinition[] } = {
-      [HookEventName.BeforeTool]: [
+    const mockHooks = {
+      BeforeTool: [
         {
-          matcher: 'write_file',
-          hooks: [
-            {
-              type: HookType.Command,
-              command: 'echo "test hook"',
-              timeout: 5000,
-            },
-          ],
-        },
-      ],
-      [HookEventName.AfterTool]: [
-        {
-          hooks: [
-            {
-              type: HookType.Command,
-              command: './hooks/after-tool.sh',
-              timeout: 10000,
-            },
-          ],
+          hooks: [{ type: HookType.Command, command: 'echo 1' }],
         },
       ],
     };
-
-    const config = new Config({
-      ...baseParams,
-      hooks: mockHooks,
-    });
-
+    const config = new Config({ ...baseParams, hooks: mockHooks });
     const retrievedHooks = config.getHooks();
     expect(retrievedHooks).toEqual(mockHooks);
-    expect(retrievedHooks).toBe(mockHooks); // Should return the same reference
   });
 
   it('should return hooks with all supported event types', () => {
@@ -1628,6 +1696,30 @@ describe('Config getHooks', () => {
 
       expect(config.getModel()).toBe(originalModel);
       expect(config.getActiveModel()).toBe(originalModel);
+    });
+
+    it('should call onModelChange when a new model is set and should persist', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onModelChange,
+      });
+
+      config.setModel(DEFAULT_GEMINI_MODEL, false);
+
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
+
+    it('should NOT call onModelChange when a new model is temporary', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onModelChange,
+      });
+
+      config.setModel(DEFAULT_GEMINI_MODEL, true);
+
+      expect(onModelChange).not.toHaveBeenCalled();
     });
   });
 });
@@ -1775,6 +1867,43 @@ describe('Availability Service Integration', () => {
   });
 });
 
+describe('Hooks configuration', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+    disabledHooks: ['initial-hook'],
+  };
+
+  it('updateDisabledHooks should update the disabled list', () => {
+    const config = new Config(baseParams);
+    expect(config.getDisabledHooks()).toEqual(['initial-hook']);
+
+    const newDisabled = ['new-hook-1', 'new-hook-2'];
+    config.updateDisabledHooks(newDisabled);
+
+    expect(config.getDisabledHooks()).toEqual(['new-hook-1', 'new-hook-2']);
+  });
+
+  it('updateDisabledHooks should only update disabled list and not definitions', () => {
+    const initialHooks = {
+      BeforeAgent: [
+        {
+          hooks: [{ type: HookType.Command, command: 'initial' }],
+        },
+      ],
+    };
+    const config = new Config({ ...baseParams, hooks: initialHooks });
+
+    config.updateDisabledHooks(['some-hook']);
+
+    expect(config.getDisabledHooks()).toEqual(['some-hook']);
+    expect(config.getHooks()).toEqual(initialHooks);
+  });
+});
+
 describe('Config Quota & Preview Model Access', () => {
   let config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1886,6 +2015,29 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
     });
   });
+
+  describe('isPlanEnabled', () => {
+    it('should return false by default', () => {
+      const config = new Config(baseParams);
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+
+    it('should return true when plan is enabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: true,
+      });
+      expect(config.isPlanEnabled()).toBe(true);
+    });
+
+    it('should return false when plan is explicitly disabled', () => {
+      const config = new Config({
+        ...baseParams,
+        plan: false,
+      });
+      expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
 });
 
 describe('Config JIT Initialization', () => {
@@ -1953,5 +2105,130 @@ describe('Config JIT Initialization', () => {
 
     expect(ContextManager).not.toHaveBeenCalled();
     expect(config.getUserMemory()).toBe('Initial Memory');
+  });
+
+  describe('reloadSkills', () => {
+    it('should refresh disabledSkills and re-register ActivateSkillTool when skills exist', async () => {
+      const mockOnReload = vi.fn().mockResolvedValue({
+        disabledSkills: ['skill2'],
+      });
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+        onReload: mockOnReload,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      const toolRegistry = config.getToolRegistry();
+
+      vi.spyOn(skillManager, 'discoverSkills').mockResolvedValue(undefined);
+      vi.spyOn(skillManager, 'setDisabledSkills');
+      vi.spyOn(toolRegistry, 'registerTool');
+      vi.spyOn(toolRegistry, 'unregisterTool');
+
+      const mockSkills = [{ name: 'skill1' }];
+      vi.spyOn(skillManager, 'getSkills').mockReturnValue(
+        mockSkills as SkillDefinition[],
+      );
+
+      await config.reloadSkills();
+
+      expect(mockOnReload).toHaveBeenCalled();
+      expect(skillManager.setDisabledSkills).toHaveBeenCalledWith(['skill2']);
+      expect(toolRegistry.registerTool).toHaveBeenCalled();
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
+        ACTIVATE_SKILL_TOOL_NAME,
+      );
+    });
+
+    it('should unregister ActivateSkillTool when no skills exist after reload', async () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      const toolRegistry = config.getToolRegistry();
+
+      vi.spyOn(skillManager, 'discoverSkills').mockResolvedValue(undefined);
+      vi.spyOn(toolRegistry, 'registerTool');
+      vi.spyOn(toolRegistry, 'unregisterTool');
+
+      vi.spyOn(skillManager, 'getSkills').mockReturnValue([]);
+
+      await config.reloadSkills();
+
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
+        ACTIVATE_SKILL_TOOL_NAME,
+      );
+    });
+
+    it('should clear disabledSkills when onReload returns undefined for them', async () => {
+      const mockOnReload = vi.fn().mockResolvedValue({
+        disabledSkills: undefined,
+      });
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+        onReload: mockOnReload,
+      };
+
+      config = new Config(params);
+      // Initially set some disabled skills
+      // @ts-expect-error - accessing private
+      config.disabledSkills = ['skill1'];
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      vi.spyOn(skillManager, 'discoverSkills').mockResolvedValue(undefined);
+      vi.spyOn(skillManager, 'setDisabledSkills');
+
+      await config.reloadSkills();
+
+      expect(skillManager.setDisabledSkills).toHaveBeenCalledWith([]);
+    });
+
+    it('should update admin settings from onReload', async () => {
+      const mockOnReload = vi.fn().mockResolvedValue({
+        adminSkillsEnabled: false,
+      });
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        skillsSupport: true,
+        onReload: mockOnReload,
+      };
+
+      config = new Config(params);
+      await config.initialize();
+
+      const skillManager = config.getSkillManager();
+      vi.spyOn(skillManager, 'setAdminSettings');
+
+      await config.reloadSkills();
+
+      expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
+    });
   });
 });

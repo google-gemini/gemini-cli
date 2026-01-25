@@ -42,6 +42,15 @@ vi.mock('node:os', () => ({
   platform: mocks.platform,
 }));
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: mocks.homedir,
+  };
+});
+
 vi.mock('./terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
     isKittyProtocolEnabled: vi.fn().mockReturnValue(false),
@@ -49,11 +58,12 @@ vi.mock('./terminalCapabilityManager.js', () => ({
 }));
 
 describe('terminalSetup', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...originalEnv };
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('VSCODE_GIT_IPC_HANDLE', '');
 
     // Default mocks
     mocks.homedir.mockReturnValue('/home/user');
@@ -64,7 +74,7 @@ describe('terminalSetup', () => {
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   describe('detectTerminal', () => {

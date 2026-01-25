@@ -75,9 +75,10 @@ describe('editor utils', () => {
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
+      { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -179,8 +180,8 @@ describe('editor utils', () => {
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
     ];
 
@@ -310,11 +311,26 @@ describe('editor utils', () => {
       });
     }
 
-    it('should return the correct command for emacs', () => {
-      const command = getDiffCommand('old.txt', 'new.txt', 'emacs');
+    it('should return the correct command for emacs with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacs',
+      );
       expect(command).toEqual({
         command: 'emacs',
-        args: ['--eval', '(ediff "old.txt" "new.txt")'],
+        args: [
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
+      });
+    });
+
+    it('should return the correct command for helix', () => {
+      const command = getDiffCommand('old.txt', 'new.txt', 'hx');
+      expect(command).toEqual({
+        command: 'hx',
+        args: ['--vsplit', '--', 'old.txt', 'new.txt'],
       });
     });
 
@@ -385,7 +401,7 @@ describe('editor utils', () => {
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
@@ -441,6 +457,15 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('neovim')).toBe(true);
     });
 
+    it('should allow hx in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('hx')).toBe(true);
+    });
+
+    it('should allow hx when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('hx')).toBe(true);
+    });
+
     const guiEditors: EditorType[] = [
       'vscode',
       'vscodium',
@@ -455,6 +480,7 @@ describe('editor utils', () => {
       });
 
       it(`should allow ${editor} when not in sandbox mode`, () => {
+        vi.stubEnv('SANDBOX', '');
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
       });
     }
@@ -475,6 +501,7 @@ describe('editor utils', () => {
 
     it('should return true for vscode when installed and not in sandbox mode', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+      vi.stubEnv('SANDBOX', '');
       expect(isEditorAvailable('vscode')).toBe(true);
     });
 
@@ -501,6 +528,12 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/emacs'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('emacs')).toBe(true);
+    });
+
+    it('should return true for hx when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/hx'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('hx')).toBe(true);
     });
 
     it('should return true for neovim when installed and in sandbox mode', () => {

@@ -5,7 +5,6 @@
  */
 
 import type {
-  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
@@ -16,9 +15,7 @@ import type {
 import type {
   ToolCallConfirmationDetails,
   ToolResult,
-  ToolResultDisplay,
 } from '../tools/tools.js';
-import type { ToolErrorType } from '../tools/tool-error.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
@@ -33,7 +30,11 @@ import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 
-// Define a structure for tools passed to the server
+import {
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+} from '../scheduler/types.js';
+
 export interface ServerTool {
   name: string;
   schema: FunctionDeclaration;
@@ -65,10 +66,30 @@ export enum GeminiEventType {
   ContextWindowWillOverflow = 'context_window_will_overflow',
   InvalidStream = 'invalid_stream',
   ModelInfo = 'model_info',
+  AgentExecutionStopped = 'agent_execution_stopped',
+  AgentExecutionBlocked = 'agent_execution_blocked',
 }
 
 export type ServerGeminiRetryEvent = {
   type: GeminiEventType.Retry;
+};
+
+export type ServerGeminiAgentExecutionStoppedEvent = {
+  type: GeminiEventType.AgentExecutionStopped;
+  value: {
+    reason: string;
+    systemMessage?: string;
+    contextCleared?: boolean;
+  };
+};
+
+export type ServerGeminiAgentExecutionBlockedEvent = {
+  type: GeminiEventType.AgentExecutionBlocked;
+  value: {
+    reason: string;
+    systemMessage?: string;
+    contextCleared?: boolean;
+  };
 };
 
 export type ServerGeminiContextWindowWillOverflowEvent = {
@@ -100,26 +121,6 @@ export interface GeminiErrorEventValue {
 export interface GeminiFinishedEventValue {
   reason: FinishReason | undefined;
   usageMetadata: GenerateContentResponseUsageMetadata | undefined;
-}
-
-export interface ToolCallRequestInfo {
-  callId: string;
-  name: string;
-  args: Record<string, unknown>;
-  isClientInitiated: boolean;
-  prompt_id: string;
-  checkpoint?: string;
-  traceId?: string;
-}
-
-export interface ToolCallResponseInfo {
-  callId: string;
-  responseParts: Part[];
-  resultDisplay: ToolResultDisplay | undefined;
-  error: Error | undefined;
-  errorType: ToolErrorType | undefined;
-  outputFile?: string | undefined;
-  contentLength?: number;
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -173,6 +174,9 @@ export enum CompressionStatus {
   /** The compression failed due to an error counting tokens */
   COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
 
+  /** The compression failed because the summary was empty */
+  COMPRESSION_FAILED_EMPTY_SUMMARY,
+
   /** The compression was not necessary and no action was taken */
   NOOP,
 }
@@ -223,7 +227,9 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiRetryEvent
   | ServerGeminiContextWindowWillOverflowEvent
   | ServerGeminiInvalidStreamEvent
-  | ServerGeminiModelInfoEvent;
+  | ServerGeminiModelInfoEvent
+  | ServerGeminiAgentExecutionStoppedEvent
+  | ServerGeminiAgentExecutionBlockedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
@@ -265,6 +271,22 @@ export class Turn {
           continue; // Skip to the next event in the stream
         }
 
+        if (streamEvent.type === 'agent_execution_stopped') {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: { reason: streamEvent.reason },
+          };
+          return;
+        }
+
+        if (streamEvent.type === 'agent_execution_blocked') {
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: { reason: streamEvent.reason },
+          };
+          continue;
+        }
+
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
@@ -273,15 +295,16 @@ export class Turn {
 
         const traceId = resp.responseId;
 
-        const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
-        if (thoughtPart?.thought) {
-          const thought = parseThought(thoughtPart.text ?? '');
-          yield {
-            type: GeminiEventType.Thought,
-            value: thought,
-            traceId,
-          };
-          continue;
+        const parts = resp.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          if (part.thought) {
+            const thought = parseThought(part.text ?? '');
+            yield {
+              type: GeminiEventType.Thought,
+              value: thought,
+              traceId,
+            };
+          }
         }
 
         const text = getResponseText(resp);
