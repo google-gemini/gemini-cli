@@ -1,0 +1,95 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
+import type { PartUnion } from '@google/genai';
+// eslint-disable-next-line import/no-internal-modules
+import mime from 'mime/lite';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { createRequire as createModuleRequire } from 'node:module';
+import { debugLogger } from './debugLogger.js';
+
+const IMAGE_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]);
+
+const requireModule = createModuleRequire(import.meta.url);
+
+export async function readWasmBinaryFromDisk(
+  specifier: string,
+): Promise<Uint8Array> {
+  const resolvedPath = requireModule.resolve(specifier);
+  const buffer = await fsPromises.readFile(resolvedPath);
+  return new Uint8Array(buffer);
+}
+
+export async function loadWasmBinary(
+  dynamicImport: () => Promise<{ default: Uint8Array }>,
+  fallbackSpecifier: string,
+): Promise<Uint8Array> {
+  try {
+    const module = await dynamicImport();
+    if (module?.default instanceof Uint8Array) {
+      return module.default;
+    }
+  } catch (error) {
+    try {
+      return await readWasmBinaryFromDisk(fallbackSpecifier);
+    } catch {
+      throw error;
+    }
+  }
+
+  try {
+    return await readWasmBinaryFromDisk(fallbackSpecifier);
+  } catch {
+    throw new Error(`Failed to load wasm binary from ${fallbackSpecifier}`);
+  }
+}
+
+/**
+ * Returns the specific mime type for a file path.
+ */
+export function getSpecificMimeType(filePath: string): string | null {
+  return mime.getType(filePath);
+}
+
+/**
+ * Checks if a mime type is an image.
+ */
+export function isImageMimeType(mimeType: string | null): boolean {
+  return !!mimeType && IMAGE_MIME_TYPES.has(mimeType);
+}
+
+/**
+ * Processes a single file content, returning a string or a multimodal part.
+ */
+export async function processSingleFileContent(
+  filePath: string,
+  content: string | Buffer,
+  mimeType: string | null,
+): Promise<PartUnion> {
+  if (isImageMimeType(mimeType)) {
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content);
+    return {
+      inlineData: {
+        data: buffer.toString('base64'),
+        mimeType: mimeType!,
+      },
+    };
+  }
+  return content.toString('utf-8');
+}
+
+// ... rest of the file logic (truncation, etc.)
