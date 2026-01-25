@@ -136,16 +136,30 @@ describe('getInstallationInfo', () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
-    const cliPath = '/usr/local/bin/gemini';
+    // Use a path that matches what brew would resolve to
+    const cliPath = '/opt/homebrew/Cellar/gemini-cli/1.0.0/bin/gemini';
     process.argv[1] = cliPath;
-    mockedRealPathSync.mockReturnValue(cliPath);
-    mockedExecSync.mockReturnValue(Buffer.from('gemini-cli')); // Simulate successful command
+
+    mockedExecSync.mockImplementation((cmd) => {
+      if (typeof cmd === 'string' && cmd.includes('brew --prefix gemini-cli')) {
+        return '/opt/homebrew/opt/gemini-cli';
+      }
+      throw new Error(`Command failed: ${cmd}`);
+    });
+
+    mockedRealPathSync.mockImplementation((p) => {
+      if (p === cliPath) return cliPath;
+      if (p === '/opt/homebrew/opt/gemini-cli') {
+        return '/opt/homebrew/Cellar/gemini-cli/1.0.0';
+      }
+      return String(p);
+    });
 
     const info = getInstallationInfo(projectRoot, true);
 
     expect(mockedExecSync).toHaveBeenCalledWith(
-      'brew list -1 | grep -q "^gemini-cli$"',
-      { stdio: 'ignore' },
+      expect.stringContaining('brew --prefix gemini-cli'),
+      expect.anything(),
     );
     expect(info.packageManager).toBe(PackageManager.HOMEBREW);
     expect(info.isGlobal).toBe(true);
@@ -168,8 +182,8 @@ describe('getInstallationInfo', () => {
     const info = getInstallationInfo(projectRoot, true);
 
     expect(mockedExecSync).toHaveBeenCalledWith(
-      'brew list -1 | grep -q "^gemini-cli$"',
-      { stdio: 'ignore' },
+      expect.stringContaining('brew --prefix gemini-cli'),
+      expect.anything(),
     );
     // Should fall back to default global npm
     expect(info.packageManager).toBe(PackageManager.NPM);
@@ -323,5 +337,40 @@ describe('getInstallationInfo', () => {
     // isAutoUpdateEnabled = false -> "Please run..."
     const infoDisabled = getInstallationInfo(projectRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run npm install');
+  });
+
+  it('should NOT detect Homebrew if gemini-cli is installed in brew but running from npm location', () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+    });
+    // Path looks like standard global NPM
+    const cliPath =
+      '/usr/local/lib/node_modules/@google/gemini-cli/dist/index.js';
+    process.argv[1] = cliPath;
+
+    // Setup mocks
+    mockedExecSync.mockImplementation((cmd) => {
+      if (typeof cmd === 'string' && cmd.includes('brew list')) {
+        return Buffer.from('gemini-cli\n');
+      }
+      // Future proofing for the fix:
+      if (typeof cmd === 'string' && cmd.includes('brew --prefix gemini-cli')) {
+        return '/opt/homebrew/opt/gemini-cli';
+      }
+      throw new Error(`Command failed: ${cmd}`);
+    });
+
+    mockedRealPathSync.mockImplementation((p) => {
+      if (p === cliPath) return cliPath;
+      // Future proofing for the fix:
+      if (p === '/opt/homebrew/opt/gemini-cli')
+        return '/opt/homebrew/Cellar/gemini-cli/1.0.0';
+      return String(p);
+    });
+
+    const info = getInstallationInfo(projectRoot, false);
+
+    expect(info.packageManager).not.toBe(PackageManager.HOMEBREW);
+    expect(info.packageManager).toBe(PackageManager.NPM);
   });
 });
