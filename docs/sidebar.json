@@ -88,7 +88,6 @@
   {
     "label": "Resources",
     "items": [
-      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
       { "label": "Release notes", "slug": "docs/changelogs/" },
@@ -100,6 +99,7 @@
   {
     "label": "Development",
     "items": [
+      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },      
       { "label": "Integration testing", "slug": "docs/integration-tests" },
       {
         "label": "Issue and PR automation",
