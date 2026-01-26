@@ -335,6 +335,7 @@ export interface ConfigParameters {
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
+  stats?: boolean;
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
@@ -476,6 +477,7 @@ export class Config {
   private readonly maxSessionTurns: number;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
+  private readonly stats: boolean;
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
   private readonly _enabledExtensions: string[];
@@ -646,6 +648,7 @@ export class Config {
       params.experimentalZedIntegration ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
+    this.stats = params.stats ?? false;
     this.listExtensions = params.listExtensions ?? false;
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
@@ -1567,6 +1570,10 @@ export class Config {
 
   getDeleteSession(): string | undefined {
     return this.deleteSession;
+  }
+
+  getStats(): boolean {
+    return this.stats;
   }
 
   getExtensionManagement(): boolean {

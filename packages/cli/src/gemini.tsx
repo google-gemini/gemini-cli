@@ -100,6 +100,64 @@ import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
 
+async function displayStats(
+  config: Config,
+  settings: LoadedSettings,
+): Promise<void> {
+  try {
+    // First, ensure we're authenticated
+    const authType = settings.merged.security.auth.selectedType;
+    if (authType) {
+      try {
+        await config.refreshAuth(authType);
+      } catch (e) {
+        writeToStderr('Authentication failed: ');
+        writeToStderr(`${e}\n`);
+        writeToStderr(
+          'Please run `gemini` without --stats to set up authentication first.\n',
+        );
+        process.exit(1);
+      }
+    }
+
+    const quota = await config.refreshUserQuota();
+    if (!quota || !quota.buckets || quota.buckets.length === 0) {
+      writeToStdout('No quota information available.\n');
+      writeToStdout(
+        'Note: Quota information is only available with Google OAuth authentication.\n',
+      );
+      writeToStdout(
+        'Try running `gemini` without --stats to set up OAuth authentication.\n',
+      );
+      return;
+    }
+
+    writeToStdout('Quota Information:\n');
+    writeToStdout('==================\n');
+
+    for (const bucket of quota.buckets) {
+      writeToStdout(`\nModel: ${bucket.modelId || 'Unknown'}\n`);
+      if (bucket.remainingAmount !== undefined) {
+        writeToStdout(`  Remaining: ${bucket.remainingAmount}\n`);
+      }
+      if (bucket.remainingFraction !== undefined) {
+        const percentage = (bucket.remainingFraction * 100).toFixed(1);
+        writeToStdout(`  Percentage: ${percentage}%\n`);
+      }
+      if (bucket.resetTime) {
+        writeToStdout(`  Reset Time: ${bucket.resetTime}\n`);
+      }
+      if (bucket.tokenType) {
+        writeToStdout(`  Token Type: ${bucket.tokenType}\n`);
+      }
+    }
+  } catch (error) {
+    writeToStderr('Error fetching quota information: ');
+    writeToStderr(`${error}\n`);
+    process.exit(1);
+  }
+}
+
 export function validateDnsResolutionOrder(
   order: string | undefined,
 ): DnsResolutionOrder {
@@ -552,6 +610,13 @@ export async function main() {
     const sessionToDelete = config.getDeleteSession();
     if (sessionToDelete) {
       await deleteSession(config, sessionToDelete);
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
+    // Handle --stats flag
+    if (config.getStats?.()) {
+      await displayStats(config, settings);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     }
