@@ -91,7 +91,7 @@ jobs:
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
       - name: 'Download Logs'
-        uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
+        uses: 'actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131' # ratchet:actions/download-artifact@v4
         with:
           path: 'artifacts'
 
