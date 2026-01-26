@@ -57,7 +57,9 @@ vi.mock('fs', async (importOriginal) => {
 
   return {
     ...actualFs,
-    mkdirSync: vi.fn(),
+    mkdirSync: vi.fn((p) => {
+      mockPaths.add(p.toString());
+    }),
     writeFileSync: vi.fn(),
     existsSync: vi.fn((p) => mockPaths.has(p.toString())),
     statSync: vi.fn((p) => {

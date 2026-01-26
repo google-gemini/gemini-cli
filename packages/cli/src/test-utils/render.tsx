@@ -16,7 +16,6 @@ import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
-import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
@@ -36,6 +35,11 @@ export const persistentStateMock = new FakePersistentState();
 
 vi.mock('../utils/persistentState.js', () => ({
   persistentState: persistentStateMock,
+}));
+
+vi.mock('../ui/utils/terminalUtils.js', () => ({
+  isLowColorDepth: vi.fn(() => false),
+  getColorDepth: vi.fn(() => 24),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -147,7 +151,6 @@ export const createMockSettings = (
 const baseMockUiState = {
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
-  mainAreaWidth: 100,
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
@@ -198,6 +201,7 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
+  handleNewAgentsSelect: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -268,7 +272,7 @@ export const renderWithProviders = (
     });
   }
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
+  const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
     ...baseState,
