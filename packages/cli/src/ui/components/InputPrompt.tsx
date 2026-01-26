@@ -49,7 +49,7 @@ import {
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
-import { resolveColor } from '../themes/color-utils.js';
+import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -1051,17 +1051,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       return true;
     }
     if (isLowColor) {
-      const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
-      if (
-        resolvedTerminalBg !== 'black' &&
-        resolvedTerminalBg !== '#000000' &&
-        resolvedTerminalBg !== '#000' &&
-        resolvedTerminalBg !== 'white' &&
-        resolvedTerminalBg !== '#ffffff' &&
-        resolvedTerminalBg !== '#fff'
-      ) {
-        return true;
-      }
+      return !getSafeLowColorBackground(terminalBg);
     }
     return false;
   }, [useBackgroundColor, isLowColor, terminalBg]);

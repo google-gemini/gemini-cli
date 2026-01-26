@@ -8,7 +8,11 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import { interpolateColor, resolveColor } from '../../themes/color-utils.js';
+import {
+  interpolateColor,
+  resolveColor,
+  getSafeLowColorBackground,
+} from '../../themes/color-utils.js';
 import { isLowColorDepth } from '../../utils/terminalUtils.js';
 
 export interface HalfLinePaddedBoxProps {
@@ -34,10 +38,17 @@ export interface HalfLinePaddedBoxProps {
  * A container component that renders a solid background with half-line padding
  * at the top and bottom using block characters (▀/▄).
  */
-export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = ({
+export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = (props) => {
+  if (props.useBackgroundColor === false) {
+    return <>{props.children}</>;
+  }
+
+  return <HalfLinePaddedBoxInternal {...props} />;
+};
+
+const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   backgroundBaseColor,
   backgroundOpacity,
-  useBackgroundColor = true,
   children,
 }) => {
   const { terminalWidth, terminalBackgroundColor } = useUIState();
@@ -46,28 +57,9 @@ export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = ({
   const isLowColor = isLowColorDepth();
 
   const backgroundColor = useMemo(() => {
-    if (!useBackgroundColor) {
-      return undefined;
-    }
-
     // Interpolated background colors often look bad in 256-color terminals
     if (isLowColor) {
-      const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
-      if (
-        resolvedTerminalBg === 'black' ||
-        resolvedTerminalBg === '#000000' ||
-        resolvedTerminalBg === '#000'
-      ) {
-        return '#1c1c1c';
-      }
-      if (
-        resolvedTerminalBg === 'white' ||
-        resolvedTerminalBg === '#ffffff' ||
-        resolvedTerminalBg === '#fff'
-      ) {
-        return '#eeeeee';
-      }
-      return undefined;
+      return getSafeLowColorBackground(terminalBg);
     }
 
     const resolvedBase =
@@ -79,13 +71,7 @@ export const HalfLinePaddedBox: React.FC<HalfLinePaddedBoxProps> = ({
       resolvedBase,
       backgroundOpacity,
     );
-  }, [
-    useBackgroundColor,
-    backgroundBaseColor,
-    backgroundOpacity,
-    terminalBg,
-    isLowColor,
-  ]);
+  }, [backgroundBaseColor, backgroundOpacity, terminalBg, isLowColor]);
 
   if (!backgroundColor) {
     return <>{children}</>;
