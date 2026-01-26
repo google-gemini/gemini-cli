@@ -64,11 +64,6 @@ decision = "allow"
 priority = 50
 modes = ["plan"]
 
-[[rule]]
-toolName = "SubagentInvocation"
-decision = "allow"
-priority = 50
-
 # Allow write_file for .md files in plans directory
 [[rule]]
 toolName = "write_file"
