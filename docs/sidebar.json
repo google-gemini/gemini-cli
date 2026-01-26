@@ -87,7 +87,7 @@
   {
     "label": "Resources",
     "items": [
-      { "label": "Contribution guide", "slug": "docs/contributing" },
+      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
       { "label": "Release notes", "slug": "docs/changelogs/" },
