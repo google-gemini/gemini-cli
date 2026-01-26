@@ -34,9 +34,6 @@ topics on:
     list of supported locations, see the following pages:
     - Gemini Code Assist for individuals:
       [Available locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
-    - Google AI Pro and Ultra where Gemini Code Assist (and Gemini CLI) is also
-      available:
-      [Available locations](https://developers.google.com/gemini-code-assist/resources/locations-pro-ultra)
 
 - **Error: `Failed to login. Message: Request contains an invalid argument`**
   - **Cause:** Users with Google Workspace accounts or Google Cloud accounts
