@@ -113,9 +113,6 @@ export interface LogResponse {
 export interface LogEventEntry {
   event_time_ms: number;
   source_extension_json: string;
-  exp?: {
-    gws_experiment: number[];
-  };
 }
 
 export interface EventValue {
@@ -289,7 +286,7 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
-  enqueueHelper(event: LogEvent, experimentIds?: number[]): void {
+  enqueueHelper(event: LogEvent): void {
     // Manually handle overflow for FixedDeque, which throws when full.
     const wasAtCapacity = this.events.size >= MAX_EVENTS;
 
@@ -297,18 +294,12 @@ export class ClearcutLogger {
       this.events.shift(); // Evict oldest element to make space.
     }
 
-    const logEventEntry: LogEventEntry = {
-      event_time_ms: Date.now(),
-      source_extension_json: safeJsonStringify(event),
-    };
-
-    if (experimentIds !== undefined) {
-      logEventEntry.exp = {
-        gws_experiment: experimentIds,
-      };
-    }
-
-    this.events.push([logEventEntry]);
+    this.events.push([
+      {
+        event_time_ms: Date.now(),
+        source_extension_json: safeJsonStringify(event),
+      },
+    ]);
 
     if (wasAtCapacity && this.config?.getDebugMode()) {
       debugLogger.debug(
@@ -343,7 +334,7 @@ export class ClearcutLogger {
           event.event_metadata = [[...event.event_metadata[0], ...exp_id_data]];
         }
 
-        this.enqueueHelper(event, experiments?.experimentIds);
+        this.enqueueHelper(event);
       });
     } catch (error) {
       debugLogger.warn('ClearcutLogger: Failed to enqueue log event.', error);
