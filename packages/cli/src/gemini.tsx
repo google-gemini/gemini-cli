@@ -615,7 +615,7 @@ export async function main() {
     }
 
     // Handle --stats flag
-    if (config.getStats?.()) {
+    if (config.getStats()) {
       await displayStats(config, settings);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
