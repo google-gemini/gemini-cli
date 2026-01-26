@@ -350,17 +350,35 @@ export class LoadedSettings {
     const admin: Settings['admin'] = {};
     const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
-    if (secureModeEnabled !== undefined) {
+    if (Object.keys(remoteSettings).length === 0) {
+      this._remoteAdminSettings = { admin };
+      this._merged = this.computeMergedSettings();
+      return;
+    }
+
+    if (secureModeEnabled === undefined) {
+      admin.secureModeEnabled = false;
+    } else {
       admin.secureModeEnabled = secureModeEnabled;
     }
 
-    if (mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: mcpSetting.mcpEnabled };
+    if (mcpSetting) {
+      // Default proto values are sent as undefined, so we need to set them to false explicitly.
+      if (mcpSetting.mcpEnabled === undefined) {
+        admin.mcp = { enabled: false };
+      } else {
+        admin.mcp = { enabled: mcpSetting.mcpEnabled };
+      }
     }
 
     const extensionsSetting = cliFeatureSetting?.extensionsSetting;
-    if (extensionsSetting?.extensionsEnabled !== undefined) {
-      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
+    if (extensionsSetting) {
+      // Default proto values are sent as undefined, so we need to set them to false explicitly.
+      if (extensionsSetting.extensionsEnabled === undefined) {
+        admin.extensions = { enabled: false };
+      } else {
+        admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
+      }
     }
 
     if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
