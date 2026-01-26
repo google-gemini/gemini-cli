@@ -46,10 +46,9 @@ describe('getPackageJson', () => {
     expect(result).toEqual(mockPackageJson);
   });
 
-  it('should return undefined when readPackageUp throws', async () => {
+  it('should propagate errors when readPackageUp throws', async () => {
     vi.mocked(readPackageUp).mockRejectedValue(new Error('Read error'));
 
-    const result = await getPackageJson('/some/path');
-    expect(result).toBeUndefined();
+    await expect(getPackageJson('/some/path')).rejects.toThrow('Read error');
   });
 });
