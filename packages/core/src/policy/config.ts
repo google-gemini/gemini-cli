@@ -130,7 +130,6 @@ async function filterSecurePolicyDirectories(
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
           const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
-          debugLogger.warn(msg);
           coreEvents.emitFeedback('warning', msg);
           return null;
         }
