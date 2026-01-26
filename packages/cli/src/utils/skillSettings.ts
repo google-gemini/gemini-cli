@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SettingScope, type LoadedSettings } from '../config/settings.js';
+import type { SettingScope, LoadedSettings } from '../config/settings.js';
 
 import {
   type FeatureActionResult,
@@ -63,10 +63,14 @@ export function enableSkill(
   settings: LoadedSettings,
   skillName: string,
 ): SkillActionResult {
-  const result = enableFeature(settings, skillName, skillStrategy);
+  const { featureName, ...rest } = enableFeature(
+    settings,
+    skillName,
+    skillStrategy,
+  );
   return {
-    ...result,
-    skillName: result.featureName,
+    ...rest,
+    skillName: featureName,
   };
 }
 
@@ -78,9 +82,14 @@ export function disableSkill(
   skillName: string,
   scope: SettingScope,
 ): SkillActionResult {
-  const result = disableFeature(settings, skillName, scope, skillStrategy);
+  const { featureName, ...rest } = disableFeature(
+    settings,
+    skillName,
+    scope,
+    skillStrategy,
+  );
   return {
-    ...result,
-    skillName: result.featureName,
+    ...rest,
+    skillName: featureName,
   };
 }

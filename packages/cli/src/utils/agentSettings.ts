@@ -47,10 +47,14 @@ export function enableAgent(
   settings: LoadedSettings,
   agentName: string,
 ): AgentActionResult {
-  const result = enableFeature(settings, agentName, agentStrategy);
+  const { featureName, ...rest } = enableFeature(
+    settings,
+    agentName,
+    agentStrategy,
+  );
   return {
-    ...result,
-    agentName: result.featureName,
+    ...rest,
+    agentName: featureName,
   };
 }
 
@@ -62,9 +66,14 @@ export function disableAgent(
   agentName: string,
   scope: SettingScope,
 ): AgentActionResult {
-  const result = disableFeature(settings, agentName, scope, agentStrategy);
+  const { featureName, ...rest } = disableFeature(
+    settings,
+    agentName,
+    scope,
+    agentStrategy,
+  );
   return {
-    ...result,
-    agentName: result.featureName,
+    ...rest,
+    agentName: featureName,
   };
 }
