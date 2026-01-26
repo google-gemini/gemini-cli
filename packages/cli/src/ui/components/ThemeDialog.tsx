@@ -289,9 +289,20 @@ export function ThemeDialog({
                 };
 
                 if (item.themeNameDisplay && item.themeTypeDisplay) {
+                  const match = item.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode = item.themeNameDisplay;
+                  if (match) {
+                    themeNamePart = (
+                      <>
+                        {match[1]}{' '}
+                        <Text color={theme.text.secondary}>({match[2]})</Text>
+                      </>
+                    );
+                  }
+
                   return (
                     <Text color={titleColor} wrap="truncate" key={item.key}>
-                      {item.themeNameDisplay}{' '}
+                      {themeNamePart}{' '}
                       <Text color={theme.text.secondary}>
                         {item.themeTypeDisplay}
                       </Text>

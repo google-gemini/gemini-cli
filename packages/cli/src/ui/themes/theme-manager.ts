@@ -128,7 +128,7 @@ class ThemeManager {
     );
 
     for (const customThemeConfig of customThemes) {
-      const namespacedName = `${extensionName}: ${customThemeConfig.name}`;
+      const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
       // Check for collisions with built-in themes (unlikely with prefix, but safe)
       if (this.availableThemes.some((t) => t.name === namespacedName)) {
@@ -182,7 +182,7 @@ class ThemeManager {
     }
 
     for (const theme of customThemes) {
-      const namespacedName = `${extensionName}: ${theme.name}`;
+      const namespacedName = `${theme.name} (${extensionName})`;
       this.extensionThemes.delete(namespacedName);
       debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
@@ -221,6 +221,15 @@ class ThemeManager {
         [...this.fileThemes.values()].includes(this.activeTheme);
 
       if (isBuiltIn || isCustom) {
+        return this.activeTheme;
+      }
+
+      // If the theme object is no longer valid, try to find it again by name.
+      // This handles the case where extensions are reloaded and theme objects
+      // are re-created.
+      const reloadedTheme = this.findThemeByName(this.activeTheme.name);
+      if (reloadedTheme) {
+        this.activeTheme = reloadedTheme;
         return this.activeTheme;
       }
     }

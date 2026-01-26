@@ -22,35 +22,20 @@ export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
 export interface ColorsTheme {
   type: ThemeType;
-
   Background: string;
-
   Foreground: string;
-
   LightBlue: string;
-
   AccentBlue: string;
-
   AccentPurple: string;
-
   AccentCyan: string;
-
   AccentGreen: string;
-
   AccentYellow: string;
-
   AccentRed: string;
-
   DiffAdded: string;
-
   DiffRemoved: string;
-
   Comment: string;
-
   Gray: string;
-
   DarkGray: string;
-
   GradientColors?: string[];
 }
 
