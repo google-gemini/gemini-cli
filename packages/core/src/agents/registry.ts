@@ -139,8 +139,15 @@ export class AgentRegistry {
       const agentsToRegister: AgentDefinition[] = [];
 
       for (const agent of projectAgents.agents) {
-        // If it's a remote agent, we might not have a hash, or we handle it differently.
-        // For now, assuming project agents are primarily local .md files with hashes.
+        // If it's a remote agent, use the agentCardUrl as the hash.
+        // This allows multiple remote agents in a single file to be tracked independently.
+        if (agent.kind === 'remote') {
+          if (!agent.metadata) {
+            agent.metadata = {};
+          }
+          agent.metadata.hash = agent.agentCardUrl;
+        }
+
         if (!agent.metadata?.hash) {
           agentsToRegister.push(agent);
           continue;
