@@ -99,7 +99,7 @@
   {
     "label": "Development",
     "items": [
-      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },      
+      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },
       { "label": "Integration testing", "slug": "docs/integration-tests" },
       {
         "label": "Issue and PR automation",
