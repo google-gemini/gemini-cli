@@ -74,33 +74,22 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
     ];
   }
 
-  let localUser: string | undefined;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-    localUser = require('node:child_process')
-      .execSync('git config user.name', { encoding: 'utf-8' })
-      .trim();
-  } catch {
-    // localUser will be undefined, and isOwner will be false.
-  }
-
-  const isOwner =
-    repoInfo.owner &&
-    localUser &&
-    repoInfo.owner.toLowerCase() === localUser.toLowerCase();
-
+  const UpstreamRepo = 'google-gemini/gemini-cli';
+  const isUpstream =
+    `${repoInfo.owner}/${repoInfo.repo}`.toLowerCase() === UpstreamRepo;
   const isSafeRepo =
     isValidGitHubOwner(repoInfo.owner) && isValidGitHubRepoName(repoInfo.repo);
 
-  // Only push the URL if the fork exists and isn’t upstream
-  if (isOwner && isSafeRepo) {
+  // Only push the secrets URL if we are NOT in the upstream repo and the name is valid
+  if (!isUpstream && isSafeRepo) {
     urlsToOpen.push(
       `https://github.com/${repoInfo.owner}/${repoInfo.repo}/settings/secrets/actions`,
     );
   } else {
+    // Skip secrets page if in upstream repo or invalid names
     return [
       `${openCmd} "${readmeUrl}"`,
-      `echo "\nℹ️  Gemini CLI: Secrets page skipped. If this is a fork, ensure origin points to your fork and repository names are valid."`,
+      `echo "\nℹ️  Gemini CLI: Secrets page skipped. (You are in the upstream repo or the repo info is invalid)."`,
     ];
   }
 
