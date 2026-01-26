@@ -9,6 +9,7 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -131,8 +132,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
 
-  // Track escape key timestamps for double-escape detection (shared across modes)
-  const escapeHistoryRef = useRef<number[]>([]);
+  // Track last escape timestamp for double-escape detection
+  const lastEscapeTimestampRef = useRef<number>(0);
 
   // Sync vim mode from context to local state
   useEffect(() => {
@@ -154,23 +155,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [state.count],
   );
 
-  /**
-   * Checks if double-escape was pressed within timeout window.
-   * Used to clear input buffer quickly in both INSERT and NORMAL modes.
-   * @returns true if double-escape detected, false otherwise
-   */
+  // Returns true if two escapes occurred within DOUBLE_ESCAPE_TIMEOUT_MS.
   const checkDoubleEscape = useCallback((): boolean => {
     const now = Date.now();
-    escapeHistoryRef.current.push(now);
+    const lastEscape = lastEscapeTimestampRef.current;
+    lastEscapeTimestampRef.current = now;
 
-    // Keep only escapes within timeout window
-    escapeHistoryRef.current = escapeHistoryRef.current.filter(
-      (timestamp) => now - timestamp <= DOUBLE_ESCAPE_TIMEOUT_MS,
-    );
-
-    // Check if we have 2+ escapes within timeout
-    if (escapeHistoryRef.current.length >= 2) {
-      escapeHistoryRef.current = [];
+    if (now - lastEscape <= DOUBLE_ESCAPE_TIMEOUT_MS) {
+      lastEscapeTimestampRef.current = 0;
       return true;
     }
     return false;
@@ -273,15 +265,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
    */
   const handleInsertModeInput = useCallback(
     (normalizedKey: Key): boolean => {
-      // Handle escape key
-      if (normalizedKey.name === 'escape') {
-        // Record escape timestamp for double-escape detection.
-        // Double-escape clearing is handled in NORMAL mode since the first
-        // escape switches to NORMAL, so the second escape is processed there.
+      if (keyMatchers[Command.ESCAPE](normalizedKey)) {
+        // Record for double-escape detection (clearing happens in NORMAL mode)
         checkDoubleEscape();
-
-        // Switch to NORMAL mode
-        // Vim behavior: move cursor left when exiting insert mode (unless at beginning of line)
         buffer.vimEscapeInsertMode();
         dispatch({ type: 'ESCAPE_TO_NORMAL' });
         updateMode('NORMAL');
@@ -434,7 +420,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       }
 
       // Let InputPrompt handle Ctrl+C for clearing input (works in all modes)
-      if (normalizedKey.ctrl && normalizedKey.name === 'c') {
+      if (keyMatchers[Command.CLEAR_INPUT](normalizedKey)) {
         return false;
       }
 
@@ -445,11 +431,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        // Handle escape key in NORMAL mode
-        if (normalizedKey.name === 'escape') {
+        if (keyMatchers[Command.ESCAPE](normalizedKey)) {
           if (state.pendingOperator) {
             dispatch({ type: 'CLEAR_PENDING_STATES' });
-            escapeHistoryRef.current = []; // Clear escape history when clearing operator
+            lastEscapeTimestampRef.current = 0;
             return true; // Handled by vim
           }
 
