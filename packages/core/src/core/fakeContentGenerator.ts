@@ -42,6 +42,7 @@ export type FakeResponse =
 export class FakeContentGenerator implements ContentGenerator {
   private callCounter = 0;
   userTier?: UserTierId;
+  userTierName?: string;
 
   constructor(private readonly responses: FakeResponse[]) {}
 

@@ -50,14 +50,34 @@
     ]
   },
   {
+    "label": "Extensions",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/extensions"
+      },
+      {
+        "label": "Writing extensions",
+        "slug": "docs/extensions/writing-extensions"
+      },
+      {
+        "label": "Extensions reference",
+        "slug": "docs/extensions/reference"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/extensions/best-practices"
+      },
+      {
+        "label": "Extensions releasing",
+        "slug": "docs/extensions/releasing"
+      }
+    ]
+  },  
+  {
     "label": "Ecosystem and extensibility",
     "items": [
       { "label": "Agent skills (experimental)", "slug": "docs/cli/skills" },
-      { "label": "Extensions", "slug": "docs/extensions" },
-      {
-        "label": "Extension releasing",
-        "slug": "docs/extensions/extension-releasing"
-      },
       { "label": "Hooks (experimental)", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }

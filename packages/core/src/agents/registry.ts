@@ -5,7 +5,7 @@
  */
 
 import { Storage } from '../config/storage.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
@@ -21,7 +21,6 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -75,6 +74,23 @@ export class AgentRegistry {
   }
 
   /**
+   * Acknowledges and registers a previously unacknowledged agent.
+   */
+  async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
+    const ackService = this.config.getAcknowledgedAgentsService();
+    const projectRoot = this.config.getProjectRoot();
+    if (agent.metadata?.hash) {
+      await ackService.acknowledge(
+        projectRoot,
+        agent.name,
+        agent.metadata.hash,
+      );
+      await this.registerAgent(agent);
+      coreEvents.emitAgentsRefreshed();
+    }
+  }
+
+  /**
    * Disposes of resources and removes event listeners.
    */
   dispose(): void {
@@ -116,8 +132,46 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
+
+      const ackService = this.config.getAcknowledgedAgentsService();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
+
+      for (const agent of projectAgents.agents) {
+        // If it's a remote agent, use the agentCardUrl as the hash.
+        // This allows multiple remote agents in a single file to be tracked independently.
+        if (agent.kind === 'remote') {
+          if (!agent.metadata) {
+            agent.metadata = {};
+          }
+          agent.metadata.hash = agent.agentCardUrl;
+        }
+
+        if (!agent.metadata?.hash) {
+          agentsToRegister.push(agent);
+          continue;
+        }
+
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
+        } else {
+          unacknowledgedAgents.push(agent);
+        }
+      }
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
       await Promise.allSettled(
-        projectAgents.agents.map((agent) => this.registerAgent(agent)),
+        agentsToRegister.map((agent) => this.registerAgent(agent)),
       );
     } else {
       coreEvents.emitFeedback(
@@ -394,23 +448,6 @@ export class AgentRegistry {
   }
 
   /**
-   * Generates a description for the delegate_to_agent tool.
-   * Unlike getDirectoryContext() which is for system prompts,
-   * this is formatted for tool descriptions.
-   */
-  getToolDescription(): string {
-    if (this.agents.size === 0) {
-      return 'Delegates a task to a specialized sub-agent. No agents are currently available.';
-    }
-
-    const agentDescriptions = Array.from(this.agents.entries())
-      .map(([name, def]) => `- **${name}**: ${def.description}`)
-      .join('\n');
-
-    return `Delegates a task to a specialized sub-agent.\n\nAvailable agents:\n${agentDescriptions}`;
-  }
-
-  /**
    * Generates a markdown "Phone Book" of available agents and their schemas.
    * This MUST be injected into the System Prompt of the parent agent.
    */
@@ -423,20 +460,23 @@ export class AgentRegistry {
     context += `Sub-agents are specialized expert agents that you can use to assist you in
       the completion of all or part of a task.
 
-      ALWAYS use \`${DELEGATE_TO_AGENT_TOOL_NAME}\` to delegate to a subagent if one
-      exists that has expertise relevant to your task.
+      Each sub-agent is available as a tool of the same name.
 
-      For example:
-      - Prompt: 'Fix test', Description: 'An agent with expertise in fixing tests.' -> should use the sub-agent.
-      - Prompt: 'Update the license header', Description: 'An agent with expertise in licensing and copyright.' -> should use the sub-agent.
-      - Prompt: 'Diagram the architecture of the codebase', Description: 'Agent with architecture experience'. -> should use the sub-agent.
-      - Prompt: 'Implement a fix for [bug]' -> Should decompose the project into subtasks, which may utilize available agents like 'plan', 'validate', and 'fix-tests'.
+      You MUST always delegate tasks to the sub-agent with the
+      relevant expertise, if one is available.
 
-      The following are the available sub-agents:\n\n`;
+      The following tools can be used to start sub-agents:\n\n`;
 
-    for (const [name, def] of this.agents) {
-      context += `- **${name}**: ${def.description}\n`;
+    for (const [name] of this.agents) {
+      context += `- ${name}\n`;
     }
+
+    context += `Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
+
+    For example:
+    - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
+    - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
+
     return context;
   }
 }

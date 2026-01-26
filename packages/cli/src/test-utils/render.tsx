@@ -9,6 +9,7 @@ import { Box } from 'ink';
 import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
+import os from 'node:os';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -27,8 +28,9 @@ import {
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
+import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -91,21 +93,27 @@ export const simulateClick = async (
   });
 };
 
-const mockConfig = {
-  getModel: () => 'gemini-pro',
-  getTargetDir: () =>
-    '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
-  getDebugMode: () => false,
-  isTrustedFolder: () => true,
-  getIdeMode: () => false,
-  getEnableInteractiveShell: () => true,
-  getPreviewFeatures: () => false,
+let mockConfigInternal: Config | undefined;
+
+const getMockConfigInternal = (): Config => {
+  if (!mockConfigInternal) {
+    mockConfigInternal = makeFakeConfig({
+      targetDir: os.tmpdir(),
+      enableEventDrivenScheduler: true,
+    });
+  }
+  return mockConfigInternal;
 };
 
-const configProxy = new Proxy(mockConfig, {
-  get(target, prop) {
-    if (prop in target) {
-      return target[prop as keyof typeof target];
+const configProxy = new Proxy({} as Config, {
+  get(_target, prop) {
+    if (prop === 'getTargetDir') {
+      return () =>
+        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+    }
+    const internal = getMockConfigInternal();
+    if (prop in internal) {
+      return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
   },
@@ -144,6 +152,11 @@ const baseMockUiState = {
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+};
+
+export const mockAppState: AppState = {
+  version: '1.2.3',
+  startupWarnings: [],
 };
 
 const mockUIActions: UIActions = {
@@ -185,6 +198,7 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
+  handleNewAgentsSelect: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -199,6 +213,7 @@ export const renderWithProviders = (
     useAlternateBuffer = true,
     uiActions,
     persistentState,
+    appState = mockAppState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -212,6 +227,7 @@ export const renderWithProviders = (
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
     };
+    appState?: AppState;
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -268,36 +284,41 @@ export const renderWithProviders = (
     .flatMap((item) => item.tools);
 
   const renderResult = render(
-    <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={finalSettings}>
-        <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={finalSettings}>
-            <ShellFocusContext.Provider value={shellFocus}>
-              <StreamingContext.Provider value={finalUiState.streamingState}>
-                <UIActionsContext.Provider value={finalUIActions}>
-                  <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-                    <KeypressProvider>
-                      <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                        <ScrollProvider>
-                          <Box
-                            width={terminalWidth}
-                            flexShrink={0}
-                            flexGrow={0}
-                            flexDirection="column"
-                          >
-                            {component}
-                          </Box>
-                        </ScrollProvider>
-                      </MouseProvider>
-                    </KeypressProvider>
-                  </ToolActionsProvider>
-                </UIActionsContext.Provider>
-              </StreamingContext.Provider>
-            </ShellFocusContext.Provider>
-          </VimModeProvider>
-        </UIStateContext.Provider>
-      </SettingsContext.Provider>
-    </ConfigContext.Provider>,
+    <AppContext.Provider value={appState}>
+      <ConfigContext.Provider value={config}>
+        <SettingsContext.Provider value={finalSettings}>
+          <UIStateContext.Provider value={finalUiState}>
+            <VimModeProvider settings={finalSettings}>
+              <ShellFocusContext.Provider value={shellFocus}>
+                <StreamingContext.Provider value={finalUiState.streamingState}>
+                  <UIActionsContext.Provider value={finalUIActions}>
+                    <ToolActionsProvider
+                      config={config}
+                      toolCalls={allToolCalls}
+                    >
+                      <KeypressProvider>
+                        <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+                          <ScrollProvider>
+                            <Box
+                              width={terminalWidth}
+                              flexShrink={0}
+                              flexGrow={0}
+                              flexDirection="column"
+                            >
+                              {component}
+                            </Box>
+                          </ScrollProvider>
+                        </MouseProvider>
+                      </KeypressProvider>
+                    </ToolActionsProvider>
+                  </UIActionsContext.Provider>
+                </StreamingContext.Provider>
+              </ShellFocusContext.Provider>
+            </VimModeProvider>
+          </UIStateContext.Provider>
+        </SettingsContext.Provider>
+      </ConfigContext.Provider>
+    </AppContext.Provider>,
     terminalWidth,
   );
 
