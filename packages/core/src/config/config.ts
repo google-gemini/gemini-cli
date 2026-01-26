@@ -966,6 +966,11 @@ export class Config {
     return this.contentGenerator?.userTier;
   }
 
+  getUserTierName(): string | undefined {
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
+  }
+
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
