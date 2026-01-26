@@ -36,7 +36,7 @@ jobs:
           destination: './_site'
 
       - name: 'Upload artifact'
-        uses: 'actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa' # ratchet:actions/upload-pages-artifact@v3
+        uses: 'actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b' # ratchet:actions/upload-pages-artifact@v3
 
   deploy:
     environment:
