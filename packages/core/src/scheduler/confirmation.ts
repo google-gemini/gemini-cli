@@ -103,6 +103,7 @@ export async function resolveConfirmation(
     state: SchedulerStateManager;
     modifier: ToolModificationHandler;
     getPreferredEditor: () => EditorType | undefined;
+    schedulerId: string;
   },
 ): Promise<ResolutionResult> {
   const { state } = deps;
