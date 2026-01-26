@@ -43,7 +43,7 @@ const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
-    mainAreaWidth: 100, // Fixed width for consistent snapshots
+    terminalWidth: 100, // Fixed width for consistent snapshots
   }),
 }));
 
