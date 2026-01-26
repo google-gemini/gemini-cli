@@ -12,7 +12,10 @@ import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { execStreaming } from '../utils/shell-utils.js';
-import { DEFAULT_TOTAL_MAX_MATCHES } from './constants.js';
+import {
+  DEFAULT_TOTAL_MAX_MATCHES,
+  DEFAULT_SEARCH_TIMEOUT_MS,
+} from './constants.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -133,6 +136,15 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     if (!isNaN(lineNumber)) {
       const absoluteFilePath = path.resolve(basePath, filePathRaw);
+      const relativeCheck = path.relative(basePath, absoluteFilePath);
+      if (
+        relativeCheck === '..' ||
+        relativeCheck.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativeCheck)
+      ) {
+        return null;
+      }
+
       const relativeFilePath = path.relative(basePath, absoluteFilePath);
 
       return {
@@ -164,27 +176,46 @@ class GrepToolInvocation extends BaseToolInvocation<
       let allMatches: GrepMatch[] = [];
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
 
-      for (const searchDir of searchDirectories) {
-        const remainingLimit = totalMaxMatches - allMatches.length;
-        if (remainingLimit <= 0) break;
+      // Create a timeout controller to prevent indefinitely hanging searches
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, DEFAULT_SEARCH_TIMEOUT_MS);
 
-        const matches = await this.performGrepSearch({
-          pattern: this.params.pattern,
-          path: searchDir,
-          include: this.params.include,
-          maxMatches: remainingLimit,
-          signal,
-        });
+      // Link the passed signal to our timeout controller
+      const onAbort = () => timeoutController.abort();
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
 
-        // Add directory prefix if searching multiple directories
-        if (searchDirectories.length > 1) {
-          const dirName = path.basename(searchDir);
-          matches.forEach((match) => {
-            match.filePath = path.join(dirName, match.filePath);
+      try {
+        for (const searchDir of searchDirectories) {
+          const remainingLimit = totalMaxMatches - allMatches.length;
+          if (remainingLimit <= 0) break;
+
+          const matches = await this.performGrepSearch({
+            pattern: this.params.pattern,
+            path: searchDir,
+            include: this.params.include,
+            maxMatches: remainingLimit,
+            signal: timeoutController.signal,
           });
-        }
 
-        allMatches = allMatches.concat(matches);
+          // Add directory prefix if searching multiple directories
+          if (searchDirectories.length > 1) {
+            const dirName = path.basename(searchDir);
+            matches.forEach((match) => {
+              match.filePath = path.join(dirName, match.filePath);
+            });
+          }
+
+          allMatches = allMatches.concat(matches);
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        signal.removeEventListener('abort', onAbort);
       }
 
       let searchLocationDescription: string;
@@ -436,7 +467,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         const fileAbsolutePath = filePath;
         // security check
         const relativePath = path.relative(absolutePath, fileAbsolutePath);
-        if (relativePath.startsWith('..') || path.isAbsolute(relativePath))
+        if (
+          relativePath === '..' ||
+          relativePath.startsWith(`..${path.sep}`) ||
+          path.isAbsolute(relativePath)
+        )
           continue;
 
         try {

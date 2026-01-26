@@ -24,7 +24,10 @@ import {
 } from '../utils/ignorePatterns.js';
 import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 import { execStreaming } from '../utils/shell-utils.js';
-import { DEFAULT_TOTAL_MAX_MATCHES } from './constants.js';
+import {
+  DEFAULT_TOTAL_MAX_MATCHES,
+  DEFAULT_SEARCH_TIMEOUT_MS,
+} from './constants.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -212,19 +215,39 @@ class GrepToolInvocation extends BaseToolInvocation<
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      const allMatches = await this.performRipgrepSearch({
-        pattern: this.params.pattern,
-        path: searchDirAbs!,
-        include: this.params.include,
-        case_sensitive: this.params.case_sensitive,
-        fixed_strings: this.params.fixed_strings,
-        context: this.params.context,
-        after: this.params.after,
-        before: this.params.before,
-        no_ignore: this.params.no_ignore,
-        maxMatches: totalMaxMatches,
-        signal,
-      });
+      // Create a timeout controller to prevent indefinitely hanging searches
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        timeoutController.abort();
+      }, DEFAULT_SEARCH_TIMEOUT_MS);
+
+      // Link the passed signal to our timeout controller
+      const onAbort = () => timeoutController.abort();
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      let allMatches: GrepMatch[];
+      try {
+        allMatches = await this.performRipgrepSearch({
+          pattern: this.params.pattern,
+          path: searchDirAbs!,
+          include: this.params.include,
+          case_sensitive: this.params.case_sensitive,
+          fixed_strings: this.params.fixed_strings,
+          context: this.params.context,
+          after: this.params.after,
+          before: this.params.before,
+          no_ignore: this.params.no_ignore,
+          maxMatches: totalMaxMatches,
+          signal: timeoutController.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        signal.removeEventListener('abort', onAbort);
+      }
 
       const searchLocationDescription = `in path "${searchDirDisplay}"`;
       if (allMatches.length === 0) {
@@ -392,6 +415,15 @@ class GrepToolInvocation extends BaseToolInvocation<
         // Defensive check: ensure text properties exist (skips binary/invalid encoding)
         if (match.path?.text && match.lines?.text) {
           const absoluteFilePath = path.resolve(basePath, match.path.text);
+          const relativeCheck = path.relative(basePath, absoluteFilePath);
+          if (
+            relativeCheck === '..' ||
+            relativeCheck.startsWith(`..${path.sep}`) ||
+            path.isAbsolute(relativeCheck)
+          ) {
+            return null;
+          }
+
           const relativeFilePath = path.relative(basePath, absoluteFilePath);
 
           return {

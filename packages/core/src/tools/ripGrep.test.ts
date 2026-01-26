@@ -404,6 +404,40 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toBe('Found 3 matches');
     });
 
+    it('should ignore matches that escape the base path', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '..env' },
+                line_number: 1,
+                lines: { text: 'world in ..env\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '../secret.txt' },
+                line_number: 1,
+                lines: { text: 'leak\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'world' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: world in ..env');
+      expect(result.llmContent).not.toContain('secret.txt');
+    });
+
     it('should find matches in a specific path', async () => {
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
       mockSpawn.mockImplementationOnce(
