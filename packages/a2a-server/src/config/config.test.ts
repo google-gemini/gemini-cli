@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as path from 'node:path';
 import { loadConfig } from './config.js';
 import type { Settings } from './settings.js';
 import {
@@ -94,6 +95,14 @@ describe('loadConfig', () => {
       settingsPath,
       envPath,
     ]);
+  });
+
+  it('should split CUSTOM_IGNORE_FILE_PATHS using system delimiter', async () => {
+    const paths = ['/path/one', '/path/two'];
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = paths.join(path.delimiter);
+    const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual(paths);
   });
 
   it('should have empty customIgnoreFilePaths when both are missing', async () => {

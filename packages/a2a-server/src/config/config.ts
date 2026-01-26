@@ -92,7 +92,7 @@ export async function loadConfig(
       customIgnoreFilePaths: [
         ...(settings.fileFiltering?.customIgnoreFilePaths || []),
         ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
-          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(',')
+          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(path.delimiter)
           : []),
       ],
     },
