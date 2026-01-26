@@ -31,6 +31,7 @@ interface UseQuotaAndFallbackArgs {
   historyManager: UseHistoryManagerReturn;
   userTier: UserTierId | undefined;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
+  onShowAuthSelection: () => void;
 }
 
 export function useQuotaAndFallback({
@@ -38,6 +39,7 @@ export function useQuotaAndFallback({
   historyManager,
   userTier,
   setModelSwitchedFromQuotaError,
+  onShowAuthSelection,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
@@ -197,17 +199,11 @@ export function useQuotaAndFallback({
       validationRequest.resolve(choice);
       setValidationRequest(null);
 
-      if (choice === 'change_auth') {
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Use /auth to change authentication method.',
-          },
-          Date.now(),
-        );
+      if (choice === 'change_auth' || choice === 'cancel') {
+        onShowAuthSelection();
       }
     },
-    [validationRequest, historyManager],
+    [validationRequest, onShowAuthSelection],
   );
 
   return {
