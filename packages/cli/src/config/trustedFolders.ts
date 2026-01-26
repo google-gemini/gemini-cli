@@ -88,7 +88,6 @@ export class LoadedTrustedFolders {
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
     const configToUse = config ?? this.user.config;
-    const normalizedLocation = path.normalize(location);
     let matchedTrusted = false;
 
     for (const [rulePath, trustLevel] of Object.entries(configToUse)) {
