@@ -5,18 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '../../test-utils/render.js';
-import {
-  NewAgentsNotification,
-  NewAgentsChoice,
-} from './NewAgentsNotification.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-
-vi.mock('./shared/RadioButtonSelect.js', () => ({
-  RadioButtonSelect: vi.fn(() => null),
-}));
-
-const MockedRadioButtonSelect = vi.mocked(RadioButtonSelect);
+import { renderWithProviders as render } from '../../test-utils/render.js';
+import { NewAgentsNotification } from './NewAgentsNotification.js';
 
 describe('NewAgentsNotification', () => {
   const mockAgents = [
@@ -62,32 +52,6 @@ describe('NewAgentsNotification', () => {
 
     const frame = lastFrame();
     expect(frame).toMatchSnapshot();
-    unmount();
-  });
-
-  it('passes correct options to RadioButtonSelect', () => {
-    const { unmount } = render(
-      <NewAgentsNotification agents={mockAgents} onSelect={onSelect} />,
-    );
-
-    expect(MockedRadioButtonSelect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        items: [
-          {
-            label: 'Acknowledge and Enable',
-            value: NewAgentsChoice.ACKNOWLEDGE,
-            key: 'acknowledge',
-          },
-          {
-            label: 'Do not enable (Ask again next time)',
-            value: NewAgentsChoice.IGNORE,
-            key: 'ignore',
-          },
-        ],
-        onSelect,
-      }),
-      undefined,
-    );
     unmount();
   });
 });

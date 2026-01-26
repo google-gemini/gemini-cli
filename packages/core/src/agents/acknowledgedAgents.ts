@@ -5,11 +5,10 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 
 export interface AcknowledgedAgentsMap {
   // Project Path -> Agent Name -> Agent Hash
@@ -27,16 +26,16 @@ export class AcknowledgedAgentsService {
 
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
-      if (existsSync(filePath)) {
-        const content = await fs.readFile(filePath, 'utf-8');
-        this.acknowledgedAgents = JSON.parse(content);
-      }
+      const content = await fs.readFile(filePath, 'utf-8');
+      this.acknowledgedAgents = JSON.parse(content);
     } catch (error: unknown) {
-      debugLogger.error(
-        'Failed to load acknowledged agents:',
-        getErrorMessage(error),
-      );
-      // Fallback to empty
+      if (!isNodeError(error) || error.code !== 'ENOENT') {
+        debugLogger.error(
+          'Failed to load acknowledged agents:',
+          getErrorMessage(error),
+        );
+      }
+      // If file doesn't exist or there's a parsing error, fallback to empty
       this.acknowledgedAgents = {};
     }
     this.loaded = true;
@@ -46,9 +45,7 @@ export class AcknowledgedAgentsService {
     const filePath = Storage.getAcknowledgedAgentsPath();
     try {
       const dir = path.dirname(filePath);
-      if (!existsSync(dir)) {
-        await fs.mkdir(dir, { recursive: true });
-      }
+      await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(
         filePath,
         JSON.stringify(this.acknowledgedAgents, null, 2),

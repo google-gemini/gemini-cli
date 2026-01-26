@@ -67,7 +67,11 @@ export class Storage {
   }
 
   static getAcknowledgedAgentsPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'acknowledgedAgents.json');
+    return path.join(
+      Storage.getGlobalGeminiDir(),
+      'acknowledgments',
+      'agents.json',
+    );
   }
 
   static getSystemSettingsPath(): string {

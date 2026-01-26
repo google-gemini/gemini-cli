@@ -1574,7 +1574,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!proQuotaRequest ||
     !!validationRequest ||
     isSessionBrowserOpen ||
-    isAuthDialogOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
 

@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import { Storage } from '../config/storage.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -37,7 +38,7 @@ describe('AcknowledgedAgentsService', () => {
 
   it('should acknowledge an agent and save to disk', async () => {
     const service = new AcknowledgedAgentsService();
-    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
+    const ackPath = Storage.getAcknowledgedAgentsPath();
 
     await service.acknowledge('/project', 'AgentA', 'hash1');
 
@@ -63,7 +64,7 @@ describe('AcknowledgedAgentsService', () => {
   });
 
   it('should load acknowledged agents from disk', async () => {
-    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
+    const ackPath = Storage.getAcknowledgedAgentsPath();
     const data = {
       '/project': {
         AgentLoaded: 'hashLoaded',
@@ -83,7 +84,7 @@ describe('AcknowledgedAgentsService', () => {
 
   it('should handle load errors gracefully', async () => {
     // Create a directory where the file should be to cause a read error (EISDIR)
-    const ackPath = path.join(tempDir, '.gemini', 'acknowledgedAgents.json');
+    const ackPath = Storage.getAcknowledgedAgentsPath();
     await fs.mkdir(ackPath, { recursive: true });
 
     const service = new AcknowledgedAgentsService();
