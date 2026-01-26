@@ -88,7 +88,7 @@ export const INFORMATIVE_TIPS = [
   'Clear your screen at any time with Ctrl+L…',
   'Toggle the debug console display with F12…',
   'Toggle the todo list display with Ctrl+T…',
-  'See full, untruncated responses with Ctrl+S…',
+  'See full, untruncated responses with Ctrl+O…',
   'Toggle auto-approval (YOLO mode) for all tools with Ctrl+Y…',
   'Cycle through approval modes (Default, Plan, Auto-Edit) with Shift+Tab…',
   'Toggle Markdown rendering (raw markdown mode) with Alt+M…',
