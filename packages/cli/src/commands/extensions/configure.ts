@@ -112,8 +112,6 @@ async function configureSpecificSetting(
     promptForSetting,
     scope,
   );
-
-  await extensionManager.restartExtension(extension);
 }
 
 async function configureExtension(
@@ -141,7 +139,6 @@ async function configureExtension(
 
   debugLogger.log(`Configuring settings for "${extensionName}"...`);
   await configureExtensionSettings(extensionConfig, extension.id, scope);
-  await extensionManager.restartExtension(extension);
 }
 
 async function configureAllExtensions(scope: ExtensionSettingScope) {
@@ -164,7 +161,6 @@ async function configureAllExtensions(scope: ExtensionSettingScope) {
     ) {
       debugLogger.log(`\nConfiguring settings for "${extension.name}"...`);
       await configureExtensionSettings(extensionConfig, extension.id, scope);
-      await extensionManager.restartExtension(extension);
     }
   }
 }
