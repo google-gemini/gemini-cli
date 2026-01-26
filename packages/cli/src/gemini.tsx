@@ -62,6 +62,7 @@ import {
   SessionEndReason,
   getVersion,
   type FetchAdminControlsResponse,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -110,9 +111,9 @@ async function displayStats(
     if (authType) {
       try {
         await config.refreshAuth(authType);
-      } catch (e) {
+      } catch (e: unknown) {
         writeToStderr('Authentication failed: ');
-        writeToStderr(`${e}\n`);
+        writeToStderr(`${getErrorMessage(e)}\n`);
         writeToStderr(
           'Please run `gemini` without --stats to set up authentication first.\n',
         );
@@ -151,9 +152,9 @@ async function displayStats(
         writeToStdout(`  Token Type: ${bucket.tokenType}\n`);
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     writeToStderr('Error fetching quota information: ');
-    writeToStderr(`${error}\n`);
+    writeToStderr(`${getErrorMessage(error)}\n`);
     process.exit(1);
   }
 }
