@@ -5,6 +5,9 @@ Gemini CLI extensions.
 
 ## Development
 
+Developing extensions for Gemini CLI is intended to be a lightweight, iterative
+process.
+
 ### Structure your extension
 
 While simple extensions can just be a few files, we recommend a robust structure
@@ -50,6 +53,9 @@ Your `GEMINI.md` file provides context to the model. Keep it focused:
 - **Do:** Use clear, concise language.
 
 ## Security
+
+When building a Gemini CLI extension, follow general security best practices
+(such as least privilege and input validation) to reduce risk.
 
 ### Minimal permissions
 
@@ -101,7 +107,11 @@ keychain and obfuscated in the UI.
 
 ## Releasing
 
-### Semantic Versioning
+You can upload your extension directly to GitHub to list it in the gallery.
+Gemini CLI extensions also offers support for more complicated
+[releases](releasing.md).
+
+### Semantic versioning
 
 Follow [Semantic Versioning](https://semver.org/).
 
@@ -122,7 +132,7 @@ gemini extensions install github.com/user/repo
 gemini extensions install github.com/user/repo --ref dev
 ```
 
-### Clean Artifacts
+### Clean artifacts
 
 If you are using GitHub Releases, ensure your release artifacts only contain the
 necessary files (`dist/`, `gemini-extension.json`, `package.json`). Exclude
