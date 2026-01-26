@@ -65,6 +65,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        getProjectTempPlansDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),

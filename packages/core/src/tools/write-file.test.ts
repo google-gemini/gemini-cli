@@ -47,6 +47,7 @@ import {
 } from '../test-utils/mock-message-bus.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
+const plansDir = path.resolve(os.tmpdir(), 'gemini-cli-test-plans');
 
 // --- MOCKS ---
 vi.mock('../core/client.js');
@@ -84,7 +85,7 @@ const mockConfigInternal = {
   getBaseLlmClient: vi.fn(), // Initialize as a plain mock function
   getFileSystemService: () => fsService,
   getIdeMode: vi.fn(() => false),
-  getWorkspaceContext: () => new WorkspaceContext(rootDir),
+  getWorkspaceContext: () => new WorkspaceContext(rootDir, [plansDir]),
   getApiKey: () => 'test-key',
   getModel: () => 'test-model',
   getSandbox: () => false,
@@ -126,9 +127,12 @@ describe('WriteFileTool', () => {
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'write-file-test-external-'),
     );
-    // Ensure the rootDir for the tool exists
+    // Ensure the rootDir and plansDir for the tool exists
     if (!fs.existsSync(rootDir)) {
       fs.mkdirSync(rootDir, { recursive: true });
+    }
+    if (!fs.existsSync(plansDir)) {
+      fs.mkdirSync(plansDir, { recursive: true });
     }
 
     // Setup GeminiClient mock
@@ -205,6 +209,9 @@ describe('WriteFileTool', () => {
     }
     if (fs.existsSync(rootDir)) {
       fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+    if (fs.existsSync(plansDir)) {
+      fs.rmSync(plansDir, { recursive: true, force: true });
     }
     vi.clearAllMocks();
   });
@@ -807,6 +814,24 @@ describe('WriteFileTool', () => {
     it('should reject paths outside workspace root', () => {
       const params = {
         file_path: '/etc/passwd',
+        content: 'malicious',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /File path must be within one of the workspace directories/,
+      );
+    });
+
+    it('should allow paths within the plans directory', () => {
+      const params = {
+        file_path: path.join(plansDir, 'my-plan.md'),
+        content: '# My Plan',
+      };
+      expect(() => tool.build(params)).not.toThrow();
+    });
+
+    it('should reject paths that try to escape the plans directory', () => {
+      const params = {
+        file_path: path.join(plansDir, '..', 'escaped.txt'),
         content: 'malicious',
       };
       expect(() => tool.build(params)).toThrow(
