@@ -1131,4 +1131,92 @@ describe('getIdeServerHost', () => {
       '/run/.containerenv',
     ); // Short-circuiting
   });
+
+  describe('validateWorkspacePath', () => {
+    describe('with special characters and encoding', () => {
+      it('should return true for a URI-encoded path with spaces', () => {
+        const workspacePath = 'file:///test/my%20workspace';
+        const cwd = '/test/my workspace/sub-dir';
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for a URI-encoded path with Korean characters', () => {
+        const workspacePath = 'file:///test/%ED%85%8C%EC%8A%A4%ED%8A%B8'; // "테스트"
+        const cwd = '/test/테스트/sub-dir';
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for a plain decoded path with Korean characters', () => {
+        const workspacePath = '/test/테스트';
+        const cwd = '/test/테스트/sub-dir';
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true when one of multi-root paths is a valid URI-encoded path', () => {
+        const workspacePath = [
+          '/another/workspace',
+          'file:///test/%ED%85%8C%EC%8A%A4%ED%8A%B8', // "테스트"
+        ].join(path.delimiter);
+        const cwd = '/test/테스트/sub-dir';
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for paths containing a literal % sign', () => {
+        const workspacePath = '/test/a%path';
+        const cwd = '/test/a%path/sub-dir';
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it.skipIf(process.platform !== 'win32')(
+        'should correctly convert a Windows file URI',
+        () => {
+          const workspacePath = 'file:///C:\\Users\\test';
+          const cwd = 'C:\\Users\\test\\sub-dir';
+
+          const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+
+          expect(result.isValid).toBe(true);
+        },
+      );
+    });
+  });
+
+  describe('validateWorkspacePath (sanitization)', () => {
+    it.each([
+      {
+        description: 'should return true for identical paths',
+        workspacePath: '/test/ws',
+        cwd: '/test/ws',
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has file:// protocol',
+        workspacePath: 'file:///test/ws',
+        cwd: '/test/ws',
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has encoded spaces',
+        workspacePath: '/test/my%20ws',
+        cwd: '/test/my ws',
+        expectedValid: true,
+      },
+      {
+        description:
+          'should return true when cwd needs normalization matching workspace',
+        workspacePath: '/test/my ws',
+        cwd: '/test/my%20ws',
+        expectedValid: true,
+      },
+    ])('$description', ({ workspacePath, cwd, expectedValid }) => {
+      expect(IdeClient.validateWorkspacePath(workspacePath, cwd)).toMatchObject(
+        { isValid: expectedValid },
+      );
+    });
+  });
 });
