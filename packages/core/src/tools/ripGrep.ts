@@ -382,13 +382,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         rgArgs.push('--glob', `!${exclude}`);
       });
 
-      if (this.config.getFileFilteringRespectGeminiIgnore()) {
-        // Add .geminiignore support (ripgrep natively handles .gitignore)
-        const geminiIgnorePaths =
-          this.fileDiscoveryService.getIgnoreFilePaths();
-        for (const ignorePath of geminiIgnorePaths) {
-          rgArgs.push('--ignore-file', ignorePath);
-        }
+      // Add .geminiignore and customr ignore files support (if provided/mandated)
+      // (ripgrep natively handles .gitignore)
+      const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
+      for (const ignorePath of geminiIgnorePaths) {
+        rgArgs.push('--ignore-file', ignorePath);
       }
     }
 

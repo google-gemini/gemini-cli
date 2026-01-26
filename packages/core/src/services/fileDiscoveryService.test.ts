@@ -470,5 +470,11 @@ describe('FileDiscoveryService', () => {
       expect(paths).not.toContain(path.join(projectRoot, '.gitignore'));
       expect(paths).toContain(path.join(projectRoot, GEMINI_IGNORE_FILE_NAME));
     });
+
+    it('should ensure .gitignore is the first file in the list', () => {
+      const service = new FileDiscoveryService(projectRoot);
+      const paths = service.getAllIgnoreFilePaths();
+      expect(paths[0]).toBe(path.join(projectRoot, '.gitignore'));
+    });
   });
 });

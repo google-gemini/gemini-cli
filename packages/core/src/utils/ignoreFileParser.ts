@@ -114,11 +114,6 @@ export class IgnoreFileParser implements IgnoreFileFilter {
    * Returns true if at least one ignore file exists and has patterns.
    */
   hasPatterns(): boolean {
-    if (this.patterns.length === 0) {
-      return false;
-    }
-    return this.fileNames.some((fileName) =>
-      fs.existsSync(path.join(this.projectRoot, fileName)),
-    );
+    return this.patterns.length > 0;
   }
 }

@@ -166,7 +166,7 @@ export class FileDiscoveryService {
    * Returns all ignore files including .gitignore if applicable.
    */
   getAllIgnoreFilePaths(): string[] {
-    const paths = this.getIgnoreFilePaths();
+    const paths: string[] = [];
     if (
       this.gitIgnoreFilter &&
       this.defaultFilterFileOptions.respectGitIgnore
@@ -176,6 +176,6 @@ export class FileDiscoveryService {
         paths.push(gitIgnorePath);
       }
     }
-    return paths;
+    return paths.concat(this.getIgnoreFilePaths());
   }
 }
