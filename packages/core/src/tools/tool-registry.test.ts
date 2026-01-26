@@ -568,6 +568,22 @@ describe('ToolRegistry', () => {
       expect(retrievedTool).toBeDefined();
       expect(retrievedTool?.name).toBe(validToolName);
     });
+
+    it('should resolve qualified names in getFunctionDeclarationsFiltered', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      toolRegistry.registerTool(mcpTool);
+
+      const fullyQualifiedName = `${serverName}__${toolName}`;
+      const declarations = toolRegistry.getFunctionDeclarationsFiltered([
+        fullyQualifiedName,
+      ]);
+
+      expect(declarations).toHaveLength(1);
+      expect(declarations[0].name).toBe(toolName);
+    });
   });
 
   describe('DiscoveredToolInvocation', () => {
