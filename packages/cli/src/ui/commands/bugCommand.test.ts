@@ -135,6 +135,7 @@ describe('bugCommand', () => {
               getHistory: () => history,
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
           storage: {
             getProjectTempDir: () => '/tmp/gemini',
           },
