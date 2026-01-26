@@ -281,8 +281,24 @@ const shareCommand: SlashCommand = {
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
     let filePathArg = args.trim();
-    if (!filePathArg) {
-      filePathArg = `gemini-conversation-${Date.now()}.json`;
+    // New: support default share dir via environment variable.
+    try {
+      const defaultShareDir = process.env['GEMINI_CHAT_SHARE_DIR'];
+      const looksLikeFilenameOnly =
+        !!filePathArg &&
+        !filePathArg.includes(path.sep) &&
+        !filePathArg.includes('/') &&
+        !filePathArg.includes('\\') &&
+        !filePathArg.startsWith('@');
+
+      if (!filePathArg) {
+        filePathArg = `gemini-conversation-${Date.now()}.json`;
+      } else if (defaultShareDir && looksLikeFilenameOnly) {
+        // Join default dir and filename in a cross-platform way.
+        filePathArg = path.join(defaultShareDir, filePathArg);
+      }
+    } catch (_e) {
+      // Fail-safe: do nothing on unexpected errors (do not crash CLI).
     }
 
     const filePath = path.resolve(filePathArg);
