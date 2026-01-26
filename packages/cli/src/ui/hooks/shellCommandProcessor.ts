@@ -9,7 +9,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
@@ -81,6 +81,7 @@ export const useShellCommandProcessor = (
   terminalWidth?: number,
   terminalHeight?: number,
   activeToolPtyId?: number,
+  isWaitingForConfirmation?: boolean,
 ) => {
   const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
   const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
@@ -90,8 +91,57 @@ export const useShellCommandProcessor = (
   const [backgroundShellCount, setBackgroundShellCount] = useState(0);
   const [isBackgroundShellVisible, setIsBackgroundShellVisible] =
     useState(false);
+
+  // Sync ref with state for use in callbacks without stale closures
+  const isVisibleRef = useRef(false);
+  isVisibleRef.current = isBackgroundShellVisible;
+
+  // Persistence state for auto-hiding background shell during foreground execution
+  const wasVisibleBeforeForegroundRef = useRef(false);
+  const restoreTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Used to force re-render when background shell output updates while visible
   const [, setTick] = useState(0);
+  const notifyUpdate = useCallback(() => {
+    if (isVisibleRef.current) {
+      setTick((t) => t + 1);
+    }
+  }, []);
+
+  const activePtyId = activeShellPtyId || activeToolPtyId;
+
+  useEffect(() => {
+    const isForegroundActive = !!activePtyId || !!isWaitingForConfirmation;
+
+    if (isForegroundActive) {
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+
+      if (isVisibleRef.current) {
+        wasVisibleBeforeForegroundRef.current = true;
+        setIsBackgroundShellVisible(false);
+      }
+    } else if (
+      wasVisibleBeforeForegroundRef.current &&
+      !restoreTimeoutRef.current
+    ) {
+      // Restore if it was automatically hidden, with a small delay to avoid
+      // flickering between model turn segments.
+      restoreTimeoutRef.current = setTimeout(() => {
+        setIsBackgroundShellVisible(true);
+        wasVisibleBeforeForegroundRef.current = false;
+        restoreTimeoutRef.current = null;
+      }, 300);
+    }
+
+    return () => {
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+      }
+    };
+  }, [activePtyId, isWaitingForConfirmation]);
 
   const countRunningShells = useCallback(
     () =>
@@ -104,6 +154,7 @@ export const useShellCommandProcessor = (
   const toggleBackgroundShell = useCallback(() => {
     if (backgroundShellsRef.current.size > 0) {
       setIsBackgroundShellVisible((prev) => !prev);
+      wasVisibleBeforeForegroundRef.current = false;
     } else {
       addItemToHistory(
         {
@@ -158,19 +209,17 @@ export const useShellCommandProcessor = (
 
       // Subscribe to process exit directly
       ShellExecutionService.onExit(pid, (code) => {
-        if (backgroundShellsRef.current.has(pid)) {
-          const shell = backgroundShellsRef.current.get(pid);
-          if (shell) {
-            // Remove and re-add to move to the end of the map (maintains insertion order)
-            backgroundShellsRef.current.delete(pid);
-            backgroundShellsRef.current.set(pid, {
-              ...shell,
-              status: 'exited',
-              exitCode: code,
-            });
-          }
+        const shell = backgroundShellsRef.current.get(pid);
+        if (shell) {
+          // Remove and re-add to move to the end of the map (maintains insertion order)
+          backgroundShellsRef.current.delete(pid);
+          backgroundShellsRef.current.set(pid, {
+            ...shell,
+            status: 'exited',
+            exitCode: code,
+          });
           setBackgroundShellCount(countRunningShells());
-          setTick((t) => t + 1);
+          notifyUpdate();
         }
       });
 
@@ -181,11 +230,10 @@ export const useShellCommandProcessor = (
 
         if (event.type === 'data') {
           if (typeof event.chunk === 'string') {
-            if (typeof shell.output === 'string') {
-              shell.output += event.chunk;
-            } else {
-              shell.output = event.chunk;
-            }
+            shell.output =
+              typeof shell.output === 'string'
+                ? shell.output + event.chunk
+                : event.chunk;
           } else {
             shell.output = event.chunk;
           }
@@ -194,12 +242,16 @@ export const useShellCommandProcessor = (
         } else if (event.type === 'binary_progress') {
           shell.isBinary = true;
           shell.binaryBytesReceived = event.bytesReceived;
+        } else {
+          return;
         }
+
+        notifyUpdate();
       });
 
       setBackgroundShellCount(countRunningShells());
     },
-    [countRunningShells],
+    [countRunningShells, notifyUpdate],
   );
 
   const handleShellCommand = useCallback(
@@ -324,6 +376,8 @@ export const useShellCommandProcessor = (
                     isBinary: isBinaryStream,
                     binaryBytesReceived,
                   });
+
+                  notifyUpdate();
                   return;
                 }
 
@@ -472,6 +526,7 @@ export const useShellCommandProcessor = (
       terminalHeight,
       terminalWidth,
       registerBackgroundShell,
+      notifyUpdate,
     ],
   );
 

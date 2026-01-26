@@ -235,14 +235,13 @@ export const useGeminiStream = (
   );
 
   const activeToolPtyId = useMemo(() => {
-    const executingShellTool = toolCalls?.find(
+    const executingShellTool = toolCalls.find(
       (tc) =>
         tc.status === 'executing' && tc.request.name === 'run_shell_command',
     );
-    if (executingShellTool) {
-      return (executingShellTool as { pid?: number }).pid;
-    }
-    return undefined;
+    return executingShellTool && 'pid' in executingShellTool
+      ? (executingShellTool as { pid: number }).pid
+      : undefined;
   }, [toolCalls]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -260,6 +259,12 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
+
+  const isWaitingForConfirmation = useMemo(
+    () => toolCalls.some((tc) => tc.status === 'awaiting_approval'),
+    [toolCalls],
+  );
+
   const {
     handleShellCommand,
     activeShellPtyId,
@@ -282,6 +287,7 @@ export const useGeminiStream = (
     terminalWidth,
     terminalHeight,
     activeToolPtyId,
+    isWaitingForConfirmation,
   );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
