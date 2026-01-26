@@ -1,4 +1,4 @@
-name: '🏷️ PR Contribution Guidelines Notifier'
+cc+ name: # Suena run-name: 
 
 on:
   pull_request:
@@ -76,8 +76,10 @@ jobs:
             `.trim().replace(/^[ ]+/gm, '');
 
             await github.rest.issues.createComment({
+            
               owner: org,
               repo: repo,
               issue_number: pr_number,
               body: comment
-            });
+            }); (πες ήταν)
+            (0)+Q0 =
