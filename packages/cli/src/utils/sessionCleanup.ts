@@ -6,7 +6,11 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, type Config } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  TOOL_OUTPUT_DIR,
+  type Config,
+} from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
 
@@ -140,15 +144,17 @@ export async function cleanupExpiredSessions(
     if (result.deleted > 0) {
       const toolOutputDir = path.join(
         config.storage.getProjectTempDir(),
-        'tool_output',
+        TOOL_OUTPUT_DIR,
       );
       try {
         await fs.rm(toolOutputDir, { recursive: true, force: true });
         if (config.getDebugMode()) {
           debugLogger.debug('Cleaned up tool_output directory');
         }
-      } catch {
-        /* ignore if directory doesn't exist or fails to delete */
+      } catch (error) {
+        if (config.getDebugMode()) {
+          debugLogger.warn('Failed to clean up tool_output directory:', error);
+        }
       }
     }
 
