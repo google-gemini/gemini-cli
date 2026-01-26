@@ -51,7 +51,7 @@ export async function scheduleAgentTools(
   } = options;
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
-  const agentConfig = Object.create(config) as Config;
+  const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
 
   const scheduler = new Scheduler({
