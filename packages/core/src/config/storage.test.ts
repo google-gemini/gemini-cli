@@ -78,4 +78,10 @@ describe('Storage – additional helpers', () => {
     const expected = path.join(os.homedir(), GEMINI_DIR, 'tmp', 'bin');
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
+
+  it('getProjectTempPlansDir returns ~/.gemini/tmp/<hash>/plans', () => {
+    const tempDir = storage.getProjectTempDir();
+    const expected = path.join(tempDir, 'plans');
+    expect(storage.getProjectTempPlansDir()).toBe(expected);
+  });
 });
