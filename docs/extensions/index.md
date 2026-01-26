@@ -324,7 +324,7 @@ The `hooks.json` file contains a `hooks` object where keys are
 ```json
 {
   "hooks": {
-    "BeforeAgent": [
+    "before_agent": [
       {
         "hooks": [
           {
