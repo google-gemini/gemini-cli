@@ -8,16 +8,18 @@ import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
-import { ToolErrorType } from '../tools/tool-error.js';
 import type {
   LocalAgentDefinition,
   AgentInputs,
   SubagentActivityEvent,
+  SubagentProgress,
+  SubagentActivityItem,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
+const MAX_RECENT_ACTIVITY = 3;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -83,9 +85,17 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
+    let recentActivity: SubagentActivityItem[] = [];
+
     try {
       if (updateOutput) {
-        updateOutput('Subagent starting...\n');
+        // Send initial state
+        const initialProgress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [],
+        };
+        updateOutput(initialProgress as unknown as AnsiOutput);
       }
 
       // Create an activity callback to bridge the executor's events to the
@@ -93,11 +103,79 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
 
-        if (
-          activity.type === 'THOUGHT_CHUNK' &&
-          typeof activity.data['text'] === 'string'
-        ) {
-          updateOutput(`🤖💭 ${activity.data['text']}`);
+        let updated = false;
+
+        switch (activity.type) {
+          case 'THOUGHT_CHUNK': {
+            const text = String(activity.data['text']);
+            const lastItem = recentActivity[recentActivity.length - 1];
+            if (lastItem && lastItem.type === 'thought') {
+              lastItem.content += text;
+            } else {
+              recentActivity.push({
+                type: 'thought',
+                content: text,
+                status: 'running',
+              });
+            }
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_START': {
+            const name = String(activity.data['name']);
+            const args = JSON.stringify(activity.data['args']);
+            recentActivity.push({
+              type: 'tool_call',
+              content: name,
+              args,
+              status: 'running',
+            });
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_END': {
+            const name = String(activity.data['name']);
+            // Find the last running tool call with this name
+            for (let i = recentActivity.length - 1; i >= 0; i--) {
+              if (
+                recentActivity[i].type === 'tool_call' &&
+                recentActivity[i].content === name &&
+                recentActivity[i].status === 'running'
+              ) {
+                recentActivity[i].status = 'completed';
+                updated = true;
+                break;
+              }
+            }
+            break;
+          }
+          case 'ERROR': {
+            const error = String(activity.data['error']);
+            recentActivity.push({
+              type: 'thought', // Treat errors as thoughts for now, or add an error type
+              content: `Error: ${error}`,
+              status: 'error',
+            });
+            updated = true;
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (updated) {
+          // Keep only the last N items
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+
+          const progress: SubagentProgress = {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [...recentActivity], // Copy to avoid mutation issues
+          };
+
+          updateOutput(progress as unknown as AnsiOutput);
         }
       };
 
@@ -131,13 +209,31 @@ ${output.result}
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
+      // Ensure the error is reflected in the recent activity for display
+      const lastActivity = recentActivity[recentActivity.length - 1];
+      if (!lastActivity || lastActivity.status !== 'error') {
+        recentActivity.push({
+          type: 'thought',
+          content: `Error: ${errorMessage}`,
+          status: 'error',
+        });
+        // Maintain size limit
+        if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+          recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+        }
+      }
+
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.definition.name,
+        recentActivity: [...recentActivity],
+      };
+
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
-        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
-        error: {
-          message: errorMessage,
-          type: ToolErrorType.EXECUTION_FAILED,
-        },
+        returnDisplay: progress,
+        // We omit the 'error' property so that the UI renders our rich returnDisplay
+        // instead of the raw error message. The llmContent still informs the agent of the failure.
       };
     }
   }

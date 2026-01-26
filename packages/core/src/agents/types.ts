@@ -71,6 +71,19 @@ export interface SubagentActivityEvent {
   data: Record<string, unknown>;
 }
 
+export interface SubagentActivityItem {
+  type: 'thought' | 'tool_call';
+  content: string;
+  args?: string;
+  status: 'running' | 'completed' | 'error';
+}
+
+export interface SubagentProgress {
+  isSubagentProgress: true;
+  agentName: string;
+  recentActivity: SubagentActivityItem[];
+}
+
 /**
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
