@@ -63,6 +63,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  ChangeAuthRequestedError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -106,6 +107,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
@@ -131,6 +133,7 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import { isSlashCommand } from './utils/commandUtils.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -525,7 +528,7 @@ export const AppContainer = (props: AppContainerProps) => {
     onAuthError,
     apiKeyDefaultValue,
     reloadApiKey,
-  } = useAuthCommand(settings, config);
+  } = useAuthCommand(settings, config, initializationResult.authError);
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},
   );
@@ -547,6 +550,7 @@ export const AppContainer = (props: AppContainerProps) => {
     historyManager,
     userTier,
     setModelSwitchedFromQuotaError,
+    onShowAuthSelection: () => setAuthState(AuthState.Updating),
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext
@@ -556,7 +560,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
 
-  const { loadHistoryForResume } = useSessionResume({
+  const { loadHistoryForResume, isResuming } = useSessionResume({
     config,
     historyManager,
     refreshStatic,
@@ -596,6 +600,9 @@ export const AppContainer = (props: AppContainerProps) => {
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
         } catch (e) {
+          if (e instanceof ChangeAuthRequestedError) {
+            return;
+          }
           onAuthError(
             `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
           );
@@ -910,6 +917,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isActive: !embeddedShellFocused,
   });
 
+  const { isMcpReady } = useMcpStatus(config);
+
   const {
     messageQueue,
     addMessage,
@@ -920,6 +929,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isConfigInitialized,
     streamingState,
     submitQuery,
+    isMcpReady,
   });
 
   cancelHandlerRef.current = useCallback(
@@ -961,10 +971,31 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
-      addMessage(submittedValue);
+      const isSlash = isSlashCommand(submittedValue.trim());
+      const isIdle = streamingState === StreamingState.Idle;
+
+      if (isSlash || (isIdle && isMcpReady)) {
+        void submitQuery(submittedValue);
+      } else {
+        // Check messageQueue.length === 0 to only notify on the first queued item
+        if (isIdle && !isMcpReady && messageQueue.length === 0) {
+          coreEvents.emitFeedback(
+            'info',
+            'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
+          );
+        }
+        addMessage(submittedValue);
+      }
       addInput(submittedValue); // Track input for up-arrow history
     },
-    [addMessage, addInput],
+    [
+      addMessage,
+      addInput,
+      submitQuery,
+      isMcpReady,
+      streamingState,
+      messageQueue.length,
+    ],
   );
 
   const handleClearScreen = useCallback(() => {
@@ -984,8 +1015,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
    * - Any future streaming states not explicitly allowed
    */
   const isInputActive =
+    isConfigInitialized &&
     !initError &&
     !isProcessing &&
+    !isResuming &&
     !!slashCommands &&
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding) &&
@@ -1638,6 +1671,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputWidth,
       suggestionsWidth,
       isInputActive,
+      isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
       isTrustedFolder,
@@ -1734,6 +1768,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputWidth,
       suggestionsWidth,
       isInputActive,
+      isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
       isTrustedFolder,
