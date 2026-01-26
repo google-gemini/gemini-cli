@@ -136,6 +136,22 @@ export async function cleanupExpiredSessions(
 
     result.skipped = result.scanned - result.deleted - result.failed;
 
+    // Clean up tool_output directory if any sessions were deleted
+    if (result.deleted > 0) {
+      const toolOutputDir = path.join(
+        config.storage.getProjectTempDir(),
+        'tool_output',
+      );
+      try {
+        await fs.rm(toolOutputDir, { recursive: true, force: true });
+        if (config.getDebugMode()) {
+          debugLogger.debug('Cleaned up tool_output directory');
+        }
+      } catch {
+        /* ignore if directory doesn't exist or fails to delete */
+      }
+    }
+
     if (config.getDebugMode() && result.deleted > 0) {
       debugLogger.debug(
         `Session cleanup: deleted ${result.deleted}, skipped ${result.skipped}, failed ${result.failed}`,

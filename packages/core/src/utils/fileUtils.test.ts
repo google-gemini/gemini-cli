@@ -1038,7 +1038,11 @@ describe('fileUtils', () => {
         tempRootDir,
       );
 
-      const expectedOutputFile = path.join(tempRootDir, 'shell_123.txt');
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'tool_output',
+        'shell_123.txt',
+      );
       expect(result.outputFile).toBe(expectedOutputFile);
       expect(result.totalLines).toBe(1);
 
@@ -1064,6 +1068,7 @@ describe('fileUtils', () => {
       // ../../dangerous/tool -> ______dangerous_tool
       const expectedOutputFile = path.join(
         tempRootDir,
+        'tool_output',
         '______dangerous_tool_1.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
@@ -1084,6 +1089,7 @@ describe('fileUtils', () => {
       // ../../etc/passwd -> ______etc_passwd
       const expectedOutputFile = path.join(
         tempRootDir,
+        'tool_output',
         'shell_______etc_passwd.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
