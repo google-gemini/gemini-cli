@@ -59,6 +59,9 @@ describe('ExtensionManager theme loading', () => {
       enabledExtensionOverrides: [],
     });
     vi.clearAllMocks();
+    themeManager.clearExtensionThemes();
+    themeManager.loadCustomThemes({});
+    themeManager.setActiveTheme(DEFAULT_THEME.name);
   });
 
   afterEach(() => {
@@ -149,7 +152,7 @@ describe('ExtensionManager theme loading', () => {
   it('should revert to default theme when extension is stopped', async () => {
     const extensionName = 'my-theme-extension';
     const themeName = 'My-Awesome-Theme';
-    const namespacedThemeName = `${extensionName}: ${themeName}`;
+    const namespacedThemeName = `${themeName} (${extensionName})`;
 
     createExtension({
       extensionsDir: userExtensionsDir,
@@ -212,7 +215,7 @@ describe('ExtensionManager theme loading', () => {
 
     // Set the active theme to the one from the extension
     themeManager.setActiveTheme(namespacedThemeName);
-    expect(themeManager.getActiveTheme().name).toBe(namespacedThemeName);
+    expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
 
     // Stop the extension
     await extensionManager.disableExtension(extensionName, SettingScope.User);

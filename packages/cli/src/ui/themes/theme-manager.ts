@@ -189,6 +189,14 @@ class ThemeManager {
   }
 
   /**
+   * Clears all registered extension themes.
+   * This is primarily for testing purposes to reset state between tests.
+   */
+  clearExtensionThemes(): void {
+    this.extensionThemes.clear();
+  }
+
+  /**
    * Sets the active theme.
    * @param themeName The name of the theme to set as active.
    * @returns True if the theme was successfully set, false otherwise.

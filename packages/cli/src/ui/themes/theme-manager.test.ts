@@ -196,7 +196,7 @@ describe('ThemeManager', () => {
         name: 'ExtensionTheme',
       };
       const extensionName = 'test-extension';
-      const namespacedName = `${extensionName}: ExtensionTheme`;
+      const namespacedName = `ExtensionTheme (${extensionName})`;
 
       themeManager.registerExtensionThemes(extensionName, [extTheme]);
       expect(themeManager.getCustomThemeNames()).toContain(namespacedName);
@@ -213,7 +213,7 @@ describe('ThemeManager', () => {
       themeManager.registerExtensionThemes('Ext', [
         { ...validCustomTheme, name: 'Theme' },
       ]);
-      expect(themeManager.getCustomThemeNames()).toContain('Ext: Theme');
+      expect(themeManager.getCustomThemeNames()).toContain('Theme (Ext)');
     });
 
     it('should allow extension themes and settings themes to coexist', () => {
@@ -230,11 +230,11 @@ describe('ThemeManager', () => {
       themeManager.loadCustomThemes({ SettingsTheme: settingsTheme });
 
       expect(themeManager.getCustomThemeNames()).toContain(
-        'Ext: ExtensionTheme',
+        'ExtensionTheme (Ext)',
       );
       expect(themeManager.getCustomThemeNames()).toContain('SettingsTheme');
 
-      expect(themeManager.isCustomTheme('Ext: ExtensionTheme')).toBe(true);
+      expect(themeManager.isCustomTheme('ExtensionTheme (Ext)')).toBe(true);
       expect(themeManager.isCustomTheme('SettingsTheme')).toBe(true);
     });
   });
