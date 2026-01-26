@@ -82,6 +82,11 @@ export interface IneligibleTier {
   reasonMessage: string;
   tierId: UserTierId;
   tierName: string;
+  validationErrorMessage?: string;
+  validationUrl?: string;
+  validationUrlLinkText?: string;
+  validationLearnMoreUrl?: string;
+  validationLearnMoreLinkText?: string;
 }
 
 /**
@@ -98,6 +103,7 @@ export enum IneligibleTierReasonCode {
   UNKNOWN = 'UNKNOWN',
   UNKNOWN_LOCATION = 'UNKNOWN_LOCATION',
   UNSUPPORTED_LOCATION = 'UNSUPPORTED_LOCATION',
+  VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
 /**
