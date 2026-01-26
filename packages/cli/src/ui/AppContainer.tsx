@@ -993,6 +993,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  useEffect(() => {
+    const handleRemoteInput = (text: string) => {
+      handleFinalSubmit(text);
+    };
+    appEvents.on(AppEvent.RemoteInput, handleRemoteInput);
+    return () => {
+      appEvents.off(AppEvent.RemoteInput, handleRemoteInput);
+    };
+  }, [handleFinalSubmit]);
+
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();

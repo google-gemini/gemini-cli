@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini CLI Companion",
+  "version": "1.0",
+  "description": "Connects to Gemini CLI A2A Server",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage", "contextMenus"],
+  "host_permissions": ["http://localhost/*", "<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Gemini CLI"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}

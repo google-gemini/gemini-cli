@@ -97,6 +97,7 @@ import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { remoteInputServer } from './utils/remoteInputServer.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -205,6 +206,9 @@ export async function startInteractiveUI(
   });
   consolePatcher.patch();
   registerCleanup(consolePatcher.cleanup);
+
+  remoteInputServer.start();
+  registerCleanup(() => remoteInputServer.stop());
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
