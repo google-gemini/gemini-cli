@@ -93,7 +93,7 @@ export class LoadedTrustedFolders {
 
     for (const [rulePath, trustLevel] of Object.entries(configToUse)) {
       if (trustLevel === TrustLevel.DO_NOT_TRUST) {
-        if (normalizedLocation === path.normalize(rulePath)) {
+        if (isWithinRoot(location, rulePath)) {
           return false;
         }
       } else if (!matchedTrusted) {
