@@ -63,7 +63,7 @@ export class ValidationRequiredError extends Error {
 
   constructor(
     message: string,
-    override readonly cause: GoogleApiError,
+    override readonly cause?: GoogleApiError,
     validationLink?: string,
     validationDescription?: string,
     learnMoreUrl?: string,
@@ -174,9 +174,9 @@ function classifyValidationRequiredError(
  * - 403 errors with `VALIDATION_REQUIRED` from cloudcode-pa domains are classified
  *   as `ValidationRequiredError`.
  * - 429 errors are classified as either `TerminalQuotaError` or `RetryableQuotaError`:
- *   - If the error indicates a daily limit, it's a `TerminalQuotaError`.
- *   - If the error suggests a retry delay of more than 2 minutes, it's a `TerminalQuotaError`.
- *   - If the error suggests a retry delay of 2 minutes or less, it's a `RetryableQuotaError`.
+ *   - CloudCode API: `RATE_LIMIT_EXCEEDED` → `RetryableQuotaError`, `QUOTA_EXHAUSTED` → `TerminalQuotaError`.
+ *   - If the error indicates a daily limit (in QuotaFailure), it's a `TerminalQuotaError`.
+ *   - If the error has a retry delay, it's a `RetryableQuotaError`.
  *   - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.
  *   - If the error message contains the phrase "Please retry in X[s|ms]", it's a `RetryableQuotaError`.
  *
@@ -302,34 +302,15 @@ export function classifyGoogleError(error: unknown): unknown {
         }
       }
     }
-
-    // Existing Cloud Code API quota handling
-    const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
-    if (quotaLimit.includes('PerDay') || quotaLimit.includes('Daily')) {
-      return new TerminalQuotaError(
-        `You have exhausted your daily quota on this model.`,
-        googleApiError,
-      );
-    }
   }
 
-  // 2. Check for long delays in RetryInfo
-  if (retryInfo?.retryDelay) {
-    if (delaySeconds) {
-      if (delaySeconds > 120) {
-        return new TerminalQuotaError(
-          `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
-          googleApiError,
-          delaySeconds,
-        );
-      }
-      // This is a retryable error with a specific delay.
-      return new RetryableQuotaError(
-        `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
-        googleApiError,
-        delaySeconds,
-      );
-    }
+  // 2. Check for delays in RetryInfo
+  if (retryInfo?.retryDelay && delaySeconds) {
+    return new RetryableQuotaError(
+      `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
+      googleApiError,
+      delaySeconds,
+    );
   }
 
   // 3. Check for short-term limits in QuotaFailure or ErrorInfo

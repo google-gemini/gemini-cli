@@ -17,6 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
+import { ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -39,7 +40,10 @@ export class SchedulerStateManager {
   private readonly queue: ToolCall[] = [];
   private _completedBatch: CompletedToolCall[] = [];
 
-  constructor(private readonly messageBus: MessageBus) {}
+  constructor(
+    private readonly messageBus: MessageBus,
+    private readonly schedulerId: string = ROOT_SCHEDULER_ID,
+  ) {}
 
   addToolCalls(calls: ToolCall[]): void {
     this.enqueue(calls);
@@ -130,6 +134,7 @@ export class SchedulerStateManager {
     if (this.isTerminalCall(call)) {
       this._completedBatch.push(call);
       this.activeCalls.delete(callId);
+      this.emitUpdate();
     }
   }
 
@@ -160,6 +165,10 @@ export class SchedulerStateManager {
   }
 
   cancelAllQueued(reason: string): void {
+    if (this.queue.length === 0) {
+      return;
+    }
+
     while (this.queue.length > 0) {
       const queuedCall = this.queue.shift()!;
       if (queuedCall.status === 'error') {
@@ -196,6 +205,7 @@ export class SchedulerStateManager {
     void this.messageBus.publish({
       type: MessageBusType.TOOL_CALLS_UPDATE,
       toolCalls: snapshot,
+      schedulerId: this.schedulerId,
     });
   }
 
@@ -316,6 +326,7 @@ export class SchedulerStateManager {
       response,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -331,6 +342,7 @@ export class SchedulerStateManager {
       response,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -359,6 +371,7 @@ export class SchedulerStateManager {
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -383,6 +396,7 @@ export class SchedulerStateManager {
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -437,6 +451,7 @@ export class SchedulerStateManager {
       },
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -457,6 +472,7 @@ export class SchedulerStateManager {
       startTime: 'startTime' in call ? call.startTime : undefined,
       outcome: call.outcome,
       invocation: call.invocation,
+      schedulerId: call.schedulerId,
     };
   }
 
@@ -477,6 +493,7 @@ export class SchedulerStateManager {
       invocation: call.invocation,
       liveOutput,
       pid,
+      schedulerId: call.schedulerId,
     };
   }
 }

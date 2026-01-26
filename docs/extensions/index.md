@@ -26,7 +26,7 @@ gemini extensions list
 ## Installation
 
 To install a real extension, you can use the `extensions install` command with a
-GitHub repository URL. For example:
+GitHub repository URL in noninteractive mode. For example:
 
 ```bash
 gemini extensions install https://github.com/gemini-cli-extensions/workspace
@@ -36,7 +36,9 @@ gemini extensions install https://github.com/gemini-cli-extensions/workspace
 
 - [Writing extensions](writing-extensions.md): Learn how to create your first
   extension.
-- [Extensions reference](reference.md): deeply understand the extension format,
+- [Extensions reference](reference.md): Deeply understand the extension format,
   commands, and configuration.
+- [Best practices](best-practices.md): Learn strategies for building great
+  extensions.
 - [Extensions releasing](releasing.md): Learn how to share your extensions with
   the world.

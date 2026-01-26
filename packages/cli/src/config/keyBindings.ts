@@ -49,6 +49,7 @@ export enum Command {
   REVERSE_SEARCH = 'history.search.start',
   SUBMIT_REVERSE_SEARCH = 'history.search.submit',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'history.search.accept',
+  REWIND = 'history.rewind',
 
   // Navigation
   NAVIGATION_UP = 'nav.up',
@@ -188,6 +189,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.HISTORY_UP]: [{ key: 'p', shift: false, ctrl: true }],
   [Command.HISTORY_DOWN]: [{ key: 'n', shift: false, ctrl: true }],
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
+  [Command.REWIND]: [{ key: 'double escape' }],
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
 
@@ -317,6 +319,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
+      Command.REWIND,
     ],
   },
   {
@@ -413,6 +416,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
+  [Command.REWIND]: 'Browse and rewind previous interactions.',
 
   // Navigation
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
