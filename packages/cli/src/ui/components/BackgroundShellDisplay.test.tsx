@@ -105,7 +105,8 @@ vi.mock('./shared/ScrollableList.js', () => ({
 const createMockKey = (overrides: Partial<Key>): Key => ({
   name: '',
   ctrl: false,
-  meta: false,
+  alt: false,
+  cmd: false,
   shift: false,
   insertable: false,
   sequence: '',

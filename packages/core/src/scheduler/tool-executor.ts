@@ -66,8 +66,6 @@ export class ToolExecutor {
         : undefined;
 
     const shellExecutionConfig = this.config.getShellExecutionConfig();
-    const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
 
     return runInDevTraceSpan(
       {
@@ -95,8 +93,6 @@ export class ToolExecutor {
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
@@ -108,8 +104,6 @@ export class ToolExecutor {
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
