@@ -41,11 +41,26 @@ const formatToolArgs = (args?: string): string => {
 
 export const SubagentProgressDisplay: React.FC<
   SubagentProgressDisplayProps
-> = ({ progress }) => (
+> = ({ progress }) => {
+  let headerText = `Subagent ${progress.agentName} is working...`;
+  let headerColor = theme.text.secondary;
+
+  if (progress.state === 'cancelled') {
+    headerText = `Subagent ${progress.agentName} was cancelled.`;
+    headerColor = theme.status.warning;
+  } else if (progress.state === 'error') {
+    headerText = `Subagent ${progress.agentName} failed.`;
+    headerColor = theme.status.error;
+  } else if (progress.state === 'completed') {
+    headerText = `Subagent ${progress.agentName} completed.`;
+    headerColor = theme.status.success;
+  }
+
+  return (
     <Box flexDirection="column" paddingY={0}>
       <Box marginBottom={1}>
-        <Text color={theme.text.secondary} italic>
-          Subagent {progress.agentName} is working...
+        <Text color={headerColor} italic>
+          {headerText}
         </Text>
       </Box>
       <Box flexDirection="column" marginLeft={0} gap={0}>
@@ -104,3 +119,4 @@ export const SubagentProgressDisplay: React.FC<
       </Box>
     </Box>
   );
+};

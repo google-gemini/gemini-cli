@@ -128,4 +128,19 @@ describe('<SubagentProgressDisplay />', () => {
     const frame = lastFrame();
     expect(frame).toContain('💭 Thinking about life');
   });
+
+  it('renders cancelled state correctly', () => {
+    const progress: SubagentProgress = {
+      isSubagentProgress: true,
+      agentName: 'TestAgent',
+      recentActivity: [],
+      state: 'cancelled',
+    };
+
+    const { lastFrame } = render(
+      <SubagentProgressDisplay progress={progress} />,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain('Subagent TestAgent was cancelled.');
+  });
 });

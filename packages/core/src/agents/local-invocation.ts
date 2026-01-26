@@ -8,12 +8,13 @@ import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  SubagentActivityEvent,
-  SubagentProgress,
-  SubagentActivityItem,
+import {
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type SubagentActivityEvent,
+  type SubagentProgress,
+  type SubagentActivityItem,
+  AgentTerminateMode,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -94,6 +95,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           isSubagentProgress: true,
           agentName: this.definition.name,
           recentActivity: [],
+          state: 'running',
         };
         updateOutput(initialProgress as unknown as AnsiOutput);
       }
@@ -173,6 +175,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             isSubagentProgress: true,
             agentName: this.definition.name,
             recentActivity: [...recentActivity], // Copy to avoid mutation issues
+            state: 'running',
           };
 
           updateOutput(progress as unknown as AnsiOutput);
@@ -186,6 +189,24 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       );
 
       const output = await executor.run(this.params, signal);
+
+      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
+        const progress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [...recentActivity],
+          state: 'cancelled',
+        };
+
+        if (updateOutput) {
+          updateOutput(progress as unknown as AnsiOutput);
+        }
+
+        return {
+          llmContent: `Subagent '${this.definition.name}' was cancelled by the user.`,
+          returnDisplay: progress,
+        };
+      }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
@@ -209,17 +230,31 @@ ${output.result}
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
+      const isAbort =
+        (error instanceof Error && error.name === 'AbortError') ||
+        errorMessage.includes('Aborted');
+
+      // Mark any running items as error/cancelled
+      for (const item of recentActivity) {
+        if (item.status === 'running') {
+          item.status = 'error';
+        }
+      }
+
       // Ensure the error is reflected in the recent activity for display
-      const lastActivity = recentActivity[recentActivity.length - 1];
-      if (!lastActivity || lastActivity.status !== 'error') {
-        recentActivity.push({
-          type: 'thought',
-          content: `Error: ${errorMessage}`,
-          status: 'error',
-        });
-        // Maintain size limit
-        if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-          recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+      // But only if it's NOT an abort, or if we want to show "Cancelled" as a thought
+      if (!isAbort) {
+        const lastActivity = recentActivity[recentActivity.length - 1];
+        if (!lastActivity || lastActivity.status !== 'error') {
+          recentActivity.push({
+            type: 'thought',
+            content: `Error: ${errorMessage}`,
+            status: 'error',
+          });
+          // Maintain size limit
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
         }
       }
 
@@ -227,7 +262,12 @@ ${output.result}
         isSubagentProgress: true,
         agentName: this.definition.name,
         recentActivity: [...recentActivity],
+        state: isAbort ? 'cancelled' : 'error',
       };
+
+      if (updateOutput) {
+        updateOutput(progress as unknown as AnsiOutput);
+      }
 
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,

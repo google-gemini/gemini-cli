@@ -341,5 +341,25 @@ describe('LocalSubagentInvocation', () => {
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toContain('Aborted');
     });
+
+    it('should return cancelled state when execution returns ABORTED', async () => {
+      const mockOutput = {
+        result: 'Cancelled by user',
+        terminate_reason: AgentTerminateMode.ABORTED,
+      };
+      mockExecutorInstance.run.mockResolvedValue(mockOutput);
+
+      const result = await invocation.execute(signal, updateOutput);
+
+      expect(result.llmContent).toEqual(
+        expect.stringContaining(
+          "Subagent 'MockAgent' was cancelled by the user.",
+        ),
+      );
+
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('cancelled');
+    });
   });
 });
