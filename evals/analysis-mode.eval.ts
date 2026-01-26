@@ -88,4 +88,79 @@ describe('analysis mode eval', () => {
       expect(content).toContain('a - b');
     },
   });
+
+  /**
+   * Ensures that when the user asks a general question, the agent does NOT
+   * automatically modify the file.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should not edit files when asked a general question',
+    prompt: 'How does app.ts work?',
+    files: FILES,
+    assert: async (rig, result) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Verify NO edit tools called
+      const editCalls = toolLogs.filter((log) =>
+        ['replace', 'write_file'].includes(log.toolRequest.name),
+      );
+      expect(editCalls.length).toBe(0);
+
+      // Verify file unchanged
+      const content = rig.readFile('app.ts');
+      expect(content).toContain('a - b');
+    },
+  });
+
+  /**
+   * Ensures that when the user asks a question about style, the agent does NOT
+   * automatically modify the file.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should not edit files when asked about style',
+    prompt: 'Is app.ts following good style?',
+    files: FILES,
+    assert: async (rig, result) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Verify NO edit tools called
+      const editCalls = toolLogs.filter((log) =>
+        ['replace', 'write_file'].includes(log.toolRequest.name),
+      );
+      expect(editCalls.length).toBe(0);
+
+      // Verify file unchanged
+      const content = rig.readFile('app.ts');
+      expect(content).toContain('a - b');
+    },
+  });
+
+  /**
+   * Ensures that when the user points out an issue but doesn't ask for a fix,
+   * the agent does NOT automatically modify the file.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should not edit files when user notes an issue',
+    prompt: 'The add function subtracts numbers.',
+    files: FILES,
+    params: { timeout: 20000 }, // 20s timeout
+    assert: async (rig, result) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Verify NO edit tools called
+      const editCalls = toolLogs.filter((log) =>
+        ['replace', 'write_file'].includes(log.toolRequest.name),
+      );
+      expect(editCalls.length).toBe(0);
+
+      // Verify asks permission or just acknowledges
+      if (result.toLowerCase().includes('fix')) {
+        expect(result.toLowerCase()).toContain('would you like me to fix');
+      }
+
+      // Verify file unchanged
+      const content = rig.readFile('app.ts');
+      expect(content).toContain('a - b');
+    },
+  });
 });
