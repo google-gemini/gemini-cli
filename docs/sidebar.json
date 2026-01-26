@@ -192,12 +192,20 @@
         "slug": "docs/extensions"
       },
       {
-        "label": "Get started with extensions",
-        "slug": "docs/extensions/getting-started-extensions"
+        "label": "Writing extensions",
+        "slug": "docs/extensions/writing-extensions"
       },
       {
-        "label": "Extension releasing",
-        "slug": "docs/extensions/extension-releasing"
+        "label": "Extensions reference",
+        "slug": "docs/extensions/reference"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/extensions/best-practices"
+      },
+      {
+        "label": "Extensions releasing",
+        "slug": "docs/extensions/releasing"
       }
     ]
   },
