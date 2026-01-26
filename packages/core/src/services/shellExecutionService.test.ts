@@ -892,7 +892,10 @@ describe('ShellExecutionService child_process fallback', () => {
   // Helper function to run a standard execution simulation
   const simulateExecution = async (
     command: string,
-    simulation: (cp: typeof mockChildProcess, ac: AbortController) => void,
+    simulation: (
+      cp: typeof mockChildProcess,
+      ac: AbortController,
+    ) => void | Promise<void>,
   ) => {
     const abortController = new AbortController();
     const handle = await ShellExecutionService.execute(
@@ -905,7 +908,7 @@ describe('ShellExecutionService child_process fallback', () => {
     );
 
     await new Promise((resolve) => process.nextTick(resolve));
-    simulation(mockChildProcess, abortController);
+    await simulation(mockChildProcess, abortController);
     const result = await handle.result;
     return { result, handle, abortController };
   };
@@ -937,7 +940,37 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
         chunk: 'file1.txt\na warning',
+        incremental: true,
       });
+    });
+
+    it('should stream output incrementally', async () => {
+      vi.useFakeTimers();
+      const chunks: string[] = [];
+      onOutputEventMock.mockImplementation((event) => {
+        if (event.type === 'data') chunks.push(event.chunk as string);
+      });
+
+      const { result } = await simulateExecution(
+        'streaming-cmd',
+        async (cp) => {
+          cp.stdout?.emit('data', Buffer.from('chunk1'));
+          await vi.advanceTimersByTimeAsync(150); // > 100ms debounce
+          cp.stdout?.emit('data', Buffer.from('chunk2'));
+          await vi.advanceTimersByTimeAsync(150);
+          cp.emit('exit', 0, null);
+          cp.emit('close', 0, null);
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toBe('chunk1chunk2');
+      // Expect multiple events
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(chunks[0]).toBe('chunk1');
+      expect(chunks[chunks.length - 1]).toBe('chunk2');
+
+      vi.useRealTimers();
     });
 
     it('should strip ANSI color codes from output', async () => {
@@ -1192,16 +1225,16 @@ describe('ShellExecutionService child_process fallback', () => {
       const eventTypes = onOutputEventMock.mock.calls.map(
         (call: [ShellOutputEvent]) => call[0].type,
       );
-      expect(eventTypes).toEqual(['binary_detected']);
+      expect(eventTypes).toEqual(['data', 'binary_detected']);
     });
   });
 
   describe('Platform-Specific Behavior', () => {
     it('should use powershell.exe on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
-      await simulateExecution('dir "foo bar"', (cp) =>
-        cp.emit('exit', 0, null),
-      );
+      await simulateExecution('dir "foo bar"', (cp) => {
+        cp.emit('exit', 0, null);
+      });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
@@ -1216,7 +1249,9 @@ describe('ShellExecutionService child_process fallback', () => {
 
     it('should use bash and detached process group on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
-      await simulateExecution('ls "foo bar"', (cp) => cp.emit('exit', 0, null));
+      await simulateExecution('ls "foo bar"', (cp) => {
+        cp.emit('exit', 0, null);
+      });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'bash',

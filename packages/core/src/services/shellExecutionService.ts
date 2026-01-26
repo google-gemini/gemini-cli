@@ -101,8 +101,10 @@ export type ShellOutputEvent =
   | {
       /** The event contains a chunk of output data. */
       type: 'data';
-      /** The decoded string chunk. */
+      /** The decoded string chunk or full terminal state. */
       chunk: string | AnsiOutput;
+      /** Whether this is an incremental chunk. Defaults to false. */
+      incremental?: boolean;
     }
   | {
       /** Signals that the output stream has been identified as binary. */
@@ -271,11 +273,15 @@ export class ShellExecutionService {
       const result = new Promise<ShellExecutionResult>((resolve) => {
         let stdoutDecoder: TextDecoder | null = null;
         let stderrDecoder: TextDecoder | null = null;
+        let emitTimeout: NodeJS.Timeout | null = null;
 
         let stdout = '';
         let stderr = '';
         let stdoutTruncated = false;
         let stderrTruncated = false;
+        let stdoutToEmit = '';
+        let stderrToEmit = '';
+        let pendingRaw = '';
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -283,6 +289,84 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+
+        const composeOutput = () => {
+          const separator = stdout.endsWith('\n') ? '' : '\n';
+          let combinedOutput =
+            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+
+          if (stdoutTruncated || stderrTruncated) {
+            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
+              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
+            }MB.]`;
+            combinedOutput += truncationMessage;
+          }
+          // Ensure no raw ESC/CSI remains even if malformed/partial at the end of output
+          return stripAnsi(combinedOutput)
+            .replaceAll('\u001b', '')
+            .replaceAll('\u009b', '')
+            .trim();
+        };
+
+        const emit = (isFinal = false) => {
+          emitTimeout = null;
+          if (!isStreamingRawContent) {
+            return;
+          }
+          let combined = pendingRaw + stdoutToEmit + stderrToEmit;
+          stdoutToEmit = '';
+          stderrToEmit = '';
+          pendingRaw = '';
+
+          if (!combined) {
+            return;
+          }
+
+          if (!isFinal) {
+            // Find the last ESC or 8-bit CSI that might start a partial sequence
+            const lastEsc = Math.max(
+              combined.lastIndexOf('\u001b'),
+              combined.lastIndexOf('\u009b'),
+            );
+
+            if (lastEsc !== -1) {
+              const tail = combined.slice(lastEsc);
+              // If stripAnsi leaves the ESC/CSI at the start of the tail, it's partial.
+              // We hold onto it to be safe, unless it's too long (probably not a sequence).
+              if (
+                stripAnsi(tail).includes(combined[lastEsc]) &&
+                tail.length < 128
+              ) {
+                pendingRaw = tail;
+                combined = combined.slice(0, lastEsc);
+              }
+            }
+          }
+
+          if (combined) {
+            let stripped = stripAnsi(combined);
+            if (isFinal) {
+              // At exit, ensure no raw ESC/CSI remains even if malformed/partial
+              stripped = stripped
+                .replaceAll('\u001b', '')
+                .replaceAll('\u009b', '');
+            }
+            if (stripped) {
+              onOutputEvent({
+                type: 'data',
+                chunk: stripped,
+                incremental: true,
+              });
+            }
+          }
+        };
+
+        const scheduleEmit = () => {
+          if (emitTimeout) {
+            return;
+          }
+          emitTimeout = setTimeout(() => emit(), 100);
+        };
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
           if (!stdoutDecoder || !stderrDecoder) {
@@ -303,7 +387,9 @@ export class ShellExecutionService {
             sniffedBytes = sniffBuffer.length;
 
             if (isBinary(sniffBuffer)) {
+              emit();
               isStreamingRawContent = false;
+              onOutputEvent({ type: 'binary_detected' });
             }
           }
 
@@ -318,6 +404,7 @@ export class ShellExecutionService {
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
               stdout = newBuffer;
+              stdoutToEmit += decodedChunk;
               if (truncated) {
                 stdoutTruncated = true;
               }
@@ -328,10 +415,12 @@ export class ShellExecutionService {
                 MAX_CHILD_PROCESS_BUFFER_SIZE,
               );
               stderr = newBuffer;
+              stderrToEmit += decodedChunk;
               if (truncated) {
                 stderrTruncated = true;
               }
             }
+            scheduleEmit();
           }
         };
 
@@ -339,28 +428,14 @@ export class ShellExecutionService {
           code: number | null,
           signal: NodeJS.Signals | null,
         ) => {
+          if (emitTimeout) {
+            clearTimeout(emitTimeout);
+          }
           const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
-          let combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
 
-          if (stdoutTruncated || stderrTruncated) {
-            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
-              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
-            }MB.]`;
-            combinedOutput += truncationMessage;
-          }
+          emit(true);
 
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
-
-          if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
-          }
+          const finalStrippedOutput = composeOutput();
 
           resolve({
             rawOutput: finalBuffer,
@@ -634,7 +709,6 @@ export class ShellExecutionService {
                     onOutputEvent({ type: 'binary_detected' });
                   }
                 }
-
                 if (isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   if (decodedChunk.length === 0) {
