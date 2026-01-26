@@ -13,6 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
+import * as path from 'node:path';
 import { MessageType, type HistoryItem } from '../types.js';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -120,7 +121,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     } else {
       for (const dir of folders) {
         try {
-          const expandedPath = expandHomeDir(dir);
+          const expandedPath = path.resolve(expandHomeDir(dir));
           if (choice === MultiFolderTrustChoice.YES_AND_REMEMBER) {
             trustedFolders.setValue(expandedPath, TrustLevel.TRUST_FOLDER);
           }

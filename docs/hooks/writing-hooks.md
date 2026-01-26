@@ -194,6 +194,7 @@ main().catch((err) => {
         "hooks": [
           {
             "name": "intent-filter",
+            "type": "command",
             "command": "node .gemini/hooks/filter-tools.js"
           }
         ]
@@ -234,7 +235,13 @@ security.
     "SessionStart": [
       {
         "matcher": "startup",
-        "hooks": [{ "name": "init", "command": "node .gemini/hooks/init.js" }]
+        "hooks": [
+          {
+            "name": "init",
+            "type": "command",
+            "command": "node .gemini/hooks/init.js"
+          }
+        ]
       }
     ],
     "BeforeAgent": [
@@ -243,6 +250,7 @@ security.
         "hooks": [
           {
             "name": "memory",
+            "type": "command",
             "command": "node .gemini/hooks/inject-memories.js"
           }
         ]
@@ -252,7 +260,11 @@ security.
       {
         "matcher": "*",
         "hooks": [
-          { "name": "filter", "command": "node .gemini/hooks/rag-filter.js" }
+          {
+            "name": "filter",
+            "type": "command",
+            "command": "node .gemini/hooks/rag-filter.js"
+          }
         ]
       }
     ],
@@ -260,7 +272,11 @@ security.
       {
         "matcher": "write_file",
         "hooks": [
-          { "name": "security", "command": "node .gemini/hooks/security.js" }
+          {
+            "name": "security",
+            "type": "command",
+            "command": "node .gemini/hooks/security.js"
+          }
         ]
       }
     ],
@@ -268,7 +284,11 @@ security.
       {
         "matcher": "*",
         "hooks": [
-          { "name": "record", "command": "node .gemini/hooks/record.js" }
+          {
+            "name": "record",
+            "type": "command",
+            "command": "node .gemini/hooks/record.js"
+          }
         ]
       }
     ],
@@ -276,7 +296,11 @@ security.
       {
         "matcher": "*",
         "hooks": [
-          { "name": "validate", "command": "node .gemini/hooks/validate.js" }
+          {
+            "name": "validate",
+            "type": "command",
+            "command": "node .gemini/hooks/validate.js"
+          }
         ]
       }
     ],
@@ -284,7 +308,11 @@ security.
       {
         "matcher": "exit",
         "hooks": [
-          { "name": "save", "command": "node .gemini/hooks/consolidate.js" }
+          {
+            "name": "save",
+            "type": "command",
+            "command": "node .gemini/hooks/consolidate.js"
+          }
         ]
       }
     ]
