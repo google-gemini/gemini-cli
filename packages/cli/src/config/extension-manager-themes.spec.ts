@@ -215,7 +215,7 @@ describe('ExtensionManager theme loading', () => {
 
     // Set the active theme to the one from the extension
     themeManager.setActiveTheme(namespacedThemeName);
-    expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+    expect(themeManager.getActiveTheme().name).toBe(namespacedThemeName);
 
     // Stop the extension
     await extensionManager.disableExtension(extensionName, SettingScope.User);
