@@ -356,30 +356,11 @@ export class LoadedSettings {
       return;
     }
 
-    if (secureModeEnabled === undefined) {
-      admin.secureModeEnabled = false;
-    } else {
-      admin.secureModeEnabled = secureModeEnabled;
-    }
-
-    if (mcpSetting) {
-      // Default proto values are sent as undefined, so we need to set them to false explicitly.
-      if (mcpSetting.mcpEnabled === undefined) {
-        admin.mcp = { enabled: false };
-      } else {
-        admin.mcp = { enabled: mcpSetting.mcpEnabled };
-      }
-    }
-
-    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
-    if (extensionsSetting) {
-      // Default proto values are sent as undefined, so we need to set them to false explicitly.
-      if (extensionsSetting.extensionsEnabled === undefined) {
-        admin.extensions = { enabled: false };
-      } else {
-        admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
-      }
-    }
+    admin.secureModeEnabled = secureModeEnabled ?? false;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.extensions = {
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+    };
 
     if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
       admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };

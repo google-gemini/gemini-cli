@@ -1959,7 +1959,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
-      config,
       newAgents,
       config,
       historyManager,
