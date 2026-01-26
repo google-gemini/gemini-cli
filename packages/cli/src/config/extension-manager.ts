@@ -539,12 +539,14 @@ Would you like to attempt to install via "git clone" instead?`,
           extensionId,
           ExtensionSettingScope.USER,
         );
-        workspaceSettings = await getScopedEnvContents(
-          config,
-          extensionId,
-          ExtensionSettingScope.WORKSPACE,
-          this.workspaceDir,
-        );
+        if (isWorkspaceTrusted(this.settings).isTrusted) {
+          workspaceSettings = await getScopedEnvContents(
+            config,
+            extensionId,
+            ExtensionSettingScope.WORKSPACE,
+            this.workspaceDir,
+          );
+        }
       }
 
       const customEnv = { ...userSettings, ...workspaceSettings };
