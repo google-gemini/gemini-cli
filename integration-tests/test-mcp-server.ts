@@ -100,7 +100,7 @@ export class TestMcpServer {
     });
 
     return new Promise((resolve, reject) => {
-      this.server = app.listen(0, () => {
+      this.server = app.listen(0, '0.0.0.0', () => {
         const address = this.server!.address();
         if (address && typeof address !== 'string') {
           resolve(address.port);
