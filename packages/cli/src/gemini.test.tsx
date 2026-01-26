@@ -1445,7 +1445,7 @@ describe('project hooks loading based on trust', () => {
     });
 
     vi.spyOn(process, 'exit').mockImplementation((() => {}) as unknown as (
-      code?: number,
+      code?: string | number | null,
     ) => never);
 
     // Default mock implementation for loadCliConfig
