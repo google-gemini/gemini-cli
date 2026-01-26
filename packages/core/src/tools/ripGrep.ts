@@ -25,7 +25,8 @@ import {
 } from '../utils/ignorePatterns.js';
 import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 
-const DEFAULT_TOTAL_MAX_MATCHES = 20000;
+const DEFAULT_TOTAL_MAX_MATCHES = 500;
+const MAX_MATCH_LINE_LENGTH = 1000;
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -238,13 +239,21 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const wasTruncated = allMatches.length >= totalMaxMatches;
 
+      let someLinesTruncatedInLength = false;
       const matchesByFile = allMatches.reduce(
         (acc, match) => {
           const fileKey = match.filePath;
           if (!acc[fileKey]) {
             acc[fileKey] = [];
           }
-          acc[fileKey].push(match);
+          let processedLine = match.line.trim();
+          if (processedLine.length > MAX_MATCH_LINE_LENGTH) {
+            processedLine =
+              processedLine.substring(0, MAX_MATCH_LINE_LENGTH) +
+              '... [truncated]';
+            someLinesTruncatedInLength = true;
+          }
+          acc[fileKey].push({ ...match, line: processedLine });
           acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
           return acc;
         },
@@ -257,7 +266,11 @@ class GrepToolInvocation extends BaseToolInvocation<
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
 
       if (wasTruncated) {
-        llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+        llmContent += ` (results limited to ${totalMaxMatches} matches). If the result you need isn't here, please try a more specific search pattern or search in a specific sub-directory.`;
+      }
+
+      if (someLinesTruncatedInLength) {
+        llmContent += ` (some long lines were truncated).`;
       }
 
       llmContent += `:\n---\n`;
@@ -265,14 +278,13 @@ class GrepToolInvocation extends BaseToolInvocation<
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
         matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          llmContent += `L${match.lineNumber}: ${match.line}\n`;
         });
         llmContent += '---\n';
       }
 
       let displayMessage = `Found ${matchCount} ${matchTerm}`;
-      if (wasTruncated) {
+      if (wasTruncated || someLinesTruncatedInLength) {
         displayMessage += ` (limited)`;
       }
 

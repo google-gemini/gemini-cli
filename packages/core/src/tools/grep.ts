@@ -22,6 +22,9 @@ import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+const DEFAULT_TOTAL_MAX_MATCHES = 500;
+const MAX_MATCH_LINE_LENGTH = 1000;
+
 // --- Interfaces ---
 
 /**
@@ -129,6 +132,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
+
       for (const searchDir of searchDirectories) {
         const matches = await this.performGrepSearch({
           pattern: this.params.pattern,
@@ -146,6 +150,10 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
 
         allMatches = allMatches.concat(matches);
+        if (allMatches.length >= DEFAULT_TOTAL_MAX_MATCHES) {
+          allMatches = allMatches.slice(0, DEFAULT_TOTAL_MAX_MATCHES);
+          break;
+        }
       }
 
       let searchLocationDescription: string;
@@ -164,6 +172,9 @@ class GrepToolInvocation extends BaseToolInvocation<
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
 
+      const wasTruncated = allMatches.length >= DEFAULT_TOTAL_MAX_MATCHES;
+      let someLinesTruncatedInLength = false;
+
       // Group matches by file
       const matchesByFile = allMatches.reduce(
         (acc, match) => {
@@ -171,7 +182,16 @@ class GrepToolInvocation extends BaseToolInvocation<
           if (!acc[fileKey]) {
             acc[fileKey] = [];
           }
-          acc[fileKey].push(match);
+
+          let processedLine = match.line.trim();
+          if (processedLine.length > MAX_MATCH_LINE_LENGTH) {
+            processedLine =
+              processedLine.substring(0, MAX_MATCH_LINE_LENGTH) +
+              '... [truncated]';
+            someLinesTruncatedInLength = true;
+          }
+
+          acc[fileKey].push({ ...match, line: processedLine });
           acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
           return acc;
         },
@@ -181,22 +201,34 @@ class GrepToolInvocation extends BaseToolInvocation<
       const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}:
----
-`;
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
+
+      if (wasTruncated) {
+        llmContent += ` (results limited to ${DEFAULT_TOTAL_MAX_MATCHES} matches). If the result you need isn't here, please try a more specific search pattern or search in a specific sub-directory.`;
+      }
+
+      if (someLinesTruncatedInLength) {
+        llmContent += ` (some long lines were truncated).`;
+      }
+
+      llmContent += `:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
         matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          llmContent += `L${match.lineNumber}: ${match.line}\n`;
         });
         llmContent += '---\n';
       }
 
+      let displayMessage = `Found ${matchCount} ${matchTerm}`;
+      if (wasTruncated || someLinesTruncatedInLength) {
+        displayMessage += ` (limited)`;
+      }
+
       return {
         llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matchCount} ${matchTerm}`,
+        returnDisplay: displayMessage,
       };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
