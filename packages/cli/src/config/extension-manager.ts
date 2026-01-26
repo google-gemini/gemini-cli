@@ -633,34 +633,23 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       // Hydrate hooks with extension settings as environment variables
-      if (
-        hooks &&
-        hydrationContext &&
-        Object.keys(hydrationContext).length > 0
-      ) {
-        // Filter out system hydration variables to get only user-defined settings for env injection
-        const {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          extensionPath,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          workspacePath,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          pathSeparator,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          ['/']: slash,
-          ...envVars
-        } = hydrationContext;
+      if (hooks && config.settings) {
+        const hookEnv: Record<string, string> = {};
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          if (value !== undefined) {
+            hookEnv[setting.envVar] = value;
+          }
+        }
 
-        const safeEnvVars = envVars as Record<string, string>;
-
-        if (Object.keys(safeEnvVars).length > 0) {
+        if (Object.keys(hookEnv).length > 0) {
           for (const eventName of Object.keys(hooks)) {
             const eventHooks = hooks[eventName as HookEventName];
             if (eventHooks) {
               for (const definition of eventHooks) {
                 for (const hook of definition.hooks) {
-                  // Merge existing env with new env vars
-                  hook.env = { ...hook.env, ...safeEnvVars };
+                  // Merge existing env with new env vars, giving extension settings precedence.
+                  hook.env = { ...hook.env, ...hookEnv };
                 }
               }
             }
