@@ -88,41 +88,27 @@ export class LoadedTrustedFolders {
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
     const configToUse = config ?? this.user.config;
-    const trustedPaths: string[] = [];
-    const untrustedPaths: string[] = [];
+    const normalizedLocation = path.normalize(location);
+    let matchedTrusted = false;
 
-    for (const rule of Object.entries(configToUse).map(
-      ([path, trustLevel]) => ({ path, trustLevel }),
-    )) {
-      switch (rule.trustLevel) {
-        case TrustLevel.TRUST_FOLDER:
-          trustedPaths.push(rule.path);
-          break;
-        case TrustLevel.TRUST_PARENT:
-          trustedPaths.push(path.dirname(rule.path));
-          break;
-        case TrustLevel.DO_NOT_TRUST:
-          untrustedPaths.push(rule.path);
-          break;
-        default:
-          // Do nothing for unknown trust levels.
-          break;
+    for (const [rulePath, trustLevel] of Object.entries(configToUse)) {
+      if (trustLevel === TrustLevel.DO_NOT_TRUST) {
+        if (normalizedLocation === path.normalize(rulePath)) {
+          return false;
+        }
+      } else if (!matchedTrusted) {
+        const trustedPath =
+          trustLevel === TrustLevel.TRUST_PARENT
+            ? path.dirname(rulePath)
+            : rulePath;
+
+        if (isWithinRoot(location, trustedPath)) {
+          matchedTrusted = true;
+        }
       }
     }
 
-    for (const trustedPath of trustedPaths) {
-      if (isWithinRoot(location, trustedPath)) {
-        return true;
-      }
-    }
-
-    for (const untrustedPath of untrustedPaths) {
-      if (path.normalize(location) === path.normalize(untrustedPath)) {
-        return false;
-      }
-    }
-
-    return undefined;
+    return matchedTrusted ? true : undefined;
   }
 
   setValue(path: string, trustLevel: TrustLevel): void {

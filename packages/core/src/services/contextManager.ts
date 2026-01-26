@@ -43,6 +43,10 @@ export class ContextManager {
   }
 
   private async loadEnvironmentMemory(): Promise<void> {
+    if (!this.config.isTrustedFolder()) {
+      this.environmentMemory = '';
+      return;
+    }
     const result = await loadEnvironmentMemory(
       [...this.config.getWorkspaceContext().getDirectories()],
       this.config.getExtensionLoader(),
@@ -68,6 +72,9 @@ export class ContextManager {
     accessedPath: string,
     trustedRoots: string[],
   ): Promise<string> {
+    if (!this.config.isTrustedFolder()) {
+      return '';
+    }
     const result = await loadJitSubdirectoryMemory(
       accessedPath,
       trustedRoots,
@@ -101,9 +108,7 @@ export class ContextManager {
   }
 
   private markAsLoaded(paths: string[]): void {
-    for (const p of paths) {
-      this.loadedPaths.add(p);
-    }
+    paths.forEach((p) => this.loadedPaths.add(p));
   }
 
   getLoadedPaths(): ReadonlySet<string> {

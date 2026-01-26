@@ -1666,6 +1666,82 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
       expect(settings.merged.ui?.theme).toBe('dark'); // User setting
     });
+
+    it('should clear workspace settings when trust is revoked and restore when granted', () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+        context: { fileName: 'USER.md' },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.isTrusted).toBe(true);
+      expect(settings.workspace.settings.tools?.sandbox).toBe(true);
+      expect(settings.merged.tools?.sandbox).toBe(true);
+      expect(settings.merged.context?.fileName).toBe('WORKSPACE.md');
+
+      // Revoke trust
+      settings.setTrusted(false);
+      expect(settings.isTrusted).toBe(false);
+      expect(settings.workspace.settings).toEqual({});
+      expect(settings.merged.tools?.sandbox).toBe(false); // Should revert to user setting
+      expect(settings.merged.context?.fileName).toBe('USER.md');
+
+      // Grant trust again
+      settings.setTrusted(true);
+      expect(settings.isTrusted).toBe(true);
+      expect(settings.workspace.settings.tools?.sandbox).toBe(true);
+      expect(settings.merged.tools?.sandbox).toBe(true);
+    });
+
+    it('should include system defaults in the initial trust check', () => {
+      // Setup: Enable folder trust in system defaults
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemDefaultsContent = {
+        security: { folderTrust: { enabled: true } },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemDefaultsPath()) {
+            return JSON.stringify(systemDefaultsContent);
+          }
+          return '{}';
+        },
+      );
+
+      loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify that isWorkspaceTrusted was called with settings containing the enabled flag
+      expect(isWorkspaceTrusted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          security: expect.objectContaining({
+            folderTrust: expect.objectContaining({
+              enabled: true,
+            }),
+          }),
+        }),
+      );
+    });
   });
 
   describe('loadEnvironment', () => {

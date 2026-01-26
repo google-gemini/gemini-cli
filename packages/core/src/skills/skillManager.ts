@@ -47,6 +47,7 @@ export class SkillManager {
   async discoverSkills(
     storage: Storage,
     extensions: GeminiCLIExtension[] = [],
+    isTrusted: boolean = false,
   ): Promise<void> {
     this.clearSkills();
 
@@ -65,10 +66,16 @@ export class SkillManager {
     this.addSkillsWithPrecedence(userSkills);
 
     // 4. Workspace skills (highest precedence)
-    const projectSkills = await loadSkillsFromDir(
-      storage.getProjectSkillsDir(),
-    );
-    this.addSkillsWithPrecedence(projectSkills);
+    if (isTrusted) {
+      const projectSkills = await loadSkillsFromDir(
+        storage.getProjectSkillsDir(),
+      );
+      this.addSkillsWithPrecedence(projectSkills);
+    } else {
+      debugLogger.debug(
+        'Workspace skills disabled because folder is not trusted.',
+      );
+    }
   }
 
   /**

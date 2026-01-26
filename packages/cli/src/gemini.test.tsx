@@ -12,6 +12,7 @@ import {
   beforeEach,
   afterEach,
   type MockInstance,
+  type Mock,
 } from 'vitest';
 import {
   main,
@@ -1408,6 +1409,249 @@ describe('validateDnsResolutionOrder', () => {
     expect(validateDnsResolutionOrder('invalid-value')).toBe('ipv4first');
     expect(debugLoggerWarnSpy).toHaveBeenCalledExactlyOnceWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
+    );
+  });
+});
+
+describe('project hooks loading based on trust', () => {
+  let loadCliConfig: Mock;
+  let loadSettings: Mock;
+  let parseArguments: Mock;
+
+  beforeEach(async () => {
+    // Dynamically import and get the mocked functions
+    const configModule = await import('./config/config.js');
+    loadCliConfig = vi.mocked(configModule.loadCliConfig);
+    parseArguments = vi.mocked(configModule.parseArguments);
+    parseArguments.mockResolvedValue({ startupMessages: [] });
+
+    const settingsModule = await import('./config/settings.js');
+    loadSettings = vi.mocked(settingsModule.loadSettings);
+
+    vi.clearAllMocks();
+    // Mock the main function's dependencies to isolate the config loading part
+    vi.mock('./nonInteractiveCli.js', () => ({
+      runNonInteractive: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    // Mock logUserPrompt to avoid ClearcutLogger issues
+    vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+      const actual =
+        await importOriginal<typeof import('@google/gemini-cli-core')>();
+      return {
+        ...actual,
+        logUserPrompt: vi.fn(),
+      };
+    });
+
+    vi.spyOn(process, 'exit').mockImplementation((() => {}) as unknown as (
+      code?: number,
+    ) => never);
+
+    // Default mock implementation for loadCliConfig
+    loadCliConfig.mockResolvedValue({
+      isInteractive: vi.fn().mockReturnValue(false),
+      getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+      refreshAuth: vi.fn().mockResolvedValue(undefined),
+      getDeferredCommand: vi.fn().mockReturnValue(undefined),
+      getPolicyEngine: vi.fn().mockReturnValue({}),
+      getMessageBus: vi.fn().mockReturnValue({
+        subscribe: vi.fn(),
+      }),
+      getHookSystem: vi.fn().mockReturnValue({
+        fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+        fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+      }),
+      getListSessions: vi.fn().mockReturnValue(false),
+      getDeleteSession: vi.fn().mockReturnValue(undefined),
+      getExperimentalZedIntegration: vi.fn().mockReturnValue(false),
+      getDebugMode: vi.fn().mockReturnValue(false),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: 'google' }),
+      setTerminalBackground: vi.fn(),
+      setSessionId: vi.fn(),
+      getSessionId: vi.fn().mockReturnValue('mock-session-id'),
+      clientVersion: '1.0.0',
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),
+      getToolRegistry: vi.fn().mockReturnValue({
+        getTools: vi.fn().mockReturnValue([]),
+        getAllTools: vi.fn().mockReturnValue([]),
+      }),
+      getAgentRegistry: vi.fn().mockReturnValue({}),
+      getPromptRegistry: vi.fn().mockReturnValue({}),
+      getResourceRegistry: vi.fn().mockReturnValue({}),
+      getSkillManager: vi.fn().mockReturnValue({
+        isAdminEnabled: vi.fn().mockReturnValue(false),
+      }),
+      getFileService: vi.fn().mockReturnValue({}),
+      getGitService: vi.fn().mockResolvedValue({}),
+      getUserMemory: vi.fn().mockReturnValue(''),
+      getGeminiMdFileCount: vi.fn().mockReturnValue(0),
+      getGeminiMdFilePaths: vi.fn().mockReturnValue([]),
+      getApprovalMode: vi.fn().mockReturnValue('default'),
+      isYoloModeDisabled: vi.fn().mockReturnValue(false),
+      getRawOutput: vi.fn().mockReturnValue(false),
+      getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getPendingIncludeDirectories: vi.fn().mockReturnValue([]),
+      getShowMemoryUsage: vi.fn().mockReturnValue(false),
+      getAccessibility: vi.fn().mockReturnValue({}),
+      getTelemetryEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
+      getTelemetryOtlpEndpoint: vi.fn().mockReturnValue(''),
+      getTelemetryOtlpProtocol: vi.fn().mockReturnValue('grpc'),
+      getTelemetryTarget: vi.fn().mockReturnValue(''),
+      getTelemetryOutfile: vi.fn().mockReturnValue(undefined),
+      getTelemetryUseCollector: vi.fn().mockReturnValue(false),
+      getTelemetryUseCliAuth: vi.fn().mockReturnValue(false),
+      getGeminiClient: vi.fn().mockReturnValue({
+        isInitialized: vi.fn().mockReturnValue(true),
+      }),
+      updateSystemInstructionIfInitialized: vi
+        .fn()
+        .mockResolvedValue(undefined),
+      getModelRouterService: vi.fn().mockReturnValue({}),
+      getModelAvailabilityService: vi.fn().mockReturnValue({}),
+      getEnableRecursiveFileSearch: vi.fn().mockReturnValue(true),
+      getFileFilteringEnableFuzzySearch: vi.fn().mockReturnValue(true),
+      getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
+      getFileFilteringRespectGeminiIgnore: vi.fn().mockReturnValue(true),
+      getFileFilteringOptions: vi.fn().mockReturnValue({}),
+      getCustomExcludes: vi.fn().mockReturnValue([]),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getBugCommand: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+      getListExtensions: vi.fn().mockReturnValue(false),
+      getExtensionManagement: vi.fn().mockReturnValue(true),
+      getExtensions: vi.fn().mockReturnValue([]),
+      getExtensionLoader: vi.fn().mockReturnValue({}),
+      getEnabledExtensions: vi.fn().mockReturnValue([]),
+      getEnableExtensionReloading: vi.fn().mockReturnValue(false),
+      getDisableLLMCorrection: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isAgentsEnabled: vi.fn().mockReturnValue(false),
+      isEventDrivenSchedulerEnabled: vi.fn().mockReturnValue(false),
+      getNoBrowser: vi.fn().mockReturnValue(false),
+      getAgentsSettings: vi.fn().mockReturnValue({}),
+      isBrowserLaunchSuppressed: vi.fn().mockReturnValue(false),
+      getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
+      getIdeMode: vi.fn().mockReturnValue(false),
+      getFolderTrust: vi.fn().mockReturnValue(true),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
+      setIdeMode: vi.fn(),
+      getFileSystemService: vi.fn().mockReturnValue({}),
+      setFileSystemService: vi.fn(),
+      getCompressionThreshold: vi.fn().mockResolvedValue(undefined),
+      getUserCaching: vi.fn().mockResolvedValue(false),
+      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
+      getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
+      getBannerTextNoCapacityIssues: vi.fn().mockResolvedValue(''),
+      getBannerTextCapacityIssues: vi.fn().mockResolvedValue(''),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      reloadSkills: vi.fn().mockResolvedValue(undefined),
+      reloadAgents: vi.fn().mockResolvedValue(undefined),
+      getUseRipgrep: vi.fn().mockReturnValue(false),
+      getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
+      getContinueOnFailedApiCall: vi.fn().mockReturnValue(false),
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+      getShellExecutionConfig: vi.fn().mockReturnValue({}),
+      setShellExecutionConfig: vi.fn(),
+      getScreenReader: vi.fn().mockReturnValue(false),
+      getEnablePromptCompletion: vi.fn().mockReturnValue(false),
+      getEnableToolOutputTruncation: vi.fn().mockReturnValue(true),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(1000),
+      getTruncateToolOutputLines: vi.fn().mockReturnValue(100),
+      getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
+      getUseWriteTodos: vi.fn().mockReturnValue(false),
+      getOutputFormat: vi.fn().mockReturnValue('text'),
+      getFileExclusions: vi.fn().mockReturnValue({}),
+      getEnableHooks: vi.fn().mockReturnValue(true),
+      getEnableHooksUI: vi.fn().mockReturnValue(true),
+      getMcpClientManager: vi.fn().mockReturnValue({
+        getMcpInstructions: vi.fn().mockReturnValue(''),
+        getMcpServers: vi.fn().mockReturnValue({}),
+      }),
+      getEnableEventDrivenScheduler: vi.fn().mockReturnValue(false),
+      getAdminSkillsEnabled: vi.fn().mockReturnValue(false),
+      getDisabledSkills: vi.fn().mockReturnValue([]),
+      getExperimentalJitContext: vi.fn().mockReturnValue(false),
+      getContextManager: vi.fn().mockReturnValue(undefined),
+      getTerminalBackground: vi.fn().mockReturnValue(undefined),
+      getEmbeddingModel: vi.fn().mockReturnValue('embedding-model'),
+      getSandbox: vi.fn().mockReturnValue(undefined),
+      getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
+      getMaxSessionTurns: vi.fn().mockReturnValue(100),
+      getCoreTools: vi.fn().mockReturnValue([]),
+      getAllowedTools: vi.fn().mockReturnValue([]),
+      getExcludeTools: vi.fn().mockReturnValue(new Set()),
+      getAllowedMcpServers: vi.fn().mockReturnValue([]),
+      getBlockedMcpServers: vi.fn().mockReturnValue([]),
+      getExperiments: vi.fn().mockReturnValue(undefined),
+      getQuestion: vi.fn().mockReturnValue('test question'),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should load project hooks when workspace is trusted', async () => {
+    const hooks = { 'before-model': 'echo "trusted"' };
+    loadSettings.mockReturnValue(
+      createMockSettings({
+        workspace: {
+          isTrusted: true,
+          settings: { hooks },
+        },
+        merged: {
+          security: { auth: { selectedType: 'google' } },
+        },
+      }),
+    );
+
+    await main();
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        projectHooks: hooks,
+      }),
+    );
+  });
+
+  it('should NOT load project hooks when workspace is not trusted', async () => {
+    loadSettings.mockReturnValue(
+      createMockSettings({
+        workspace: {
+          isTrusted: false,
+          settings: {},
+        },
+        merged: {
+          security: { auth: { selectedType: 'google' } },
+        },
+      }),
+    );
+
+    await main();
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        projectHooks: undefined,
+      }),
     );
   });
 });
