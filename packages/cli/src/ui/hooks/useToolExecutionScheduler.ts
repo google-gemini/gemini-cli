@@ -16,6 +16,7 @@ import {
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -78,7 +79,7 @@ export function useToolExecutionScheduler(
         config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       }),
     [config, messageBus],
   );
@@ -91,16 +92,16 @@ export function useToolExecutionScheduler(
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
+      // Update output timer for UI spinners (Side Effect)
+      if (event.toolCalls.some((tc) => tc.status === 'executing')) {
+        setLastToolOutputTime(Date.now());
+      }
+
       setToolCallsMap((prev) => {
         const adapted = internalAdaptToolCalls(
           event.toolCalls,
           prev[event.schedulerId] ?? [],
         );
-
-        // Update output timer for UI spinners
-        if (event.toolCalls.some((tc) => tc.status === 'executing')) {
-          setLastToolOutputTime(Date.now());
-        }
 
         return {
           ...prev,
@@ -179,8 +180,8 @@ export function useToolExecutionScheduler(
         const nextMap: Record<string, TrackedToolCall[]> = {};
         for (const call of nextFlattened) {
           // All tool calls should have a schedulerId from the core.
-          // Default to 'root' as a safeguard.
-          const sid = call.schedulerId ?? 'root';
+          // Default to ROOT_SCHEDULER_ID as a safeguard.
+          const sid = call.schedulerId ?? ROOT_SCHEDULER_ID;
           if (!nextMap[sid]) {
             nextMap[sid] = [];
           }

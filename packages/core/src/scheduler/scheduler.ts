@@ -48,7 +48,7 @@ export interface SchedulerOptions {
   config: Config;
   messageBus: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
-  schedulerId?: string;
+  schedulerId: string;
   parentCallId?: string;
 }
 
@@ -98,7 +98,7 @@ export class Scheduler {
     this.config = options.config;
     this.messageBus = options.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.schedulerId = options.schedulerId ?? 'root';
+    this.schedulerId = options.schedulerId;
     this.parentCallId = options.parentCallId;
     this.state = new SchedulerStateManager(this.messageBus, this.schedulerId);
     this.executor = new ToolExecutor(this.config);

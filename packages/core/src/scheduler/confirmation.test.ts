@@ -29,6 +29,7 @@ import {
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
 import type { ValidatingToolCall, WaitingToolCall } from './types.js';
+import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
 import type { EditorType } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
@@ -52,7 +53,7 @@ describe('confirmation.ts', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   const emitResponse = (response: ToolConfirmationResponse) => {
@@ -188,7 +189,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
 
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
@@ -218,7 +219,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
       await listenerPromise;
 
@@ -254,7 +255,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
 
       await waitForListener(MessageBusType.TOOL_CONFIRMATION_RESPONSE);
@@ -296,7 +297,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
 
       await listenerPromise1;
@@ -355,7 +356,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
 
       await listenerPromise;
@@ -402,7 +403,7 @@ describe('confirmation.ts', () => {
         state: mockState,
         modifier: mockModifier,
         getPreferredEditor,
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       });
 
       const result = await promise;
@@ -426,7 +427,7 @@ describe('confirmation.ts', () => {
           state: mockState,
           modifier: mockModifier,
           getPreferredEditor,
-          schedulerId: 'root',
+          schedulerId: ROOT_SCHEDULER_ID,
         }),
       ).rejects.toThrow(/lost during confirmation loop/);
     });

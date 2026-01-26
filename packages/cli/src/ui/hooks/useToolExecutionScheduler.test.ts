@@ -19,6 +19,7 @@ import {
   type ToolCallsUpdateMessage,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -73,6 +74,10 @@ describe('useToolExecutionScheduler', () => {
     } as unknown as Config;
   });
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('initializes with empty tool calls', () => {
     const { result } = renderHook(() =>
       useToolExecutionScheduler(
@@ -112,7 +117,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -157,7 +162,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -214,7 +219,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -277,7 +282,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -294,7 +299,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [mockToolCall],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -331,7 +336,7 @@ describe('useToolExecutionScheduler', () => {
             invocation: createMockInvocation(),
           },
         ],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 
@@ -446,7 +451,7 @@ describe('useToolExecutionScheduler', () => {
         error: undefined,
         errorType: undefined,
       },
-      schedulerId: 'root',
+      schedulerId: ROOT_SCHEDULER_ID,
     };
 
     const callSub = {
@@ -460,7 +465,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [callRoot],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
 
       void mockMessageBus.publish({
@@ -474,7 +479,7 @@ describe('useToolExecutionScheduler', () => {
     expect(toolCalls).toHaveLength(2);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-root')?.schedulerId,
-    ).toBe('root');
+    ).toBe(ROOT_SCHEDULER_ID);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
     ).toBe('subagent-1');
@@ -496,7 +501,7 @@ describe('useToolExecutionScheduler', () => {
     const updatedRoot = toolCalls.find((t) => t.request.callId === 'call-root');
     const updatedSub = toolCalls.find((t) => t.request.callId === 'call-sub');
 
-    expect(updatedRoot?.schedulerId).toBe('root');
+    expect(updatedRoot?.schedulerId).toBe(ROOT_SCHEDULER_ID);
     expect(updatedSub?.schedulerId).toBe('subagent-1');
 
     // 4. Verify that a subsequent update to ONE scheduler doesn't wipe the other
@@ -504,7 +509,7 @@ describe('useToolExecutionScheduler', () => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [{ ...callRoot, status: 'executing' }],
-        schedulerId: 'root',
+        schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
 

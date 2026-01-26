@@ -17,6 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
+import { ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -41,7 +42,7 @@ export class SchedulerStateManager {
 
   constructor(
     private readonly messageBus: MessageBus,
-    private readonly schedulerId: string = 'root',
+    private readonly schedulerId: string = ROOT_SCHEDULER_ID,
   ) {}
 
   addToolCalls(calls: ToolCall[]): void {

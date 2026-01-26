@@ -16,6 +16,8 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 
+export const ROOT_SCHEDULER_ID = 'root';
+
 export interface ToolCallRequestInfo {
   callId: string;
   name: string;
