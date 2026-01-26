@@ -374,4 +374,37 @@ describe('ScrollableList Demo Behavior', () => {
       });
     });
   });
+
+  describe('Width Prop', () => {
+    it('should apply the width prop to the container', async () => {
+      const items = [{ id: '1', title: 'Item 1' }];
+      let lastFrame: () => string | undefined;
+
+      await act(async () => {
+        const result = render(
+          <MouseProvider mouseEventsEnabled={false}>
+            <KeypressProvider>
+              <ScrollProvider>
+                <Box width={100} height={20}>
+                  <ScrollableList
+                    data={items}
+                    renderItem={({ item }) => <Text>{item.title}</Text>}
+                    estimatedItemHeight={() => 1}
+                    keyExtractor={(item) => item.id}
+                    hasFocus={true}
+                    width={50}
+                  />
+                </Box>
+              </ScrollProvider>
+            </KeypressProvider>
+          </MouseProvider>,
+        );
+        lastFrame = result.lastFrame;
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Item 1');
+      });
+    });
+  });
 });

@@ -67,7 +67,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'user_shell' && (
-        <UserShellMessage text={itemForDisplay.text} />
+        <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage
