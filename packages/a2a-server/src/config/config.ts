@@ -97,6 +97,7 @@ export async function loadConfig(
     previewFeatures: settings.general?.previewFeatures,
     interactive: true,
     enableInteractiveShell: true,
+    ptyInfo: 'auto',
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
