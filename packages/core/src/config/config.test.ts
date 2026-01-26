@@ -24,6 +24,7 @@ import {
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
+  createContentGenerator,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
@@ -197,6 +198,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
+import { UserTierId } from 'src/code_assist/types.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -2058,6 +2060,35 @@ describe('Config Quota & Preview Model Access', () => {
       expect(result).toBeUndefined();
       // Should remain default (false)
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+  });
+
+  describe('getUserTier and getUserTierName', () => {
+    it('should return undefined if contentGenerator is not initialized', () => {
+      const config = new Config(baseParams);
+      expect(config.getUserTier()).toBeUndefined();
+      expect(config.getUserTierName()).toBeUndefined();
+    });
+
+    it('should return values from contentGenerator after refreshAuth', async () => {
+      const config = new Config(baseParams);
+      const mockTier = UserTierId.STANDARD;
+      const mockTierName = 'Standard Tier';
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+        authType: AuthType.USE_GEMINI,
+      } as ContentGeneratorConfig);
+
+      vi.mocked(createContentGenerator).mockResolvedValue({
+        userTier: mockTier,
+        userTierName: mockTierName,
+      } as unknown as CodeAssistServer);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getUserTier()).toBe(mockTier);
+      // TODO(#1275): User tier name is disabled until re-enabled.
+      expect(config.getUserTierName()).toBeUndefined();
     });
   });
 
