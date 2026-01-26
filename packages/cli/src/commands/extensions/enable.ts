@@ -15,13 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
-import {
-  McpServerEnablementManager,
-  normalizeServerId,
-} from '../../config/mcp/mcpServerEnablement.js';
-
-const GREEN = '\x1b[32m';
-const RESET = '\x1b[0m';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 
 interface EnableArgs {
   name: string;
@@ -52,27 +46,14 @@ export async function handleEnable(args: EnableArgs) {
 
     if (extension?.mcpServers) {
       const mcpEnablementManager = McpServerEnablementManager.getInstance();
+      const enabledServers = await mcpEnablementManager.autoEnableServers(
+        Object.keys(extension.mcpServers ?? {}),
+      );
 
-      for (const serverName of Object.keys(extension.mcpServers)) {
-        const normalizedName = normalizeServerId(serverName);
-        const state =
-          await mcpEnablementManager.getDisplayState(normalizedName);
-
-        let wasDisabled = false;
-        if (state.isPersistentDisabled) {
-          await mcpEnablementManager.enable(normalizedName);
-          wasDisabled = true;
-        }
-        if (state.isSessionDisabled) {
-          mcpEnablementManager.clearSessionDisable(normalizedName);
-          wasDisabled = true;
-        }
-
-        if (wasDisabled) {
-          debugLogger.log(
-            `${GREEN}✓${RESET} MCP server '${serverName}' was disabled - now enabled.`,
-          );
-        }
+      for (const serverName of enabledServers) {
+        debugLogger.log(
+          `MCP server '${serverName}' was disabled - now enabled.`,
+        );
       }
       // Note: No restartServer() - CLI exits immediately, servers load on next session
     }

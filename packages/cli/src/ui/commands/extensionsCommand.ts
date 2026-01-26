@@ -29,10 +29,7 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
-import {
-  McpServerEnablementManager,
-  normalizeServerId,
-} from '../../config/mcp/mcpServerEnablement.js';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
 
@@ -394,39 +391,19 @@ async function enableAction(context: CommandContext, args: string) {
     if (extension?.mcpServers) {
       const mcpEnablementManager = McpServerEnablementManager.getInstance();
       const mcpClientManager = context.services.config?.getMcpClientManager();
-      const enabledServers: string[] = [];
-
-      for (const serverName of Object.keys(extension.mcpServers)) {
-        const normalizedName = normalizeServerId(serverName);
-        const state =
-          await mcpEnablementManager.getDisplayState(normalizedName);
-
-        let wasDisabled = false;
-        if (state.isPersistentDisabled) {
-          await mcpEnablementManager.enable(normalizedName);
-          wasDisabled = true;
-        }
-        if (state.isSessionDisabled) {
-          mcpEnablementManager.clearSessionDisable(normalizedName);
-          wasDisabled = true;
-        }
-
-        if (wasDisabled) {
-          enabledServers.push(serverName);
-        }
-      }
+      const enabledServers = await mcpEnablementManager.autoEnableServers(
+        Object.keys(extension.mcpServers ?? {}),
+      );
 
       if (mcpClientManager && enabledServers.length > 0) {
-        const restartPromises = enabledServers.map(async (serverName) => {
-          try {
-            await mcpClientManager.restartServer(serverName);
-          } catch (error) {
+        const restartPromises = enabledServers.map((serverName) =>
+          mcpClientManager.restartServer(serverName).catch((error) => {
             context.ui.addItem({
               type: MessageType.WARNING,
               text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
             });
-          }
-        });
+          }),
+        );
         await Promise.all(restartPromises);
       }
 
