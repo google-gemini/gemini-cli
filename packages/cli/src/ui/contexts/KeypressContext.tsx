@@ -124,10 +124,16 @@ function charLengthAt(str: string, i: number): number {
   return code !== undefined && code >= kUTF16SurrogateThreshold ? 2 : 1;
 }
 
-const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
+const MAC_ALT_KEY_CHARACTER_MAP: Record<
+  string,
+  string | { name: string; shift?: boolean }
+> = {
   '\u222B': 'b', // "∫" back one word
   '\u0192': 'f', // "ƒ" forward one word
   '\u00B5': 'm', // "µ" toggle markup view
+  '\u03A9': 'z', // "Ω" undo
+  '\u00B8': { name: 'z', shift: true }, // "¸" redo
+  '\u00DB': { name: 'z', shift: true }, // "Û" redo (common variant)
 };
 
 function nonKeyboardEventFilter(
@@ -559,10 +565,11 @@ function* emitKeys(
       name = 'space';
       alt = escaped;
       insertable = true;
-    } else if (!escaped && ch <= '\x1a') {
+    } else if (ch.length > 0 && ch <= '\x1a') {
       // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
       ctrl = true;
+      alt = escaped;
     } else if (/^[0-9A-Za-z]$/.exec(ch) !== null) {
       // Letter, number, shift+letter
       name = ch.toLowerCase();
@@ -572,7 +579,15 @@ function* emitKeys(
     } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
       // Note: we do this even if we are not on Mac, because mac users may
       // remotely connect to non-Mac systems.
-      name = MAC_ALT_KEY_CHARACTER_MAP[ch];
+      const mapping = MAC_ALT_KEY_CHARACTER_MAP[ch];
+      if (typeof mapping === 'string') {
+        name = mapping;
+      } else {
+        name = mapping.name;
+        if (mapping.shift) {
+          shift = true;
+        }
+      }
       alt = true;
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape

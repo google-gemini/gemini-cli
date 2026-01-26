@@ -12,7 +12,14 @@ import {
   useRef,
   useLayoutEffect,
 } from 'react';
-import { type DOMElement, measureElement } from 'ink';
+import {
+  type DOMElement,
+  measureElement,
+  useApp,
+  useStdout,
+  useStdin,
+  type AppProps,
+} from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -87,7 +94,6 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -193,6 +199,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+  const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
     HistoryItem[] | null
@@ -379,7 +386,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
-  const app = useApp();
+  const app: AppProps = useApp();
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
@@ -1432,6 +1439,49 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setCtrlDPressCount((prev) => prev + 1);
         return true;
+      } else if (keyMatchers[Command.SUSPEND](key)) {
+        if (process.platform !== 'win32') {
+          // Cleanup before suspend
+          writeToStdout('\x1b[?25h'); // Show cursor
+          disableMouseEvents();
+          terminalCapabilityManager.disableKittyProtocol();
+
+          if (process.stdin.isTTY) {
+            process.stdin.setRawMode(false);
+          }
+          setRawMode(false);
+
+          const onResume = () => {
+            // Restore terminal state
+            if (process.stdin.isTTY) {
+              process.stdin.setRawMode(true);
+              process.stdin.resume();
+              process.stdin.ref();
+            }
+            setRawMode(true);
+
+            terminalCapabilityManager.enableKittyProtocol();
+            writeToStdout('\x1b[?25l'); // Hide cursor
+            enableMouseEvents();
+
+            // Force Ink to do a complete repaint by:
+            // 1. Emitting a resize event (tricks Ink into full redraw)
+            // 2. Remounting components via state changes
+            process.stdout.emit('resize');
+
+            // Give a tick for resize to process, then trigger remount
+            setImmediate(() => {
+              refreshStatic();
+              setForceRerenderKey((prev) => prev + 1);
+            });
+
+            process.off('SIGCONT', onResume);
+          };
+          process.on('SIGCONT', onResume);
+
+          process.kill(0, 'SIGTSTP');
+        }
+        return;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1519,6 +1569,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
+      setRawMode,
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
@@ -2068,7 +2119,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
                 onCancel={handleAskUserCancel}
               >
                 <ShellFocusContext.Provider value={isFocused}>
-                  <App />
+                  <App key={`app-${forceRerenderKey}`} />
                 </ShellFocusContext.Provider>
               </AskUserActionsProvider>
             </ToolActionsProvider>

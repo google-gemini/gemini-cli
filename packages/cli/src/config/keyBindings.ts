@@ -85,6 +85,7 @@ export enum Command {
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
+  SUSPEND = 'app.suspend',
 }
 
 /**
@@ -170,8 +171,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
-  [Command.UNDO]: [{ key: 'z', shift: false, ctrl: true }],
-  [Command.REDO]: [{ key: 'z', shift: true, ctrl: true }],
+  [Command.UNDO]: [{ key: 'z', alt: true, shift: false }],
+  [Command.REDO]: [{ key: 'z', alt: true, shift: true }],
 
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
@@ -257,6 +258,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
+  [Command.SUSPEND]: [{ key: 'z', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
@@ -374,6 +376,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
+      Command.SUSPEND,
     ],
   },
 ];
@@ -458,6 +461,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
+  [Command.SUSPEND]: 'Suspend the CLI and move it to the background.',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
