@@ -54,7 +54,9 @@ const StatRow: React.FC<{
 
 export const ToolStatsDisplay: React.FC = () => {
   const { stats } = useSessionStats();
+
   const { tools } = stats.metrics;
+
   const activeTools = Object.entries(tools.byName).filter(
     ([, metrics]) => metrics.count > 0,
   );
@@ -77,19 +79,26 @@ export const ToolStatsDisplay: React.FC = () => {
   const totalDecisions = Object.values(tools.byName).reduce(
     (acc, tool) => {
       acc.accept += tool.decisions.accept;
+
       acc.reject += tool.decisions.reject;
+
       acc.modify += tool.decisions.modify;
+
       return acc;
     },
+
     { accept: 0, reject: 0, modify: 0 },
   );
 
   const totalReviewed =
     totalDecisions.accept + totalDecisions.reject + totalDecisions.modify;
+
   const agreementRate =
     totalReviewed > 0 ? (totalDecisions.accept / totalReviewed) * 100 : 0;
+
   const agreementColor = getStatusColor(agreementRate, {
     green: USER_AGREEMENT_RATE_HIGH,
+
     yellow: USER_AGREEMENT_RATE_MEDIUM,
   });
 
@@ -105,9 +114,11 @@ export const ToolStatsDisplay: React.FC = () => {
       <Text bold color={theme.text.accent}>
         Tool Stats For Nerds
       </Text>
+
       <Box height={1} />
 
       {/* Header */}
+
       <Box>
         <Box width={TOOL_NAME_COL_WIDTH}>
           <Text bold color={theme.text.primary}>

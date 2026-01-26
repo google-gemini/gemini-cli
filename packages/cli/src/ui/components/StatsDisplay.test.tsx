@@ -498,4 +498,62 @@ describe('<StatsDisplay />', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('User Identity Display', () => {
+    it('renders User row with Auth Method and Tier', () => {
+      const metrics = createTestMetrics();
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay
+          duration="1s"
+          selectedAuthType="oauth"
+          userEmail="test@example.com"
+          tier="Pro"
+        />,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Auth Method:');
+      expect(output).toContain('Logged in with Google (test@example.com)');
+      expect(output).toContain('Tier:');
+      expect(output).toContain('Pro');
+    });
+
+    it('renders User row with API Key and no Tier', () => {
+      const metrics = createTestMetrics();
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay duration="1s" selectedAuthType="Google API Key" />,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Auth Method:');
+      expect(output).toContain('Google API Key');
+      expect(output).not.toContain('Tier:');
+    });
+  });
 });

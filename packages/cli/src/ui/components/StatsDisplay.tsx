@@ -364,12 +364,18 @@ interface StatsDisplayProps {
   duration: string;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
   quotas,
+  selectedAuthType,
+  userEmail,
+  tier,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -417,6 +423,22 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         <StatRow title="Session ID:">
           <Text color={theme.text.primary}>{stats.sessionId}</Text>
         </StatRow>
+        {selectedAuthType && (
+          <StatRow title="Auth Method:">
+            <Text color={theme.text.primary}>
+              {selectedAuthType.startsWith('oauth')
+                ? userEmail
+                  ? `Logged in with Google (${userEmail})`
+                  : 'Logged in with Google'
+                : selectedAuthType}
+            </Text>
+          </StatRow>
+        )}
+        {tier && (
+          <StatRow title="Tier:">
+            <Text color={theme.text.primary}>{tier}</Text>
+          </StatRow>
+        )}
         <StatRow title="Tool Calls:">
           <Text color={theme.text.primary}>
             {tools.totalCalls} ({' '}

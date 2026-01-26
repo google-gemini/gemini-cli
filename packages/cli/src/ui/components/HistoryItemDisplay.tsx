@@ -122,9 +122,18 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <StatsDisplay
           duration={itemForDisplay.duration}
           quotas={itemForDisplay.quotas}
+          selectedAuthType={itemForDisplay.selectedAuthType}
+          userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
         />
       )}
-      {itemForDisplay.type === 'model_stats' && <ModelStatsDisplay />}
+      {itemForDisplay.type === 'model_stats' && (
+        <ModelStatsDisplay
+          selectedAuthType={itemForDisplay.selectedAuthType}
+          userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
+        />
+      )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
