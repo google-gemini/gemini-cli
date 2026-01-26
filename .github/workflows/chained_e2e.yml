@@ -114,7 +114,7 @@ jobs:
     if: 'always()'
     steps:
       - name: 'Set pending status'
-        uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
+        uses: 'myrotvorets/set-commit-status-action@0e709a89566c3de108b6674b65fb22aca2133247' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
           allowForks: 'true'
@@ -338,7 +338,7 @@ jobs:
       - 'e2e'
     steps:
       - name: 'Set workflow status'
-        uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
+        uses: 'myrotvorets/set-commit-status-action@0e709a89566c3de108b6674b65fb22aca2133247' # ratchet:myrotvorets/set-commit-status-action@master
         if: 'always()'
         with:
           allowForks: 'true'
