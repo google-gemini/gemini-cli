@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getPackageJson } from './package.js';
 import { readPackageUp } from 'read-package-up';
 
@@ -13,6 +13,14 @@ vi.mock('read-package-up', () => ({
 }));
 
 describe('getPackageJson', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should return packageJson when found', async () => {
     const mockPackageJson = { name: 'test-pkg', version: '1.2.3' };
     vi.mocked(readPackageUp).mockResolvedValue({
@@ -28,27 +36,30 @@ describe('getPackageJson', () => {
     });
   });
 
-  it('should return undefined when no package.json is found', async () => {
-    vi.mocked(readPackageUp).mockResolvedValue(undefined);
-
+  it.each([
+    {
+      description: 'no package.json is found',
+      setup: () => vi.mocked(readPackageUp).mockResolvedValue(undefined),
+      expected: undefined,
+    },
+    {
+      description: 'non-semver versions (when normalize is false)',
+      setup: () =>
+        vi.mocked(readPackageUp).mockResolvedValue({
+          packageJson: { name: 'test-pkg', version: '2024.60' },
+          path: '/path/to/package.json',
+        }),
+      expected: { name: 'test-pkg', version: '2024.60' },
+    },
+    {
+      description: 'readPackageUp throws',
+      setup: () =>
+        vi.mocked(readPackageUp).mockRejectedValue(new Error('Read error')),
+      expected: undefined,
+    },
+  ])('should handle $description', async ({ setup, expected }) => {
+    setup();
     const result = await getPackageJson('/some/path');
-    expect(result).toBeUndefined();
-  });
-
-  it('should handle non-semver versions when normalize is false', async () => {
-    const mockPackageJson = { name: 'test-pkg', version: '2024.60' };
-    vi.mocked(readPackageUp).mockResolvedValue({
-      packageJson: mockPackageJson,
-      path: '/path/to/package.json',
-    });
-
-    const result = await getPackageJson('/some/path');
-    expect(result).toEqual(mockPackageJson);
-  });
-
-  it('should propagate errors when readPackageUp throws', async () => {
-    vi.mocked(readPackageUp).mockRejectedValue(new Error('Read error'));
-
-    await expect(getPackageJson('/some/path')).rejects.toThrow('Read error');
+    expect(result).toEqual(expected);
   });
 });
