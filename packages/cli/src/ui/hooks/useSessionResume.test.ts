@@ -62,7 +62,7 @@ describe('useSessionResume', () => {
       expect(result.current.loadHistoryForResume).toBeInstanceOf(Function);
     });
 
-    it('should clear history and add items when loading history', () => {
+    it('should clear history and add items when loading history', async () => {
       const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const uiHistory: HistoryItemWithoutId[] = [
@@ -86,8 +86,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume(
+      await act(async () => {
+        await result.current.loadHistoryForResume(
           uiHistory,
           clientHistory,
           resumedData,
@@ -116,7 +116,7 @@ describe('useSessionResume', () => {
       );
     });
 
-    it('should not load history if Gemini client is not initialized', () => {
+    it('should not load history if Gemini client is not initialized', async () => {
       const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
@@ -141,8 +141,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume(
+      await act(async () => {
+        await result.current.loadHistoryForResume(
           uiHistory,
           clientHistory,
           resumedData,
@@ -154,7 +154,7 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
-    it('should handle empty history arrays', () => {
+    it('should handle empty history arrays', async () => {
       const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const resumedData: ResumedSessionData = {
@@ -168,8 +168,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume([], [], resumedData);
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
       });
 
       expect(mockHistoryManager.clearItems).toHaveBeenCalled();
@@ -311,15 +311,17 @@ describe('useSessionResume', () => {
         ] as MessageRecord[],
       };
 
-      renderHook(() =>
-        useSessionResume({
-          ...getDefaultProps(),
-          resumedSessionData: {
-            conversation,
-            filePath: '/path/to/session.json',
-          },
-        }),
-      );
+      await act(async () => {
+        renderHook(() =>
+          useSessionResume({
+            ...getDefaultProps(),
+            resumedSessionData: {
+              conversation,
+              filePath: '/path/to/session.json',
+            },
+          }),
+        );
+      });
 
       await waitFor(() => {
         expect(mockHistoryManager.clearItems).toHaveBeenCalled();
@@ -358,20 +360,24 @@ describe('useSessionResume', () => {
         ] as MessageRecord[],
       };
 
-      const { rerender } = renderHook(
-        ({ refreshStatic }: { refreshStatic: () => void }) =>
-          useSessionResume({
-            ...getDefaultProps(),
-            refreshStatic,
-            resumedSessionData: {
-              conversation,
-              filePath: '/path/to/session.json',
-            },
-          }),
-        {
-          initialProps: { refreshStatic: mockRefreshStatic },
-        },
-      );
+      let rerenderFunc: (props: { refreshStatic: () => void }) => void;
+      await act(async () => {
+        const { rerender } = renderHook(
+          ({ refreshStatic }: { refreshStatic: () => void }) =>
+            useSessionResume({
+              ...getDefaultProps(),
+              refreshStatic,
+              resumedSessionData: {
+                conversation,
+                filePath: '/path/to/session.json',
+              },
+            }),
+          {
+            initialProps: { refreshStatic: mockRefreshStatic as () => void },
+          },
+        );
+        rerenderFunc = rerender;
+      });
 
       await waitFor(() => {
         expect(mockHistoryManager.clearItems).toHaveBeenCalled();
@@ -383,7 +389,9 @@ describe('useSessionResume', () => {
 
       // Rerender with different refreshStatic
       const newRefreshStatic = vi.fn();
-      rerender({ refreshStatic: newRefreshStatic });
+      await act(async () => {
+        rerenderFunc({ refreshStatic: newRefreshStatic });
+      });
 
       // Should not resume again
       expect(mockHistoryManager.clearItems).toHaveBeenCalledTimes(
@@ -413,15 +421,17 @@ describe('useSessionResume', () => {
         ] as MessageRecord[],
       };
 
-      renderHook(() =>
-        useSessionResume({
-          ...getDefaultProps(),
-          resumedSessionData: {
-            conversation,
-            filePath: '/path/to/session.json',
-          },
-        }),
-      );
+      await act(async () => {
+        renderHook(() =>
+          useSessionResume({
+            ...getDefaultProps(),
+            resumedSessionData: {
+              conversation,
+              filePath: '/path/to/session.json',
+            },
+          }),
+        );
+      });
 
       await waitFor(() => {
         expect(mockGeminiClient.resumeChat).toHaveBeenCalled();

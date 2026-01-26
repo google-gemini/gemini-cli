@@ -24,7 +24,7 @@ export const useSessionBrowser = (
     uiHistory: HistoryItemWithoutId[],
     clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
     resumedSessionData: ResumedSessionData,
-  ) => void,
+  ) => Promise<void>,
 ) => {
   const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
 
@@ -73,7 +73,7 @@ export const useSessionBrowser = (
           const historyData = convertSessionToHistoryFormats(
             conversation.messages,
           );
-          onLoadHistory(
+          await onLoadHistory(
             historyData.uiHistory,
             historyData.clientHistory,
             resumedSessionData,
