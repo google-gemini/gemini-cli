@@ -81,10 +81,6 @@
         "slug": "docs/cli/model"
       },
       {
-        "label": "Rewind",
-        "slug": "docs/cli/rewind"
-      },
-      {
         "label": "Sandbox",
         "slug": "docs/cli/sandbox"
       },
@@ -196,17 +192,25 @@
         "slug": "docs/extensions"
       },
       {
-        "label": "Get started with extensions",
-        "slug": "docs/extensions/getting-started-extensions"
+        "label": "Writing extensions",
+        "slug": "docs/extensions/writing-extensions"
       },
       {
-        "label": "Extension releasing",
-        "slug": "docs/extensions/extension-releasing"
+        "label": "Extensions reference",
+        "slug": "docs/extensions/reference"
+      },
+      {
+        "label": "Best practices",
+        "slug": "docs/extensions/best-practices"
+      },
+      {
+        "label": "Extensions releasing",
+        "slug": "docs/extensions/releasing"
       }
     ]
   },
   {
-    "label": "Hooks",
+    "label": "Hooks (experimental)",
     "items": [
       {
         "label": "Introduction",
@@ -274,10 +278,6 @@
       {
         "label": "Preview release",
         "slug": "docs/changelogs/preview"
-      },
-      {
-        "label": "Changelog",
-        "slug": "docs/changelogs/releases"
       }
     ]
   },
