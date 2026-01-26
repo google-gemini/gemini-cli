@@ -189,32 +189,43 @@ export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
 
-  const initialHistoryItems = useMemo(() => {
-    const items: HistoryItem[] = [];
-    if (resumedSessionData) return items;
+  const historyManager = useHistory({
+    chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
+  });
+  const { addItem } = historyManager;
 
-    // Check if the user has disabled showing auth on startup
-    if (settings.merged.ui.showAuthOnStartup === false) return items;
+  const authCheckPerformed = useRef(false);
+  useEffect(() => {
+    if (authCheckPerformed.current) return;
+    authCheckPerformed.current = true;
 
+    if (resumedSessionData || settings.merged.ui.showUserIdentity === false) {
+      return;
+    }
     // We can't use authState here because it's initialized in useAuthCommand which is called later.
     // However, we can check config directly since we know startup just finished.
     const authType = config.getContentGeneratorConfig()?.authType;
     if (
-      authType === AuthType.LOGIN_WITH_GOOGLE ||
-      authType === AuthType.COMPUTE_ADC
+      authType !== AuthType.LOGIN_WITH_GOOGLE &&
+      authType !== AuthType.COMPUTE_ADC
     ) {
+      return;
+    }
+
+    // Run this asynchronously to avoid blocking the event loop.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
       try {
         const userAccountManager = new UserAccountManager();
         const email = userAccountManager.getCachedGoogleAccount();
-        const tier = config.getUserTier();
+        const tierName = config.getUserTierName();
 
         if (email) {
           let message = `Authenticated as: ${email}`;
-          if (tier) {
-            message += ` (Plan: ${tier})`;
+          if (tierName) {
+            message += ` (Plan: ${tierName})`;
           }
-          items.push({
-            id: Date.now(), // Use timestamp as ID for initial item
+          addItem({
             type: MessageType.INFO,
             text: message,
           });
@@ -222,14 +233,14 @@ export const AppContainer = (props: AppContainerProps) => {
       } catch (_e) {
         // Ignore errors during initial auth check
       }
-    }
-    return items;
-  }, [config, resumedSessionData, settings.merged.ui.showAuthOnStartup]);
+    })();
+  }, [
+    config,
+    resumedSessionData,
+    settings.merged.ui.showUserIdentity,
+    addItem,
+  ]);
 
-  const historyManager = useHistory({
-    chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
-    initialItems: initialHistoryItems,
-  });
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
