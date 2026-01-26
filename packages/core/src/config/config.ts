@@ -799,7 +799,7 @@ export class Config {
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
       const plansDir = this.storage.getProjectTempPlansDir();
-      fs.mkdirSync(plansDir, { recursive: true });
+      await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
 

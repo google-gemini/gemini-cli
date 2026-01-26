@@ -2244,11 +2244,11 @@ describe('Plans Directory Initialization', () => {
   };
 
   beforeEach(() => {
-    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+    vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
-    vi.mocked(fs.mkdirSync).mockRestore();
+    vi.mocked(fs.promises.mkdir).mockRestore();
   });
 
   it('should create plans directory and add it to workspace context when plan is enabled', async () => {
@@ -2260,7 +2260,9 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getProjectTempPlansDir();
-    expect(fs.mkdirSync).toHaveBeenCalledWith(plansDir, { recursive: true });
+    expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
@@ -2275,7 +2277,7 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getProjectTempPlansDir();
-    expect(fs.mkdirSync).not.toHaveBeenCalledWith(plansDir, {
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
 
