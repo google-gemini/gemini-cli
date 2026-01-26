@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 import { ValidationDialog } from './ValidationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import type { Key } from '../hooks/useKeypress.js';
 
 // Mock the child components and utilities
 vi.mock('./shared/RadioButtonSelect.js', () => ({
@@ -41,8 +42,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+// Capture keypress handler to test it
+let mockKeypressHandler: (key: Key) => void;
+let mockKeypressOptions: { isActive: boolean };
+
 vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: vi.fn(),
+  useKeypress: vi.fn((handler, options) => {
+    mockKeypressHandler = handler;
+    mockKeypressOptions = options;
+  }),
 }));
 
 describe('ValidationDialog', () => {
@@ -97,6 +105,29 @@ describe('ValidationDialog', () => {
 
       expect(lastFrame()).toContain('Learn more:');
       expect(lastFrame()).toContain('https://example.com/help');
+      unmount();
+    });
+
+    it('should call onChoice with cancel when ESCAPE is pressed', () => {
+      const { unmount } = render(<ValidationDialog onChoice={mockOnChoice} />);
+
+      // Verify the keypress hook is active
+      expect(mockKeypressOptions.isActive).toBe(true);
+
+      // Simulate ESCAPE key press
+      act(() => {
+        mockKeypressHandler({
+          name: 'escape',
+          ctrl: false,
+          shift: false,
+          alt: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b',
+        });
+      });
+
+      expect(mockOnChoice).toHaveBeenCalledWith('cancel');
       unmount();
     });
   });
