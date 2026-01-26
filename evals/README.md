@@ -160,8 +160,7 @@ failing evaluations. It will:
     `evals/logs`.
 2.  **Fix**: Suggest and apply targeted fixes to the prompt or tool definitions.
     It prioritizes minimal changes to `prompt.ts`, tool instructions, and
-    modules that contribute to the prompt. It generally tries to avoid changing
-    the test itself.
+    modules that contribute to the prompt.
 3.  **Verify**: Re-run the test 3 times across multiple models (e.g., Gemini
     3.0, Gemini 3 Flash, Gemini 2.5 Pro) to ensure stability and calculate a
     success rate.
