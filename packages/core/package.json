@@ -85,7 +85,7 @@
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
-    "@types/minimatch": "^5.1.2",
+    "@types/minimatch": "^6.0.0",
     "@types/picomatch": "^4.0.1",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
