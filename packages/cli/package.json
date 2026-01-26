@@ -71,7 +71,7 @@
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
     "@google/gemini-cli-test-utils": "file:../test-utils",
-    "@types/archiver": "^6.0.3",
+    "@types/archiver": "^7.0.0",
     "@types/command-exists": "^1.2.3",
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.11.24",
