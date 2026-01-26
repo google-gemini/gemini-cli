@@ -5,7 +5,7 @@
  */
 
 import { Storage } from '../config/storage.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
@@ -74,6 +74,23 @@ export class AgentRegistry {
   }
 
   /**
+   * Acknowledges and registers a previously unacknowledged agent.
+   */
+  async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
+    const ackService = this.config.getAcknowledgedAgentsService();
+    const projectRoot = this.config.getProjectRoot();
+    if (agent.metadata?.hash) {
+      await ackService.acknowledge(
+        projectRoot,
+        agent.name,
+        agent.metadata.hash,
+      );
+      await this.registerAgent(agent);
+      coreEvents.emitAgentsRefreshed();
+    }
+  }
+
+  /**
    * Disposes of resources and removes event listeners.
    */
   dispose(): void {
@@ -115,8 +132,46 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
+
+      const ackService = this.config.getAcknowledgedAgentsService();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
+
+      for (const agent of projectAgents.agents) {
+        // If it's a remote agent, use the agentCardUrl as the hash.
+        // This allows multiple remote agents in a single file to be tracked independently.
+        if (agent.kind === 'remote') {
+          if (!agent.metadata) {
+            agent.metadata = {};
+          }
+          agent.metadata.hash = agent.agentCardUrl;
+        }
+
+        if (!agent.metadata?.hash) {
+          agentsToRegister.push(agent);
+          continue;
+        }
+
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
+        } else {
+          unacknowledgedAgents.push(agent);
+        }
+      }
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
       await Promise.allSettled(
-        projectAgents.agents.map((agent) => this.registerAgent(agent)),
+        agentsToRegister.map((agent) => this.registerAgent(agent)),
       );
     } else {
       coreEvents.emitFeedback(
