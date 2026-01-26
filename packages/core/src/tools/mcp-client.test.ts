@@ -697,6 +697,7 @@ describe('mcp-client', () => {
         workspaceContext,
         { sanitizationConfig: EMPTY_CONFIG } as Config,
         false,
+        '0.0.1',
       );
       await client.connect();
       await client.discover({ sanitizationConfig: EMPTY_CONFIG } as Config);
