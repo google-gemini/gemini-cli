@@ -26,6 +26,7 @@ export enum MessageBusType {
 export interface ToolCallsUpdateMessage {
   type: MessageBusType.TOOL_CALLS_UPDATE;
   toolCalls: ToolCall[];
+  schedulerId: string;
 }
 
 export interface ToolConfirmationRequest {

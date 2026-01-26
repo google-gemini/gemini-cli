@@ -66,6 +66,7 @@ import type {
   CancelledToolCall,
   ToolCallResponseInfo,
 } from './types.js';
+import { ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';
@@ -94,6 +95,8 @@ describe('Scheduler (Orchestrator)', () => {
     args: { foo: 'bar' },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
+    schedulerId: ROOT_SCHEDULER_ID,
+    parentCallId: undefined,
   };
 
   const req2: ToolCallRequestInfo = {
@@ -102,6 +105,8 @@ describe('Scheduler (Orchestrator)', () => {
     args: { foo: 'baz' },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
+    schedulerId: ROOT_SCHEDULER_ID,
+    parentCallId: undefined,
   };
 
   const mockTool = {
@@ -208,6 +213,7 @@ describe('Scheduler (Orchestrator)', () => {
       config: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
+      schedulerId: 'root',
     });
 
     // Reset Tool build behavior
@@ -271,6 +277,8 @@ describe('Scheduler (Orchestrator)', () => {
             request: req1,
             tool: mockTool,
             invocation: mockInvocation,
+            schedulerId: ROOT_SCHEDULER_ID,
+            startTime: expect.any(Number),
           }),
         ]),
       );
@@ -769,6 +777,7 @@ describe('Scheduler (Orchestrator)', () => {
           config: mockConfig,
           messageBus: mockMessageBus,
           state: mockStateManager,
+          schedulerId: ROOT_SCHEDULER_ID,
         }),
       );
 
