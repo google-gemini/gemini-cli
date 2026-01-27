@@ -14,5 +14,22 @@
   "error": "エラー",
   "success": "成功",
   "warning": "警告",
-  "info": "情報"
+  "info": "情報",
+  "update": {
+    "newVersionAvailable": "Gemini CLIの新しいバージョンが利用可能です！ {{current}} → {{latest}}",
+    "updateAvailable": "Gemini CLIのアップデートがあります！ {{current}} → {{latest}}",
+    "sandboxNotAvailable": "サンドボックスモードでは自動アップデートを利用できません。",
+    "autoUpdateFailedCommand": "自動アップデートに失敗しました。手動でアップデートしてください。（コマンド: {{command}}）",
+    "autoUpdateFailedError": "自動アップデートに失敗しました。手動でアップデートしてください。（エラー: {{error}}）",
+    "autoUpdateFailed": "自動アップデートに失敗しました。手動でアップデートしてください",
+    "updateSuccess": "アップデートが完了しました！次回起動時に新しいバージョンが使用されます。",
+    "gitClone": "ローカルのgitクローンから実行中です。\"git pull\"でアップデートしてください。",
+    "npxNotApplicable": "npx経由で実行中のため、アップデートは不要です。",
+    "pnpxNotApplicable": "pnpx経由で実行中のため、アップデートは不要です。",
+    "bunxNotApplicable": "bunx経由で実行中のため、アップデートは不要です。",
+    "homebrew": "Homebrewでインストールされています。\"brew upgrade gemini-cli\"でアップデートしてください。",
+    "localInstall": "ローカルにインストールされています。プロジェクトのpackage.jsonからアップデートしてください。",
+    "autoUpdating": "{{pm}}でインストールされています。自動アップデートを実行中...",
+    "manualUpdate": "{{command}} を実行してアップデートしてください"
+  }
 }

@@ -23,5 +23,258 @@
     "instructions": "(Enterで選択)",
     "instructionsWithScope": "(Enterで選択、Tabでフォーカス切替)",
     "restartPrompt": "変更を反映するにはGemini CLIを再起動する必要があります。rを押すと終了して変更を適用します。"
+  },
+  "stats": {
+    "goodbye": "エージェントを終了します。さようなら！",
+    "sessionStats": "セッション統計",
+    "interactionSummary": "対話サマリー",
+    "sessionId": "セッションID:",
+    "toolCalls": "ツール呼び出し:",
+    "successRate": "成功率:",
+    "userAgreement": "ユーザー承認率:",
+    "reviewed": "件確認済み",
+    "codeChanges": "コード変更:",
+    "performance": "パフォーマンス",
+    "wallTime": "経過時間:",
+    "agentActive": "エージェント稼働時間:",
+    "apiTime": "API時間:",
+    "toolTime": "ツール時間:",
+    "modelUsage": "モデル使用状況",
+    "reqs": "リクエスト",
+    "inputTokens": "入力トークン",
+    "cacheReads": "キャッシュ読取",
+    "outputTokens": "出力トークン",
+    "usageLeft": "残り使用量",
+    "cacheSavings": "入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。",
+    "usageLimits": "使用量制限は全セッション共通で、毎日リセットされます。\n/auth でアップグレードまたはAPIキーに切り替えできます。",
+    "statsTip": "» ヒント: 詳細なトークン内訳は `/stats model` で確認できます。",
+    "resetsIn": "{{time}}後にリセット"
+  },
+  "folderTrust": {
+    "title": "このフォルダを信頼しますか？",
+    "description": "フォルダを信頼すると、Geminiが提案するコマンドを実行できるようになります。これは信頼されていないディレクトリでの誤った実行を防ぐためのセキュリティ機能です。",
+    "trustFolder": "フォルダを信頼 ({{dirName}})",
+    "trustParentFolder": "親フォルダを信頼 ({{parentFolder}})",
+    "dontTrust": "信頼しない",
+    "restarting": "信頼設定を適用するためGemini CLIを再起動しています...",
+    "exitMessage": "続行するにはフォルダの信頼レベルを選択する必要があります。Escapeキーが押されたため終了します。"
+  },
+  "consent": {
+    "yes": "はい",
+    "no": "いいえ"
+  },
+  "newAgents": {
+    "title": "新しいエージェントを検出",
+    "description": "このプロジェクトで以下のエージェントが見つかりました。確認してください：",
+    "acknowledge": "確認して有効化",
+    "ignore": "有効化しない（次回再度確認）",
+    "andMore": "... 他 {{count}} 件"
+  },
+  "ideTrustChange": {
+    "changed": "ワークスペースの信頼設定が変更されました。",
+    "changedConnection": "IDE接続の変更によりワークスペースの信頼設定が変更されました。",
+    "changedTrust": "IDE信頼設定の変更によりワークスペースの信頼設定が変更されました。",
+    "pressRestart": "'r'キーを押してGeminiを再起動し、変更を適用してください。"
+  },
+  "validation": {
+    "verifyAccount": "アカウントを確認",
+    "changeAuth": "認証方法を変更",
+    "openUrl": "ブラウザでこのURLを開いてください: {{url}}",
+    "failedOpenBrowser": "ブラウザを開けませんでした",
+    "failedOpenLink": "確認リンクを開けませんでした。再試行するか、認証方法を変更してください。",
+    "waiting": "確認を待っています... (ESCまたはCTRL+Cでキャンセル)",
+    "pressEnter": "確認が完了したらEnterを押してください。",
+    "complete": "確認完了",
+    "actionRequired": "このサービスを使用するには追加の操作が必要です。",
+    "learnMore": "詳細:"
+  },
+  "ideIntegrationNudge": {
+    "yes": "はい",
+    "noEsc": "いいえ (esc)",
+    "noDontAsk": "いいえ、今後表示しない",
+    "connectPrompt": "{{ideName}}をGemini CLIに接続しますか？",
+    "yourEditor": "エディタ",
+    "installTextPreInstalled": "「はい」を選択すると、CLIが開いているファイルにアクセスし、{{ideName}}で直接差分を表示できるようになります。",
+    "installTextNew": "「はい」を選択すると、CLIが開いているファイルにアクセスし、{{ideName}}で直接差分を表示できる拡張機能をインストールします。"
+  },
+  "rewindConfirmation": {
+    "title": "巻き戻しを確認",
+    "rewindAndRevert": "会話を巻き戻してコード変更を元に戻す",
+    "rewindOnly": "会話を巻き戻す",
+    "revertOnly": "コード変更を元に戻す",
+    "doNothing": "何もしない (esc)",
+    "singleFile": "ファイル: {{fileName}}",
+    "filesAffected": "{{count}}個のファイルが影響を受けます",
+    "linesAdded": "追加行: {{count}}",
+    "linesRemoved": "削除行: {{count}}",
+    "infoText": "巻き戻しは手動またはシェルツールで編集されたファイルには影響しません。",
+    "noChanges": "元に戻すコード変更がありません。",
+    "selectAction": "アクションを選択:"
+  },
+  "model": {
+    "title": "モデルを選択",
+    "autoDescriptionDefault": "タスクに最適なモデルをGemini CLIが決定します: gemini-2.5-pro, gemini-2.5-flash",
+    "autoDescriptionPreview": "タスクに最適なモデルをGemini CLIが決定します: gemini-3-pro, gemini-3-flash",
+    "manual": "手動設定",
+    "manualWithModel": "手動設定 ({{model}})",
+    "manualDescription": "モデルを手動で選択します",
+    "gemini3Available": "Gemini 3が利用可能になりました。",
+    "enablePreviewFeatures": "/settings で「プレビュー機能」を有効にしてください。\n詳細はこちら：https://goo.gle/enable-preview-features",
+    "gemini3ComingSoon": "Gemini 3は近日公開予定です。",
+    "rememberModel": "今後のセッションでもこのモデルを使用する: ",
+    "persistModeTrue": "はい",
+    "persistModeFalse": "いいえ",
+    "pressTabToToggle": "(Tabキーで切り替え)",
+    "modelFlagUsage": "> 起動時に特定のGeminiモデルを使用するには、--modelフラグを使用してください。",
+    "pressEscToClose": "(Escキーで閉じる)"
+  },
+  "agentConfig": {
+    "title": "設定: {{displayName}}",
+    "fields": {
+      "enabled": {
+        "label": "有効",
+        "description": "このエージェントを有効または無効にします"
+      },
+      "model": {
+        "label": "モデル",
+        "description": "使用するモデル（例：'gemini-2.0-flash'、'inherit' など）"
+      },
+      "temperature": {
+        "label": "Temperature",
+        "description": "サンプリング温度（0.0 から 2.0）"
+      },
+      "topP": {
+        "label": "Top P",
+        "description": "Nucleusサンプリングパラメータ（0.0 から 1.0）"
+      },
+      "topK": {
+        "label": "Top K",
+        "description": "Top-Kサンプリングパラメータ"
+      },
+      "maxOutputTokens": {
+        "label": "最大出力トークン数",
+        "description": "生成するトークンの最大数"
+      },
+      "maxTimeMinutes": {
+        "label": "最大実行時間（分）",
+        "description": "実行時間の最大値（分単位）"
+      },
+      "maxTurns": {
+        "label": "最大ターン数",
+        "description": "対話ターンの最大数"
+      }
+    },
+    "values": {
+      "true": "はい",
+      "false": "いいえ",
+      "default": "(デフォルト)"
+    },
+    "changesSaved": "変更は自動的に保存されました。"
+  },
+  "multiFolderTrust": {
+    "cancelled": "操作はキャンセルされました。以下のディレクトリは追加されませんでした：\n- {{folders}}",
+    "yes": "はい",
+    "yesAndRemember": "はい、これらのディレクトリを信頼済みとして保存する",
+    "no": "いいえ",
+    "configUnavailable": "設定を利用できません。",
+    "notTrusted": "信頼されていないため、以下のディレクトリは追加されませんでした：\n- {{folders}}",
+    "errorAdding": "'{{dir}}' の追加中にエラーが発生しました: {{message}}",
+    "question": "このワークスペースに追加される以下のフォルダを信頼しますか？",
+    "description": "フォルダを信頼すると、自動承認モード時にGeminiがファイルを読み取ったり自動編集を行ったりできるようになります。これは信頼されていないディレクトリでの意図しない実行を防ぐためのセキュリティ機能です。",
+    "applying": "信頼設定を適用中..."
+  },
+  "permissions": {
+    "trustThisFolder": "このフォルダを信頼する ({{dirName}})",
+    "trustParentFolder": "親フォルダを信頼する ({{parentFolder}})",
+    "dontTrust": "信頼しない",
+    "title": "信頼レベルの変更",
+    "folder": "フォルダ: {{cwd}}",
+    "currentLevel": "現在のレベル: ",
+    "notSet": "設定なし",
+    "inheritedFromParent": "注：このフォルダは親フォルダの一つが信頼されているため、信頼されたフォルダとして動作します。ここで別の信頼レベルを設定しても、信頼された状態のままとなります。これを変更するには、親フォルダの信頼設定を変更する必要があります。",
+    "inheritedFromIde": "注：このフォルダは接続されているIDEワークスペースが信頼されているため、信頼されたフォルダとして動作します。ここで別の信頼レベルを設定しても、信頼された状態のままとなります。",
+    "instructions": "(Enterで選択、Escで閉じる)",
+    "restartPrompt": "信頼設定の変更を適用するには、Gemini CLIを再起動する必要があります。'r'キーを押して今すぐ再起動してください。"
+  },
+  "editor": {
+    "unsupported": "エディタはサポートされていません: {{preference}}",
+    "userSettings": "ユーザー設定",
+    "workspaceSettings": "ワークスペース設定",
+    "alsoModifiedIn": "({{scope}} でも変更されています)",
+    "modifiedIn": "({{scope}} で変更されています)",
+    "none": "なし",
+    "title": "エディタを選択",
+    "applyTo": "適用先",
+    "instructions": "(Enterで選択、Tabでフォーカス切替、Escで閉じる)",
+    "preferenceTitle": "エディタ設定",
+    "description": "現在サポートされているエディタは以下の通りです。一部のエディタはサンドボックスモードでは使用できないことに注意してください。",
+    "currentPreference": "現在の設定: "
+  },
+  "sessionBrowser": {
+    "loading": "セッションを読み込み中…",
+    "error": "エラー: {{message}}",
+    "pressQToExit": "qキーで終了",
+    "noSessions": "自動保存された会話は見つかりませんでした。",
+    "searchLabel": "検索: ",
+    "escToCancel": "(Escでキャンセル)",
+    "chatSessions": "チャットセッション",
+    "total": "合計",
+    "filtered": "フィルター済み",
+    "sortedBy": "{{criteria}} ({{direction}}) でソート済み",
+    "sortCriteria": {
+      "date": "日付",
+      "messages": "メッセージ数",
+      "name": "名前"
+    },
+    "sortDirection": {
+      "asc": "昇順",
+      "desc": "降順"
+    },
+    "actions": {
+      "navigate": "移動",
+      "resume": "再開",
+      "search": "検索",
+      "delete": "削除",
+      "quit": "終了",
+      "sort": "ソート",
+      "reverse": "反転",
+      "firstLast": "最初/最後"
+    },
+    "columns": {
+      "index": "番号",
+      "msgs": "件数",
+      "age": "時間",
+      "match": "一致",
+      "name": "名前"
+    },
+    "noMatch": "'{{query}}' に一致するセッションは見つかりませんでした。",
+    "roles": {
+      "user": "ユーザー: ",
+      "model": "Gemini:  "
+    },
+    "currentSession": "(現在)",
+    "moreMatches": " (他 {{count}} 件)",
+    "noMessages": "(メッセージなし)",
+    "errors": {
+      "loadFailed": "セッションの読み込みに失敗しました",
+      "loadFullFailed": "セッション内容の完全な読み込みに失敗しました",
+      "deleteFailed": "セッションの削除に失敗しました: {{message}}"
+    }
+  },
+  "rewindViewer": {
+    "stayAtCurrent": "現在の位置に留まる",
+    "rewinding": "巻き戻し中...",
+    "title": "巻き戻し",
+    "cancelRewindDesc": "巻き戻しをキャンセルして現在の状態を維持します",
+    "singleFileChanged": "1個のファイルを変更",
+    "filesChanged": "{{count}}個のファイルを変更",
+    "noFilesChanged": "変更されたファイルはありません",
+    "instructions": "(Enterでメッセージを選択、Escで閉じる、右/左キーで展開/折りたたみ)"
+  },
+  "proQuota": {
+    "keepTrying": "再試行する",
+    "stop": "停止",
+    "switchTo": "{{model}} に切り替える",
+    "upgrade": "アップグレードして制限を増やす"
   }
 }

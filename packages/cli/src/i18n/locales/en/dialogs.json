@@ -23,5 +23,258 @@
     "instructions": "(Use Enter to select)",
     "instructionsWithScope": "(Use Enter to select, Tab to change focus)",
     "restartPrompt": "To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now."
+  },
+  "stats": {
+    "goodbye": "Agent powering down. Goodbye!",
+    "sessionStats": "Session Stats",
+    "interactionSummary": "Interaction Summary",
+    "sessionId": "Session ID:",
+    "toolCalls": "Tool Calls:",
+    "successRate": "Success Rate:",
+    "userAgreement": "User Agreement:",
+    "reviewed": "reviewed",
+    "codeChanges": "Code Changes:",
+    "performance": "Performance",
+    "wallTime": "Wall Time:",
+    "agentActive": "Agent Active:",
+    "apiTime": "API Time:",
+    "toolTime": "Tool Time:",
+    "modelUsage": "Model Usage",
+    "reqs": "Reqs",
+    "inputTokens": "Input Tokens",
+    "cacheReads": "Cache Reads",
+    "outputTokens": "Output Tokens",
+    "usageLeft": "Usage left",
+    "cacheSavings": "{{tokens}} ({{percent}}) of input tokens were served from the cache, reducing costs.",
+    "usageLimits": "Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.",
+    "statsTip": "» Tip: For a full token breakdown, run `/stats model`.",
+    "resetsIn": "Resets in {{time}}"
+  },
+  "folderTrust": {
+    "title": "Do you trust this folder?",
+    "description": "Trusting a folder allows Gemini to execute commands it suggests. This is a security feature to prevent accidental execution in untrusted directories.",
+    "trustFolder": "Trust folder ({{dirName}})",
+    "trustParentFolder": "Trust parent folder ({{parentFolder}})",
+    "dontTrust": "Don't trust",
+    "restarting": "Gemini CLI is restarting to apply the trust changes...",
+    "exitMessage": "A folder trust level must be selected to continue. Exiting since escape was pressed."
+  },
+  "consent": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "newAgents": {
+    "title": "New Agents Discovered",
+    "description": "The following agents were found in this project. Please review them:",
+    "acknowledge": "Acknowledge and Enable",
+    "ignore": "Do not enable (Ask again next time)",
+    "andMore": "... and {{count}} more."
+  },
+  "ideTrustChange": {
+    "changed": "Workspace trust has changed.",
+    "changedConnection": "Workspace trust has changed due to a change in the IDE connection.",
+    "changedTrust": "Workspace trust has changed due to a change in the IDE trust.",
+    "pressRestart": "Press 'r' to restart Gemini to apply the changes."
+  },
+  "validation": {
+    "verifyAccount": "Verify your account",
+    "changeAuth": "Change authentication",
+    "openUrl": "Please open this URL in a browser: {{url}}",
+    "failedOpenBrowser": "Failed to open browser",
+    "failedOpenLink": "Failed to open verification link. Please try again or change authentication.",
+    "waiting": "Waiting for verification... (Press ESC or CTRL+C to cancel)",
+    "pressEnter": "Press Enter when verification is complete.",
+    "complete": "Verification complete",
+    "actionRequired": "Further action is required to use this service.",
+    "learnMore": "Learn more:"
+  },
+  "ideIntegrationNudge": {
+    "yes": "Yes",
+    "noEsc": "No (esc)",
+    "noDontAsk": "No, don't ask again",
+    "connectPrompt": "Do you want to connect {{ideName}} to Gemini CLI?",
+    "yourEditor": "your editor",
+    "installTextPreInstalled": "If you select Yes, the CLI will have access to your open files and display diffs directly in {{ideName}}.",
+    "installTextNew": "If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in {{ideName}}."
+  },
+  "rewindConfirmation": {
+    "title": "Confirm Rewind",
+    "rewindAndRevert": "Rewind conversation and revert code changes",
+    "rewindOnly": "Rewind conversation",
+    "revertOnly": "Revert code changes",
+    "doNothing": "Do nothing (esc)",
+    "singleFile": "File: {{fileName}}",
+    "filesAffected": "{{count}} files affected",
+    "linesAdded": "Lines added: {{count}}",
+    "linesRemoved": "Lines removed: {{count}}",
+    "infoText": "Rewinding does not affect files edited manually or by the shell tool.",
+    "noChanges": "No code changes to revert.",
+    "selectAction": "Select an action:"
+  },
+  "model": {
+    "title": "Select Model",
+    "autoDescriptionDefault": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
+    "autoDescriptionPreview": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
+    "manual": "Manual",
+    "manualWithModel": "Manual ({{model}})",
+    "manualDescription": "Manually select a model",
+    "gemini3Available": "Gemini 3 is now available.",
+    "enablePreviewFeatures": "Enable \"Preview features\" in /settings.\nLearn more at https://goo.gle/enable-preview-features",
+    "gemini3ComingSoon": "Gemini 3 is coming soon.",
+    "rememberModel": "Remember model for future sessions: ",
+    "persistModeTrue": "true",
+    "persistModeFalse": "false",
+    "pressTabToToggle": "(Press Tab to toggle)",
+    "modelFlagUsage": "> To use a specific Gemini model on startup, use the --model flag.",
+    "pressEscToClose": "(Press Esc to close)"
+  },
+  "agentConfig": {
+    "title": "Configure: {{displayName}}",
+    "fields": {
+      "enabled": {
+        "label": "Enabled",
+        "description": "Enable or disable this agent"
+      },
+      "model": {
+        "label": "Model",
+        "description": "Model to use (e.g., 'gemini-2.0-flash' or 'inherit')"
+      },
+      "temperature": {
+        "label": "Temperature",
+        "description": "Sampling temperature (0.0 to 2.0)"
+      },
+      "topP": {
+        "label": "Top P",
+        "description": "Nucleus sampling parameter (0.0 to 1.0)"
+      },
+      "topK": {
+        "label": "Top K",
+        "description": "Top-K sampling parameter"
+      },
+      "maxOutputTokens": {
+        "label": "Max Output Tokens",
+        "description": "Maximum number of tokens to generate"
+      },
+      "maxTimeMinutes": {
+        "label": "Max Time (minutes)",
+        "description": "Maximum execution time in minutes"
+      },
+      "maxTurns": {
+        "label": "Max Turns",
+        "description": "Maximum number of conversational turns"
+      }
+    },
+    "values": {
+      "true": "true",
+      "false": "false",
+      "default": "(default)"
+    },
+    "changesSaved": "Changes saved automatically."
+  },
+  "multiFolderTrust": {
+    "cancelled": "Operation cancelled. The following directories were not added:\n- {{folders}}",
+    "yes": "Yes",
+    "yesAndRemember": "Yes, and remember the directories as trusted",
+    "no": "No",
+    "configUnavailable": "Configuration is not available.",
+    "notTrusted": "The following directories were not added because they were not trusted:\n- {{folders}}",
+    "errorAdding": "Error adding '{{dir}}': {{message}}",
+    "question": "Do you trust the following folders being added to this workspace?",
+    "description": "Trusting a folder allows Gemini to read and perform auto-edits when in auto-approval mode. This is a security feature to prevent accidental execution in untrusted directories.",
+    "applying": "Applying trust settings..."
+  },
+  "permissions": {
+    "trustThisFolder": "Trust this folder ({{dirName}})",
+    "trustParentFolder": "Trust parent folder ({{parentFolder}})",
+    "dontTrust": "Don't trust",
+    "title": "Modify Trust Level",
+    "folder": "Folder: {{cwd}}",
+    "currentLevel": "Current Level: ",
+    "notSet": "Not Set",
+    "inheritedFromParent": "Note: This folder behaves as a trusted folder because one of the parent folders is trusted. It will remain trusted even if you set a different trust level here. To change this, you need to modify the trust setting in the parent folder.",
+    "inheritedFromIde": "Note: This folder behaves as a trusted folder because the connected IDE workspace is trusted. It will remain trusted even if you set a different trust level here.",
+    "instructions": "(Use Enter to select, Esc to close)",
+    "restartPrompt": "To apply the trust changes, Gemini CLI must be restarted. Press 'r' to restart CLI now."
+  },
+  "editor": {
+    "unsupported": "Editor is not supported: {{preference}}",
+    "userSettings": "User Settings",
+    "workspaceSettings": "Workspace Settings",
+    "alsoModifiedIn": "(Also modified in {{scope}})",
+    "modifiedIn": "(Modified in {{scope}})",
+    "none": "None",
+    "title": "Select Editor",
+    "applyTo": "Apply To",
+    "instructions": "(Use Enter to select, Tab to change focus, Esc to close)",
+    "preferenceTitle": "Editor Preference",
+    "description": "These editors are currently supported. Please note that some editors cannot be used in sandbox mode.",
+    "currentPreference": "Your preferred editor is: "
+  },
+  "sessionBrowser": {
+    "loading": "Loading sessions…",
+    "error": "Error: {{message}}",
+    "pressQToExit": "Press q to exit",
+    "noSessions": "No auto-saved conversations found.",
+    "searchLabel": "Search: ",
+    "escToCancel": "(Esc to cancel)",
+    "chatSessions": "Chat Sessions",
+    "total": "total",
+    "filtered": "filtered",
+    "sortedBy": "sorted by {{criteria}} {{direction}}",
+    "sortCriteria": {
+      "date": "date",
+      "messages": "messages",
+      "name": "name"
+    },
+    "sortDirection": {
+      "asc": "asc",
+      "desc": "desc"
+    },
+    "actions": {
+      "navigate": "Navigate",
+      "resume": "Resume",
+      "search": "Search",
+      "delete": "Delete",
+      "quit": "Quit",
+      "sort": "Sort",
+      "reverse": "Reverse",
+      "firstLast": "First/Last"
+    },
+    "columns": {
+      "index": "Index",
+      "msgs": "Msgs",
+      "age": "Age",
+      "match": "Match",
+      "name": "Name"
+    },
+    "noMatch": "No sessions found matching '{{query}}'.",
+    "roles": {
+      "user": "You:   ",
+      "model": "Gemini:"
+    },
+    "currentSession": "(current)",
+    "moreMatches": " (+{{count}} more)",
+    "noMessages": "(No messages)",
+    "errors": {
+      "loadFailed": "Failed to load sessions",
+      "loadFullFailed": "Failed to load full session content",
+      "deleteFailed": "Failed to delete session: {{message}}"
+    }
+  },
+  "rewindViewer": {
+    "stayAtCurrent": "Stay at current position",
+    "rewinding": "Rewinding...",
+    "title": "Rewind",
+    "cancelRewindDesc": "Cancel rewind and stay here",
+    "singleFileChanged": "1 file changed",
+    "filesChanged": "{{count}} files changed",
+    "noFilesChanged": "No files have been changed",
+    "instructions": "(Use Enter to select a message, Esc to close, Right/Left to expand/collapse)"
+  },
+  "proQuota": {
+    "keepTrying": "Keep trying",
+    "stop": "Stop",
+    "switchTo": "Switch to {{model}}",
+    "upgrade": "Upgrade for higher limits"
   }
 }

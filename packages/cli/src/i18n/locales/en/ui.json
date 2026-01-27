@@ -1,0 +1,96 @@
+{
+  "approvalMode": {
+    "acceptingEdits": "accepting edits",
+    "planMode": "plan mode",
+    "yoloMode": "YOLO mode",
+    "cycleHint": " (shift + tab to cycle)",
+    "toggleHint": " (ctrl + y to toggle)"
+  },
+  "shellMode": {
+    "enabled": "shell mode enabled",
+    "disableHint": " (esc to disable)"
+  },
+  "rawMarkdown": {
+    "mode": "raw markdown mode",
+    "toggleHint": " ({{modKey}} to toggle) "
+  },
+  "showMoreLines": {
+    "hint": "Press ctrl-s to show more lines"
+  },
+  "about": {
+    "title": "About Gemini CLI",
+    "cliVersion": "CLI Version",
+    "gitCommit": "Git Commit",
+    "model": "Model",
+    "sandbox": "Sandbox",
+    "os": "OS",
+    "authMethod": "Auth Method",
+    "loggedInWithGoogle": "Logged in with Google",
+    "loggedInWithGoogleEmail": "Logged in with Google ({{email}})",
+    "tier": "Tier",
+    "gcpProject": "GCP Project",
+    "ideClient": "IDE Client"
+  },
+  "loadingIndicator": {
+    "cancelAndTimer": "(esc to cancel, {{time}})"
+  },
+  "configInit": {
+    "initializing": "Initializing...",
+    "moreServers": ", +{{count}} more",
+    "connectingMcp": "Connecting to MCP servers... ({{connected}}/{{total}})",
+    "waitingFor": " - Waiting for: {{servers}}"
+  },
+  "consoleSummary": {
+    "errorCount": "{{count}} error",
+    "errorCount_plural": "{{count}} errors",
+    "detailsHint": "(F12 for details)"
+  },
+  "contextSummary": {
+    "openFiles": "{{count}} open file (ctrl+g to view)",
+    "openFiles_plural": "{{count}} open files (ctrl+g to view)",
+    "contextFiles": "{{count}} {{name}} file",
+    "contextFiles_plural": "{{count}} {{name}} files",
+    "contextGenericName": "context",
+    "mcpServers": "{{count}} MCP server",
+    "mcpServers_plural": "{{count}} MCP servers",
+    "blockedOnly": "{{count}} Blocked",
+    "blockedMcpServers": "{{count}} Blocked MCP server",
+    "blockedMcpServers_plural": "{{count}} Blocked MCP servers",
+    "skills": "{{count}} skill",
+    "skills_plural": "{{count}} skills"
+  },
+  "footer": {
+    "untrusted": "untrusted",
+    "macosSeatbelt": "macOS Seatbelt",
+    "noSandbox": "no sandbox",
+    "seeDocs": " (see /docs)",
+    "modelCmd": " /model"
+  },
+  "hookStatus": {
+    "executing": "Executing Hook",
+    "executing_plural": "Executing Hooks"
+  },
+  "detailedMessages": {
+    "title": "Debug Console",
+    "closeHint": "(F12 to close)"
+  },
+  "inputPrompt": {
+    "shellCommandsNotQueued": "Shell commands cannot be queued",
+    "slashCommandsNotQueued": "Slash commands cannot be queued",
+    "nothingToRewind": "Nothing to rewind to",
+    "status": {
+      "shell": "Shell mode",
+      "yolo": "YOLO mode",
+      "plan": "Plan mode",
+      "acceptingEdits": "Accepting edits"
+    }
+  },
+  "composer": {
+    "resuming": "Resuming session...",
+    "placeholder": {
+      "vim": "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode.",
+      "shell": "  Type your shell command",
+      "default": "  Type your message or @path/to/file"
+    }
+  }
+}

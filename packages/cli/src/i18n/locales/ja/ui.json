@@ -1,0 +1,89 @@
+{
+  "approvalMode": {
+    "acceptingEdits": "編集を受け入れ中",
+    "planMode": "プランモード",
+    "yoloMode": "YOLOモード",
+    "cycleHint": " (shift + tab でサイクル)",
+    "toggleHint": " (ctrl + y で切り替え)"
+  },
+  "shellMode": {
+    "enabled": "シェルモード有効",
+    "disableHint": " (esc で無効化)"
+  },
+  "rawMarkdown": {
+    "mode": "生マークダウンモード",
+    "toggleHint": " ({{modKey}} で切り替え) "
+  },
+  "showMoreLines": {
+    "hint": "ctrl-s を押してさらに行を表示"
+  },
+  "about": {
+    "title": "Gemini CLI について",
+    "cliVersion": "CLI バージョン",
+    "gitCommit": "Git コミット",
+    "model": "モデル",
+    "sandbox": "サンドボックス",
+    "os": "OS",
+    "authMethod": "認証方法",
+    "loggedInWithGoogle": "Google でログイン済み",
+    "loggedInWithGoogleEmail": "Google でログイン済み ({{email}})",
+    "tier": "ティア",
+    "gcpProject": "GCP プロジェクト",
+    "ideClient": "IDE クライアント"
+  },
+  "loadingIndicator": {
+    "cancelAndTimer": "(Escキーでキャンセル、{{time}})"
+  },
+  "configInit": {
+    "initializing": "初期化中...",
+    "moreServers": ", 他 {{count}} 件",
+    "connectingMcp": "MCPサーバーに接続中... ({{connected}}/{{total}})",
+    "waitingFor": " - 待機中: {{servers}}"
+  },
+  "consoleSummary": {
+    "errorCount": "{{count}} 個のエラー",
+    "detailsHint": "(F12で詳細を表示)"
+  },
+  "contextSummary": {
+    "openFiles": "{{count}} 個の開いているファイル (Ctrl+Gで表示)",
+    "contextFiles": "{{count}} 個の {{name}} ファイル",
+    "contextGenericName": "コンテキスト",
+    "mcpServers": "{{count}} 台の MCP サーバー",
+    "blockedOnly": "{{count}} 個がブロック済み",
+    "blockedMcpServers": "{{count}} 台のブロック済み MCP サーバー",
+    "skills": "{{count}} 個のスキル"
+  },
+  "footer": {
+    "untrusted": "信頼されていない",
+    "macosSeatbelt": "macOS Seatbelt",
+    "noSandbox": "サンドボックスなし",
+    "seeDocs": " (/docs を参照)",
+    "modelCmd": " /model"
+  },
+  "hookStatus": {
+    "executing": "フックを実行中"
+  },
+  "detailedMessages": {
+    "title": "デバッグコンソール",
+    "closeHint": "(F12で閉じる)"
+  },
+  "inputPrompt": {
+    "shellCommandsNotQueued": "シェルコマンドはキューに追加できません",
+    "slashCommandsNotQueued": "スラッシュコマンドはキューに追加できません",
+    "nothingToRewind": "巻き戻す履歴がありません",
+    "status": {
+      "shell": "シェルモード",
+      "yolo": "YOLOモード",
+      "plan": "プランモード",
+      "acceptingEdits": "編集を受け入れ中"
+    }
+  },
+  "composer": {
+    "resuming": "セッションを再開中...",
+    "placeholder": {
+      "vim": "  'i'キーで挿入モード、'Esc'キーで通常モードに切り替えます。",
+      "shell": "  シェルコマンドを入力してください",
+      "default": "  メッセージを入力するか、@path/to/file でファイルを参照します"
+    }
+  }
+}
