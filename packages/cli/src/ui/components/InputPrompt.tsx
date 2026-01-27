@@ -7,6 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
@@ -147,6 +148,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const { t } = useTranslation('ui');
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
@@ -276,7 +278,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding
       ) {
         setQueueErrorMessage(
-          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+          isShell
+            ? t('inputPrompt.shellCommandsNotQueued')
+            : t('inputPrompt.slashCommandsNotQueued'),
         );
         return;
       }
@@ -287,6 +291,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       streamingState,
       setQueueErrorMessage,
+      t,
     ],
   );
 
@@ -594,7 +599,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           onSubmit('/rewind');
           return true;
         }
-        coreEvents.emitFeedback('info', 'Nothing to rewind to');
+        coreEvents.emitFeedback('info', t('inputPrompt.nothingToRewind'));
         return true;
       }
 
@@ -968,6 +973,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       activePtyId,
       setEmbeddedShellFocused,
       history,
+      t,
     ],
   );
 
@@ -1133,16 +1139,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   let statusText = '';
   if (shellModeActive) {
     statusColor = theme.ui.symbol;
-    statusText = 'Shell mode';
+    statusText = t('inputPrompt.status.shell');
   } else if (showYoloStyling) {
     statusColor = theme.status.error;
-    statusText = 'YOLO mode';
+    statusText = t('inputPrompt.status.yolo');
   } else if (showPlanStyling) {
     statusColor = theme.status.success;
-    statusText = 'Plan mode';
+    statusText = t('inputPrompt.status.plan');
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
-    statusText = 'Accepting edits';
+    statusText = t('inputPrompt.status.acceptingEdits');
   }
 
   const suggestionsNode = shouldShowSuggestions ? (
