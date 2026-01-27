@@ -31,6 +31,14 @@ class MockConfig {
   getFileFilteringRespectGeminiIgnore() {
     return true;
   }
+
+  getFileFilteringOptions() {
+    return {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
+    };
+  }
 }
 
 describe('ripgrep-real-direct', () => {
