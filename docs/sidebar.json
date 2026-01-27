@@ -88,7 +88,7 @@
     "items": [
       {
         "label": "Get started with extensions",
-        "slug": "docs/extensions/getting-started-extensions"
+        "slug": "docs/extensions/writing-extensions"
       },
       { "label": "How to write hooks", "slug": "docs/hooks/writing-hooks" }
     ]
