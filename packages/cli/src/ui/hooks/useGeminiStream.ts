@@ -93,6 +93,48 @@ function showCitations(settings: LoadedSettings): boolean {
 }
 
 /**
+ * Calculates the current streaming state based on tool call status and responding flag.
+ */
+function calculateStreamingState(
+  isResponding: boolean,
+  toolCalls: TrackedToolCall[],
+): StreamingState {
+  if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
+    return StreamingState.WaitingForConfirmation;
+  }
+
+  const isAnyToolActive = toolCalls.some((tc) => {
+    // These statuses indicate active processing
+    if (
+      tc.status === 'executing' ||
+      tc.status === 'scheduled' ||
+      tc.status === 'validating'
+    ) {
+      return true;
+    }
+
+    // Terminal statuses (success, error, cancelled) still count as "Responding"
+    // if the result hasn't been submitted back to Gemini yet.
+    if (
+      tc.status === 'success' ||
+      tc.status === 'error' ||
+      tc.status === 'cancelled'
+    ) {
+      return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
+        .responseSubmittedToGemini;
+    }
+
+    return false;
+  });
+
+  if (isResponding || isAnyToolActive) {
+    return StreamingState.Responding;
+  }
+
+  return StreamingState.Idle;
+}
+
+/**
  * Manages the Gemini stream, including user input, command processing,
  * API interaction, and tool call lifecycle.
  */
@@ -216,28 +258,10 @@ export const useGeminiStream = (
     getPreferredEditor,
   );
 
-  const streamingState = useMemo(() => {
-    if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
-      return StreamingState.WaitingForConfirmation;
-    }
-    if (
-      isResponding ||
-      toolCalls.some(
-        (tc) =>
-          tc.status === 'executing' ||
-          tc.status === 'scheduled' ||
-          tc.status === 'validating' ||
-          ((tc.status === 'success' ||
-            tc.status === 'error' ||
-            tc.status === 'cancelled') &&
-            !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
-              .responseSubmittedToGemini),
-      )
-    ) {
-      return StreamingState.Responding;
-    }
-    return StreamingState.Idle;
-  }, [isResponding, toolCalls]);
+  const streamingState = useMemo(
+    () => calculateStreamingState(isResponding, toolCalls),
+    [isResponding, toolCalls],
+  );
 
   // Reset tracking when a new batch of tools starts
   useEffect(() => {

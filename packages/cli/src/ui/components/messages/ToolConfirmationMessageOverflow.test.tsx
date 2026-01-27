@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,6 +18,7 @@ import {
   type IndividualToolCallDisplay,
 } from '../../types.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
+import { waitFor } from '../../../test-utils/async.js';
 
 vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
   const actual =
@@ -104,7 +105,9 @@ describe('ToolConfirmationMessage Overflow', () => {
     );
 
     // ResizeObserver might take a tick
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(() =>
+      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
+    );
 
     const frame = lastFrame();
     expect(frame).toBeDefined();
