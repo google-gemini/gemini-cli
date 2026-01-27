@@ -872,4 +872,95 @@ describe('AskUserDialog', () => {
       });
     });
   });
+
+  describe('Question content field', () => {
+    it('renders content in a choice question', () => {
+      const questionWithContent: Question[] = [
+        {
+          question: 'Approve this plan?',
+          header: 'Plan',
+          options: [{ label: 'Yes', description: 'Approve and proceed' }],
+          content:
+            '## Plan Details\n\n- Step 1: Do something\n- Step 2: Do another thing',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questionWithContent}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders content in a text question', () => {
+      const questionWithContent: Question[] = [
+        {
+          question: 'Enter your feedback:',
+          header: 'Feedback',
+          type: QuestionType.TEXT,
+          content:
+            'Please review the following changes before providing feedback:\n\n- Changed file A\n- Updated file B',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questionWithContent}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('does not render content when content is not provided', () => {
+      const questionWithoutContent: Question[] = [
+        {
+          question: 'Simple question?',
+          header: 'Simple',
+          options: [{ label: 'Yes', description: '' }],
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questionWithoutContent}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('uses customOptionPlaceholder for the Other option', () => {
+      const questionWithCustomPlaceholder: Question[] = [
+        {
+          question: 'Approve this?',
+          header: 'Approve',
+          options: [{ label: 'Yes', description: '' }],
+          customOptionPlaceholder: 'Enter your feedback here...',
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questionWithCustomPlaceholder}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
 });

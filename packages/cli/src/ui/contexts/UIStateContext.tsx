@@ -25,6 +25,7 @@ import type {
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  PlanApprovalRequest,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -156,6 +157,8 @@ export interface UIState {
   settingsNonce: number;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  planApprovalRequest: PlanApprovalRequest | null;
+  planContent: string | undefined;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

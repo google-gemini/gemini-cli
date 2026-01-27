@@ -32,6 +32,7 @@ import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -1438,6 +1439,42 @@ describe('setApprovalMode with folder trust', () => {
       expect(wasGrepRegistered).toBe(true);
       expect(canUseRipgrep).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
+    });
+
+    it('should register ExitPlanModeTool when plan is enabled', async () => {
+      const config = new Config({ ...baseParams, plan: true });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasExitPlanModeRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(ExitPlanModeTool),
+      );
+
+      expect(wasExitPlanModeRegistered).toBe(true);
+    });
+
+    it('should not register ExitPlanModeTool when plan is disabled', async () => {
+      const config = new Config({ ...baseParams, plan: false });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasExitPlanModeRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(ExitPlanModeTool),
+      );
+
+      expect(wasExitPlanModeRegistered).toBe(false);
+    });
+
+    it('should not register ExitPlanModeTool by default', async () => {
+      const config = new Config({ ...baseParams });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasExitPlanModeRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(ExitPlanModeTool),
+      );
+
+      expect(wasExitPlanModeRegistered).toBe(false);
     });
   });
 });

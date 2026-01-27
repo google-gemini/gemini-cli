@@ -746,6 +746,7 @@ export enum Kind {
   Think = 'think',
   Fetch = 'fetch',
   Communicate = 'communicate',
+  Plan = 'plan',
   Other = 'other',
 }
 

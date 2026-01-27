@@ -1,5 +1,60 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`AskUserDialog > Question content field > does not render content when content is not provided 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Simple question?                                                                                                     │
+│                                                                                                                      │
+│ ● 1.  Yes                                                                                                            │
+│   2.  Enter a custom value                                                                                           │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AskUserDialog > Question content field > renders content in a choice question 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Plan Details                                                                                                         │
+│                                                                                                                      │
+│  - Step 1: Do something                                                                                              │
+│  - Step 2: Do another thing                                                                                          │
+│                                                                                                                      │
+│ Approve this plan?                                                                                                   │
+│                                                                                                                      │
+│ ● 1.  Yes                                                                                                            │
+│       Approve and proceed                                                                                            │
+│   2.  Enter a custom value                                                                                           │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AskUserDialog > Question content field > renders content in a text question 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Please review the following changes before providing feedback:                                                       │
+│                                                                                                                      │
+│  - Changed file A                                                                                                    │
+│  - Updated file B                                                                                                    │
+│                                                                                                                      │
+│ Enter your feedback:                                                                                                 │
+│                                                                                                                      │
+│ > Enter your response                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│ Enter to submit · Esc to cancel                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AskUserDialog > Question content field > uses customOptionPlaceholder for the Other option 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Approve this?                                                                                                        │
+│                                                                                                                      │
+│ ● 1.  Yes                                                                                                            │
+│   2.  Enter your feedback here...                                                                                    │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ What should we name this component?                                                                                  │

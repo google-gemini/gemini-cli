@@ -118,6 +118,7 @@ import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { usePlanApproval } from './hooks/usePlanApproval.js';
 import {
   useConfirmUpdateRequests,
   useExtensionUpdates,
@@ -963,6 +964,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
     embeddedShellFocused,
   );
 
+  const {
+    planApprovalRequest,
+    planContent,
+    handlePlanApprove,
+    handlePlanFeedback,
+    handlePlanCancel,
+  } = usePlanApproval({
+    config,
+    addItem: historyManager.addItem,
+    onApprovalModeChange: handleApprovalModeChange,
+  });
+
   const lastOutputTimeRef = useRef(0);
   useEffect(() => {
     lastOutputTimeRef.current = lastOutputTime;
@@ -1417,7 +1430,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (keyMatchers[Command.QUIT](key)) {
         // Skip when ask_user dialog is open (use Esc to cancel instead)
-        if (askUserRequest) {
+        if (askUserRequest || planApprovalRequest) {
           return;
         }
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
@@ -1518,6 +1531,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleSlashCommand,
       cancelOngoingRequest,
       askUserRequest,
+      planApprovalRequest,
       activePtyId,
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
@@ -1631,6 +1645,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const dialogsVisible =
     !!askUserRequest ||
+    !!planApprovalRequest ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
@@ -1816,6 +1831,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       adminSettingsChanged,
       newAgents,
+      planApprovalRequest,
+      planContent,
     }),
     [
       isThemeDialogOpen,
@@ -1917,6 +1934,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       adminSettingsChanged,
       newAgents,
+      planApprovalRequest,
+      planContent,
     ],
   );
 
@@ -1997,6 +2016,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      handlePlanApprove,
+      handlePlanFeedback,
+      handlePlanCancel,
     }),
     [
       handleThemeSelect,
@@ -2039,6 +2061,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      handlePlanApprove,
+      handlePlanFeedback,
+      handlePlanCancel,
     ],
   );
 

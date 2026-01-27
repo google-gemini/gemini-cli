@@ -16,6 +16,7 @@ import {
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
@@ -28,6 +29,7 @@ import { UIStateContext } from '../contexts/UIStateContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -214,6 +216,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const uiState = useContext(UIStateContext);
   const prefix = '> ';
   const horizontalPadding = 4 + 1; // Padding from Box (2) and border (2) + 1 for cursor
   const bufferWidth =
@@ -278,6 +281,17 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
+      {question.content && (
+        <Box marginBottom={1} flexDirection="column">
+          <MaxSizedBox maxHeight={uiState?.availableTerminalHeight}>
+            <MarkdownDisplay
+              text={question.content}
+              isPending={false}
+              terminalWidth={availableWidth - 4} // Adjust for parent border/padding
+            />
+          </MaxSizedBox>
+        </Box>
+      )}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
           {question.question}
@@ -706,6 +720,17 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
+      {question.content && (
+        <Box marginBottom={1} flexDirection="column">
+          <MaxSizedBox maxHeight={uiState?.availableTerminalHeight}>
+            <MarkdownDisplay
+              text={question.content}
+              isPending={false}
+              terminalWidth={availableWidth - 4} // Adjust for parent border/padding
+            />
+          </MaxSizedBox>
+        </Box>
+      )}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
           {question.question}
@@ -734,7 +759,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder =
+              question.customOptionPlaceholder || 'Enter a custom value';
             return (
               <Box flexDirection="row">
                 {showCheck && (
