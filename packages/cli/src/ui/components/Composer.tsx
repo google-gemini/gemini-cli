@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
@@ -30,6 +31,7 @@ import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
+  const { t } = useTranslation('ui');
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -75,7 +77,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         !uiState.isConfigInitialized ||
         uiState.isResuming) && (
         <ConfigInitDisplay
-          message={uiState.isResuming ? 'Resuming session...' : undefined}
+          message={uiState.isResuming ? t('composer.resuming') : undefined}
         />
       )}
 
@@ -143,10 +145,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+              ? t('composer.placeholder.vim')
               : uiState.shellModeActive
-                ? '  Type your shell command'
-                : '  Type your message or @path/to/file'
+                ? t('composer.placeholder.shell')
+                : t('composer.placeholder.default')
           }
           setQueueErrorMessage={uiActions.setQueueErrorMessage}
           streamingState={uiState.streamingState}
