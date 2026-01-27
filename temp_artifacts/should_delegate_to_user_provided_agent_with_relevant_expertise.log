@@ -1,0 +1,26 @@
+[
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"index.ts\"\n}",
+      "success": true,
+      "duration_ms": 6
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"README.md\"\n}",
+      "success": true,
+      "duration_ms": 8
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "write_file",
+      "args": "{\n  \"content\": \"# Simple Math Library\\n\\nThis library provides basic mathematical operations.\\n\\n## Features\\n\\n- **add**: A function that takes two numbers and returns their sum.\\n\\n## Usage\\n\\n```typescript\\nimport { add } from './index';\\n\\nconst sum = add(2, 3);\\nconsole.log(sum); // Output: 5\\n```\\n\",\n  \"file_path\": \"README.md\"\n}",
+      "success": true,
+      "duration_ms": 4
+    }
+  }
+]

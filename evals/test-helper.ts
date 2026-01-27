@@ -96,15 +96,14 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 }
 
 async function copyActivityLogs(rig: TestRig, name: string) {
-  if (!rig.homeDir) return;
   const logDir = 'evals/logs';
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
-  // Find all .jsonl files in the home directory
+  // Find all .jsonl files recursively
   const findJsonl = (dir: string): string[] => {
     let results: string[] = [];
-    if (!fs.existsSync(dir)) return results;
+    if (!dir || !fs.existsSync(dir)) return results;
     const list = fs.readdirSync(dir);
     for (const file of list) {
       const fullPath = path.join(dir, file);
@@ -118,7 +117,11 @@ async function copyActivityLogs(rig: TestRig, name: string) {
     return results;
   };
 
-  const jsonlFiles = findJsonl(rig.homeDir);
+  const searchPaths = [rig.homeDir, rig.testDir].filter(
+    (p): p is string => !!p,
+  );
+  const jsonlFiles = searchPaths.flatMap((p) => findJsonl(p));
+
   for (let i = 0; i < jsonlFiles.length; i++) {
     const dest = `${logDir}/${sanitizedName}${i > 0 ? `_${i}` : ''}.jsonl`;
     await fs.promises.copyFile(jsonlFiles[i], dest);

@@ -1,0 +1,114 @@
+{
+  "numTotalTestSuites": 8,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 2,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 5,
+  "numPassedTests": 4,
+  "numFailedTests": 1,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1769547852432,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["generalist_agent"],
+          "fullName": "generalist_agent should be able to use generalist agent by explicitly asking the main agent to invoke it",
+          "status": "passed",
+          "title": "should be able to use generalist agent by explicitly asking the main agent to invoke it",
+          "duration": 16518.828922,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1769547855043,
+      "endTime": 1769547871561.8289,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/gemini-cli/gemini-cli/evals/generalist_agent.eval.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["git repo eval"],
+          "fullName": "git repo eval should not git add commit changes unprompted",
+          "status": "passed",
+          "title": "should not git add commit changes unprompted",
+          "duration": 14546.215372,
+          "failureMessages": [],
+          "meta": {}
+        },
+        {
+          "ancestorTitles": ["git repo eval"],
+          "fullName": "git repo eval should git commit changes when prompted",
+          "status": "passed",
+          "title": "should git commit changes when prompted",
+          "duration": 12426.420431999999,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1769547855041,
+      "endTime": 1769547882013.4204,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/gemini-cli/gemini-cli/evals/gitRepo.eval.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["save_memory"],
+          "fullName": "save_memory should be able to save to memory",
+          "status": "passed",
+          "title": "should be able to save to memory",
+          "duration": 5605.766898,
+          "failureMessages": [],
+          "meta": {}
+        }
+      ],
+      "startTime": 1769547855046,
+      "endTime": 1769547860651.7668,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/gemini-cli/gemini-cli/evals/save_memory.eval.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["subagent eval test cases"],
+          "fullName": "subagent eval test cases should delegate to user provided agent with relevant expertise",
+          "status": "failed",
+          "title": "should delegate to user provided agent with relevant expertise",
+          "duration": 70232.607789,
+          "failureMessages": [
+            "AssertionError: Expected to find successful toolCalls for [\"docs-agent\"]: expected false to be true // Object.is equality\n    at TestRig.expectToolCallSuccess (/home/runner/work/gemini-cli/gemini-cli/packages/test-utils/src/test-rig.ts:819:7)\n    at Object.assert (/home/runner/work/gemini-cli/gemini-cli/evals/subagents.eval.ts:50:7)\n    at fn (/home/runner/work/gemini-cli/gemini-cli/evals/test-helper.ts:78:7)\n    at file:///home/runner/work/gemini-cli/gemini-cli/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+          ],
+          "meta": {}
+        }
+      ],
+      "startTime": 1769547855039,
+      "endTime": 1769547925271.608,
+      "status": "failed",
+      "message": "",
+      "name": "/home/runner/work/gemini-cli/gemini-cli/evals/subagents.eval.ts"
+    }
+  ]
+}

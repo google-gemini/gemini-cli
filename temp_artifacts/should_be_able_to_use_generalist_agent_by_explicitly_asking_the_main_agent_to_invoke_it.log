@@ -1,0 +1,34 @@
+[
+  {
+    "toolRequest": {
+      "name": "write_file",
+      "args": "{\n  \"content\": \"success\",\n  \"file_path\": \"/tmp/gemini-cli-tests/should-be-able-to-use-generalist-agent-by-explicitly-asking-the-main-agent-to-invoke-it/generalist_test_file.txt\"\n}",
+      "success": true,
+      "duration_ms": 4
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"/tmp/gemini-cli-tests/should-be-able-to-use-generalist-agent-by-explicitly-asking-the-main-agent-to-invoke-it/generalist_test_file.txt\"\n}",
+      "success": true,
+      "duration_ms": 3
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "generalist",
+      "args": "{\n  \"request\": \"Create a file called \\\"generalist_test_file.txt\\\" containing exactly the following text: success\"\n}",
+      "success": true,
+      "duration_ms": 7587
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"generalist_test_file.txt\"\n}",
+      "success": true,
+      "duration_ms": 2
+    }
+  }
+]
