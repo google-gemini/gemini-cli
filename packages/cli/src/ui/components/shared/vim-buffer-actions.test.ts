@@ -35,7 +35,7 @@ const createTestState = (
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
   pastedContent: {},
-  expandedPasteInfo: new Map(),
+  expandedPaste: null,
 });
 
 describe('vim-buffer-actions', () => {
@@ -912,7 +912,7 @@ describe('vim-buffer-actions', () => {
           cursorRow: 0,
           cursorCol: 0,
           pastedContent: {},
-          expandedPasteInfo: new Map(),
+          expandedPaste: null,
         },
       ];
 
