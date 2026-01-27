@@ -38,6 +38,11 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
+const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
+vi.mock('./utils/activityLogger.js', () => ({
+  registerActivityLogger: mockRegisterActivityLogger,
+}));
+
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
@@ -257,6 +262,29 @@ describe('runNonInteractive', () => {
     expect(getWrittenOutput()).toBe('Hello World\n');
     // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
     // so we no longer expect shutdownTelemetry to be called directly here
+  });
+
+  it('should register activity logger when enabled via environment variable', async () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_ACTIVITY_LOG', 'true');
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'test',
+      prompt_id: 'prompt-id-activity-logger',
+    });
+
+    expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    vi.unstubAllEnvs();
   });
 
   it('should handle a single tool call and respond', async () => {
