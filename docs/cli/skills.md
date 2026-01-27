@@ -13,7 +13,7 @@ discoverable capability.
 ## Overview
 
 Unlike general context files ([`GEMINI.md`](./gemini-md.md)), which provide
-persistent project-wide background, Skills represent **on-demand expertise**.
+persistent workspace-wide background, Skills represent **on-demand expertise**.
 This allows Gemini to maintain a vast library of specialized capabilities—such
 as security auditing, cloud deployments, or codebase migrations—without
 cluttering the model's immediate context window.
@@ -39,15 +39,15 @@ the full instructions and resources required to complete the task using the
 
 Gemini CLI discovers skills from three primary locations:
 
-1.  **Project Skills** (`.gemini/skills/`): Project-specific skills that are
+1.  **Workspace Skills** (`.gemini/skills/`): Workspace-specific skills that are
     typically committed to version control and shared with the team.
 2.  **User Skills** (`~/.gemini/skills/`): Personal skills available across all
-    your projects.
+    your workspaces.
 3.  **Extension Skills**: Skills bundled within installed
     [extensions](../extensions/index.md).
 
 **Precedence:** If multiple skills share the same name, higher-precedence
-locations override lower ones: **Project > User > Extension**.
+locations override lower ones: **Workspace > User > Extension**.
 
 ## Managing Skills
 
@@ -61,7 +61,7 @@ Use the `/skills` slash command to view and manage available expertise:
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
 
 _Note: `/skills disable` and `/skills enable` default to the `user` scope. Use
-`--scope project` to manage project-specific settings._
+`--scope workspace` to manage workspace-specific settings._
 
 ### From the Terminal
 
@@ -89,8 +89,8 @@ gemini skills uninstall my-expertise --scope workspace
 # Enable a skill (globally)
 gemini skills enable my-expertise
 
-# Disable a skill. Can use --scope to specify project or user (defaults to project)
-gemini skills disable my-expertise --scope project
+# Disable a skill. Can use --scope to specify workspace or user (defaults to workspace)
+gemini skills disable my-expertise --scope workspace
 ```
 
 ## Creating a Skill
@@ -147,7 +147,7 @@ You are an expert code reviewer. When reviewing code, follow this workflow:
 1.  **Analyze**: Review the staged changes or specific files provided. Ensure
     that the changes are scoped properly and represent minimal changes required
     to address the issue.
-2.  **Style**: Ensure code follows the project's conventions and idiomatic
+2.  **Style**: Ensure code follows the workspace's conventions and idiomatic
     patterns as described in the `GEMINI.md` file.
 3.  **Security**: Flag any potential security vulnerabilities.
 4.  **Tests**: Verify that new logic has corresponding test coverage and that

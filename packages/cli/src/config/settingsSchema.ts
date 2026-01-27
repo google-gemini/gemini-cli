@@ -14,12 +14,12 @@ import type {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
+  AgentOverride,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
-  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -108,6 +108,7 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  ignoreInDocs?: boolean;
   mergeStrategy?: MergeStrategy;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
@@ -190,22 +191,22 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      disableAutoUpdate: {
+      enableAutoUpdate: {
         type: 'boolean',
-        label: 'Disable Auto Update',
+        label: 'Enable Auto Update',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable automatic updates',
+        default: true,
+        description: 'Enable automatic updates.',
         showInDialog: true,
       },
-      disableUpdateNag: {
+      enableAutoUpdateNotification: {
         type: 'boolean',
-        label: 'Disable Update Nag',
+        label: 'Enable Auto Update Notification',
         category: 'General',
         requiresRestart: false,
-        default: false,
-        description: 'Disable update notification prompts.',
+        default: true,
+        description: 'Enable update notification prompts.',
         showInDialog: false,
       },
       checkpointing: {
@@ -525,15 +526,6 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
-      useFullWidth: {
-        type: 'boolean',
-        label: 'Use Full Width',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Use the entire width of the terminal for output.',
-        showInDialog: true,
-      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',
@@ -544,6 +536,15 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      useBackgroundColor: {
+        type: 'boolean',
+        label: 'Use Background Color',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Whether to use background colors in the UI.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
@@ -552,6 +553,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
+        showInDialog: true,
+      },
+      showSpinner: {
+        type: 'boolean',
+        label: 'Show Spinner',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the spinner during operations.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -576,13 +586,13 @@ const SETTINGS_SCHEMA = {
         description: 'Accessibility settings.',
         showInDialog: false,
         properties: {
-          disableLoadingPhrases: {
+          enableLoadingPhrases: {
             type: 'boolean',
-            label: 'Disable Loading Phrases',
+            label: 'Enable Loading Phrases',
             category: 'UI',
             requiresRestart: true,
-            default: false,
-            description: 'Disable loading phrases for accessibility',
+            default: true,
+            description: 'Enable loading phrases during operations.',
             showInDialog: true,
           },
           screenReader: {
@@ -799,7 +809,7 @@ const SETTINGS_SCHEMA = {
         label: 'Agent Overrides',
         category: 'Advanced',
         requiresRestart: true,
-        default: {},
+        default: {} as Record<string, AgentOverride>,
         description:
           'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
         showInDialog: false,
@@ -913,13 +923,13 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          disableFuzzySearch: {
+          enableFuzzySearch: {
             type: 'boolean',
-            label: 'Disable Fuzzy Search',
+            label: 'Enable Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
-            default: false,
-            description: 'Disable fuzzy search when searching for files.',
+            default: true,
+            description: 'Enable fuzzy search when searching for files.',
             showInDialog: true,
           },
         },
@@ -1021,6 +1031,24 @@ const SETTINGS_SCHEMA = {
           Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
         `,
         showInDialog: true,
+      },
+      approvalMode: {
+        type: 'enum',
+        label: 'Approval Mode',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
       },
       core: {
         type: 'array',
@@ -1124,7 +1152,7 @@ const SETTINGS_SCHEMA = {
         label: 'Disable LLM Correction',
         category: 'Tools',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: oneLine`
           Disable LLM-based error correction for edit tools.
           When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
@@ -1422,6 +1450,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
+      enableEventDrivenScheduler: {
+        type: 'boolean',
+        label: 'Event Driven Scheduler',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: true,
+        description: 'Enables event-driven scheduler within the CLI session.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -1450,66 +1487,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Agent Skills (experimental).',
         showInDialog: true,
       },
-      codebaseInvestigatorSettings: {
-        type: 'object',
-        label: 'Codebase Investigator Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for Codebase Investigator.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Codebase Investigator',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxNumTurns: {
-            type: 'number',
-            label: 'Codebase Investigator Max Num Turns',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 10,
-            description:
-              'Maximum number of turns for the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxTimeMinutes: {
-            type: 'number',
-            label: 'Max Time (Minutes)',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 3,
-            description:
-              'Maximum time for the Codebase Investigator agent (in minutes).',
-            showInDialog: false,
-          },
-          thinkingBudget: {
-            type: 'number',
-            label: 'Thinking Budget',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 8192,
-            description:
-              'The thinking budget for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-          model: {
-            type: 'string',
-            label: 'Model',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: GEMINI_MODEL_ALIAS_AUTO,
-            description:
-              'The model to use for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-        },
-      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',
@@ -1520,25 +1497,14 @@ const SETTINGS_SCHEMA = {
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
       },
-      cliHelpAgentSettings: {
-        type: 'object',
-        label: 'CLI Help Agent Settings',
+      plan: {
+        type: 'boolean',
+        label: 'Plan',
         category: 'Experimental',
         requiresRestart: true,
-        default: {},
-        description: 'Configuration for CLI Help Agent.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable CLI Help Agent',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the CLI Help Agent.',
-            showInDialog: true,
-          },
-        },
+        default: false,
+        description: 'Enable planning features (Plan Mode and tools).',
+        showInDialog: true,
       },
     },
   },
@@ -1587,6 +1553,16 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for agent skills.',
     showInDialog: false,
     properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Agent Skills',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: true,
+        description: 'Enable Agent Skills.',
+        showInDialog: true,
+        ignoreInDocs: true,
+      },
       disabled: {
         type: 'array',
         label: 'Disabled Skills',
@@ -1601,9 +1577,9 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  hooks: {
+  hooksConfig: {
     type: 'object',
-    label: 'Hooks',
+    label: 'HooksConfig',
     category: 'Advanced',
     requiresRestart: false,
     default: {},
@@ -1616,7 +1592,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Hooks',
         category: 'Advanced',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
         showInDialog: false,
@@ -1645,6 +1621,18 @@ const SETTINGS_SCHEMA = {
         description: 'Show visual indicators when hooks are executing.',
         showInDialog: true,
       },
+    },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hook Events',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Event-specific hook configurations.',
+    showInDialog: false,
+    properties: {
       BeforeTool: {
         type: 'array',
         label: 'Before Tool Hooks',
@@ -2083,9 +2071,9 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
-      disabled: {
+      enabled: {
         type: 'boolean',
-        description: 'Whether to disable the agent.',
+        description: 'Whether to enable the agent.',
       },
     },
   },
@@ -2253,12 +2241,17 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default'];
 };
 
+type InferMergedSettings<T extends SettingsSchema> = {
+  -readonly [K in keyof T]-?: T[K] extends { properties: SettingsSchema }
+    ? InferMergedSettings<T[K]['properties']>
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
+};
+
 export type Settings = InferSettings<SettingsSchemaType>;
-
-export function getEnableHooksUI(settings: Settings): boolean {
-  return settings.tools?.enableHooks ?? true;
-}
-
-export function getEnableHooks(settings: Settings): boolean {
-  return getEnableHooksUI(settings) && (settings.hooks?.enabled ?? false);
-}
+export type MergedSettings = InferMergedSettings<SettingsSchemaType>;

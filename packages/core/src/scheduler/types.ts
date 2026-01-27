@@ -14,6 +14,9 @@ import type {
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
+import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
+
+export const ROOT_SCHEDULER_ID = 'root';
 
 export interface ToolCallRequestInfo {
   callId: string;
@@ -23,6 +26,8 @@ export interface ToolCallRequestInfo {
   prompt_id: string;
   checkpoint?: string;
   traceId?: string;
+  parentCallId?: string;
+  schedulerId?: string;
 }
 
 export interface ToolCallResponseInfo {
@@ -42,6 +47,7 @@ export type ValidatingToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type ScheduledToolCall = {
@@ -51,6 +57,7 @@ export type ScheduledToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type ErroredToolCall = {
@@ -60,6 +67,7 @@ export type ErroredToolCall = {
   tool?: AnyDeclarativeTool;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type SuccessfulToolCall = {
@@ -70,6 +78,7 @@ export type SuccessfulToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type ExecutingToolCall = {
@@ -81,6 +90,7 @@ export type ExecutingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;
+  schedulerId?: string;
 };
 
 export type CancelledToolCall = {
@@ -91,6 +101,7 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type WaitingToolCall = {
@@ -98,9 +109,21 @@ export type WaitingToolCall = {
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  confirmationDetails: ToolCallConfirmationDetails;
+  /**
+   * Supports both legacy (with callbacks) and new (serializable) details.
+   * New code should treat this as SerializableConfirmationDetails.
+   *
+   * TODO: Remove ToolCallConfirmationDetails and collapse to just
+   * SerializableConfirmationDetails after migration.
+   */
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
+  // TODO: Make required after migration.
+  correlationId?: string;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  schedulerId?: string;
 };
 
 export type Status = ToolCall['status'];
