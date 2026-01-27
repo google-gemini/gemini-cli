@@ -111,6 +111,15 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.consentRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.consentRequest.prompt}
+        onConfirm={uiState.consentRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
   if (uiState.confirmUpdateExtensionRequests.length > 0) {
     const request = uiState.confirmUpdateExtensionRequests[0];
     return (

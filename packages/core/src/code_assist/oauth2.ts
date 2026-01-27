@@ -269,6 +269,11 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    const userConsent = await getConsentForOauth();
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
@@ -370,6 +375,53 @@ async function initOauthClient(
   }
 
   return client;
+}
+
+export async function getConsentForOauth(): Promise<boolean> {
+  const prompt =
+    'Code Assist login required. Opening authentication page in your browser. ';
+
+  if (coreEvents.listenerCount(CoreEvent.ConsentRequest) === 0) {
+    if (!process.stdin.isTTY) {
+      throw new FatalAuthenticationError(
+        'Code Assist login required, but interactive consent could not be obtained.\n' +
+          'Please run Gemini CLI in an interactive terminal to authenticate, or use NO_BROWSER=true for manual authentication.',
+      );
+    }
+    return getOauthConsentNonInteractive(prompt);
+  }
+
+  return getOauthConsentInteractive(prompt);
+}
+
+async function getOauthConsentNonInteractive(prompt: string) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: createWorkingStdio().stdout,
+    terminal: true,
+  });
+
+  const fullPrompt = prompt + 'Do you want to continue? [Y/n]: ';
+  writeToStdout(`\n${fullPrompt}`);
+
+  return new Promise<boolean>((resolve) => {
+    rl.on('line', (answer) => {
+      rl.close();
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
+    });
+  });
+}
+
+async function getOauthConsentInteractive(prompt: string) {
+  const fullPrompt = prompt + '\n\nDo you want to continue?';
+  return new Promise<boolean>((resolve) => {
+    coreEvents.emitConsentRequest({
+      prompt: fullPrompt,
+      onConfirm: (confirmed: boolean) => {
+        resolve(confirmed);
+      },
+    });
+  });
 }
 
 export async function getOauthClient(

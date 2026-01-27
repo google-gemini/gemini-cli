@@ -9,6 +9,7 @@ import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getOauthClient,
+  getConsentForOauth,
   resetOauthClientForTesting,
   clearCachedCredentialFile,
   clearOauthClientCache,
@@ -29,8 +30,12 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
-import { FatalCancellationError } from '../utils/errors.js';
+import {
+  FatalAuthenticationError,
+  FatalCancellationError,
+} from '../utils/errors.js';
 import process from 'node:process';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -88,6 +93,13 @@ const mockConfig = {
 global.fetch = vi.fn();
 
 describe('oauth2', () => {
+  beforeEach(() => {
+    vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
+    vi.spyOn(coreEvents, 'emitConsentRequest').mockImplementation((payload) => {
+      payload.onConfirm(true);
+    });
+  });
+
   describe('with encrypted flag false', () => {
     let tempHomeDir: string;
 
@@ -1501,6 +1513,86 @@ describe('oauth2', () => {
         OAuthCredentialStorage.clearCredentials as Mock,
       ).toHaveBeenCalled();
       expect(fs.existsSync(credsPath)).toBe(true); // The unencrypted file should remain
+    });
+  });
+
+  describe('getConsentForOauth', () => {
+    it('should use coreEvents when listeners are present', async () => {
+      vi.restoreAllMocks();
+      const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
+      const mockListenerCount = vi
+        .spyOn(coreEvents, 'listenerCount')
+        .mockReturnValue(1);
+
+      mockEmitConsentRequest.mockImplementation((payload) => {
+        payload.onConfirm(true);
+      });
+
+      const result = await getConsentForOauth();
+
+      expect(result).toBe(true);
+      expect(mockEmitConsentRequest).toHaveBeenCalled();
+
+      mockListenerCount.mockRestore();
+      mockEmitConsentRequest.mockRestore();
+    });
+
+    it('should use readline when no listeners are present and stdin is a TTY', async () => {
+      vi.restoreAllMocks();
+      const mockListenerCount = vi
+        .spyOn(coreEvents, 'listenerCount')
+        .mockReturnValue(0);
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
+
+      const mockReadline = {
+        on: vi.fn((event, callback) => {
+          if (event === 'line') {
+            callback('y');
+          }
+        }),
+        close: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
+
+      const result = await getConsentForOauth();
+
+      expect(result).toBe(true);
+      expect(readline.createInterface).toHaveBeenCalled();
+      expect(writeToStdout).toHaveBeenCalledWith(
+        expect.stringContaining('Do you want to continue? [Y/n]: '),
+      );
+
+      mockListenerCount.mockRestore();
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    });
+
+    it('should throw FatalAuthenticationError when no listeners and not a TTY', async () => {
+      vi.restoreAllMocks();
+      const mockListenerCount = vi
+        .spyOn(coreEvents, 'listenerCount')
+        .mockReturnValue(0);
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        configurable: true,
+      });
+
+      await expect(getConsentForOauth()).rejects.toThrow(
+        FatalAuthenticationError,
+      );
+
+      mockListenerCount.mockRestore();
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
     });
   });
 });

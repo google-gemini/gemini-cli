@@ -108,6 +108,14 @@ export interface RetryAttemptPayload {
   model: string;
 }
 
+/**
+ * Payload for the 'consent-request' event.
+ */
+export interface ConsentRequestPayload {
+  prompt: string;
+  onConfirm: (confirmed: boolean) => void;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -121,6 +129,7 @@ export enum CoreEvent {
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
+  ConsentRequest = 'consent-request',
 }
 
 export interface CoreEvents {
@@ -136,6 +145,7 @@ export interface CoreEvents {
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
 }
 
 type EventBacklogItem = {
@@ -256,6 +266,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitRetryAttempt(payload: RetryAttemptPayload): void {
     this.emit(CoreEvent.RetryAttempt, payload);
+  }
+
+  /**
+   * Requests consent from the user via the UI.
+   */
+  emitConsentRequest(payload: ConsentRequestPayload): void {
+    this._emitOrQueue(CoreEvent.ConsentRequest, payload);
   }
 
   /**
