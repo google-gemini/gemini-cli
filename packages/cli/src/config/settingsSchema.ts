@@ -938,7 +938,8 @@ const SETTINGS_SCHEMA = {
             category: 'Context',
             requiresRestart: true,
             default: [] as string[],
-            description: 'Additional ignore file paths to respect.',
+            description:
+              'Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore.',
             showInDialog: true,
             items: { type: 'string' },
             mergeStrategy: MergeStrategy.UNION,

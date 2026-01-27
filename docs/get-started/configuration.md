@@ -617,7 +617,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`context.fileFiltering.customIgnoreFilePaths`** (array):
-  - **Description:** Additional ignore file paths to respect.
+  - **Description:** Additional ignore file paths to respect. These files take
+    precedence over .geminiignore and .gitignore.
   - **Default:** `[]`
   - **Requires restart:** Yes
 

@@ -47,7 +47,7 @@ export class FileDiscoveryService {
       this.projectRoot,
       GEMINI_IGNORE_FILE_NAME,
     );
-    if (this.defaultFilterFileOptions.customIgnoreFilePaths) {
+    if (this.defaultFilterFileOptions.customIgnoreFilePaths?.length) {
       this.customIgnoreFilter = new IgnoreFileParser(
         this.projectRoot,
         this.defaultFilterFileOptions.customIgnoreFilePaths,
