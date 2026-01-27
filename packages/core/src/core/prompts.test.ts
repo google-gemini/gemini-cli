@@ -274,10 +274,11 @@ describe('Core System Prompt (prompts.ts)', () => {
 
     it('should only list available tools in PLAN mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      // Only enable glob and read_file, disable others (like web search)
+      // Only enable a subset of tools, including ask_user
       vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
         'glob',
         'read_file',
+        'ask_user',
       ]);
 
       const prompt = getCoreSystemPrompt(mockConfig);
@@ -285,6 +286,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       // Should include enabled tools
       expect(prompt).toContain('`glob`');
       expect(prompt).toContain('`read_file`');
+      expect(prompt).toContain('`ask_user`');
 
       // Should NOT include disabled tools
       expect(prompt).not.toContain('`google_web_search`');
