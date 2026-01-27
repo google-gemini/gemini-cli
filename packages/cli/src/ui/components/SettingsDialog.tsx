@@ -45,6 +45,7 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface FzfResult {
   item: string;
@@ -71,6 +72,8 @@ export function SettingsDialog({
   availableTerminalHeight,
   config,
 }: SettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -697,15 +700,12 @@ export function SettingsDialog({
 
   // Footer content for restart prompt
   const footerContent = showRestartPrompt ? (
-    <Text color={theme.status.warning}>
-      To see changes, Gemini CLI must be restarted. Press r to exit and apply
-      changes now.
-    </Text>
+    <Text color={theme.status.warning}>{t('settings.restartPrompt')}</Text>
   ) : null;
 
   return (
     <BaseSettingsDialog
-      title="Settings"
+      title={t('settings.title')}
       borderColor={showRestartPrompt ? theme.status.warning : undefined}
       searchEnabled={showSearch}
       searchBuffer={searchBuffer}
