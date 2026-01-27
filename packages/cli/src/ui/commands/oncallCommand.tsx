@@ -22,10 +22,18 @@ export const oncallCommand: SlashCommand = {
       description: 'Triage issues labeled as status/possible-duplicate',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
-      action: async (context): Promise<OpenCustomDialogActionReturn> => {
+      action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
         const { config } = context.services;
         if (!config) {
           throw new Error('Config not available');
+        }
+
+        let limit = 50;
+        if (args && args.length > 0) {
+          const parsedLimit = parseInt(args[0], 10);
+          if (!isNaN(parsedLimit) && parsedLimit > 0) {
+            limit = parsedLimit;
+          }
         }
 
         return {
@@ -33,6 +41,7 @@ export const oncallCommand: SlashCommand = {
           component: (
             <TriageDuplicates
               config={config}
+              initialLimit={limit}
               onExit={() => context.ui.removeComponent()}
             />
           ),

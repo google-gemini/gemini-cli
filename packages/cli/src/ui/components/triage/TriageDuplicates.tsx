@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Config} from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
@@ -43,15 +43,31 @@ interface GeminiRecommendation {
   ranked_candidates?: RankedCandidateInfo[];
 }
 
+interface AnalysisResult {
+  candidates: Candidate[];
+  canonicalIssue?: Candidate;
+  recommendation: GeminiRecommendation;
+}
+
+interface ProcessedIssue {
+  number: number;
+  title: string;
+  action: 'duplicate' | 'remove-label' | 'skip';
+  target?: number;
+}
+
 interface TriageState {
   status: 'loading' | 'analyzing' | 'interaction' | 'completed' | 'error';
   message?: string;
-  currentIssue?: Issue;
-  candidates?: Candidate[];
-  canonicalIssue?: Candidate; // The suggested duplicate target
   issues: Issue[];
   currentIndex: number;
-  totalIssues: number;
+  // Analysis Cache
+  analysisCache: Map<number, AnalysisResult>;
+  analyzingIds: Set<number>; // Issues currently being analyzed
+  // UI State
+  currentIssue?: Issue;
+  candidates?: Candidate[];
+  canonicalIssue?: Candidate;
   suggestedComment?: string;
 }
 
@@ -62,6 +78,7 @@ const VISIBLE_LINES_COLLAPSED = 6;
 const VISIBLE_LINES_EXPANDED = 20;
 const VISIBLE_LINES_DETAIL = 25;
 const VISIBLE_CANDIDATES = 5;
+const MAX_CONCURRENT_ANALYSIS = 3;
 
 const getReactionCount = (issue: Issue | Candidate | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -74,15 +91,18 @@ const getReactionCount = (issue: Issue | Candidate | undefined) => {
 export const TriageDuplicates = ({
   config,
   onExit,
+  initialLimit = 50,
 }: {
   config: Config;
   onExit: () => void;
+  initialLimit?: number;
 }) => {
   const [state, setState] = useState<TriageState>({
     status: 'loading',
     issues: [],
     currentIndex: 0,
-    totalIssues: 0,
+    analysisCache: new Map(),
+    analyzingIds: new Set(),
     message: 'Fetching issues...',
   });
 
@@ -93,6 +113,12 @@ export const TriageDuplicates = ({
   const [targetScrollOffset, setTargetScrollOffset] = useState(0);
   const [candidateScrollOffset, setCandidateScrollOffset] = useState(0);
   const [inputAction, setInputAction] = useState<string>('');
+
+  // History View State
+  const [processedHistory, setProcessedHistory] = useState<ProcessedIssue[]>(
+    [],
+  );
+  const [showHistory, setShowHistory] = useState(false);
 
   // Derived state for candidate list scrolling
   const [candidateListScrollOffset, setCandidateListScrollOffset] = useState(0);
@@ -110,16 +136,6 @@ export const TriageDuplicates = ({
       );
     }
   }, [selectedCandidateIndex, candidateListScrollOffset]);
-
-  const resetUiState = useCallback(() => {
-    setFocusSection('target');
-    setSelectedCandidateIndex(0);
-    setCandidateListScrollOffset(0);
-    setTargetExpanded(false);
-    setTargetScrollOffset(0);
-    setCandidateScrollOffset(0);
-    setInputAction('');
-  }, []);
 
   const fetchCandidateDetails = async (
     number: number,
@@ -142,32 +158,17 @@ export const TriageDuplicates = ({
     }
   };
 
-  const processIssue = useCallback(
-    async (issue: Issue) => {
-      resetUiState();
-      setState((s) => ({
-        ...s,
-        status: 'analyzing',
-        currentIssue: issue,
-        message: `Analyzing issue #${issue.number}... (Press Esc to cancel)`,
-      }));
-
-      // Find the comment with potential duplicates
+  // Standalone analysis function (does not set main UI state directly)
+  const analyzeIssue = useCallback(
+    async (issue: Issue): Promise<AnalysisResult | null> => {
+      // Find duplicate comment
       const dupComment = issue.comments.find((c) =>
         c.body.includes('Found possible duplicate issues:'),
       );
 
-      if (!dupComment) {
-        setState((s) => ({
-          ...s,
-          status: 'interaction',
-          candidates: [],
-          message: 'No automatic duplicate candidates found in comments.',
-        }));
-        return;
-      }
+      if (!dupComment) return null;
 
-      // Extract candidate numbers from comment
+      // Extract candidate numbers
       const lines = dupComment.body.split('\n');
       const candidateNumbers: number[] = [];
       for (const line of lines) {
@@ -180,32 +181,18 @@ export const TriageDuplicates = ({
         }
       }
 
-      if (candidateNumbers.length === 0) {
-        setState((s) => ({
-          ...s,
-          status: 'interaction',
-          candidates: [],
-          message:
-            'No candidate numbers found in the "possible duplicate" comment.',
-        }));
-        return;
-      }
+      if (candidateNumbers.length === 0) return null;
 
-      // Fetch details for all candidates
-      setState((s) => ({
-        ...s,
-        message: `Fetching details for ${candidateNumbers.length} candidates... (Press Esc to cancel)`,
-      }));
+      // Fetch candidates
       const candidates: Candidate[] = [];
       for (const num of candidateNumbers) {
         const details = await fetchCandidateDetails(num);
         if (details) candidates.push(details);
       }
 
-      // Use LLM to analyze and rank
-      try {
-        const client = config.getBaseLlmClient();
-        const prompt = `
+      // LLM Analysis
+      const client = config.getBaseLlmClient();
+      const prompt = `
 I am triaging a GitHub issue labeled as 'possible-duplicate'. I need to decide if it should be marked as a duplicate of another issue, or if one of the other issues should be marked as a duplicate of this one.
 
 TARGET ISSUE:
@@ -244,167 +231,253 @@ Return a JSON object with:
 - "suggested_comment": a short, friendly comment (e.g., "Closing as a duplicate of #123. Please follow that issue for updates.")
 - "ranked_candidates": array of { "number": number, "score": 0-100, "reason": string }
 `;
-        setState((s) => ({
-          ...s,
-          message: `Analyzing with Gemini... (Press Esc to cancel)`,
-        }));
-        const response = await client.generateJson({
-          modelConfigKey: {
-            model: 'gemini-3-flash-preview',
-          },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          schema: {
-            type: 'object',
-            properties: {
-              recommendation: {
-                type: 'string',
-                enum: ['duplicate', 'canonical', 'not-duplicate', 'skip'],
-              },
-              canonical_issue_number: { type: 'number' },
-              reason: { type: 'string' },
-              suggested_comment: { type: 'string' },
-              ranked_candidates: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    number: { type: 'number' },
-                    score: { type: 'number' },
-                    reason: { type: 'string' },
-                  },
+      const response = await client.generateJson({
+        modelConfigKey: {
+          model: 'gemini-3-flash-preview',
+        },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        schema: {
+          type: 'object',
+          properties: {
+            recommendation: {
+              type: 'string',
+              enum: ['duplicate', 'canonical', 'not-duplicate', 'skip'],
+            },
+            canonical_issue_number: { type: 'number' },
+            reason: { type: 'string' },
+            suggested_comment: { type: 'string' },
+            ranked_candidates: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  number: { type: 'number' },
+                  score: { type: 'number' },
+                  reason: { type: 'string' },
                 },
               },
             },
           },
-          abortSignal: new AbortController().signal,
-          promptId: 'triage-duplicates',
-        });
+        },
+        abortSignal: new AbortController().signal,
+        promptId: 'triage-duplicates',
+      });
 
-        const rec = response as unknown as GeminiRecommendation;
+      const rec = response as unknown as GeminiRecommendation;
 
-        let canonical: Candidate | undefined;
-        if (rec.canonical_issue_number) {
-          canonical = candidates.find(
-            (c) => c.number === rec.canonical_issue_number,
+      let canonical: Candidate | undefined;
+      if (rec.canonical_issue_number) {
+        canonical = candidates.find(
+          (c) => c.number === rec.canonical_issue_number,
+        );
+        if (!canonical) {
+          canonical = {
+            number: rec.canonical_issue_number,
+            title: 'Unknown',
+            url: '',
+            author: { login: 'unknown' },
+            labels: [],
+            comments: [],
+            reactionGroups: [],
+            body: '', // Added missing property
+          } as Candidate;
+        }
+        canonical.reason = rec.reason;
+      }
+
+      const ranked = candidates
+        .map((c) => {
+          const rankInfo = rec.ranked_candidates?.find(
+            (r) => r.number === c.number,
           );
-          if (!canonical) {
-            canonical = {
-              number: rec.canonical_issue_number,
-              title: 'Unknown',
-              url: '',
-            } as Candidate;
-          }
-          canonical.reason = rec.reason;
-        }
+          return {
+            ...c,
+            score: rankInfo?.score || 0,
+            reason: rankInfo?.reason || '',
+          };
+        })
+        .sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        const ranked = candidates
-          .map((c) => {
-            const rankInfo = rec.ranked_candidates?.find(
-              (r) => r.number === c.number,
-            );
+      return {
+        candidates: ranked,
+        canonicalIssue: canonical,
+        recommendation: rec,
+      };
+    },
+    [config],
+  );
+
+  // Background Analysis Queue
+  useEffect(() => {
+    // Don't start if we are still loading initial list
+    if (state.issues.length === 0) return;
+
+    const analyzeNext = async () => {
+      // Find next N unanalyzed issues starting from currentIndex
+      const issuesToAnalyze = state.issues
+        .slice(
+          state.currentIndex,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 2,
+        ) // Look ahead a bit
+        .filter(
+          (issue) =>
+            !state.analysisCache.has(issue.number) &&
+            !state.analyzingIds.has(issue.number),
+        )
+        .slice(0, MAX_CONCURRENT_ANALYSIS - state.analyzingIds.size);
+
+      if (issuesToAnalyze.length === 0) return;
+
+      // Mark as analyzing
+      setState((prev) => {
+        const nextAnalyzing = new Set(prev.analyzingIds);
+        issuesToAnalyze.forEach((i) => nextAnalyzing.add(i.number));
+        return { ...prev, analyzingIds: nextAnalyzing };
+      });
+
+      // Trigger analysis for each
+      issuesToAnalyze.forEach(async (issue) => {
+        try {
+          const result = await analyzeIssue(issue);
+          setState((prev) => {
+            const nextCache = new Map(prev.analysisCache);
+            if (result) {
+              nextCache.set(issue.number, result);
+            }
+            const nextAnalyzing = new Set(prev.analyzingIds);
+            nextAnalyzing.delete(issue.number);
             return {
-              ...c,
-              score: rankInfo?.score || 0,
-              reason: rankInfo?.reason || '',
+              ...prev,
+              analysisCache: nextCache,
+              analyzingIds: nextAnalyzing,
             };
-          })
-          .sort((a, b) => (b.score || 0) - (a.score || 0));
-
-        setState((s) => ({
-          ...s,
-          status: 'interaction',
-          candidates: ranked,
-          canonicalIssue: canonical,
-          suggestedComment: rec.suggested_comment,
-          message: `Recommendation: ${rec.recommendation}. ${rec.reason}`,
-        }));
-      } catch (err) {
-        debugLogger.error('LLM analysis failed', err);
-        setState((s) => ({
-          ...s,
-          status: 'interaction',
-          candidates,
-          message: 'LLM analysis failed. Please triage manually.',
-        }));
-      }
-    },
-    [config, resetUiState],
-  );
-
-  const fetchIssues = useCallback(
-    async (limit = 50) => {
-      try {
-        const { stdout } = await spawnAsync('gh', [
-          'issue',
-          'list',
-          '--label',
-          'status/possible-duplicate',
-          '--state',
-          'open',
-          '--json',
-          'number,title,body,labels,url,comments,author,reactionGroups',
-          '--limit',
-          String(limit),
-        ]);
-        const issues: Issue[] = JSON.parse(stdout);
-        if (issues.length === 0) {
-          setState((s) => ({
-            ...s,
-            status: 'completed',
-            message: 'No issues found with status/possible-duplicate label.',
-          }));
-          return;
+          });
+        } catch (e) {
+          // If failed, remove from analyzing so we might retry or just leave it
+          debugLogger.error(`Analysis failed for ${issue.number}`, e);
+          setState((prev) => {
+            const nextAnalyzing = new Set(prev.analyzingIds);
+            nextAnalyzing.delete(issue.number);
+            return { ...prev, analyzingIds: nextAnalyzing };
+          });
         }
+      });
+    };
+
+    void analyzeNext();
+  }, [
+    state.issues,
+    state.currentIndex,
+    state.analysisCache,
+    state.analyzingIds,
+    analyzeIssue,
+  ]);
+
+  // Update UI when current issue changes or its analysis completes
+  useEffect(() => {
+    const issue = state.issues[state.currentIndex];
+    if (!issue) return;
+
+    const analysis = state.analysisCache.get(issue.number);
+    const isAnalyzing = state.analyzingIds.has(issue.number);
+
+    if (analysis) {
+      setState((prev) => ({
+        ...prev,
+        status: 'interaction',
+        currentIssue: issue,
+        candidates: analysis.candidates,
+        canonicalIssue: analysis.canonicalIssue,
+        suggestedComment: analysis.recommendation.suggested_comment,
+        message: `Recommendation: ${analysis.recommendation.recommendation}. ${analysis.recommendation.reason || ''}`,
+      }));
+    } else if (isAnalyzing) {
+      setState((prev) => ({
+        ...prev,
+        status: 'analyzing',
+        currentIssue: issue,
+        message: `Analyzing issue #${issue.number} (in background)...`,
+      }));
+    } else {
+      // Not analyzing and not in cache? Should be picked up by queue soon, or we can force it here?
+      // The queue logic should pick it up.
+      setState((prev) => ({
+        ...prev,
+        status: 'loading',
+        currentIssue: issue,
+        message: `Waiting for analysis queue...`,
+      }));
+    }
+  }, [
+    state.currentIndex,
+    state.issues,
+    state.analysisCache,
+    state.analyzingIds,
+  ]);
+
+  const fetchIssues = useCallback(async (limit: number) => {
+    try {
+      const { stdout } = await spawnAsync('gh', [
+        'issue',
+        'list',
+        '--label',
+        'status/possible-duplicate',
+        '--state',
+        'open',
+        '--json',
+        'number,title,body,labels,url,comments,author,reactionGroups',
+        '--limit',
+        String(limit),
+      ]);
+      const issues: Issue[] = JSON.parse(stdout);
+      if (issues.length === 0) {
         setState((s) => ({
           ...s,
-          issues,
-          totalIssues: issues.length,
-          currentIndex: 0,
-          status: 'analyzing',
-          message: `Found ${issues.length} issues. Analyzing first issue...`,
+          status: 'completed',
+          message: 'No issues found with status/possible-duplicate label.',
         }));
-        void processIssue(issues[0]);
-      } catch (error) {
-        setState((s) => ({
-          ...s,
-          status: 'error',
-          message: `Error fetching issues: ${error instanceof Error ? error.message : String(error)}`,
-        }));
+        return;
       }
-    },
-    [processIssue],
-  );
+      setState((s) => ({
+        ...s,
+        issues,
+        totalIssues: issues.length,
+        currentIndex: 0,
+        status: 'analyzing', // Will switch to interaction when cache populates
+        message: `Found ${issues.length} issues. Starting batch analysis...`,
+      }));
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        status: 'error',
+        message: `Error fetching issues: ${error instanceof Error ? error.message : String(error)}`,
+      }));
+    }
+  }, []);
 
   useEffect(() => {
-    void fetchIssues();
-  }, [fetchIssues]);
+    void fetchIssues(initialLimit);
+  }, [fetchIssues, initialLimit]);
 
   const handleNext = useCallback(() => {
     const nextIndex = state.currentIndex + 1;
     if (nextIndex < state.issues.length) {
-      // Reset UI state implicitly done in processIssue
-      setState((s) => ({
-        ...s,
-        status: 'analyzing',
-        currentIndex: nextIndex,
-        currentIssue: undefined,
-        candidates: undefined,
-        canonicalIssue: undefined,
-        message: `Analyzing issue #${state.issues[nextIndex].number}...`,
-      }));
-      void processIssue(state.issues[nextIndex]);
+      setFocusSection('target');
+      setTargetExpanded(false);
+      setTargetScrollOffset(0);
+      setCandidateScrollOffset(0);
+      setInputAction('');
+      setState((s) => ({ ...s, currentIndex: nextIndex }));
     } else {
-      // No delay, exit immediately.
       onExit();
     }
-  }, [state.currentIndex, state.issues, processIssue, onExit]);
+  }, [state.currentIndex, state.issues.length, onExit]);
 
   const performAction = async (action: 'duplicate' | 'remove-label') => {
     if (!state.currentIssue) return;
 
     setState((s) => ({
       ...s,
-      status: 'analyzing',
       message: `Performing action: ${action}...`,
     }));
 
@@ -414,7 +487,6 @@ Return a JSON object with:
           state.suggestedComment ||
           `Duplicate of #${state.canonicalIssue.number}. ${state.canonicalIssue.reason || ''}`;
 
-        // 1. Add comment
         await spawnAsync('gh', [
           'issue',
           'comment',
@@ -423,7 +495,6 @@ Return a JSON object with:
           comment,
         ]);
 
-        // 2. Remove the triage label
         await spawnAsync('gh', [
           'issue',
           'edit',
@@ -432,7 +503,6 @@ Return a JSON object with:
           'status/possible-duplicate',
         ]);
 
-        // 3. Close as duplicate using API (gh issue close doesn't support 'duplicate' reason via CLI flags yet)
         await spawnAsync('gh', [
           'api',
           '-X',
@@ -443,6 +513,16 @@ Return a JSON object with:
           '-f',
           'state_reason=duplicate',
         ]);
+
+        setProcessedHistory((prev) => [
+          ...prev,
+          {
+            number: state.currentIssue!.number,
+            title: state.currentIssue!.title,
+            action: 'duplicate',
+            target: state.canonicalIssue!.number,
+          },
+        ]);
       } else if (action === 'remove-label') {
         await spawnAsync('gh', [
           'issue',
@@ -450,6 +530,14 @@ Return a JSON object with:
           String(state.currentIssue.number),
           '--remove-label',
           'status/possible-duplicate',
+        ]);
+        setProcessedHistory((prev) => [
+          ...prev,
+          {
+            number: state.currentIssue!.number,
+            title: state.currentIssue!.title,
+            action: 'remove-label',
+          },
         ]);
       }
       handleNext();
@@ -466,6 +554,23 @@ Return a JSON object with:
     (key) => {
       const input = key.sequence;
 
+      // History Toggle
+      if (input === 'h' && focusSection !== 'candidate_detail') {
+        setShowHistory((prev) => !prev);
+        return;
+      }
+
+      if (showHistory) {
+        if (
+          keyMatchers[Command.ESCAPE](key) ||
+          input === 'h' ||
+          input === 'q'
+        ) {
+          setShowHistory(false);
+        }
+        return;
+      }
+
       // Global Quit/Cancel
       if (
         keyMatchers[Command.ESCAPE](key) ||
@@ -479,33 +584,52 @@ Return a JSON object with:
         return;
       }
 
-      if (state.status !== 'interaction') return;
+      if (state.status !== 'interaction' && state.status !== 'analyzing')
+        return;
+
+      // Allow action if 'skip' (s) even if analyzing, but d/r require interaction
+      const isInteraction = state.status === 'interaction';
 
       // Priority 1: Action Confirmation (Enter)
-      // If an action is pending (inputAction is set), Enter ALWAYS confirms it
       if (keyMatchers[Command.RETURN](key) && inputAction) {
         if (inputAction === 's') {
+          setProcessedHistory((prev) => [
+            ...prev,
+            {
+              number: state.currentIssue!.number,
+              title: state.currentIssue!.title,
+              action: 'skip',
+            },
+          ]);
           handleNext();
-        } else if (inputAction === 'd' && state.canonicalIssue) {
+        } else if (
+          inputAction === 'd' &&
+          state.canonicalIssue &&
+          isInteraction
+        ) {
           void performAction('duplicate');
-        } else if (inputAction === 'r') {
+        } else if (inputAction === 'r' && isInteraction) {
           void performAction('remove-label');
         }
         setInputAction('');
         return;
       }
 
-      // Priority 2: Action Selection (s, d, r)
+      // Priority 2: Action Selection
       if (focusSection !== 'candidate_detail') {
-        if (
-          input === 's' ||
-          (input === 'd' && state.canonicalIssue) ||
-          input === 'r'
-        ) {
-          setInputAction(input);
+        if (input === 's') {
+          setInputAction('s');
           return;
         }
+        if (isInteraction) {
+          if ((input === 'd' && state.canonicalIssue) || input === 'r') {
+            setInputAction(input);
+            return;
+          }
+        }
       }
+
+      if (!isInteraction) return; // Navigation only when interaction is ready
 
       // Priority 3: Navigation
       if (key.name === 'tab') {
@@ -519,7 +643,6 @@ Return a JSON object with:
       if (focusSection === 'target') {
         if (input === 'e') {
           setTargetExpanded((prev) => !prev);
-          // Reset scroll on expand toggle to avoid confusion
           setTargetScrollOffset(0);
         }
         if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
@@ -543,7 +666,6 @@ Return a JSON object with:
         if (keyMatchers[Command.NAVIGATION_UP](key)) {
           setSelectedCandidateIndex((prev) => Math.max(0, prev - 1));
         }
-        // Enter on candidates only goes to detail if NO action is selected
         if (
           keyMatchers[Command.MOVE_RIGHT](key) ||
           (keyMatchers[Command.RETURN](key) && !inputAction)
@@ -580,11 +702,45 @@ Return a JSON object with:
     );
   }
 
-  if (state.status === 'analyzing') {
+  if (showHistory) {
     return (
-      <Box>
-        <Spinner type="dots" />
-        <Text> {state.message}</Text>
+      <Box
+        flexDirection="column"
+        borderStyle="double"
+        borderColor="yellow"
+        padding={1}
+      >
+        <Text bold color="yellow">
+          Processed Issues History:
+        </Text>
+        <Box flexDirection="column" marginTop={1}>
+          {processedHistory.length === 0 ? (
+            <Text color="gray">No issues processed yet.</Text>
+          ) : (
+            processedHistory.map((item, i) => (
+              <Text key={i}>
+                <Text bold>#{item.number}</Text> {item.title.slice(0, 40)}...
+                <Text
+                  color={
+                    item.action === 'duplicate'
+                      ? 'red'
+                      : item.action === 'skip'
+                        ? 'gray'
+                        : 'green'
+                  }
+                >
+                  [{item.action.toUpperCase()}
+                  {item.target ? ` -> #${item.target}` : ''}]
+                </Text>
+              </Text>
+            ))
+          )}
+        </Box>
+        <Box marginTop={1}>
+          <Text color="gray">
+            Press &apos;h&apos; or &apos;Esc&apos; to return to triage.
+          </Text>
+        </Box>
       </Box>
     );
   }
@@ -598,8 +754,10 @@ Return a JSON object with:
   }
 
   const { currentIssue } = state;
-  const targetBody = currentIssue?.body || '';
-  // Visible lines for target
+
+  if (!currentIssue) return <Text>Loading...</Text>;
+
+  const targetBody = currentIssue.body || '';
   const targetLines = targetBody.split('\n');
   const visibleLines = targetExpanded
     ? VISIBLE_LINES_EXPANDED
@@ -662,7 +820,6 @@ Return a JSON object with:
     );
   }
 
-  // Calculate visible candidates list
   const visibleCandidates =
     state.candidates?.slice(
       candidateListScrollOffset,
@@ -673,11 +830,9 @@ Return a JSON object with:
     <Box flexDirection="column">
       <Box flexDirection="row" justifyContent="space-between">
         <Text bold color="cyan">
-          Triage Issue ({state.currentIndex + 1}/{state.totalIssues})
+          Triage Issue ({state.currentIndex + 1}/{state.issues.length})
         </Text>
-        <Text color="gray">
-          [Tab] Switch Focus | [e] Expand Body | [q] Quit
-        </Text>
+        <Text color="gray">[Tab] Switch Focus | [h] History | [q] Quit</Text>
       </Box>
 
       {/* Target Issue Section */}
@@ -691,16 +846,16 @@ Return a JSON object with:
           <Text>
             Issue:{' '}
             <Text bold color="yellow">
-              #{currentIssue?.number}
+              #{currentIssue.number}
             </Text>{' '}
-            - {currentIssue?.title}
+            - {currentIssue.title}
           </Text>
           <Text color="gray">
-            Author: {currentIssue?.author?.login} | 👍{' '}
+            Author: {currentIssue.author?.login} | 👍{' '}
             {getReactionCount(currentIssue)}
           </Text>
         </Box>
-        <Text color="gray">{currentIssue?.url}</Text>
+        <Text color="gray">{currentIssue.url}</Text>
         <Box
           marginTop={1}
           flexDirection="column"
@@ -731,55 +886,68 @@ Return a JSON object with:
         paddingX={1}
         minHeight={VISIBLE_CANDIDATES * 2 + 1}
       >
-        <Text bold color="magenta">
-          Ranked Candidates (Select to view details):
-        </Text>
-        {state.candidates?.length === 0 ? (
-          <Text italic color="gray">
-            {' '}
-            No candidates found.
-          </Text>
+        {state.status === 'analyzing' && !state.candidates ? (
+          <Box
+            alignItems="center"
+            justifyContent="center"
+            height={VISIBLE_CANDIDATES * 2}
+          >
+            <Spinner type="dots" />
+            <Text> {state.message}</Text>
+          </Box>
         ) : (
-          visibleCandidates.map((c: Candidate, i: number) => {
-            const absoluteIndex = candidateListScrollOffset + i;
-            return (
-              <Box key={c.number} flexDirection="column" marginLeft={1}>
-                <Text
-                  color={
-                    state.canonicalIssue?.number === c.number
-                      ? 'green'
-                      : 'white'
-                  }
-                  backgroundColor={
-                    focusSection === 'candidates' &&
-                    selectedCandidateIndex === absoluteIndex
-                      ? 'blue'
-                      : undefined
-                  }
-                  wrap="truncate-end"
-                >
-                  {absoluteIndex + 1}. <Text bold>#{c.number}</Text> - {c.title}{' '}
-                  (Score: {c.score}/100)
-                </Text>
-                <Box marginLeft={2}>
-                  <Text color="gray" wrap="truncate-end">
-                    Reactions: {getReactionCount(c)} | {c.reason}
-                  </Text>
-                </Box>
-              </Box>
-            );
-          })
-        )}
-        {state.candidates &&
-          state.candidates.length >
-            candidateListScrollOffset + VISIBLE_CANDIDATES && (
-            <Text color="gray">
-              ... (
-              {state.candidates.length -
-                (candidateListScrollOffset + VISIBLE_CANDIDATES)}{' '}
-              more)
+          <>
+            <Text bold color="magenta">
+              Ranked Candidates (Select to view details):
             </Text>
-          )}
+            {state.candidates?.length === 0 ? (
+              <Text italic color="gray">
+                {' '}
+                No candidates found.
+              </Text>
+            ) : (
+              visibleCandidates.map((c: Candidate, i: number) => {
+                const absoluteIndex = candidateListScrollOffset + i;
+                return (
+                  <Box key={c.number} flexDirection="column" marginLeft={1}>
+                    <Text
+                      color={
+                        state.canonicalIssue?.number === c.number
+                          ? 'green'
+                          : 'white'
+                      }
+                      backgroundColor={
+                        focusSection === 'candidates' &&
+                        selectedCandidateIndex === absoluteIndex
+                          ? 'blue'
+                          : undefined
+                      }
+                      wrap="truncate-end"
+                    >
+                      {absoluteIndex + 1}. <Text bold>#{c.number}</Text> -{' '}
+                      {c.title} (Score: {c.score}/100)
+                    </Text>
+                    <Box marginLeft={2}>
+                      <Text color="gray" wrap="truncate-end">
+                        Reactions: {getReactionCount(c)} | {c.reason}
+                      </Text>
+                    </Box>
+                  </Box>
+                );
+              })
+            )}
+            {state.candidates &&
+              state.candidates.length >
+                candidateListScrollOffset + VISIBLE_CANDIDATES && (
+                <Text color="gray">
+                  ... (
+                  {state.candidates.length -
+                    (candidateListScrollOffset + VISIBLE_CANDIDATES)}{' '}
+                  more)
+                </Text>
+              )}
+          </>
+        )}
       </Box>
 
       {/* Analysis / Actions Footer */}
