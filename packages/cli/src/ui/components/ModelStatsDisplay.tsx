@@ -15,6 +15,7 @@ import {
 } from '../utils/computeStats.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface StatRowData {
   metric: string;
@@ -37,6 +38,8 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
 }) => {
   const { stats } = useSessionStats();
   const { models } = stats.metrics;
+  const settings = useSettings();
+  const showUserIdentity = settings.merged.ui.showUserIdentity;
   const activeModels = Object.entries(models).filter(
     ([, metrics]) => metrics.api.totalRequests > 0,
   );
@@ -233,7 +236,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
       </Text>
       <Box height={1} />
 
-      {selectedAuthType && (
+      {showUserIdentity && selectedAuthType && (
         <Box>
           <Box width={28}>
             <Text color={theme.text.link}>Auth Method:</Text>
@@ -247,7 +250,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           </Text>
         </Box>
       )}
-      {tier && (
+      {showUserIdentity && tier && (
         <Box>
           <Box width={28}>
             <Text color={theme.text.link}>Tier:</Text>
@@ -255,7 +258,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       )}
-      {(selectedAuthType || tier) && <Box height={1} />}
+      {showUserIdentity && (selectedAuthType || tier) && <Box height={1} />}
 
       <Table data={rows} columns={columns} />
     </Box>
