@@ -861,6 +861,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.skills`** (boolean):
+  - **Description:** Enable Agent Skills (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
     (useful for remote sessions).
@@ -872,11 +877,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 #### `skills`
-
-- **`skills.enabled`** (boolean):
-  - **Description:** Enable Agent Skills.
-  - **Default:** `true`
-  - **Requires restart:** Yes
 
 - **`skills.disabled`** (array):
   - **Description:** List of disabled skills.
