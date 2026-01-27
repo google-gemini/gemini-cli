@@ -103,5 +103,23 @@
       "tool": "ツール",
       "output": "出力"
     }
+  },
+  "toolStats": {
+    "title": "ツール統計 (詳細)",
+    "noCalls": "このセッションではまだツール呼び出しが行われていません。",
+    "columns": {
+      "name": "ツール名",
+      "calls": "回数",
+      "successRate": "成功率",
+      "avgDuration": "平均時間"
+    },
+    "summary": {
+      "title": "ユーザー決定の概要",
+      "totalReviewed": "レビュー済みの提案合計:",
+      "accepted": " » 承認:",
+      "rejected": " » 拒否:",
+      "modified": " » 修正:",
+      "agreementRate": " 全体の合意率:"
+    }
   }
 }

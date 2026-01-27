@@ -110,5 +110,23 @@
       "tool": "Tool",
       "output": "Output"
     }
+  },
+  "toolStats": {
+    "title": "Tool Stats For Nerds",
+    "noCalls": "No tool calls have been made in this session.",
+    "columns": {
+      "name": "Tool Name",
+      "calls": "Calls",
+      "successRate": "Success Rate",
+      "avgDuration": "Avg Duration"
+    },
+    "summary": {
+      "title": "User Decision Summary",
+      "totalReviewed": "Total Reviewed Suggestions:",
+      "accepted": " » Accepted:",
+      "rejected": " » Rejected:",
+      "modified": " » Modified:",
+      "agreementRate": " Overall Agreement Rate:"
+    }
   }
 }
