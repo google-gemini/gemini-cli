@@ -32,6 +32,11 @@ import {
 } from '../confirmation-bus/types.js';
 
 /**
+ * Handler for terminal tool calls.
+ */
+export type TerminalCallHandler = (call: CompletedToolCall) => void;
+
+/**
  * Manages the state of tool calls.
  * Publishes state changes to the MessageBus via TOOL_CALLS_UPDATE events.
  */
@@ -43,6 +48,7 @@ export class SchedulerStateManager {
   constructor(
     private readonly messageBus: MessageBus,
     private readonly schedulerId: string = ROOT_SCHEDULER_ID,
+    private readonly onTerminalCall?: TerminalCallHandler,
   ) {}
 
   addToolCalls(calls: ToolCall[]): void {
@@ -134,6 +140,8 @@ export class SchedulerStateManager {
     if (this.isTerminalCall(call)) {
       this._completedBatch.push(call);
       this.activeCalls.delete(callId);
+
+      this.onTerminalCall?.(call);
       this.emitUpdate();
     }
   }
@@ -173,9 +181,12 @@ export class SchedulerStateManager {
       const queuedCall = this.queue.shift()!;
       if (queuedCall.status === 'error') {
         this._completedBatch.push(queuedCall);
+        this.onTerminalCall?.(queuedCall);
         continue;
       }
-      this._completedBatch.push(this.toCancelled(queuedCall, reason));
+      const cancelledCall = this.toCancelled(queuedCall, reason);
+      this._completedBatch.push(cancelledCall);
+      this.onTerminalCall?.(cancelledCall);
     }
     this.emitUpdate();
   }

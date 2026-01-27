@@ -35,7 +35,10 @@ vi.mock('../telemetry/types.js', () => ({
   ToolCallEvent: vi.fn().mockImplementation((call) => ({ ...call })),
 }));
 
-import { SchedulerStateManager } from './state-manager.js';
+import {
+  SchedulerStateManager,
+  type TerminalCallHandler,
+} from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
@@ -64,6 +67,7 @@ import type {
   SuccessfulToolCall,
   ErroredToolCall,
   CancelledToolCall,
+  CompletedToolCall,
   ToolCallResponseInfo,
 } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
@@ -201,10 +205,27 @@ describe('Scheduler (Orchestrator)', () => {
       applyInlineModify: vi.fn(),
     } as unknown as Mocked<ToolModificationHandler>;
 
-    // Wire up class constructors to return our mock instances
-    vi.mocked(SchedulerStateManager).mockReturnValue(
-      mockStateManager as unknown as Mocked<SchedulerStateManager>,
+    let capturedTerminalHandler: TerminalCallHandler | undefined;
+    vi.mocked(SchedulerStateManager).mockImplementation(
+      (_messageBus, _schedulerId, onTerminalCall) => {
+        capturedTerminalHandler = onTerminalCall;
+        return mockStateManager as unknown as SchedulerStateManager;
+      },
     );
+
+    mockStateManager.finalizeCall.mockImplementation((callId: string) => {
+      const call = mockStateManager.getToolCall(callId);
+      if (call) {
+        capturedTerminalHandler?.(call as CompletedToolCall);
+      }
+    });
+
+    mockStateManager.cancelAllQueued.mockImplementation((_reason: string) => {
+      // In tests, we usually mock the queue or completed batch.
+      // For the sake of telemetry tests, we manually trigger if needed,
+      // but most tests here check if finalizing is called.
+    });
+
     vi.mocked(ToolExecutor).mockReturnValue(
       mockExecutor as unknown as Mocked<ToolExecutor>,
     );
