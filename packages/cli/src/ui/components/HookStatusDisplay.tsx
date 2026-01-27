@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { type ActiveHook } from '../types.js';
 
@@ -16,11 +17,12 @@ interface HookStatusDisplayProps {
 export const HookStatusDisplay: React.FC<HookStatusDisplayProps> = ({
   activeHooks,
 }) => {
+  const { t } = useTranslation('ui');
   if (activeHooks.length === 0) {
     return null;
   }
 
-  const label = activeHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+  const label = t('hookStatus.executing', { count: activeHooks.length });
   const displayNames = activeHooks.map((hook) => {
     let name = hook.name;
     if (hook.index && hook.total && hook.total > 1) {
