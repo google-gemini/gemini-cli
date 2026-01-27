@@ -32,6 +32,11 @@ import {
   createWorkingStdio,
   startupProfiler,
   Kind,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  VALID_GEMINI_MODELS,
+  getDisplayString,
+  getModelDescription,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -72,6 +77,11 @@ export async function runZedIntegration(
 export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
+  private static readonly AVAILABLE_MODELS = [
+    PREVIEW_GEMINI_MODEL_AUTO,
+    DEFAULT_GEMINI_MODEL_AUTO,
+    ...VALID_GEMINI_MODELS,
+  ];
 
   constructor(
     private config: Config,
@@ -179,8 +189,20 @@ export class GeminiAgent {
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
+    const availableModels: acp.ModelInfo[] = GeminiAgent.AVAILABLE_MODELS.map(
+      (modelId) => ({
+        modelId,
+        name: getDisplayString(modelId) || modelId,
+        description: getModelDescription(modelId),
+      }),
+    );
+
     return {
       sessionId,
+      models: {
+        availableModels,
+        currentModelId: config.getModel(),
+      },
     };
   }
 
@@ -248,6 +270,37 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new acp.RequestError(
+        1001,
+        `Session not found: ${params.sessionId}`,
+      );
+    }
+
+    const requestedModelId = params.modelId;
+    const config = session.getConfig();
+
+    // Validate that the requested model is available
+    if (!GeminiAgent.AVAILABLE_MODELS.includes(requestedModelId)) {
+      const currentModelId = config.getModel();
+      const availableModelsList = GeminiAgent.AVAILABLE_MODELS.join(', ');
+
+      throw new acp.RequestError(
+        -32602, // invalid_params
+        `Model "${requestedModelId}" is not available (Current: "${currentModelId}"). Available models: ${availableModelsList}`,
+      );
+    }
+
+    // Set the model in the session's config
+    config.setModel(requestedModelId);
+
+    return {};
+  }
 }
 
 export class Session {
@@ -259,6 +312,10 @@ export class Session {
     private readonly config: Config,
     private readonly connection: acp.AgentSideConnection,
   ) {}
+
+  getConfig(): Config {
+    return this.config;
+  }
 
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {

@@ -124,6 +124,21 @@ export function getDisplayString(
 }
 
 /**
+ * Returns the description for a model, used in UI and ACP model lists.
+ * Only auto models have descriptions; concrete models return undefined.
+ */
+export function getModelDescription(model: string): string | undefined {
+  switch (model) {
+    case PREVIEW_GEMINI_MODEL_AUTO:
+      return `Let Gemini CLI decide the best model for the task: ${PREVIEW_GEMINI_MODEL}, ${PREVIEW_GEMINI_FLASH_MODEL}`;
+    case DEFAULT_GEMINI_MODEL_AUTO:
+      return `Let Gemini CLI decide the best model for the task: ${DEFAULT_GEMINI_MODEL}, ${DEFAULT_GEMINI_FLASH_MODEL}`;
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Checks if the model is a preview model.
  *
  * @param model The model name to check.

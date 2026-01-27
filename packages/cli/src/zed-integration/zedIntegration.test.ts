@@ -103,6 +103,8 @@ describe('GeminiAgent', () => {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
       }),
+      getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+      setModel: vi.fn(),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -257,6 +259,62 @@ describe('GeminiAgent', () => {
 
     expect(session.prompt).toHaveBeenCalled();
     expect(result).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('should return available models in newSession response', async () => {
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.models).toBeDefined();
+    expect(response.models?.availableModels).toHaveLength(7);
+    expect(response.models?.currentModelId).toBe('gemini-2.5-pro');
+    // Auto models have descriptions
+    expect(response.models?.availableModels).toContainEqual({
+      modelId: 'auto-gemini-2.5',
+      name: 'Auto (Gemini 2.5)',
+      description:
+        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+    });
+    // Concrete models have no description
+    expect(response.models?.availableModels).toContainEqual({
+      modelId: 'gemini-2.5-flash',
+      name: 'gemini-2.5-flash',
+      description: undefined,
+    });
+  });
+
+  it('should set session model via unstable_setSessionModel', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+
+    const result = await agent.unstable_setSessionModel({
+      sessionId: 'test-session-id',
+      modelId: 'gemini-2.5-flash',
+    });
+
+    expect(result).toEqual({});
+    expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-2.5-flash');
+  });
+
+  it('should throw error when setting non-existent model', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+
+    await expect(
+      agent.unstable_setSessionModel({
+        sessionId: 'test-session-id',
+        modelId: 'unknown-model',
+      }),
+    ).rejects.toThrow('Model "unknown-model" is not available');
+  });
+
+  it('should throw error when setting model for non-existent session', async () => {
+    await expect(
+      agent.unstable_setSessionModel({
+        sessionId: 'unknown-session',
+        modelId: 'gemini-2.5-flash',
+      }),
+    ).rejects.toThrow('Session not found');
   });
 });
 

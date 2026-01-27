@@ -18,6 +18,7 @@ import {
   ModelSlashCommandEvent,
   logModelSlashCommand,
   getDisplayString,
+  getModelDescription,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -75,8 +76,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: DEFAULT_GEMINI_MODEL_AUTO,
         title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+        description: getModelDescription(DEFAULT_GEMINI_MODEL_AUTO),
         key: DEFAULT_GEMINI_MODEL_AUTO,
       },
       {
@@ -93,8 +93,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       list.unshift({
         value: PREVIEW_GEMINI_MODEL_AUTO,
         title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-        description:
-          'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+        description: getModelDescription(PREVIEW_GEMINI_MODEL_AUTO),
         key: PREVIEW_GEMINI_MODEL_AUTO,
       });
     }
