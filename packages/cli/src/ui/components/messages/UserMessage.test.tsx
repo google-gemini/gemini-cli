@@ -47,7 +47,10 @@ describe('UserMessage', () => {
 
   it('transforms image paths in user message', () => {
     const message = 'Check out this image: @/path/to/my-image.png';
-    const { lastFrame } = render(<UserMessage text={message} width={80} />);
+    const { lastFrame } = renderWithProviders(
+      <UserMessage text={message} width={80} />,
+      { width: 80 },
+    );
     const output = lastFrame();
 
     expect(output).toContain('[Image my-image.png]');
