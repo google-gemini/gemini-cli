@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
   GeminiEventType,
@@ -90,7 +98,7 @@ describe('runNonInteractive ActivityLogger', () => {
   });
 
   it('should not call registerActivityLogger when debugMode is disabled', async () => {
-    mockConfig.getDebugMode.mockReturnValue(false);
+    (mockConfig.getDebugMode as Mock).mockReturnValue(false);
 
     await runNonInteractive({
       config: mockConfig,
