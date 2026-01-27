@@ -397,19 +397,6 @@ async function handleEnableDisable(
     };
   }
 
-  // Check if server is from an extension
-  const serverKey = Object.keys(servers).find(
-    (key) => normalizeServerId(key) === name,
-  );
-  const server = serverKey ? servers[serverKey] : undefined;
-  if (server?.extension) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Server '${serverName}' is provided by extension '${server.extension.name}'.\nUse '/extensions ${action} ${server.extension.name}' to manage this extension.`,
-    };
-  }
-
   const manager = McpServerEnablementManager.getInstance();
 
   if (enable) {
