@@ -7,12 +7,6 @@ Target PR: {{args}}
 Phase 1: Review
 Follow these steps to conduct a thorough review:
 
-description="Reviews a pull request based on issue number."
-prompt = """
-Please provide a detailed pull request review on GitHub issue: {{args}}.
-
-Follow these steps:
-
 1. Use `gh pr view {{args}}` to pull the information of the PR.
 2. Use `gh pr diff {{args}}` to view the diff of the PR.
 3. Understand the intent of the PR using the PR description.
