@@ -199,8 +199,8 @@ Slash commands provide meta-level control over the CLI itself.
     while others require a restart.
 
 - [**`/skills`**](./skills.md)
-  - **Description:** (Experimental) Manage Agent Skills, which provide on-demand
-    expertise and specialized workflows.
+  - **Description:** Manage Agent Skills, which provide on-demand expertise and
+    specialized workflows.
   - **Sub-commands:**
     - **`list`**:
       - **Description:** List all discovered skills and their current status
