@@ -202,8 +202,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Toggle the background shells view. This allows you to view
     and manage long-running processes that you've sent to the background.
 - [**`/skills`**](./skills.md)
-  - **Description:** (Experimental) Manage Agent Skills, which provide on-demand
-    expertise and specialized workflows.
+  - **Description:** Manage Agent Skills, which provide on-demand expertise and
+    specialized workflows.
   - **Sub-commands:**
     - **`list`**:
       - **Description:** List all discovered skills and their current status
