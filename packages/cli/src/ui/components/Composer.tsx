@@ -50,7 +50,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
+      width={uiState.terminalWidth}
       flexGrow={0}
       flexShrink={0}
     >
@@ -113,7 +113,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.mainAreaWidth}
+              width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
