@@ -92,5 +92,23 @@
       "shell": "  Type your shell command",
       "default": "  Type your message or @path/to/file"
     }
+  },
+  "modelStats": {
+    "title": "Model Stats For Nerds",
+    "noCalls": "No API calls have been made in this session.",
+    "metrics": {
+      "label": "Metric",
+      "api": "API",
+      "requests": "Requests",
+      "errors": "Errors",
+      "avgLatency": "Avg Latency",
+      "tokens": "Tokens",
+      "total": "Total",
+      "input": "Input",
+      "cacheReads": "Cache Reads",
+      "thoughts": "Thoughts",
+      "tool": "Tool",
+      "output": "Output"
+    }
   }
 }

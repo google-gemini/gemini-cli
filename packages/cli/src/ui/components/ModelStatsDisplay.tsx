@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -25,6 +26,7 @@ interface StatRowData {
 }
 
 export const ModelStatsDisplay: React.FC = () => {
+  const { t } = useTranslation('ui');
   const { stats } = useSessionStats();
   const { models } = stats.metrics;
   const activeModels = Object.entries(models).filter(
@@ -39,9 +41,7 @@ export const ModelStatsDisplay: React.FC = () => {
         paddingY={1}
         paddingX={2}
       >
-        <Text color={theme.text.primary}>
-          No API calls have been made in this session.
-        </Text>
+        <Text color={theme.text.primary}>{t('modelStats.noCalls')}</Text>
       </Box>
     );
   }
@@ -77,9 +77,11 @@ export const ModelStatsDisplay: React.FC = () => {
 
   const rows: StatRowData[] = [
     // API Section
-    { metric: 'API', isSection: true },
-    createRow('Requests', (m) => m.api.totalRequests.toLocaleString()),
-    createRow('Errors', (m) => {
+    { metric: t('modelStats.metrics.api'), isSection: true },
+    createRow(t('modelStats.metrics.requests'), (m) =>
+      m.api.totalRequests.toLocaleString(),
+    ),
+    createRow(t('modelStats.metrics.errors'), (m) => {
       const errorRate = calculateErrorRate(m);
       return (
         <Text
@@ -91,20 +93,22 @@ export const ModelStatsDisplay: React.FC = () => {
         </Text>
       );
     }),
-    createRow('Avg Latency', (m) => formatDuration(calculateAverageLatency(m))),
+    createRow(t('modelStats.metrics.avgLatency'), (m) =>
+      formatDuration(calculateAverageLatency(m)),
+    ),
 
     // Spacer
     { metric: '' },
 
     // Tokens Section
-    { metric: 'Tokens', isSection: true },
-    createRow('Total', (m) => (
+    { metric: t('modelStats.metrics.tokens'), isSection: true },
+    createRow(t('modelStats.metrics.total'), (m) => (
       <Text color={theme.text.secondary}>
         {m.tokens.total.toLocaleString()}
       </Text>
     )),
     createRow(
-      'Input',
+      t('modelStats.metrics.input'),
       (m) => (
         <Text color={theme.text.primary}>
           {m.tokens.input.toLocaleString()}
@@ -117,7 +121,7 @@ export const ModelStatsDisplay: React.FC = () => {
   if (hasCached) {
     rows.push(
       createRow(
-        'Cache Reads',
+        t('modelStats.metrics.cacheReads'),
         (m) => {
           const cacheHitRate = calculateCacheHitRate(m);
           return (
@@ -134,7 +138,7 @@ export const ModelStatsDisplay: React.FC = () => {
   if (hasThoughts) {
     rows.push(
       createRow(
-        'Thoughts',
+        t('modelStats.metrics.thoughts'),
         (m) => (
           <Text color={theme.text.primary}>
             {m.tokens.thoughts.toLocaleString()}
@@ -148,7 +152,7 @@ export const ModelStatsDisplay: React.FC = () => {
   if (hasTool) {
     rows.push(
       createRow(
-        'Tool',
+        t('modelStats.metrics.tool'),
         (m) => (
           <Text color={theme.text.primary}>
             {m.tokens.tool.toLocaleString()}
@@ -161,7 +165,7 @@ export const ModelStatsDisplay: React.FC = () => {
 
   rows.push(
     createRow(
-      'Output',
+      t('modelStats.metrics.output'),
       (m) => (
         <Text color={theme.text.primary}>
           {m.tokens.candidates.toLocaleString()}
@@ -174,7 +178,7 @@ export const ModelStatsDisplay: React.FC = () => {
   const columns: Array<Column<StatRowData>> = [
     {
       key: 'metric',
-      header: 'Metric',
+      header: t('modelStats.metrics.label'),
       width: 28,
       renderCell: (row) => (
         <Text
@@ -211,7 +215,7 @@ export const ModelStatsDisplay: React.FC = () => {
       paddingX={2}
     >
       <Text bold color={theme.text.accent}>
-        Model Stats For Nerds
+        {t('modelStats.title')}
       </Text>
       <Box height={1} />
       <Table data={rows} columns={columns} />

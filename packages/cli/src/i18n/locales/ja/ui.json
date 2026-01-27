@@ -85,5 +85,23 @@
       "shell": "  シェルコマンドを入力してください",
       "default": "  メッセージを入力するか、@path/to/file でファイルを参照します"
     }
+  },
+  "modelStats": {
+    "title": "モデル統計 (詳細)",
+    "noCalls": "このセッションではまだAPI呼び出しが行われていません。",
+    "metrics": {
+      "label": "メトリクス",
+      "api": "API",
+      "requests": "リクエスト数",
+      "errors": "エラー数",
+      "avgLatency": "平均レイテンシ",
+      "tokens": "トークン",
+      "total": "合計",
+      "input": "入力",
+      "cacheReads": "キャッシュ読み込み",
+      "thoughts": "Thought",
+      "tool": "ツール",
+      "output": "出力"
+    }
   }
 }
