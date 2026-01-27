@@ -12,10 +12,11 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
-import type { TextBuffer } from './shared/text-buffer.js';
 import {
+  type TextBuffer,
   logicalPosToOffset,
   PASTED_TEXT_PLACEHOLDER_REGEX,
+  getTransformUnderCursor,
 } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
@@ -56,8 +57,10 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
+import { useMouseDoubleClick } from '../hooks/useMouseDoubleClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -393,6 +396,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       const visualRow = buffer.visualScrollRow + relY;
       buffer.moveToVisualPosition(visualRow, relX);
+    },
+    { isActive: focus },
+  );
+
+  const isAlternateBuffer = useAlternateBuffer();
+
+  // Double-click to expand/collapse paste placeholders
+  useMouseDoubleClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (!isAlternateBuffer) return;
+
+      const logicalPos = buffer.getLogicalPositionFromVisual(
+        buffer.visualScrollRow + relY,
+        relX,
+      );
+      if (!logicalPos) return;
+
+      // Check for paste placeholder (collapsed state)
+      const transform = getTransformUnderCursor(
+        logicalPos.row,
+        logicalPos.col,
+        buffer.transformationsByLine,
+      );
+      if (transform?.type === 'paste' && transform.id) {
+        buffer.togglePasteExpansion(transform.id);
+        return;
+      }
+
+      // Check for expanded paste region
+      const expandedId = buffer.getExpandedPasteAtLine(logicalPos.row);
+      if (expandedId) {
+        buffer.togglePasteExpansion(expandedId);
+      }
     },
     { isActive: focus },
   );

@@ -1341,7 +1341,7 @@ export class Config {
     }
     if (this.geminiClient?.isInitialized()) {
       await this.geminiClient.setTools();
-      await this.geminiClient.updateSystemInstruction();
+      this.geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1409,6 +1409,13 @@ export class Config {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    if (isPlanModeTransition) {
+      this.updateSystemInstructionIfInitialized();
+    }
   }
 
   /**
@@ -1491,10 +1498,10 @@ export class Config {
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
    */
-  async updateSystemInstructionIfInitialized(): Promise<void> {
+  updateSystemInstructionIfInitialized(): void {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1803,7 +1810,7 @@ export class Config {
     }
 
     // Notify the client that system instructions might need updating
-    await this.updateSystemInstructionIfInitialized();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**
@@ -2142,7 +2149,7 @@ export class Config {
     const client = this.getGeminiClient();
     if (client?.isInitialized()) {
       await client.setTools();
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
     } else {
       debugLogger.debug(
         '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
