@@ -24,6 +24,7 @@ export const LoginWithGoogleRestartDialog = ({
     (key) => {
       if (key.name === 'escape') {
         onDismiss();
+        return true;
       } else if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
           if (process.send) {
@@ -38,7 +39,9 @@ export const LoginWithGoogleRestartDialog = ({
           await runExitCleanup();
           process.exit(RELAUNCH_EXIT_CODE);
         }, 100);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
