@@ -30,15 +30,16 @@ specific job.
 - **Focused context:** Each sub-agent has its own system prompt and persona.
 - **Specialized tools:** Sub-agents can have a restricted or specialized set of
   tools.
-- **Independent Context Window:** Interactions with a sub-agent happen in a
+- **Independent context window:** Interactions with a sub-agent happen in a
   separate context loop. The main agent only sees the final result, saving
   tokens in your main conversation history.
 
 The main agent uses the `delegate_to_agent` tool to hand off a task to a
 sub-agent. Once the sub-agent completes its task (or fails), it reports back to
-the main agent with its findings.
+the main agent with its findings (usually as a text summary or structured report
+returned by the tool).
 
-## Built-in Sub-Agents
+## Built-in sub-agents
 
 Gemini CLI comes with powerful built-in sub-agents.
 
@@ -50,7 +51,8 @@ Gemini CLI comes with powerful built-in sub-agents.
 - **When to use:** "How does the authentication system work?", "Map out the
   dependencies of the `AgentRegistry` class."
 - **Configuration:** Enabled by default. You can configure it in
-  `settings.json`:
+  `settings.json`.
+  Example (forcing a specific model):
   ```json
   {
     "experimental": {
@@ -68,11 +70,11 @@ Gemini CLI comes with powerful built-in sub-agents.
 - **Name:** `cli_help`
 - **Purpose:** Expert knowledge about Gemini CLI itself, its commands,
   configuration, and documentation.
-- **When to use:** "How do I configure a proxy?", "What does the /rewind command
+- **When to use:** "How do I configure a proxy?", "What does the `/rewind` command
   do?"
 - **Configuration:** Enabled by default.
 
-## Creating Custom Sub-Agents
+## Creating custom sub-agents
 
 You can create your own sub-agents to automate specific workflows or enforce
 specific personas.
@@ -89,7 +91,7 @@ To use custom sub-agents, you must enable them in your `settings.json`:
 }
 ```
 
-### Agent Definition Files
+### Agent definition files
 
 Custom agents are defined as Markdown files (`.md`) with YAML frontmatter. You
 can place them in:
@@ -97,7 +99,7 @@ can place them in:
 1.  **Project-level:** `.gemini/agents/*.md` (Shared with your team)
 2.  **User-level:** `~/.gemini/agents/*.md` (Personal agents)
 
-### File Format
+### File format
 
 The file **MUST** start with YAML frontmatter enclosed in triple-dashes `---`.
 The body of the markdown file becomes the agent's **System Prompt**.
@@ -131,7 +133,7 @@ When you find a vulnerability, explain it clearly and suggest a fix. Do not fix
 it yourself; just report it.
 ```
 
-### Configuration Schema
+### Configuration schema
 
 | Field          | Type   | Required | Description                                                                                                                |
 | :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------- |
