@@ -70,6 +70,38 @@ powerful tool for developers.
   it can lead to test leakage and is less reliable. To "unset" a variable, use
   an empty string `vi.stubEnv('NAME', '')`.
 
+## Internationalization (i18n)
+
+All user-facing strings in `packages/cli` must be translatable. Never hardcode
+English text in UI components.
+
+- **In React components:** Use the `useTranslation` hook from `react-i18next`:
+
+  ```tsx
+  import { useTranslation } from 'react-i18next';
+  const { t } = useTranslation('common');
+  return <Text>{t('greeting')}</Text>;
+  ```
+
+- **Outside React:** Import `t` from `packages/cli/src/i18n/index.ts`:
+
+  ```typescript
+  import { t } from '../i18n/index.js';
+  const msg = t('common:loading');
+  ```
+
+- **Adding new strings:** Add the English key to the appropriate namespace file
+  in `packages/cli/src/i18n/locales/en/` (`common.json`, `commands.json`,
+  `dialogs.json`, `help.json`, or `loading.json`), then add the corresponding
+  translation to all other locale folders (currently `ja/`).
+- **Interpolation:** Use i18next syntax `{{variable}}` for dynamic values, never
+  string concatenation.
+- **Semantic completeness:** Each translation key should be a complete,
+  meaningful sentence or phrase. Do not split sentences across multiple keys.
+- **Locale packs:** Each locale folder contains a `manifest.json` declaring its
+  `displayName`. New languages are added by creating a folder — no code changes
+  needed. See `docs/cli/internationalization.md` for the full guide.
+
 ## Documentation
 
 - Always use the `docs-writer` skill when you are asked to write, edit, or
