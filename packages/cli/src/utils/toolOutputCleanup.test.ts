@@ -8,12 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, TOOL_OUTPUT_DIR } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupToolOutputFiles } from './sessionCleanup.js';
-
-// Use the constant value directly
-const TOOL_OUTPUT_DIR = 'tool_output';
 
 describe('Tool Output Cleanup', () => {
   let testTempDir: string;

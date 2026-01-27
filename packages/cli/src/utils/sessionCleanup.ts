@@ -425,9 +425,7 @@ export async function cleanupToolOutputFiles(
         const excessCount = remainingFiles.length - retentionConfig.maxCount;
         // remainingFiles is already sorted oldest first, so delete from the start
         for (let i = 0; i < excessCount; i++) {
-          if (!filesToDelete.includes(remainingFiles[i].name)) {
-            filesToDelete.push(remainingFiles[i].name);
-          }
+          filesToDelete.push(remainingFiles[i].name);
         }
       }
     }
