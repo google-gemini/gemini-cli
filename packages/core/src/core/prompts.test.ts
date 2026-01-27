@@ -65,6 +65,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        getProjectTempPlansDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -266,6 +269,26 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
       expect(prompt).toMatchSnapshot();
+    });
+
+    it('should only list available tools in PLAN mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      // Only enable glob and read_file, disable others (like web search)
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        'glob',
+        'read_file',
+      ]);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+
+      // Should include enabled tools
+      expect(prompt).toContain('`glob`');
+      expect(prompt).toContain('`read_file`');
+
+      // Should NOT include disabled tools
+      expect(prompt).not.toContain('`google_web_search`');
+      expect(prompt).not.toContain('`list_directory`');
+      expect(prompt).not.toContain('`search_file_content`');
     });
   });
 

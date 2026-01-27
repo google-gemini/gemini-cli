@@ -20,8 +20,10 @@ import {
   getErrorMessage,
   MCPOAuthTokenStorage,
   mcpServerRequiresOAuth,
+  CoreEvent,
+  coreEvents,
 } from '@google/gemini-cli-core';
-import { appEvents, AppEvent } from '../../utils/events.js';
+
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
 import {
   McpServerEnablementManager,
@@ -100,8 +102,7 @@ const authCommand: SlashCommand = {
       context.ui.addItem({ type: 'info', text: message });
     };
 
-    appEvents.on(AppEvent.OauthDisplayMessage, displayListener);
-
+    coreEvents.on(CoreEvent.OauthDisplayMessage, displayListener);
     try {
       context.ui.addItem({
         type: 'info',
@@ -118,12 +119,7 @@ const authCommand: SlashCommand = {
 
       const mcpServerUrl = server.httpUrl || server.url;
       const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
-      await authProvider.authenticate(
-        serverName,
-        oauthConfig,
-        mcpServerUrl,
-        appEvents,
-      );
+      await authProvider.authenticate(serverName, oauthConfig, mcpServerUrl);
 
       context.ui.addItem({
         type: 'info',
@@ -160,7 +156,7 @@ const authCommand: SlashCommand = {
         content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
       };
     } finally {
-      appEvents.removeListener(AppEvent.OauthDisplayMessage, displayListener);
+      coreEvents.removeListener(CoreEvent.OauthDisplayMessage, displayListener);
     }
   },
   completion: async (context: CommandContext, partialArg: string) => {
@@ -398,19 +394,6 @@ async function handleEnableDisable(
       type: 'message',
       messageType: 'error',
       content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
-    };
-  }
-
-  // Check if server is from an extension
-  const serverKey = Object.keys(servers).find(
-    (key) => normalizeServerId(key) === name,
-  );
-  const server = serverKey ? servers[serverKey] : undefined;
-  if (server?.extension) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Server '${serverName}' is provided by extension '${server.extension.name}'.\nUse '/extensions ${action} ${server.extension.name}' to manage this extension.`,
     };
   }
 

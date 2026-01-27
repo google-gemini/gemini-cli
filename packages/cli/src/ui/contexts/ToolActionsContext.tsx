@@ -30,6 +30,7 @@ interface ToolActionsContextValue {
     payload?: ToolConfirmationPayload,
   ) => Promise<void>;
   cancel: (callId: string) => Promise<void>;
+  isDiffingEnabled: boolean;
 }
 
 const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
@@ -52,14 +53,31 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   props: ToolActionsProviderProps,
 ) => {
   const { children, config, toolCalls } = props;
+
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
+  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+
   useEffect(() => {
     let isMounted = true;
     if (config.getIdeMode()) {
       IdeClient.getInstance()
         .then((client) => {
-          if (isMounted) setIdeClient(client);
+          if (!isMounted) return;
+          setIdeClient(client);
+          setIsDiffingEnabled(client.isDiffingEnabled());
+
+          const handleStatusChange = () => {
+            if (isMounted) {
+              setIsDiffingEnabled(client.isDiffingEnabled());
+            }
+          };
+
+          client.addStatusChangeListener(handleStatusChange);
+          // Return a cleanup function for the listener
+          return () => {
+            client.removeStatusChangeListener(handleStatusChange);
+          };
         })
         .catch((error) => {
           debugLogger.error('Failed to get IdeClient instance:', error);
@@ -87,12 +105,12 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
       // 1. Handle Side Effects (IDE Diff)
       if (
         details?.type === 'edit' &&
-        ideClient?.isDiffingEnabled() &&
+        isDiffingEnabled &&
         'filePath' in details // Check for safety
       ) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        await ideClient.resolveDiffFromCli(details.filePath, cliOutcome);
+        await ideClient?.resolveDiffFromCli(details.filePath, cliOutcome);
       }
 
       // 2. Dispatch
@@ -124,7 +142,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 
       debugLogger.warn(`ToolActions: No confirmation mechanism for ${callId}`);
     },
-    [config, toolCalls, ideClient],
+    [config, ideClient, toolCalls, isDiffingEnabled],
   );
 
   const cancel = useCallback(
@@ -135,7 +153,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   );
 
   return (
-    <ToolActionsContext.Provider value={{ confirm, cancel }}>
+    <ToolActionsContext.Provider value={{ confirm, cancel, isDiffingEnabled }}>
       {children}
     </ToolActionsContext.Provider>
   );
