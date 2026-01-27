@@ -5,8 +5,10 @@ Gemini CLI supports connecting to remote subagents using the Agent-to-Agent
 its capabilities by delegating tasks to remote services.
 
 Gemini CLI can connect to any compliant A2A agent. You can find samples of A2A
-agents in the
-[ADK Python repository](https://github.com/google/agent-developer-kit-python/tree/main/samples).
+agents in the following repositories:
+
+- [ADK Samples (Python)](https://github.com/google/adk-samples/tree/main/python)
+- [ADK Python Contributing Samples](https://github.com/google/adk-python/tree/main/contributing/samples)
 
 > **Note: Remote subagents are currently an experimental feature.**
 
