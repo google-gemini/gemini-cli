@@ -111,7 +111,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       rewindCommand,
       await ideCommand(),
       initCommand,
-      oncallCommand,
+      ...(isNightlyBuild ? [oncallCommand] : []),
       ...(this.config?.getMcpEnabled() === false
         ? [
             {
