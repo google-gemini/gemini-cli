@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text } from 'ink';
 import {
   CoreEvent,
@@ -16,16 +17,19 @@ import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 import { theme } from '../semantic-colors.js';
 
 export const ConfigInitDisplay = ({
-  message: initialMessage = 'Initializing...',
+  message: initialMessage,
 }: {
   message?: string;
 }) => {
-  const [message, setMessage] = useState(initialMessage);
+  const { t } = useTranslation('ui');
+  const defaultInitialMessage = t('configInit.initializing');
+  const actualInitialMessage = initialMessage ?? defaultInitialMessage;
+  const [message, setMessage] = useState(actualInitialMessage);
 
   useEffect(() => {
     const onChange = (clients?: Map<string, McpClient>) => {
       if (!clients || clients.size === 0) {
-        setMessage(initialMessage);
+        setMessage(actualInitialMessage);
         return;
       }
       let connected = 0;
@@ -42,17 +46,28 @@ export const ConfigInitDisplay = ({
         const maxDisplay = 3;
         const displayedServers = connecting.slice(0, maxDisplay).join(', ');
         const remaining = connecting.length - maxDisplay;
-        const suffix = remaining > 0 ? `, +${remaining} more` : '';
-        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`;
+        const suffix =
+          remaining > 0
+            ? t('configInit.moreServers', { count: remaining })
+            : '';
+        const mcpMessage =
+          t('configInit.connectingMcp', {
+            connected,
+            total: clients.size,
+          }) +
+          t('configInit.waitingFor', { servers: displayedServers + suffix });
         setMessage(
-          initialMessage && initialMessage !== 'Initializing...'
+          initialMessage && initialMessage !== defaultInitialMessage
             ? `${initialMessage} (${mcpMessage})`
             : mcpMessage,
         );
       } else {
-        const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size})`;
+        const mcpMessage = t('configInit.connectingMcp', {
+          connected,
+          total: clients.size,
+        });
         setMessage(
-          initialMessage && initialMessage !== 'Initializing...'
+          initialMessage && initialMessage !== defaultInitialMessage
             ? `${initialMessage} (${mcpMessage})`
             : mcpMessage,
         );
@@ -63,7 +78,7 @@ export const ConfigInitDisplay = ({
     return () => {
       coreEvents.off(CoreEvent.McpClientUpdate, onChange);
     };
-  }, [initialMessage]);
+  }, [actualInitialMessage, initialMessage, defaultInitialMessage, t]);
 
   return (
     <Box marginTop={1}>
