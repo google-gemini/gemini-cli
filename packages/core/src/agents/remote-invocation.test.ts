@@ -34,7 +34,7 @@ describe('RemoteAgentInvocation', () => {
     displayName: 'Test Agent',
     description: 'A test agent',
     inputConfig: {
-      inputs: {},
+      inputSchema: { type: 'object' },
     },
   };
 
@@ -70,10 +70,33 @@ describe('RemoteAgentInvocation', () => {
       }).not.toThrow();
     });
 
-    it('throws if query is missing', () => {
+    it('accepts missing query (defaults to "Get Started!")', () => {
       expect(() => {
         new RemoteAgentInvocation(mockDefinition, {}, mockMessageBus);
-      }).toThrow("requires a string 'query' input");
+      }).not.toThrow();
+    });
+
+    it('uses "Get Started!" default when query is missing during execution', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessage.mockResolvedValue({
+        kind: 'message',
+        messageId: 'msg-1',
+        role: 'agent',
+        parts: [{ kind: 'text', text: 'Hello' }],
+      });
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        {},
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockClientManager.sendMessage).toHaveBeenCalledWith(
+        'test-agent',
+        'Get Started!',
+        expect.any(Object),
+      );
     });
 
     it('throws if query is not a string', () => {

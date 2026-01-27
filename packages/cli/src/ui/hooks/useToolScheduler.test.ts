@@ -9,10 +9,8 @@ import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
-import {
-  useReactToolScheduler,
-  mapToDisplay,
-} from './useReactToolScheduler.js';
+import { useReactToolScheduler } from './useReactToolScheduler.js';
+import { mapToDisplay } from './toolMapping.js';
 import type { PartUnion, FunctionResponse } from '@google/genai';
 import type {
   Config,
@@ -940,7 +938,7 @@ describe('mapToDisplay', () => {
       name: 'validating',
       status: 'validating',
       extraProps: { tool: baseTool, invocation: baseInvocation },
-      expectedStatus: ToolCallStatus.Executing,
+      expectedStatus: ToolCallStatus.Pending,
       expectedName: baseTool.displayName,
       expectedDescription: baseInvocation.getDescription(),
     },

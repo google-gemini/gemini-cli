@@ -13,9 +13,8 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
-import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
-import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { isShellTool, isThisShellFocused } from './ToolShared.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -37,21 +36,42 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
 }) => {
-  const isEmbeddedShellFocused =
-    embeddedShellFocused &&
-    toolCalls.some(
-      (t) =>
-        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
-    );
+  const config = useConfig();
 
-  const hasPending = !toolCalls.every(
+  const isEventDriven = config.isEventDrivenSchedulerEnabled();
+
+  // If Event-Driven Scheduler is enabled, we HIDE tools that are still in
+  // pre-execution states (Confirming, Pending) from the History log.
+  // They live in the Global Queue or wait for their turn.
+  const visibleToolCalls = useMemo(() => {
+    if (!isEventDriven) {
+      return toolCalls;
+    }
+    // Only show tools that are actually running or finished.
+    // We explicitly exclude Pending and Confirming to ensure they only
+    // appear in the Global Queue until they are approved and start executing.
+    return toolCalls.filter(
+      (t) =>
+        t.status !== ToolCallStatus.Pending &&
+        t.status !== ToolCallStatus.Confirming,
+    );
+  }, [toolCalls, isEventDriven]);
+
+  const isEmbeddedShellFocused = visibleToolCalls.some((t) =>
+    isThisShellFocused(
+      t.name,
+      t.status,
+      t.ptyId,
+      activeShellPtyId,
+      embeddedShellFocused,
+    ),
+  );
+
+  const hasPending = !visibleToolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
 
-  const config = useConfig();
-  const isShellCommand = toolCalls.some(
-    (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
-  );
+  const isShellCommand = toolCalls.some((t) => isShellTool(t.name));
   const borderColor =
     (isShellCommand && hasPending) || isEmbeddedShellFocused
       ? theme.ui.symbol
@@ -64,20 +84,29 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
 
-  // only prompt for tool approval on the first 'confirming' tool in the list
-  // note, after the CTA, this automatically moves over to the next 'confirming' tool
+  // Inline confirmations are ONLY used when the Global Queue is disabled.
   const toolAwaitingApproval = useMemo(
-    () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
-    [toolCalls],
+    () =>
+      isEventDriven
+        ? undefined
+        : toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
+    [toolCalls, isEventDriven],
   );
 
+  // If all tools are hidden (e.g. group only contains confirming or pending tools),
+  // render nothing in the history log.
+  if (visibleToolCalls.length === 0) {
+    return null;
+  }
+
   let countToolCallsWithResults = 0;
-  for (const tool of toolCalls) {
+  for (const tool of visibleToolCalls) {
     if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
       countToolCallsWithResults++;
     }
   }
-  const countOneLineToolCalls = toolCalls.length - countToolCallsWithResults;
+  const countOneLineToolCalls =
+    visibleToolCalls.length - countToolCallsWithResults;
   const availableTerminalHeightPerToolMessage = availableTerminalHeight
     ? Math.max(
         Math.floor(
@@ -102,13 +131,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
     >
-      {toolCalls.map((tool, index) => {
+      {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
-        const isShellTool =
-          tool.name === SHELL_COMMAND_NAME ||
-          tool.name === SHELL_NAME ||
-          tool.name === SHELL_TOOL_NAME;
+        const isShellToolCall = isShellTool(tool.name);
 
         const commonProps = {
           ...tool,
@@ -131,7 +157,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={terminalWidth}
           >
-            {isShellTool ? (
+            {isShellToolCall ? (
               <ShellToolMessage
                 {...commonProps}
                 activeShellPtyId={activeShellPtyId}
@@ -157,6 +183,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 isConfirming &&
                 tool.confirmationDetails && (
                   <ToolConfirmationMessage
+                    callId={tool.callId}
                     confirmationDetails={tool.confirmationDetails}
                     config={config}
                     isFocused={isFocused}
@@ -182,7 +209,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               We have to keep the bottom border separate so it doesn't get
               drawn over by the sticky header directly inside it.
              */
-        toolCalls.length > 0 && (
+        visibleToolCalls.length > 0 && (
           <Box
             height={0}
             width={terminalWidth}
