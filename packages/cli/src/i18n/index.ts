@@ -34,38 +34,68 @@ async function loadTranslationFile(
 const namespaces = ['common', 'help', 'dialogs', 'loading', 'commands'];
 const localesDir = path.join(__dirname, 'locales');
 
-// Language display names for settings UI
-const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English',
-  ja: '日本語',
-  // Add more language labels here as locales are added
-};
+interface LocaleManifest {
+  displayName: string;
+}
+
+/**
+ * Read a locale's manifest.json to get its self-reported display name.
+ * Returns null if the manifest is missing or unreadable.
+ */
+function readLocaleManifest(langDir: string): LocaleManifest | null {
+  try {
+    const manifestPath = path.join(langDir, 'manifest.json');
+    const content = fsSync.readFileSync(manifestPath, 'utf8');
+    return JSON.parse(content) as LocaleManifest;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Synchronously scan the locales directory to find available language packs.
+ * Each locale folder must contain a manifest.json with a displayName field.
  * This runs at module load time so the schema can access the options.
  */
-function detectAvailableLanguagesSync(): string[] {
+function detectAvailableLanguagesSync(): {
+  codes: string[];
+  labels: Map<string, string>;
+} {
+  const labels = new Map<string, string>();
   try {
     const entries = fsSync.readdirSync(localesDir, { withFileTypes: true });
-    const langs = entries
+    const dirs = entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .filter((name) => !name.startsWith('.')); // Exclude hidden directories
 
-    // Ensure 'en' is always first (default/fallback language)
-    if (langs.includes('en')) {
-      return ['en', ...langs.filter((l) => l !== 'en')];
+    for (const dir of dirs) {
+      const manifest = readLocaleManifest(path.join(localesDir, dir));
+      if (manifest?.displayName) {
+        labels.set(dir, manifest.displayName);
+      } else {
+        // Locale folder without manifest — use the folder name as-is
+        labels.set(dir, dir.toUpperCase());
+      }
     }
-    return langs.length > 0 ? langs : ['en'];
+
+    // Ensure 'en' is always first (default/fallback language)
+    const codes = [...labels.keys()];
+    if (codes.includes('en')) {
+      const sorted = ['en', ...codes.filter((l) => l !== 'en')];
+      return { codes: sorted, labels };
+    }
+    return { codes: codes.length > 0 ? codes : ['en'], labels };
   } catch {
     // If we can't read the directory, fall back to English only
-    return ['en'];
+    labels.set('en', 'English');
+    return { codes: ['en'], labels };
   }
 }
 
 // Detect available languages synchronously at module load
-const availableLanguages: string[] = detectAvailableLanguagesSync();
+const { codes: availableLanguages, labels: languageLabels } =
+  detectAvailableLanguagesSync();
 
 // Cache language options at module load to prevent re-creation on each access
 // This prevents React flickering from new object references
@@ -74,7 +104,7 @@ const cachedLanguageOptions: ReadonlyArray<{ value: string; label: string }> =
     { value: 'auto', label: 'Auto' },
     ...availableLanguages.map((lang) => ({
       value: lang,
-      label: LANGUAGE_LABELS[lang] ?? lang.toUpperCase(),
+      label: languageLabels.get(lang) ?? lang.toUpperCase(),
     })),
   ]);
 
