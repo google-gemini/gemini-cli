@@ -369,17 +369,24 @@ export async function cleanupToolOutputFiles(
       return result;
     }
 
-    // Get file stats for age-based cleanup
-    const fileStats: Array<{ name: string; mtime: Date }> = [];
-    for (const file of files) {
-      try {
-        const filePath = path.join(toolOutputDir, file.name);
-        const stat = await fs.stat(filePath);
-        fileStats.push({ name: file.name, mtime: stat.mtime });
-      } catch {
-        // Skip files we can't stat
-      }
-    }
+    // Get file stats for age-based cleanup (parallel for better performance)
+    const fileStatsResults = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const filePath = path.join(toolOutputDir, file.name);
+          const stat = await fs.stat(filePath);
+          return { name: file.name, mtime: stat.mtime };
+        } catch (error) {
+          debugLogger.debug(
+            `Failed to stat file ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          return null;
+        }
+      }),
+    );
+    const fileStats = fileStatsResults.filter(
+      (f): f is { name: string; mtime: Date } => f !== null,
+    );
 
     // Sort by mtime (oldest first)
     fileStats.sort((a, b) => a.mtime.getTime() - b.mtime.getTime());
@@ -387,7 +394,7 @@ export async function cleanupToolOutputFiles(
     const now = new Date();
     const filesToDelete: string[] = [];
 
-    // Age-based cleanup
+    // Age-based cleanup: delete files older than maxAge
     if (retentionConfig.maxAge) {
       try {
         const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
@@ -398,19 +405,25 @@ export async function cleanupToolOutputFiles(
             filesToDelete.push(file.name);
           }
         }
-      } catch {
-        // Invalid maxAge format, skip age-based cleanup
+      } catch (error) {
+        debugLogger.debug(
+          `Invalid maxAge format, skipping age-based cleanup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     }
 
-    // Count-based cleanup (delete oldest files exceeding maxCount)
+    // Count-based cleanup: after age-based cleanup, if we still have more files
+    // than maxCount, delete the oldest ones to bring the count down.
+    // This ensures we keep at most maxCount files, preferring newer ones.
     if (retentionConfig.maxCount !== undefined) {
+      // Filter out files already marked for deletion by age-based cleanup
       const remainingFiles = fileStats.filter(
         (f) => !filesToDelete.includes(f.name),
       );
       if (remainingFiles.length > retentionConfig.maxCount) {
+        // Calculate how many excess files need to be deleted
         const excessCount = remainingFiles.length - retentionConfig.maxCount;
-        // remainingFiles is already sorted oldest first
+        // remainingFiles is already sorted oldest first, so delete from the start
         for (let i = 0; i < excessCount; i++) {
           if (!filesToDelete.includes(remainingFiles[i].name)) {
             filesToDelete.push(remainingFiles[i].name);
@@ -425,7 +438,10 @@ export async function cleanupToolOutputFiles(
         const filePath = path.join(toolOutputDir, fileName);
         await fs.unlink(filePath);
         result.deleted++;
-      } catch {
+      } catch (error) {
+        debugLogger.debug(
+          `Failed to delete file ${fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
         result.failed++;
       }
     }
