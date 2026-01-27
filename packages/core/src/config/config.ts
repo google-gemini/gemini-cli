@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -411,6 +412,7 @@ export interface ConfigParameters {
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
+  useBackgroundColor?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -555,6 +557,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
@@ -721,6 +724,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
+    this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -752,6 +756,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
+
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -848,6 +853,13 @@ export class Config {
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
+    }
+
+    // Add plans directory to workspace context for plan file storage
+    if (this.planEnabled) {
+      const plansDir = this.storage.getProjectTempPlansDir();
+      await fs.promises.mkdir(plansDir, { recursive: true });
+      this.workspaceContext.addDirectory(plansDir);
     }
 
     // Initialize centralized FileDiscoveryService
@@ -1385,7 +1397,7 @@ export class Config {
     }
     if (this.geminiClient?.isInitialized()) {
       await this.geminiClient.setTools();
-      await this.geminiClient.updateSystemInstruction();
+      this.geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1453,6 +1465,13 @@ export class Config {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    if (isPlanModeTransition) {
+      this.updateSystemInstructionIfInitialized();
+    }
   }
 
   /**
@@ -1535,10 +1554,10 @@ export class Config {
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
    */
-  async updateSystemInstructionIfInitialized(): Promise<void> {
+  updateSystemInstructionIfInitialized(): void {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1847,7 +1866,7 @@ export class Config {
     }
 
     // Notify the client that system instructions might need updating
-    await this.updateSystemInstructionIfInitialized();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**
@@ -1868,6 +1887,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getUseBackgroundColor(): boolean {
+    return this.useBackgroundColor;
   }
 
   getEnableInteractiveShell(): boolean {
@@ -2182,7 +2205,7 @@ export class Config {
     const client = this.getGeminiClient();
     if (client?.isInitialized()) {
       await client.setTools();
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
     } else {
       debugLogger.debug(
         '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
