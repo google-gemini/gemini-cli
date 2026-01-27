@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 
 import type { TelemetryTarget } from '@google/gemini-cli-core';
@@ -22,6 +21,9 @@ import {
   DEFAULT_GEMINI_MODEL,
   type ExtensionLoader,
   startupProfiler,
+  PREVIEW_GEMINI_MODEL,
+  homedir,
+  GitService,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -36,9 +38,28 @@ export async function loadConfig(
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
+  const folderTrust =
+    settings.folderTrust === true ||
+    process.env['GEMINI_FOLDER_TRUST'] === 'true';
+
+  let checkpointing = process.env['CHECKPOINTING']
+    ? process.env['CHECKPOINTING'] === 'true'
+    : settings.checkpointing?.enabled;
+
+  if (checkpointing) {
+    if (!(await GitService.verifyGitAvailability())) {
+      logger.warn(
+        '[Config] Checkpointing is enabled but git is not installed. Disabling checkpointing.',
+      );
+      checkpointing = false;
+    }
+  }
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
-    model: DEFAULT_GEMINI_MODEL,
+    model: settings.general?.previewFeatures
+      ? PREVIEW_GEMINI_MODEL
+      : DEFAULT_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
     targetDir: workspaceDir, // Or a specific directory the agent operates on
@@ -69,21 +90,29 @@ export async function loadConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     ideMode: false,
-    folderTrust: settings.folderTrust === true,
+    folderTrust,
+    trustedFolder: true,
     extensionLoader,
+    checkpointing,
+    previewFeatures: settings.general?.previewFeatures,
+    interactive: true,
+    enableInteractiveShell: true,
+    ptyInfo: 'auto',
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
-  const { memoryContent, fileCount } = await loadServerHierarchicalMemory(
-    workspaceDir,
-    [workspaceDir],
-    false,
-    fileService,
-    extensionLoader,
-    settings.folderTrust === true,
-  );
+  const { memoryContent, fileCount, filePaths } =
+    await loadServerHierarchicalMemory(
+      workspaceDir,
+      [workspaceDir],
+      false,
+      fileService,
+      extensionLoader,
+      folderTrust,
+    );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
+  configParams.geminiMdFilePaths = filePaths;
   const config = new Config({
     ...configParams,
   });

@@ -1,12 +1,31 @@
 # Policy engine
 
-:::note This feature is currently in testing. To enable it, set
-`tools.enableMessageBusIntegration` to `true` in your `settings.json` file. :::
-
 The Gemini CLI includes a powerful policy engine that provides fine-grained
 control over tool execution. It allows users and administrators to define rules
 that determine whether a tool call should be allowed, denied, or require user
 confirmation.
+
+## Quick start
+
+To create your first policy:
+
+1.  **Create the policy directory** if it doesn't exist:
+    ```bash
+    mkdir -p ~/.gemini/policies
+    ```
+2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
+    can use any filename ending in `.toml`; all such files in this directory
+    will be loaded and combined:
+    ```toml
+    [[rule]]
+    toolName = "run_shell_command"
+    commandPrefix = "git status"
+    decision = "allow"
+    priority = 100
+    ```
+3.  **Run a command** that triggers the policy (e.g., ask Gemini CLI to
+    `git status`). The tool will now execute automatically without prompting for
+    confirmation.
 
 ## Core concepts
 
@@ -127,6 +146,38 @@ A rule matches a tool call if all of its conditions are met:
 Policies are defined in `.toml` files. The CLI loads these files from Default,
 User, and (if configured) Admin directories.
 
+### Policy locations
+
+| Tier      | Type   | Location                    |
+| :-------- | :----- | :-------------------------- |
+| **User**  | Custom | `~/.gemini/policies/*.toml` |
+| **Admin** | System | _See below (OS specific)_   |
+
+#### System-wide policies (Admin)
+
+Administrators can enforce system-wide policies (Tier 3) that override all user
+and default settings. These policies must be placed in specific, secure
+directories:
+
+| OS          | Policy Directory Path                             |
+| :---------- | :------------------------------------------------ |
+| **Linux**   | `/etc/gemini-cli/policies`                        |
+| **macOS**   | `/Library/Application Support/GeminiCli/policies` |
+| **Windows** | `C:\ProgramData\gemini-cli\policies`              |
+
+**Security Requirements:**
+
+To prevent privilege escalation, the CLI enforces strict security checks on
+admin directories. If checks fail, system policies are **ignored**.
+
+- **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
+  or others (e.g., `chmod 755`).
+- **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
+  see a security warning, use the folder properties to remove write permissions
+  for non-admin groups. You may need to "Disable inheritance" in Advanced
+  Security Settings._
+
 ### TOML rule schema
 
 Here is a breakdown of the fields available in a TOML policy rule:
@@ -239,6 +290,9 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
+- **Agent delegation** (like `delegate_to_agent`) defaults to **`ask_user`** to
+  ensure remote agents can prompt for confirmation, but local sub-agent actions
+  are executed silently and checked individually.
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
 - In **`yolo`** mode, a high-priority rule allows all tools.

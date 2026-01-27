@@ -9,6 +9,16 @@ import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
+ * Error thrown when the discovered resource metadata does not match the expected resource.
+ */
+export class ResourceMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResourceMismatchError';
+  }
+}
+
+/**
  * OAuth authorization server metadata as per RFC 8414.
  */
 export interface OAuthAuthorizationServerMetadata {
@@ -45,30 +55,26 @@ export const FIVE_MIN_BUFFER_MS = 5 * 60 * 1000;
  */
 export class OAuthUtils {
   /**
-   * Construct well-known OAuth endpoint URLs.
-   * By default, uses standard root-based well-known URLs.
-   * If includePathSuffix is true, appends any path from the base URL to the well-known endpoints.
+   * Construct well-known OAuth endpoint URLs per RFC 9728 §3.1.
+   *
+   * The well-known URI is constructed by inserting /.well-known/oauth-protected-resource
+   * between the host and any existing path component. This preserves the resource's
+   * path structure in the metadata URL.
+   *
+   * Examples:
+   * - https://example.com -> https://example.com/.well-known/oauth-protected-resource
+   * - https://example.com/api/resource -> https://example.com/.well-known/oauth-protected-resource/api/resource
+   *
+   * @param baseUrl The resource URL
+   * @param useRootDiscovery If true, ignores path and uses root-based discovery (for fallback compatibility)
    */
-  static buildWellKnownUrls(baseUrl: string, includePathSuffix = false) {
+  static buildWellKnownUrls(baseUrl: string, useRootDiscovery = false) {
     const serverUrl = new URL(baseUrl);
     const base = `${serverUrl.protocol}//${serverUrl.host}`;
+    const pathSuffix = useRootDiscovery
+      ? ''
+      : serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
 
-    if (!includePathSuffix) {
-      // Standard discovery: use root-based well-known URLs
-      return {
-        protectedResource: new URL(
-          '/.well-known/oauth-protected-resource',
-          base,
-        ).toString(),
-        authorizationServer: new URL(
-          '/.well-known/oauth-authorization-server',
-          base,
-        ).toString(),
-      };
-    }
-
-    // Path-based discovery: append path suffix to well-known URLs
-    const pathSuffix = serverUrl.pathname.replace(/\/$/, ''); // Remove trailing slash
     return {
       protectedResource: new URL(
         `/.well-known/oauth-protected-resource${pathSuffix}`,
@@ -224,21 +230,33 @@ export class OAuthUtils {
     serverUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     try {
-      // First try standard root-based discovery
-      const wellKnownUrls = this.buildWellKnownUrls(serverUrl, false);
-
-      // Try to get the protected resource metadata at root
+      // RFC 9728 §3.1: Construct well-known URL by inserting /.well-known/oauth-protected-resource
+      // between the host and path. This is the RFC-compliant approach.
+      const wellKnownUrls = this.buildWellKnownUrls(serverUrl);
       let resourceMetadata = await this.fetchProtectedResourceMetadata(
         wellKnownUrls.protectedResource,
       );
 
-      // If root discovery fails and we have a path, try path-based discovery
+      // Fallback: If path-based discovery fails and we have a path, try root-based discovery
+      // for backwards compatibility with servers that don't implement RFC 9728 path handling
       if (!resourceMetadata) {
         const url = new URL(serverUrl);
         if (url.pathname && url.pathname !== '/') {
-          const pathBasedUrls = this.buildWellKnownUrls(serverUrl, true);
+          const rootBasedUrls = this.buildWellKnownUrls(serverUrl, true);
           resourceMetadata = await this.fetchProtectedResourceMetadata(
-            pathBasedUrls.protectedResource,
+            rootBasedUrls.protectedResource,
+          );
+        }
+      }
+
+      if (resourceMetadata) {
+        // RFC 9728 Section 7.3: The client MUST ensure that the resource identifier URL
+        // it is using as the prefix for the metadata request exactly matches the value
+        // of the resource metadata parameter in the protected resource metadata document.
+        const expectedResource = this.buildResourceParameter(serverUrl);
+        if (resourceMetadata.resource !== expectedResource) {
+          throw new ResourceMismatchError(
+            `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
           );
         }
       }
@@ -279,6 +297,9 @@ export class OAuthUtils {
 
       return null;
     } catch (error) {
+      if (error instanceof ResourceMismatchError) {
+        throw error;
+      }
       debugLogger.debug(
         `Failed to discover OAuth configuration: ${getErrorMessage(error)}`,
       );
@@ -305,10 +326,12 @@ export class OAuthUtils {
    * Discover OAuth configuration from WWW-Authenticate header.
    *
    * @param wwwAuthenticate The WWW-Authenticate header value
+   * @param mcpServerUrl Optional MCP server URL to validate against the resource metadata
    * @returns The discovered OAuth configuration or null if not available
    */
   static async discoverOAuthFromWWWAuthenticate(
     wwwAuthenticate: string,
+    mcpServerUrl?: string,
   ): Promise<MCPOAuthConfig | null> {
     const resourceMetadataUri =
       this.parseWWWAuthenticateHeader(wwwAuthenticate);
@@ -318,6 +341,17 @@ export class OAuthUtils {
 
     const resourceMetadata =
       await this.fetchProtectedResourceMetadata(resourceMetadataUri);
+
+    if (resourceMetadata && mcpServerUrl) {
+      // Validate resource parameter per RFC 9728 Section 7.3
+      const expectedResource = this.buildResourceParameter(mcpServerUrl);
+      if (resourceMetadata.resource !== expectedResource) {
+        throw new ResourceMismatchError(
+          `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
+        );
+      }
+    }
+
     if (!resourceMetadata?.authorization_servers?.length) {
       return null;
     }
@@ -380,7 +414,10 @@ export class OAuthUtils {
         return payload.exp * 1000; // Convert seconds to milliseconds
       }
     } catch (e) {
-      console.error('Failed to parse ID token for expiry time with error:', e);
+      debugLogger.error(
+        'Failed to parse ID token for expiry time with error:',
+        e,
+      );
     }
 
     // Return undefined if try block fails or 'exp' is missing/invalid

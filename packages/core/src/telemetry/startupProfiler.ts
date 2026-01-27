@@ -10,6 +10,8 @@ import * as fs from 'node:fs';
 import type { Config } from '../config/config.js';
 import { recordStartupPerformance } from './metrics.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { StartupStatsEvent, type StartupPhaseStats } from './types.js';
+import { logStartupStats } from './loggers.js';
 
 interface StartupPhase {
   name: string;
@@ -143,7 +145,7 @@ export class StartupProfiler {
    * Flushes buffered metrics to the telemetry system.
    */
   flush(config: Config): void {
-    debugLogger.log(
+    debugLogger.debug(
       '[STARTUP] StartupProfiler.flush() called with',
       this.phases.size,
       'phases',
@@ -179,7 +181,7 @@ export class StartupProfiler {
           ...phase.details,
         };
 
-        debugLogger.log(
+        debugLogger.debug(
           '[STARTUP] Recording metric for phase:',
           phase.name,
           'duration:',
@@ -190,11 +192,42 @@ export class StartupProfiler {
           details,
         });
       } else {
-        debugLogger.log(
+        debugLogger.debug(
           '[STARTUP] Skipping phase without measure:',
           phase.name,
         );
       }
+    }
+
+    // Emit StartupStats event
+    const startupPhases: StartupPhaseStats[] = [];
+    for (const phase of this.phases.values()) {
+      if (!phase.ended) continue;
+      const measure = measures.find((m) => m.name === phase.name);
+      if (measure && phase.cpuUsage) {
+        startupPhases.push({
+          name: phase.name,
+          duration_ms: measure.duration,
+          cpu_usage_user_usec: phase.cpuUsage.user,
+          cpu_usage_system_usec: phase.cpuUsage.system,
+          start_time_usec: (performance.timeOrigin + measure.startTime) * 1000,
+          end_time_usec:
+            (performance.timeOrigin + measure.startTime + measure.duration) *
+            1000,
+        });
+      }
+    }
+
+    if (startupPhases.length > 0) {
+      logStartupStats(
+        config,
+        new StartupStatsEvent(
+          startupPhases,
+          os.platform(),
+          os.release(),
+          fs.existsSync('/.dockerenv'),
+        ),
+      );
     }
 
     // Clear performance marks and measures for all tracked phases.

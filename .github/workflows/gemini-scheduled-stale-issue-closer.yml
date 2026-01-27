@@ -79,6 +79,17 @@ jobs:
                 continue;
               }
 
+              // Skip if it has a maintainer, help wanted, or Public Roadmap label
+              const rawLabels = issue.labels.map((l) => l.name);
+              const lowercaseLabels = rawLabels.map((l) => l.toLowerCase());
+              if (
+                lowercaseLabels.some((l) => l.includes('maintainer')) ||
+                lowercaseLabels.includes('help wanted') ||
+                rawLabels.includes('🗓️ Public Roadmap')
+              ) {
+                continue;
+              }
+
               let isStale = updatedAt < tenDaysAgo;
 
               // If apparently active, check if it's only bot activity
@@ -137,7 +148,8 @@ jobs:
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issue.number,
-                    state: 'closed'
+                    state: 'closed',
+                    state_reason: 'not_planned'
                   });
                 }
               }

@@ -665,6 +665,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
   }, [config, setSessions, setLoading, setError]);
 
@@ -693,6 +694,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
       }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadFullContent();
   }, [
     isSearchMode,
@@ -779,9 +781,10 @@ export const useSessionBrowserInput = (
           state.setScrollOffset(0);
         } else if (
           key.sequence &&
+          key.sequence.length === 1 &&
+          !key.alt &&
           !key.ctrl &&
-          !key.meta &&
-          key.sequence.length === 1
+          !key.cmd
         ) {
           state.setSearchQuery((prev) => prev + key.sequence);
           state.setActiveIndex(0);

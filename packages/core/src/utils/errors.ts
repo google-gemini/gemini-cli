@@ -81,6 +81,13 @@ export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
 
+export class ChangeAuthRequestedError extends Error {
+  constructor() {
+    super('User requested to change authentication method');
+    this.name = 'ChangeAuthRequestedError';
+  }
+}
+
 interface ResponseData {
   error?: {
     code?: number;
@@ -92,7 +99,7 @@ export function toFriendlyError(error: unknown): unknown {
   if (error && typeof error === 'object' && 'response' in error) {
     const gaxiosError = error as GaxiosError;
     const data = parseResponseData(gaxiosError);
-    if (data.error && data.error.message && data.error.code) {
+    if (data && data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:
           return new BadRequestError(data.error.message);
@@ -110,12 +117,16 @@ export function toFriendlyError(error: unknown): unknown {
   return error;
 }
 
-function parseResponseData(error: GaxiosError): ResponseData {
+function parseResponseData(error: GaxiosError): ResponseData | undefined {
   // Inexplicably, Gaxios sometimes doesn't JSONify the response data.
   if (typeof error.response?.data === 'string') {
-    return JSON.parse(error.response?.data) as ResponseData;
+    try {
+      return JSON.parse(error.response?.data) as ResponseData;
+    } catch {
+      return undefined;
+    }
   }
-  return error.response?.data as ResponseData;
+  return error.response?.data as ResponseData | undefined;
 }
 
 /**

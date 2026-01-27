@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
@@ -23,7 +23,7 @@ export class Storage {
   }
 
   static getGlobalGeminiDir(): string {
-    const homeDir = os.homedir();
+    const homeDir = homedir();
     if (!homeDir) {
       return path.join(os.tmpdir(), GEMINI_DIR);
     }
@@ -50,6 +50,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'commands');
   }
 
+  static getUserSkillsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'skills');
+  }
+
   static getGlobalMemoryFilePath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'memory.md');
   }
@@ -58,21 +62,37 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getUserAgentsDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'agents');
+  }
+
+  static getAcknowledgedAgentsPath(): string {
+    return path.join(
+      Storage.getGlobalGeminiDir(),
+      'acknowledgments',
+      'agents.json',
+    );
+  }
+
+  private static getSystemConfigDir(): string {
+    if (os.platform() === 'darwin') {
+      return '/Library/Application Support/GeminiCli';
+    } else if (os.platform() === 'win32') {
+      return 'C:\\ProgramData\\gemini-cli';
+    } else {
+      return '/etc/gemini-cli';
+    }
+  }
+
   static getSystemSettingsPath(): string {
     if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
       return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
     }
-    if (os.platform() === 'darwin') {
-      return '/Library/Application Support/GeminiCli/settings.json';
-    } else if (os.platform() === 'win32') {
-      return 'C:\\ProgramData\\gemini-cli\\settings.json';
-    } else {
-      return '/etc/gemini-cli/settings.json';
-    }
+    return path.join(Storage.getSystemConfigDir(), 'settings.json');
   }
 
   static getSystemPoliciesDir(): string {
-    return path.join(path.dirname(Storage.getSystemSettingsPath()), 'policies');
+    return path.join(Storage.getSystemConfigDir(), 'policies');
   }
 
   static getGlobalTempDir(): string {
@@ -123,8 +143,24 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'commands');
   }
 
+  getProjectSkillsDir(): string {
+    return path.join(this.getGeminiDir(), 'skills');
+  }
+
+  getProjectAgentsDir(): string {
+    return path.join(this.getGeminiDir(), 'agents');
+  }
+
   getProjectTempCheckpointsDir(): string {
     return path.join(this.getProjectTempDir(), 'checkpoints');
+  }
+
+  getProjectTempLogsDir(): string {
+    return path.join(this.getProjectTempDir(), 'logs');
+  }
+
+  getProjectTempPlansDir(): string {
+    return path.join(this.getProjectTempDir(), 'plans');
   }
 
   getExtensionsDir(): string {

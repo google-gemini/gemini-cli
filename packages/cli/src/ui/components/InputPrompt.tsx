@@ -6,28 +6,36 @@
 
 import type React from 'react';
 import clipboardy from 'clipboardy';
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text, type DOMElement } from 'ink';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
+import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
+import {
+  type TextBuffer,
+  logicalPosToOffset,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+  getTransformUnderCursor,
+} from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
-  buildSegmentsForVisualSlice,
+  parseSegmentsFromTokens,
 } from '../utils/highlight.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
@@ -41,12 +49,18 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
+import { getSafeLowColorBackground } from '../themes/color-utils.js';
+import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
+import { useMouseDoubleClick } from '../hooks/useMouseDoubleClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -129,10 +143,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const { stdout } = useStdout();
+  const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth } = useUIState();
+  const { terminalWidth, activePtyId, history, terminalBackgroundColor } =
+    useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -215,13 +232,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      let processedValue = submittedValue;
+      if (buffer.pastedContent) {
+        // Replace placeholders like [Pasted Text: 6 lines] with actual content
+        processedValue = processedValue.replace(
+          PASTED_TEXT_PLACEHOLDER_REGEX,
+          (match) => buffer.pastedContent[match] || match,
+        );
+      }
+
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(processedValue);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -303,6 +329,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const allMessages = popAllMessages();
       if (allMessages) {
         buffer.setText(allMessages);
+        return true;
       } else {
         // No queued messages, proceed with input history
         inputHistory.navigateUp();
@@ -350,13 +377,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      const textToInsert = await clipboardy.read();
-      const offset = buffer.getOffset();
-      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+      if (settings.experimental?.useOSC52Paste) {
+        stdout.write('\x1b]52;c;?\x07');
+      } else {
+        const textToInsert = await clipboardy.read();
+        buffer.insert(textToInsert, { paste: true });
+      }
     } catch (error) {
-      console.error('Error handling clipboard image:', error);
+      debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, stdout, settings]);
 
   useMouseClick(
     innerBoxRef,
@@ -370,9 +400,44 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     { isActive: focus },
   );
 
+  const isAlternateBuffer = useAlternateBuffer();
+
+  // Double-click to expand/collapse paste placeholders
+  useMouseDoubleClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (!isAlternateBuffer) return;
+
+      const logicalPos = buffer.getLogicalPositionFromVisual(
+        buffer.visualScrollRow + relY,
+        relX,
+      );
+      if (!logicalPos) return;
+
+      // Check for paste placeholder (collapsed state)
+      const transform = getTransformUnderCursor(
+        logicalPos.row,
+        logicalPos.col,
+        buffer.transformationsByLine,
+      );
+      if (transform?.type === 'paste' && transform.id) {
+        buffer.togglePasteExpansion(transform.id);
+        return;
+      }
+
+      // Check for expanded paste region
+      const expandedId = buffer.getExpandedPasteAtLine(logicalPos.row);
+      if (expandedId) {
+        buffer.togglePasteExpansion(expandedId);
+      }
+    },
+    { isActive: focus },
+  );
+
   useMouse(
     (event: MouseEvent) => {
       if (event.name === 'right-release') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
       }
     },
@@ -385,11 +450,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
       /// We want to handle paste even when not focused to support drag and drop.
-      if (!focus && !key.paste) {
+      if (!focus && key.name !== 'paste') {
         return;
       }
 
-      if (key.paste) {
+      if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
@@ -484,11 +549,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
 
-        // Handle double ESC for clearing input
+        // Handle double ESC
         if (escPressCount.current === 0) {
-          if (buffer.text === '') {
-            return;
-          }
           escPressCount.current = 1;
           setShowEscapePrompt(true);
           if (escapeTimerRef.current) {
@@ -497,12 +559,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           escapeTimerRef.current = setTimeout(() => {
             resetEscapeState();
           }, 500);
-        } else {
-          // clear input and immediately reset state
+          return;
+        }
+
+        // Second ESC
+        resetEscapeState();
+        if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          resetEscapeState();
+          return;
+        } else if (history.length > 0) {
+          onSubmit('/rewind');
+          return;
         }
+        coreEvents.emitFeedback('info', 'Nothing to rewind to');
         return;
       }
 
@@ -588,7 +658,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
+      // We prioritize execution unless the user is explicitly selecting a different suggestion.
+      if (
+        completion.isPerfectMatch &&
+        keyMatchers[Command.RETURN](key) &&
+        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
+      ) {
         handleSubmit(buffer.text);
         return;
       }
@@ -620,15 +695,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const isEnterKey = key.name === 'return' && !key.ctrl;
 
               if (isEnterKey && buffer.text.startsWith('/')) {
-                const command = completion.getCommandFromSuggestion(suggestion);
+                const { isArgumentCompletion, leafCommand } =
+                  completion.slashCompletionRange;
 
-                if (command && isAutoExecutableCommand(command)) {
+                if (
+                  isArgumentCompletion &&
+                  isAutoExecutableCommand(leafCommand)
+                ) {
+                  // isArgumentCompletion guarantees leafCommand exists
                   const completedText = completion.getCompletedText(suggestion);
-
                   if (completedText) {
                     setExpandedSuggestionIndex(-1);
                     handleSubmit(completedText.trim());
                     return;
+                  }
+                } else if (!isArgumentCompletion) {
+                  // Existing logic for command name completion
+                  const command =
+                    completion.getCommandFromSuggestion(suggestion);
+
+                  // Only auto-execute if the command has no completion function
+                  // (i.e., it doesn't require an argument to be selected)
+                  if (
+                    command &&
+                    isAutoExecutableCommand(command) &&
+                    !command.completion
+                  ) {
+                    const completedText =
+                      completion.getCompletedText(suggestion);
+
+                    if (completedText) {
+                      setExpandedSuggestionIndex(-1);
+                      handleSubmit(completedText.trim());
+                      return;
+                    }
                   }
                 }
               }
@@ -779,13 +879,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         buffer.openInExternalEditor();
         return;
       }
 
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
+        return;
+      }
+
+      if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
+        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
+        if (activePtyId) {
+          setEmbeddedShellFocused(true);
+        }
         return;
       }
 
@@ -797,8 +907,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         completion.promptCompletion.text &&
         key.sequence &&
         key.sequence.length === 1 &&
+        !key.alt &&
         !key.ctrl &&
-        !key.meta
+        !key.cmd
       ) {
         completion.promptCompletion.clear();
         setExpandedSuggestionIndex(-1);
@@ -830,6 +941,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       tryLoadQueuedMessages,
       setBannerVisible,
+      onSubmit,
+      activePtyId,
+      setEmbeddedShellFocused,
+      history,
     ],
   );
 
@@ -961,6 +1076,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
+  const useBackgroundColor = config.getUseBackgroundColor();
+  const isLowColor = isLowColorDepth();
+  const terminalBg = terminalBackgroundColor || 'black';
+
+  // We should fallback to lines if the background color is disabled OR if it is
+  // enabled but we are in a low color depth terminal where we don't have a safe
+  // background color to use.
+  const useLineFallback = useMemo(() => {
+    if (!useBackgroundColor) {
+      return true;
+    }
+    if (isLowColor) {
+      return !getSafeLowColorBackground(terminalBg);
+    }
+    return false;
+  }, [useBackgroundColor, isLowColor, terminalBg]);
+
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
       onSuggestionsVisibilityChange(shouldShowSuggestions);
@@ -971,6 +1103,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
+  const showPlanStyling =
+    !shellModeActive && approvalMode === ApprovalMode.PLAN;
 
   let statusColor: string | undefined;
   let statusText = '';
@@ -980,6 +1114,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } else if (showYoloStyling) {
     statusColor = theme.status.error;
     statusText = 'YOLO mode';
+  } else if (showPlanStyling) {
+    statusColor = theme.status.success;
+    statusText = 'Plan mode';
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
     statusText = 'Accepting edits';
@@ -995,198 +1132,254 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         scrollOffset={activeCompletion.visibleStartIndex}
         userInput={buffer.text}
         mode={
-          buffer.text.startsWith('/') &&
-          !reverseSearchActive &&
-          !commandSearchActive
-            ? 'slash'
-            : 'reverse'
+          completion.completionMode === CompletionMode.AT
+            ? 'reverse'
+            : buffer.text.startsWith('/') &&
+                !reverseSearchActive &&
+                !commandSearchActive
+              ? 'slash'
+              : 'reverse'
         }
         expandedIndex={expandedSuggestionIndex}
       />
     </Box>
   ) : null;
 
+  const borderColor =
+    isShellFocused && !isEmbeddedShellFocused
+      ? (statusColor ?? theme.border.focused)
+      : theme.border.default;
+
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      <Box
-        borderStyle="round"
-        borderColor={
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={true}
+          borderBottom={false}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
+      <HalfLinePaddedBox
+        backgroundBaseColor={
           isShellFocused && !isEmbeddedShellFocused
-            ? (statusColor ?? theme.border.focused)
+            ? theme.border.focused
             : theme.border.default
         }
-        paddingX={1}
-        width={mainAreaWidth}
-        flexDirection="row"
-        alignItems="flex-start"
-        minHeight={3}
+        backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
+        useBackgroundColor={useBackgroundColor}
       >
-        <Text
-          color={statusColor ?? theme.text.accent}
-          aria-label={statusText || undefined}
+        <Box
+          flexGrow={1}
+          flexDirection="row"
+          paddingX={1}
+          borderColor={borderColor}
+          borderStyle={useLineFallback ? 'round' : undefined}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={!useBackgroundColor}
+          borderRight={!useBackgroundColor}
         >
-          {shellModeActive ? (
-            reverseSearchActive ? (
-              <Text
-                color={theme.text.link}
-                aria-label={SCREEN_READER_USER_PREFIX}
-              >
-                (r:){' '}
-              </Text>
+          <Text
+            color={statusColor ?? theme.text.accent}
+            aria-label={statusText || undefined}
+          >
+            {shellModeActive ? (
+              reverseSearchActive ? (
+                <Text
+                  color={theme.text.link}
+                  aria-label={SCREEN_READER_USER_PREFIX}
+                >
+                  (r:){' '}
+                </Text>
+              ) : (
+                '!'
+              )
+            ) : commandSearchActive ? (
+              <Text color={theme.text.accent}>(r:) </Text>
+            ) : showYoloStyling ? (
+              '*'
             ) : (
-              '!'
-            )
-          ) : commandSearchActive ? (
-            <Text color={theme.text.accent}>(r:) </Text>
-          ) : showYoloStyling ? (
-            '*'
-          ) : (
-            '>'
-          )}{' '}
-        </Text>
-        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-          {buffer.text.length === 0 && placeholder ? (
-            showCursor ? (
-              <Text>
-                {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
-              </Text>
+              '>'
+            )}{' '}
+          </Text>
+          <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
+            {buffer.text.length === 0 && placeholder ? (
+              showCursor ? (
+                <Text>
+                  {chalk.inverse(placeholder.slice(0, 1))}
+                  <Text color={theme.text.secondary}>
+                    {placeholder.slice(1)}
+                  </Text>
+                </Text>
+              ) : (
+                <Text color={theme.text.secondary}>{placeholder}</Text>
+              )
             ) : (
-              <Text color={theme.text.secondary}>{placeholder}</Text>
-            )
-          ) : (
-            linesToRender
-              .map((lineText, visualIdxInRenderedSet) => {
-                const absoluteVisualIdx =
-                  scrollVisualRow + visualIdxInRenderedSet;
-                const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
-                const cursorVisualRow =
-                  cursorVisualRowAbsolute - scrollVisualRow;
-                const isOnCursorLine =
-                  focus && visualIdxInRenderedSet === cursorVisualRow;
+              linesToRender
+                .map((lineText: string, visualIdxInRenderedSet: number) => {
+                  const absoluteVisualIdx =
+                    scrollVisualRow + visualIdxInRenderedSet;
+                  const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
+                  const cursorVisualRow =
+                    cursorVisualRowAbsolute - scrollVisualRow;
+                  const isOnCursorLine =
+                    focus && visualIdxInRenderedSet === cursorVisualRow;
 
-                const renderedLine: React.ReactNode[] = [];
+                  const renderedLine: React.ReactNode[] = [];
 
-                const [logicalLineIdx, logicalStartCol] = mapEntry;
-                const logicalLine = buffer.lines[logicalLineIdx] || '';
-                const tokens = parseInputForHighlighting(
-                  logicalLine,
-                  logicalLineIdx,
-                );
+                  const [logicalLineIdx] = mapEntry;
+                  const logicalLine = buffer.lines[logicalLineIdx] || '';
+                  const transformations =
+                    buffer.transformationsByLine[logicalLineIdx] ?? [];
+                  const tokens = parseInputForHighlighting(
+                    logicalLine,
+                    logicalLineIdx,
+                    transformations,
+                    ...(focus && buffer.cursor[0] === logicalLineIdx
+                      ? [buffer.cursor[1]]
+                      : []),
+                  );
+                  const startColInTransformed =
+                    buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+                  const visualStartCol = startColInTransformed;
+                  const visualEndCol = visualStartCol + cpLen(lineText);
+                  const segments = parseSegmentsFromTokens(
+                    tokens,
+                    visualStartCol,
+                    visualEndCol,
+                  );
+                  let charCount = 0;
+                  segments.forEach((seg, segIdx) => {
+                    const segLen = cpLen(seg.text);
+                    let display = seg.text;
 
-                const visualStart = logicalStartCol;
-                const visualEnd = logicalStartCol + cpLen(lineText);
-                const segments = buildSegmentsForVisualSlice(
-                  tokens,
-                  visualStart,
-                  visualEnd,
-                );
-
-                let charCount = 0;
-                segments.forEach((seg, segIdx) => {
-                  const segLen = cpLen(seg.text);
-                  let display = seg.text;
-
-                  if (isOnCursorLine) {
-                    const relativeVisualColForHighlight =
-                      cursorVisualColAbsolute;
-                    const segStart = charCount;
-                    const segEnd = segStart + segLen;
-                    if (
-                      relativeVisualColForHighlight >= segStart &&
-                      relativeVisualColForHighlight < segEnd
-                    ) {
-                      const charToHighlight = cpSlice(
-                        seg.text,
-                        relativeVisualColForHighlight - segStart,
-                        relativeVisualColForHighlight - segStart + 1,
-                      );
-                      const highlighted = showCursor
-                        ? chalk.inverse(charToHighlight)
-                        : charToHighlight;
-                      display =
-                        cpSlice(
-                          seg.text,
-                          0,
+                    if (isOnCursorLine) {
+                      const relativeVisualColForHighlight =
+                        cursorVisualColAbsolute;
+                      const segStart = charCount;
+                      const segEnd = segStart + segLen;
+                      if (
+                        relativeVisualColForHighlight >= segStart &&
+                        relativeVisualColForHighlight < segEnd
+                      ) {
+                        const charToHighlight = cpSlice(
+                          display,
                           relativeVisualColForHighlight - segStart,
-                        ) +
-                        highlighted +
-                        cpSlice(
-                          seg.text,
                           relativeVisualColForHighlight - segStart + 1,
                         );
+                        const highlighted = showCursor
+                          ? chalk.inverse(charToHighlight)
+                          : charToHighlight;
+                        display =
+                          cpSlice(
+                            display,
+                            0,
+                            relativeVisualColForHighlight - segStart,
+                          ) +
+                          highlighted +
+                          cpSlice(
+                            display,
+                            relativeVisualColForHighlight - segStart + 1,
+                          );
+                      }
+                      charCount = segEnd;
+                    } else {
+                      // Advance the running counter even when not on cursor line
+                      charCount += segLen;
                     }
-                    charCount = segEnd;
-                  }
 
-                  const color =
-                    seg.type === 'command' || seg.type === 'file'
-                      ? theme.text.accent
-                      : theme.text.primary;
+                    const color =
+                      seg.type === 'command' ||
+                      seg.type === 'file' ||
+                      seg.type === 'paste'
+                        ? theme.text.accent
+                        : theme.text.primary;
 
-                  renderedLine.push(
-                    <Text key={`token-${segIdx}`} color={color}>
-                      {display}
-                    </Text>,
-                  );
-                });
-
-                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-                if (
-                  isOnCursorLine &&
-                  cursorVisualColAbsolute === cpLen(lineText)
-                ) {
-                  if (!currentLineGhost) {
                     renderedLine.push(
-                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {showCursor ? chalk.inverse(' ') : ' '}
+                      <Text key={`token-${segIdx}`} color={color}>
+                        {display}
                       </Text>,
                     );
+                  });
+
+                  const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+                  if (
+                    isOnCursorLine &&
+                    cursorVisualColAbsolute === cpLen(lineText)
+                  ) {
+                    if (!currentLineGhost) {
+                      renderedLine.push(
+                        <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                          {showCursor ? chalk.inverse(' ') : ' '}
+                        </Text>,
+                      );
+                    }
                   }
-                }
 
-                const showCursorBeforeGhost =
-                  focus &&
-                  isOnCursorLine &&
-                  cursorVisualColAbsolute === cpLen(lineText) &&
-                  currentLineGhost;
+                  const showCursorBeforeGhost =
+                    focus &&
+                    isOnCursorLine &&
+                    cursorVisualColAbsolute === cpLen(lineText) &&
+                    currentLineGhost;
 
-                return (
-                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                    <Text>
-                      {renderedLine}
-                      {showCursorBeforeGhost &&
-                        (showCursor ? chalk.inverse(' ') : ' ')}
-                      {currentLineGhost && (
-                        <Text color={theme.text.secondary}>
-                          {currentLineGhost}
-                        </Text>
-                      )}
-                    </Text>
-                  </Box>
-                );
-              })
-              .concat(
-                additionalLines.map((ghostLine, index) => {
-                  const padding = Math.max(
-                    0,
-                    inputWidth - stringWidth(ghostLine),
-                  );
                   return (
-                    <Text
-                      key={`ghost-line-${index}`}
-                      color={theme.text.secondary}
-                    >
-                      {ghostLine}
-                      {' '.repeat(padding)}
-                    </Text>
+                    <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                      <Text>
+                        {renderedLine}
+                        {showCursorBeforeGhost &&
+                          (showCursor ? chalk.inverse(' ') : ' ')}
+                        {currentLineGhost && (
+                          <Text color={theme.text.secondary}>
+                            {currentLineGhost}
+                          </Text>
+                        )}
+                      </Text>
+                    </Box>
                   );
-                }),
-              )
-          )}
+                })
+                .concat(
+                  additionalLines.map((ghostLine, index) => {
+                    const padding = Math.max(
+                      0,
+                      inputWidth - stringWidth(ghostLine),
+                    );
+                    return (
+                      <Text
+                        key={`ghost-line-${index}`}
+                        color={theme.text.secondary}
+                      >
+                        {ghostLine}
+                        {' '.repeat(padding)}
+                      </Text>
+                    );
+                  }),
+                )
+            )}
+          </Box>
         </Box>
-      </Box>
+      </HalfLinePaddedBox>
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={false}
+          borderBottom={true}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );

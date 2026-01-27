@@ -9,7 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import { debugLogger, type AnyToolInvocation } from '../index.js';
+import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -22,8 +22,8 @@ import {
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type PolicyUpdateOptions,
 } from './tools.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
@@ -37,9 +37,9 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
-  isCommandAllowed,
-  isShellInvocationAllowlisted,
   stripShellWrapper,
+  parseCommandDetails,
+  hasRedirection,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -59,8 +59,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -83,47 +82,57 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
+  protected override getPolicyUpdateOptions(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      outcome === ToolConfirmationOutcome.ProceedAlways
+    ) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = [...new Set(getCommandRoots(command))];
+      if (rootCommands.length > 0) {
+        return { commandPrefix: rootCommands };
+      }
+      return { commandPrefix: this.params.command };
+    }
+    return undefined;
+  }
+
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
+
+    const parsed = parseCommandDetails(command);
+    let rootCommandDisplay = '';
+
+    if (!parsed || parsed.hasError || parsed.details.length === 0) {
+      // Fallback if parser fails
+      const fallback = command.trim().split(/\s+/)[0];
+      rootCommandDisplay = fallback || 'shell command';
+      if (hasRedirection(command)) {
+        rootCommandDisplay += ', redirection';
+      }
+    } else {
+      rootCommandDisplay = parsed.details
+        .map((detail) => detail.name)
+        .join(', ');
+    }
+
     const rootCommands = [...new Set(getCommandRoots(command))];
 
-    // In non-interactive mode, we need to prevent the tool from hanging while
-    // waiting for user input. If a tool is not fully allowed (e.g. via
-    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
-    // prompting for confirmation. This check is skipped in YOLO mode.
-    if (
-      !this.config.isInteractive() &&
-      this.config.getApprovalMode() !== ApprovalMode.YOLO
-    ) {
-      if (this.isInvocationAllowlisted(command)) {
-        // If it's an allowed shell command, we don't need to confirm execution.
-        return false;
-      }
-
-      throw new Error(
-        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-      );
-    }
-
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
-
-    if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
-    }
-
+    // Rely entirely on PolicyEngine for interactive confirmation.
+    // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
+    // so we must provide confirmation details.
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
-      rootCommand: commandsToConfirm.join(', '),
+      rootCommand: rootCommandDisplay,
+      rootCommands,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
-        }
+        await this.publishPolicyUpdate(outcome);
       },
     };
     return confirmationDetails;
@@ -241,7 +250,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
           combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          { ...shellExecutionConfig, pager: 'cat' },
+          {
+            ...shellExecutionConfig,
+            pager: 'cat',
+            sanitizationConfig:
+              shellExecutionConfig?.sanitizationConfig ??
+              this.config.sanitizationConfig,
+          },
         );
 
       if (pid && setPidCallback) {
@@ -293,22 +308,31 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const finalError = result.error
-          ? result.error.message.replace(commandToExecute, this.params.command)
-          : '(none)';
+        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
 
-        llmContent = [
-          `Command: ${this.params.command}`,
-          `Directory: ${this.params.dir_path || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`, // Use the cleaned error string.
-          `Exit Code: ${result.exitCode ?? '(none)'}`,
-          `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
-            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
-          }`,
-          `Process Group PGID: ${result.pid ?? '(none)'}`,
-        ].join('\n');
+        if (result.error) {
+          const finalError = result.error.message.replaceAll(
+            commandToExecute,
+            this.params.command,
+          );
+          llmContentParts.push(`Error: ${finalError}`);
+        }
+
+        if (result.exitCode !== null && result.exitCode !== 0) {
+          llmContentParts.push(`Exit Code: ${result.exitCode}`);
+        }
+
+        if (result.signal) {
+          llmContentParts.push(`Signal: ${result.signal}`);
+        }
+        if (backgroundPIDs.length) {
+          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+        }
+        if (result.pid) {
+          llmContentParts.push(`Process Group PGID: ${result.pid}`);
+        }
+
+        llmContent = llmContentParts.join('\n');
       }
 
       let returnDisplayMessage = '';
@@ -376,16 +400,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
     }
   }
-
-  private isInvocationAllowlisted(command: string): boolean {
-    const allowedTools = this.config.getAllowedTools() || [];
-    if (allowedTools.length === 0) {
-      return false;
-    }
-
-    const invocation = { params: { command } } as unknown as AnyToolInvocation;
-    return isShellInvocationAllowlisted(invocation, allowedTools);
-  }
 }
 
 function getShellToolDescription(): string {
@@ -393,15 +407,12 @@ function getShellToolDescription(): string {
 
       The following information is returned:
 
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available.`;
 
   if (os.platform() === 'win32') {
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
@@ -424,11 +435,9 @@ export class ShellTool extends BaseDeclarativeTool<
 > {
   static readonly Name = SHELL_TOOL_NAME;
 
-  private allowlist: Set<string> = new Set();
-
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
@@ -458,9 +467,9 @@ export class ShellTool extends BaseDeclarativeTool<
         },
         required: ['command'],
       },
+      messageBus,
       false, // output is not markdown
       true, // output can be updated
-      messageBus,
     );
   }
 
@@ -471,19 +480,6 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        debugLogger.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
-    }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
@@ -499,14 +495,13 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
       params,
-      this.allowlist,
       messageBus,
       _toolName,
       _toolDisplayName,

@@ -233,6 +233,33 @@ export function resolveColor(colorValue: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Returns a "safe" background color to use in low-color terminals if the
+ * terminal background is a standard black or white.
+ * Returns undefined if no safe background color is available for the given
+ * terminal background.
+ */
+export function getSafeLowColorBackground(
+  terminalBg: string,
+): string | undefined {
+  const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
+  if (
+    resolvedTerminalBg === 'black' ||
+    resolvedTerminalBg === '#000000' ||
+    resolvedTerminalBg === '#000'
+  ) {
+    return '#1c1c1c';
+  }
+  if (
+    resolvedTerminalBg === 'white' ||
+    resolvedTerminalBg === '#ffffff' ||
+    resolvedTerminalBg === '#fff'
+  ) {
+    return '#eeeeee';
+  }
+  return undefined;
+}
+
 export function interpolateColor(
   color1: string,
   color2: string,
@@ -250,4 +277,23 @@ export function interpolateColor(
   const gradient = tinygradient(color1, color2);
   const color = gradient.rgbAt(factor);
   return color.toHexString();
+}
+
+export function getThemeTypeFromBackgroundColor(
+  backgroundColor: string | undefined,
+): 'light' | 'dark' | undefined {
+  if (!backgroundColor) {
+    return undefined;
+  }
+
+  // Parse hex color
+  const hex = backgroundColor.replace(/^#/, '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Calculate luminance
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  return luminance > 128 ? 'light' : 'dark';
 }

@@ -7,7 +7,11 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
+import {
+  shortenPath,
+  tildeifyPath,
+  getDisplayString,
+} from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import { ThemedGradient } from './ThemedGradient.js';
@@ -38,7 +42,7 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     nightly,
     isTrustedFolder,
-    mainAreaWidth,
+    terminalWidth,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -51,19 +55,17 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
-    mainAreaWidth: uiState.mainAreaWidth,
+    terminalWidth: uiState.terminalWidth,
   };
 
   const showMemoryUsage =
-    config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
-  const hideCWD = settings.merged.ui?.footer?.hideCWD || false;
-  const hideSandboxStatus =
-    settings.merged.ui?.footer?.hideSandboxStatus || false;
-  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
-  const hideContextPercentage =
-    settings.merged.ui?.footer?.hideContextPercentage ?? true;
+    config.getDebugMode() || settings.merged.ui.showMemoryUsage;
+  const hideCWD = settings.merged.ui.footer.hideCWD;
+  const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
+  const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
+  const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
 
-  const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
@@ -74,7 +76,7 @@ export const Footer: React.FC = () => {
   return (
     <Box
       justifyContent={justifyContent}
-      width={mainAreaWidth}
+      width={terminalWidth}
       flexDirection="row"
       alignItems="center"
       paddingX={1}
@@ -132,7 +134,7 @@ export const Footer: React.FC = () => {
           ) : (
             <Text color={theme.status.error}>
               no sandbox
-              {mainAreaWidth >= 100 && (
+              {terminalWidth >= 100 && (
                 <Text color={theme.text.secondary}> (see /docs)</Text>
               )}
             </Text>
@@ -145,14 +147,15 @@ export const Footer: React.FC = () => {
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.accent}>
-              {model}
+              {getDisplayString(model, config.getPreviewFeatures())}
+              <Text color={theme.text.secondary}> /model</Text>
               {!hideContextPercentage && (
                 <>
                   {' '}
                   <ContextUsageDisplay
                     promptTokenCount={promptTokenCount}
                     model={model}
-                    terminalWidth={mainAreaWidth}
+                    terminalWidth={terminalWidth}
                   />
                 </>
               )}
