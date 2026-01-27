@@ -6,6 +6,7 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
+import { EDIT_TOOL_NAMES } from '@google/gemini-cli-core';
 
 const FILES = {
   'app.ts': 'const add = (a: number, b: number) => a - b;',
@@ -25,7 +26,7 @@ describe('Answer vs. ask eval', () => {
 
       // Verify NO edit tools called
       const editCalls = toolLogs.filter((log) =>
-        ['replace', 'write_file'].includes(log.toolRequest.name),
+        EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
 
@@ -54,8 +55,7 @@ describe('Answer vs. ask eval', () => {
       // Verify edit tools WERE called
       const editCalls = toolLogs.filter(
         (log) =>
-          ['replace', 'write_file'].includes(log.toolRequest.name) &&
-          log.toolRequest.success,
+          EDIT_TOOL_NAMES.has(log.toolRequest.name) && log.toolRequest.success,
       );
       expect(editCalls.length).toBeGreaterThanOrEqual(1);
 
@@ -78,7 +78,7 @@ describe('Answer vs. ask eval', () => {
 
       // Verify NO edit tools called
       const editCalls = toolLogs.filter((log) =>
-        ['replace', 'write_file'].includes(log.toolRequest.name),
+        EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
 
@@ -101,12 +101,12 @@ describe('Answer vs. ask eval', () => {
     name: 'should not edit files when asked a general question',
     prompt: 'How does app.ts work?',
     files: FILES,
-    assert: async (rig, result) => {
+    assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
 
       // Verify NO edit tools called
       const editCalls = toolLogs.filter((log) =>
-        ['replace', 'write_file'].includes(log.toolRequest.name),
+        EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
 
@@ -129,7 +129,7 @@ describe('Answer vs. ask eval', () => {
 
       // Verify NO edit tools called
       const editCalls = toolLogs.filter((log) =>
-        ['replace', 'write_file'].includes(log.toolRequest.name),
+        EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
 
@@ -153,7 +153,7 @@ describe('Answer vs. ask eval', () => {
 
       // Verify NO edit tools called
       const editCalls = toolLogs.filter((log) =>
-        ['replace', 'write_file'].includes(log.toolRequest.name),
+        EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
 
