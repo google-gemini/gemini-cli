@@ -279,7 +279,7 @@ Return a JSON object with:
             labels: [],
             comments: [],
             reactionGroups: [],
-            body: '', // Added missing property
+            body: '',
           } as Candidate;
         }
         canonical.reason = rec.reason;
