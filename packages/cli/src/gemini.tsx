@@ -503,11 +503,7 @@ export async function main() {
     loadConfigHandle?.end();
     adminControlsListner.setConfig(config);
 
-    const isLoggingEnabled =
-      config.getDebugMode() ||
-      process.env['GEMINI_CLI_ENABLE_ACTIVITY_LOG'] === 'true';
-
-    if (config.isInteractive() && config.storage && isLoggingEnabled) {
+    if (config.isInteractive() && config.storage && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
         './utils/activityLogger.js'
       );

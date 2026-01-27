@@ -323,17 +323,13 @@ export class ActivityLogger extends EventEmitter {
 }
 
 /**
- * Registers the activity logger if enabled via environment variable.
+ * Registers the activity logger.
  * Captures network and console logs to a session-specific JSONL file.
  *
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {
-  if (
-    config.storage &&
-    (config.getDebugMode() ||
-      process.env['GEMINI_CLI_ENABLE_ACTIVITY_LOG'] === 'true')
-  ) {
+  if (config.storage) {
     const capture = ActivityLogger.getInstance();
     capture.enable();
 

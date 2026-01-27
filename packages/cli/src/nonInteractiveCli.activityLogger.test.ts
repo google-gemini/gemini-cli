@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import {
   GeminiEventType,
@@ -86,7 +78,9 @@ describe('runNonInteractive ActivityLogger', () => {
     vi.restoreAllMocks();
   });
 
-  it('should call registerActivityLogger when debugMode is enabled', async () => {
+  it('should call registerActivityLogger when GEMINI_CLI_ENABLE_ACTIVITY_LOG is true', async () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_ACTIVITY_LOG', 'true');
+
     await runNonInteractive({
       config: mockConfig,
       settings: mockSettings,
@@ -95,10 +89,11 @@ describe('runNonInteractive ActivityLogger', () => {
     });
 
     expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    vi.unstubAllEnvs();
   });
 
-  it('should not call registerActivityLogger when debugMode is disabled', async () => {
-    (mockConfig.getDebugMode as Mock).mockReturnValue(false);
+  it('should not call registerActivityLogger when GEMINI_CLI_ENABLE_ACTIVITY_LOG is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ENABLE_ACTIVITY_LOG', '');
 
     await runNonInteractive({
       config: mockConfig,
@@ -108,5 +103,6 @@ describe('runNonInteractive ActivityLogger', () => {
     });
 
     expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
