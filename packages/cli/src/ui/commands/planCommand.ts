@@ -27,7 +27,9 @@ export const planCommand: SlashCommand = {
 
         const plansDir = config.storage.getProjectTempPlansDir();
         try {
-          const securityCheck = await isDirectorySecure(plansDir);
+          const securityCheck = await isDirectorySecure(plansDir, {
+            owner: 'user',
+          });
           if (!securityCheck.secure) {
             context.ui.addItem(
               {

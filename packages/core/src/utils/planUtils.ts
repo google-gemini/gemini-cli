@@ -44,7 +44,7 @@ export function parseMarkdownTodos(content: string): Todo[] {
         const description = taskMarkerMatch[2].split('\n')[0].trim(); // Take only the first line as description
 
         let status: TodoStatus = 'pending';
-        if (marker === 'x') {
+        if (marker?.toLowerCase() === 'x') {
           status = 'completed';
         } else if (marker === '/' || marker === '>') {
           status = 'in_progress';

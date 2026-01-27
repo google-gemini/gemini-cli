@@ -26,7 +26,9 @@ export function usePlanMonitoring(config: Config) {
 
     const updatePlan = async () => {
       try {
-        const securityCheck = await isDirectorySecure(plansDir);
+        const securityCheck = await isDirectorySecure(plansDir, {
+          owner: 'user',
+        });
         if (!securityCheck.secure) {
           debugLogger.warn(
             'Security check failed for plans directory',

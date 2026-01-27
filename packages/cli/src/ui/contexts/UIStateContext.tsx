@@ -25,7 +25,8 @@ import type {
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
- Todo } from '@google/gemini-cli-core';
+  Todo,
+} from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
