@@ -111,6 +111,7 @@ import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
+import { ThinkingModeProvider } from './contexts/ThinkingModeContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import {
   useConfirmUpdateRequests,
@@ -1981,18 +1982,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
     <UIStateContext.Provider value={uiState}>
       <UIActionsContext.Provider value={uiActions}>
         <ConfigContext.Provider value={config}>
-          <AppContext.Provider
-            value={{
-              version: props.version,
-              startupWarnings: props.startupWarnings || [],
-            }}
-          >
-            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+          <ThinkingModeProvider config={config}>
+            <AppContext.Provider
+              value={{
+                version: props.version,
+                startupWarnings: props.startupWarnings || [],
+              }}
+            >
               <ShellFocusContext.Provider value={isFocused}>
                 <App />
               </ShellFocusContext.Provider>
-            </ToolActionsProvider>
-          </AppContext.Provider>
+            </AppContext.Provider>
+          </ThinkingModeProvider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>
     </UIStateContext.Provider>
