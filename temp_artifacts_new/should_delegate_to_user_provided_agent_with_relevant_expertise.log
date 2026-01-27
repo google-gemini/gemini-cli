@@ -1,0 +1,34 @@
+[
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"index.ts\"\n}",
+      "success": true,
+      "duration_ms": 5
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"README.md\"\n}",
+      "success": true,
+      "duration_ms": 8
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "write_file",
+      "args": "{\n  \"content\": \"# Math Library\\n\\nA simple library for performing basic mathematical operations.\\n\\n## Features\\n\\n- **add**: Adds two numbers together.\\n\\n## Usage\\n\\n```typescript\\nimport { add } from './index';\\n\\nconst sum = add(1, 2);\\nconsole.log(sum); // 3\\n```\\n\",\n  \"file_path\": \"README.md\"\n}",
+      "success": true,
+      "duration_ms": 4
+    }
+  },
+  {
+    "toolRequest": {
+      "name": "read_file",
+      "args": "{\n  \"file_path\": \"README.md\"\n}",
+      "success": true,
+      "duration_ms": 1
+    }
+  }
+]

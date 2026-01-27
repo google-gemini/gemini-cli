@@ -100,17 +100,26 @@ async function copyActivityLogs(rig: TestRig, name: string) {
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
+  console.log(`[DEBUG] copyActivityLogs for: ${name}`);
+  console.log(`[DEBUG] rig.homeDir: ${rig.homeDir}`);
+  console.log(`[DEBUG] rig.testDir: ${rig.testDir}`);
+
   // Find all .jsonl files recursively
   const findJsonl = (dir: string): string[] => {
     let results: string[] = [];
-    if (!dir || !fs.existsSync(dir)) return results;
+    if (!dir || !fs.existsSync(dir)) {
+      console.log(`[DEBUG] Path does not exist: ${dir}`);
+      return results;
+    }
     const list = fs.readdirSync(dir);
+    console.log(`[DEBUG] Listing ${dir}: ${list.join(', ')}`);
     for (const file of list) {
       const fullPath = path.join(dir, file);
       const stat = fs.statSync(fullPath);
       if (stat.isDirectory()) {
         results = results.concat(findJsonl(fullPath));
       } else if (file.endsWith('.jsonl')) {
+        console.log(`[DEBUG] Found .jsonl: ${fullPath}`);
         results.push(fullPath);
       }
     }
@@ -120,10 +129,14 @@ async function copyActivityLogs(rig: TestRig, name: string) {
   const searchPaths = [rig.homeDir, rig.testDir].filter(
     (p): p is string => !!p,
   );
+  console.log(`[DEBUG] searchPaths: ${searchPaths.join(', ')}`);
   const jsonlFiles = searchPaths.flatMap((p) => findJsonl(p));
+
+  console.log(`[DEBUG] Total .jsonl files found: ${jsonlFiles.length}`);
 
   for (let i = 0; i < jsonlFiles.length; i++) {
     const dest = `${logDir}/${sanitizedName}${i > 0 ? `_${i}` : ''}.jsonl`;
+    console.log(`[DEBUG] Copying ${jsonlFiles[i]} to ${dest}`);
     await fs.promises.copyFile(jsonlFiles[i], dest);
   }
 }
