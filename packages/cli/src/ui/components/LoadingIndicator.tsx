@@ -7,6 +7,7 @@
 import type { ThoughtSummary } from '@google/gemini-cli-core';
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
@@ -29,6 +30,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   rightContent,
   thought,
 }) => {
+  const { t } = useTranslation('ui');
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -44,9 +46,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject || currentLoadingPhrase;
 
+  const timeStr =
+    elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000);
   const cancelAndTimerContent =
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
+      ? t('loadingIndicator.cancelAndTimer', { time: timeStr })
       : null;
 
   return (
