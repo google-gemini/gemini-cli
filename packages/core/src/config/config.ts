@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -31,6 +32,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { AskUserTool } from '../tools/ask-user.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -49,7 +51,6 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_THINKING_MODE,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -101,9 +102,9 @@ import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
+import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
-import { DelegateToAgentTool } from '../agents/delegate-to-agent-tool.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
+import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -144,14 +145,6 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
-export interface CodebaseInvestigatorSettings {
-  enabled?: boolean;
-  maxNumTurns?: number;
-  maxTimeMinutes?: number;
-  thinkingBudget?: number;
-  model?: string;
-}
-
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -166,10 +159,6 @@ export interface ResolvedExtensionSetting {
   sensitive: boolean;
   scope?: 'user' | 'workspace';
   source?: string;
-}
-
-export interface CliHelpAgentSettings {
-  enabled?: boolean;
 }
 
 export interface AgentRunConfig {
@@ -231,6 +220,7 @@ import {
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 export type { FileFilteringOptions };
 export {
@@ -291,6 +281,18 @@ export interface SandboxConfig {
   image: string;
 }
 
+/**
+ * Callbacks for checking MCP server enablement status.
+ * These callbacks are provided by the CLI package to bridge
+ * the enablement state to the core package.
+ */
+export interface McpEnablementCallbacks {
+  /** Check if a server is disabled for the current session only */
+  isSessionDisabled: (serverId: string) => boolean;
+  /** Check if a server is enabled in the file-based configuration */
+  isFileEnabled: (serverId: string) => Promise<boolean>;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientVersion?: string;
@@ -307,6 +309,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
@@ -354,6 +357,7 @@ export interface ConfigParameters {
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
+  useBackgroundColor?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -368,8 +372,6 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
-  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  cliHelpAgentSettings?: CliHelpAgentSettings;
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
@@ -418,6 +420,7 @@ export class Config {
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private sessionId: string;
   private clientVersion: string;
@@ -441,6 +444,7 @@ export class Config {
   private readonly mcpEnabled: boolean;
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
+  private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
   private userMemory: string;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -498,6 +502,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
@@ -513,8 +518,6 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly cliHelpAgentSettings: CliHelpAgentSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -581,6 +584,7 @@ export class Config {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
     this.allowedMcpServers = params.allowedMcpServers ?? [];
@@ -665,6 +669,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
+    this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -688,18 +693,6 @@ export class Config {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
-      thinkingBudget:
-        params.codebaseInvestigatorSettings?.thinkingBudget ??
-        DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model,
-    };
-    this.cliHelpAgentSettings = {
-      enabled: params.cliHelpAgentSettings?.enabled ?? true,
-    };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -708,6 +701,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
+
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -719,6 +713,7 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
@@ -805,6 +800,13 @@ export class Config {
       this.workspaceContext.addDirectory(dir);
     }
 
+    // Add plans directory to workspace context for plan file storage
+    if (this.planEnabled) {
+      const plansDir = this.storage.getProjectTempPlansDir();
+      await fs.promises.mkdir(plansDir, { recursive: true });
+      this.workspaceContext.addDirectory(plansDir);
+    }
+
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
@@ -829,12 +831,20 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const mcpInitialization = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
-    ]).catch((error) => {
-      debugLogger.error('Error initializing MCP clients:', error);
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
     });
+
+    if (!this.interactive) {
+      await mcpInitialization;
+    }
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -967,6 +977,11 @@ export class Config {
 
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
+  }
+
+  getUserTierName(): string | undefined {
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
   }
 
   /**
@@ -1139,6 +1154,10 @@ export class Config {
     return this.agentRegistry;
   }
 
+  getAcknowledgedAgentsService(): AcknowledgedAgentsService {
+    return this.acknowledgedAgentsService;
+  }
+
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
   }
@@ -1264,6 +1283,10 @@ export class Config {
     return this.mcpEnabled;
   }
 
+  getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {
+    return this.mcpEnablementCallbacks;
+  }
+
   getExtensionsEnabled(): boolean {
     return this.extensionsEnabled;
   }
@@ -1319,7 +1342,7 @@ export class Config {
     }
     if (this.geminiClient?.isInitialized()) {
       await this.geminiClient.setTools();
-      await this.geminiClient.updateSystemInstruction();
+      this.geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1387,6 +1410,13 @@ export class Config {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    if (isPlanModeTransition) {
+      this.updateSystemInstructionIfInitialized();
+    }
   }
 
   /**
@@ -1469,10 +1499,10 @@ export class Config {
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
    */
-  async updateSystemInstructionIfInitialized(): Promise<void> {
+  updateSystemInstructionIfInitialized(): void {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1687,6 +1717,23 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getNumericalRoutingEnabled(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+
+    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
+      ?.boolValue;
+  }
+
+  async getClassifierThreshold(): Promise<number | undefined> {
+    await this.ensureExperimentsLoaded();
+
+    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
+    if (flag?.intValue !== undefined) {
+      return parseInt(flag.intValue, 10);
+    }
+    return flag?.floatValue;
+  }
+
   async getBannerTextNoCapacityIssues(): Promise<string> {
     await this.ensureExperimentsLoaded();
     return (
@@ -1764,7 +1811,7 @@ export class Config {
     }
 
     // Notify the client that system instructions might need updating
-    await this.updateSystemInstructionIfInitialized();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**
@@ -1785,6 +1832,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getUseBackgroundColor(): boolean {
+    return this.useBackgroundColor;
   }
 
   getEnableInteractiveShell(): boolean {
@@ -1895,14 +1946,6 @@ export class Config {
     return this.enableHooksUI;
   }
 
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
-    return this.codebaseInvestigatorSettings;
-  }
-
-  getCliHelpAgentSettings(): CliHelpAgentSettings {
-    return this.cliHelpAgentSettings;
-  }
-
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 
@@ -1963,13 +2006,13 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(AskUserTool);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
     }
 
     // Register Subagents as Tools
-    // Register DelegateToAgentTool if agents are enabled
-    this.registerDelegateToAgentTool(registry);
+    this.registerSubAgentTools(registry);
 
     await registry.discoverAllTools();
     registry.sortTools();
@@ -1977,26 +2020,36 @@ export class Config {
   }
 
   /**
-   * Registers the DelegateToAgentTool if agents or related features are enabled.
+   * Registers SubAgentTools for all available agents.
    */
-  private registerDelegateToAgentTool(registry: ToolRegistry): void {
+  private registerSubAgentTools(registry: ToolRegistry): void {
+    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     if (
       this.isAgentsEnabled() ||
-      this.getCodebaseInvestigatorSettings().enabled ||
-      this.getCliHelpAgentSettings().enabled
+      agentsOverrides['codebase_investigator']?.enabled !== false ||
+      agentsOverrides['cli_help']?.enabled !== false
     ) {
-      // Check if the delegate tool itself is allowed (if allowedTools is set)
       const allowedTools = this.getAllowedTools();
-      const isAllowed =
-        !allowedTools || allowedTools.includes(DELEGATE_TO_AGENT_TOOL_NAME);
+      const definitions = this.agentRegistry.getAllDefinitions();
 
-      if (isAllowed) {
-        const delegateTool = new DelegateToAgentTool(
-          this.agentRegistry,
-          this,
-          this.getMessageBus(),
-        );
-        registry.registerTool(delegateTool);
+      for (const definition of definitions) {
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed) {
+          try {
+            const tool = new SubagentTool(
+              definition,
+              this,
+              this.getMessageBus(),
+            );
+            registry.registerTool(tool);
+          } catch (e: unknown) {
+            debugLogger.warn(
+              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+            );
+          }
+        }
       }
     }
   }
@@ -2092,13 +2145,13 @@ export class Config {
 
   private onAgentsRefreshed = async () => {
     if (this.toolRegistry) {
-      this.registerDelegateToAgentTool(this.toolRegistry);
+      this.registerSubAgentTools(this.toolRegistry);
     }
     // Propagate updates to the active chat session
     const client = this.getGeminiClient();
     if (client?.isInitialized()) {
       await client.setTools();
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
     } else {
       debugLogger.debug(
         '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',

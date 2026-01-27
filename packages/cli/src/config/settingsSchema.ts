@@ -20,7 +20,6 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
-  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -527,15 +526,6 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
-      useFullWidth: {
-        type: 'boolean',
-        label: 'Use Full Width',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Use the entire width of the terminal for output.',
-        showInDialog: true,
-      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',
@@ -546,6 +536,15 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      useBackgroundColor: {
+        type: 'boolean',
+        label: 'Use Background Color',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Whether to use background colors in the UI.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
@@ -554,6 +553,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
+        showInDialog: true,
+      },
+      showSpinner: {
+        type: 'boolean',
+        label: 'Show Spinner',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the spinner during operations.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -1024,6 +1032,24 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
+      approvalMode: {
+        type: 'enum',
+        label: 'Approval Mode',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
+      },
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -1461,66 +1487,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Agent Skills (experimental).',
         showInDialog: true,
       },
-      codebaseInvestigatorSettings: {
-        type: 'object',
-        label: 'Codebase Investigator Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for Codebase Investigator.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Codebase Investigator',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxNumTurns: {
-            type: 'number',
-            label: 'Codebase Investigator Max Num Turns',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 10,
-            description:
-              'Maximum number of turns for the Codebase Investigator agent.',
-            showInDialog: true,
-          },
-          maxTimeMinutes: {
-            type: 'number',
-            label: 'Max Time (Minutes)',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 3,
-            description:
-              'Maximum time for the Codebase Investigator agent (in minutes).',
-            showInDialog: false,
-          },
-          thinkingBudget: {
-            type: 'number',
-            label: 'Thinking Budget',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: 8192,
-            description:
-              'The thinking budget for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-          model: {
-            type: 'string',
-            label: 'Model',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: GEMINI_MODEL_ALIAS_AUTO,
-            description:
-              'The model to use for the Codebase Investigator agent.',
-            showInDialog: false,
-          },
-        },
-      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',
@@ -1530,26 +1496,6 @@ const SETTINGS_SCHEMA = {
         description:
           'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
         showInDialog: true,
-      },
-      cliHelpAgentSettings: {
-        type: 'object',
-        label: 'CLI Help Agent Settings',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: {},
-        description: 'Configuration for CLI Help Agent.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable CLI Help Agent',
-            category: 'Experimental',
-            requiresRestart: true,
-            default: true,
-            description: 'Enable the CLI Help Agent.',
-            showInDialog: true,
-          },
-        },
       },
       plan: {
         type: 'boolean',

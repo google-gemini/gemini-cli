@@ -9,6 +9,10 @@ on:
         description: 'Run all evaluations (including usually passing)'
         type: 'boolean'
         default: true
+      test_name_pattern:
+        description: 'Test name pattern or file name'
+        required: false
+        type: 'string'
 
 permissions:
   contents: 'read'
@@ -49,11 +53,25 @@ jobs:
         run: 'mkdir -p evals/logs'
 
       - name: 'Run Evals'
+        continue-on-error: true
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
-        run: 'npm run test:all_evals'
+          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+        run: |
+          CMD="npm run test:all_evals"
+          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+
+          if [[ -n "$PATTERN" ]]; then
+            if [[ "$PATTERN" == *.ts || "$PATTERN" == *.js || "$PATTERN" == */* ]]; then
+              $CMD -- "$PATTERN"
+            else
+              $CMD -- -t "$PATTERN"
+            fi
+          else
+            $CMD
+          fi
 
       - name: 'Upload Logs'
         if: 'always()'

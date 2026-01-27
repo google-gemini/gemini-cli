@@ -158,6 +158,10 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
       keypressHandler({
         ...key,
         name: 'return',
+        shift: true, // to make it a newline, not a submission
+        alt: false,
+        ctrl: false,
+        cmd: false,
         sequence: '\r',
         insertable: true,
       });
@@ -561,7 +565,9 @@ function* emitKeys(
       shift = /^[A-Z]$/.exec(ch) !== null;
       alt = escaped;
       insertable = true;
-    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch] && process.platform === 'darwin') {
+    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
+      // Note: we do this even if we are not on Mac, because mac users may
+      // remotely connect to non-Mac systems.
       name = MAC_ALT_KEY_CHARACTER_MAP[ch];
       alt = true;
     } else if (sequence === `${ESC}${ESC}`) {

@@ -33,7 +33,8 @@ process outlined in `CONTRIBUTING.md`.
     directory that need to be modified. Always read the latest version of a file
     before you begin work.
 3.  **Check for connections:** Consider related documentation. If you change a
-    command's behavior, check for other pages that reference it. Make sure all
+    command's behavior, check for other pages that reference it. If you add a new
+    page, check if `docs/sidebar.json` needs to be updated. Make sure all
     links are up to date.
 
 ## Step 3: Write or edit the documentation

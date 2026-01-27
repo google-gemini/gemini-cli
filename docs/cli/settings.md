@@ -57,9 +57,10 @@ they appear in the UI.
 | Show Line Numbers              | `ui.showLineNumbers`                    | Show line numbers in the chat.                                                                                                                                    | `true`  |
 | Show Citations                 | `ui.showCitations`                      | Show citations for generated text in the chat.                                                                                                                    | `false` |
 | Show Model Info In Chat        | `ui.showModelInfoInChat`                | Show the model name in the chat for each model turn.                                                                                                              | `false` |
-| Use Full Width                 | `ui.useFullWidth`                       | Use the entire width of the terminal for output.                                                                                                                  | `true`  |
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                 | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
+| Use Background Color           | `ui.useBackgroundColor`                 | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering          | `ui.incrementalRendering`               | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
+| Show Spinner                   | `ui.showSpinner`                        | Show the spinner during operations.                                                                                                                               | `true`  |
 | Enable Loading Phrases         | `ui.accessibility.enableLoadingPhrases` | Enable loading phrases during operations.                                                                                                                         | `true`  |
 | Screen Reader Mode             | `ui.accessibility.screenReader`         | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
 
@@ -90,16 +91,17 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                                                                                | Default   |
-| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`    |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false`   |
-| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).                                                                         | `false`   |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`    |
-| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                   | `true`    |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                                                                                      | `4000000` |
-| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                   | `1000`    |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`    |
+| UI Label                         | Setting                              | Description                                                                                                                                                                    | Default     |
+| -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                     | `true`      |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                    | `false`     |
+| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).                                                                             | `false`     |
+| Approval Mode                    | `tools.approvalMode`                 | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                                | `true`      |
+| Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                       | `true`      |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Truncate tool output if it is larger than this many characters. Set to -1 to disable.                                                                                          | `4000000`   |
+| Tool Output Truncation Lines     | `tools.truncateToolOutputLines`      | The number of lines to keep when truncating tool output.                                                                                                                       | `1000`      |
+| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.     | `true`      |
 
 ### Security
 
@@ -113,14 +115,11 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                            | Setting                                                 | Description                                                                         | Default |
-| ----------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Agent Skills                        | `experimental.skills`                                   | Enable Agent Skills (experimental).                                                 | `false` |
-| Enable Codebase Investigator        | `experimental.codebaseInvestigatorSettings.enabled`     | Enable the Codebase Investigator agent.                                             | `true`  |
-| Codebase Investigator Max Num Turns | `experimental.codebaseInvestigatorSettings.maxNumTurns` | Maximum number of turns for the Codebase Investigator agent.                        | `10`    |
-| Use OSC 52 Paste                    | `experimental.useOSC52Paste`                            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Enable CLI Help Agent               | `experimental.cliHelpAgentSettings.enabled`             | Enable the CLI Help Agent.                                                          | `true`  |
-| Plan                                | `experimental.plan`                                     | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label         | Setting                      | Description                                                                         | Default |
+| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Agent Skills     | `experimental.skills`        | Enable Agent Skills (experimental).                                                 | `false` |
+| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
 
 ### HooksConfig
 

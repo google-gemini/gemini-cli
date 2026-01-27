@@ -69,6 +69,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
+    readonly userTierName?: string,
   ) {}
 
   async generateContentStream(
