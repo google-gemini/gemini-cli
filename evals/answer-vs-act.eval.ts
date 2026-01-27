@@ -49,7 +49,7 @@ describe('Answer vs. ask eval', () => {
     name: 'should edit files when asked to fix bug',
     prompt: 'Fix the bug in app.ts - it should add numbers not subtract',
     files: FILES,
-    assert: async (rig, result) => {
+    assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
 
       // Verify edit tools WERE called
