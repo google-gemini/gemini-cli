@@ -172,7 +172,8 @@ export function SettingsDialog({
         updated = setPendingSettingValue(key, value, updated);
       } else if (
         (def?.type === 'number' && typeof value === 'number') ||
-        (def?.type === 'string' && typeof value === 'string')
+        (def?.type === 'string' && typeof value === 'string') ||
+        (def?.type === 'enum' && typeof value === 'string')
       ) {
         updated = setPendingSettingValueAny(key, value, updated);
       }
