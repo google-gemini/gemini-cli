@@ -39,6 +39,7 @@ and parameters.
 | `--approval-mode`            | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                  |
 | `--yolo`                     | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                              |
 | `--experimental-acp`         | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                            |
+| `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                              |
 | `--allowed-mcp-server-names` | -     | array   | -         | Allowed MCP server names (comma-separated or multiple flags)                                               |
 | `--allowed-tools`            | -     | array   | -         | Tools that are allowed to run without confirmation (comma-separated or multiple flags)                     |
 | `--extensions`               | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags) |
