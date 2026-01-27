@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
+import { getCoreSystemPrompt } from './prompts.js';
+import { resolvePathFromEnv } from '../prompts/utils.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -41,7 +42,7 @@ vi.mock('../agents/codebase-investigator.js', () => ({
   CodebaseInvestigatorAgent: { name: 'codebase_investigator' },
 }));
 vi.mock('../utils/gitUtils', () => ({
-  isGitRepository: vi.fn(),
+  isGitRepository: vi.fn().mockReturnValue(false),
 }));
 vi.mock('node:fs');
 vi.mock('../config/models.js', async (importOriginal) => {
