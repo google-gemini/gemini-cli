@@ -204,21 +204,18 @@
   {
     "label": "Hooks",
     "items": [
+      { "label": "Getting started", "slug": "docs/hooks/getting-started" },
+      { "label": "Hook types", "slug": "docs/hooks/hook-types" },
+      { "label": "API reference", "slug": "docs/hooks/api-reference" }
+    ]
+  },
+  {
+    "label": "Ecosystem and extensibility",
+    "items": [
+      { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
-        "label": "Introduction",
-        "slug": "docs/hooks"
-      },
-      {
-        "label": "Writing hooks",
-        "slug": "docs/hooks/writing-hooks"
-      },
-      {
-        "label": "Hooks reference",
-        "slug": "docs/hooks/reference"
-      },
-      {
-        "label": "Best practices",
-        "slug": "docs/hooks/best-practices"
+        "label": "Sub-agents (experimental)",
+        "slug": "docs/core/subagents"
       }
     ]
   },

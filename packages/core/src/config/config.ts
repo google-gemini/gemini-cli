@@ -634,7 +634,7 @@ export class Config {
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler =
       params.enableEventDrivenScheduler ?? false;
-    this.skillsSupport = params.skillsSupport ?? false;
+    this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();

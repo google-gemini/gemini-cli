@@ -534,6 +534,42 @@ describe('parseArguments', () => {
       'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
     );
   });
+
+  it('should set isCommand to true for mcp command', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for extensions command', async () => {
+    process.argv = ['node', 'script.js', 'extensions', 'list'];
+    // Extensions command uses experimental settings
+    const settings = createTestMergedSettings({
+      experimental: { extensionManagement: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for skills command', async () => {
+    process.argv = ['node', 'script.js', 'skills', 'list'];
+    // Skills command enabled by default or via experimental
+    const settings = createTestMergedSettings({
+      skills: { enabled: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for hooks command', async () => {
+    process.argv = ['node', 'script.js', 'hooks', 'migrate'];
+    // Hooks command enabled via tools settings
+    const settings = createTestMergedSettings({
+      tools: { enableHooks: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {

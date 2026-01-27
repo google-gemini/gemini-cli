@@ -1421,13 +1421,6 @@
           "default": false,
           "type": "boolean"
         },
-        "skills": {
-          "title": "Agent Skills",
-          "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "codebaseInvestigatorSettings": {
           "title": "Codebase Investigator Settings",
           "description": "Configuration for Codebase Investigator.",
