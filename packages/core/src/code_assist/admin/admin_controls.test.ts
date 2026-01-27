@@ -170,6 +170,25 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // Initial + poll
     });
 
+    it('should return empty object on 403 fetch error and STOP polling', async () => {
+      const error403 = new Error('Forbidden');
+      Object.assign(error403, { status: 403 });
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+
+      const result = await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+
+      expect(result).toEqual({});
+
+      // Advance time - should NOT poll because of 403
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1); // Only the initial call
+    });
+
     it('should sanitize server response', async () => {
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
         secureModeEnabled: true,
@@ -301,6 +320,32 @@ describe('Admin Controls', () => {
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         secureModeEnabled: true,
       });
+    });
+
+    it('should STOP polling if server returns 403', async () => {
+      // Initial fetch is successful
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        secureModeEnabled: false,
+      });
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Next poll returns 403
+      const error403 = new Error('Forbidden');
+      Object.assign(error403, { status: 403 });
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+
+      // Advance time again - should NOT poll again
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
     });
   });
 
