@@ -350,18 +350,17 @@ export class LoadedSettings {
     const admin: Settings['admin'] = {};
     const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
-    if (secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = secureModeEnabled;
+    if (Object.keys(remoteSettings).length === 0) {
+      this._remoteAdminSettings = { admin };
+      this._merged = this.computeMergedSettings();
+      return;
     }
 
-    if (mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: mcpSetting.mcpEnabled };
-    }
-
-    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
-    if (extensionsSetting?.extensionsEnabled !== undefined) {
-      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
-    }
+    admin.secureModeEnabled = secureModeEnabled ?? false;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.extensions = {
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+    };
 
     if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
       admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };

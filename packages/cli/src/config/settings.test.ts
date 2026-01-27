@@ -2215,8 +2215,8 @@ describe('Settings Loading and Merging', () => {
       // and missing properties revert to schema defaults.
       loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2276,10 +2276,10 @@ describe('Settings Loading and Merging', () => {
         secureModeEnabled: true,
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
+      // Verify secureModeEnabled is updated, others default to false
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only mcpSetting.mcpEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -2289,7 +2289,7 @@ describe('Settings Loading and Merging', () => {
       // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -2298,7 +2298,7 @@ describe('Settings Loading and Merging', () => {
 
       // Verify extensionsEnabled is updated, others remain defaults
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
@@ -2317,6 +2317,62 @@ describe('Settings Loading and Merging', () => {
         },
       });
       expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
+    });
+
+    it('should default mcp.enabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {},
+      });
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+    });
+
+    it('should default extensions.enabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          extensionsSetting: {},
+        },
+      });
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+    });
+
+    it('should force secureModeEnabled to false if undefined, overriding schema defaults', () => {
+      // Mock schema to have secureModeEnabled default to true to verify the override
+      const originalSchema = getSettingsSchema();
+      const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
+      if (modifiedSchema.admin?.properties?.secureModeEnabled) {
+        modifiedSchema.admin.properties.secureModeEnabled.default = true;
+      }
+      vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
+
+      try {
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+        (fs.readFileSync as Mock).mockImplementation(() => '{}');
+
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // Pass a non-empty object that doesn't have secureModeEnabled
+        loadedSettings.setRemoteAdminSettings({
+          mcpSetting: {},
+        });
+
+        // It should be forced to false by the logic, overriding the mock default of true
+        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      } finally {
+        vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
+      }
+    });
+
+    it('should handle completely empty remote admin settings response', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      loadedSettings.setRemoteAdminSettings({});
+
+      // Should default to schema defaults (standard defaults)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
     });
   });
 
