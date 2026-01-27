@@ -103,7 +103,9 @@ async function copyActivityLogs(rig: TestRig, name: string) {
   // Find all .jsonl files recursively
   const findJsonl = (dir: string): string[] => {
     let results: string[] = [];
-    if (!dir || !fs.existsSync(dir)) return results;
+    if (!dir || !fs.existsSync(dir)) {
+      return results;
+    }
     const list = fs.readdirSync(dir);
     for (const file of list) {
       const fullPath = path.join(dir, file);
