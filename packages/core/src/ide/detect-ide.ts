@@ -77,65 +77,10 @@ export function detectIdeFromEnv(): IdeInfo {
   return IDE_DEFINITIONS.vscode;
 }
 
-function verifyVSCode(
-  ide: IdeInfo,
-  ideProcessInfo: {
-    pid: number;
-    command: string;
-  },
-): IdeInfo {
-  if (ide.name !== IDE_DEFINITIONS.vscode.name) {
-    return ide;
-  }
-  if (
-    !ideProcessInfo.command ||
-    ideProcessInfo.command.toLowerCase().includes('code')
-  ) {
-    return IDE_DEFINITIONS.vscode;
-  }
-  return IDE_DEFINITIONS.vscodefork;
-}
-
-function verifyJetBrains(
-  ide: IdeInfo,
-  ideProcessInfo: {
-    pid: number;
-    command: string;
-  },
-): IdeInfo {
-  if (ide.name !== IDE_DEFINITIONS.jetbrains.name || !ideProcessInfo.command) {
-    return ide;
-  }
-
-  const command = ideProcessInfo.command.toLowerCase();
-  const jetbrainsProducts: Array<[string, IdeInfo]> = [
-    ['idea', IDE_DEFINITIONS.intellijidea],
-    ['webstorm', IDE_DEFINITIONS.webstorm],
-    ['pycharm', IDE_DEFINITIONS.pycharm],
-    ['goland', IDE_DEFINITIONS.goland],
-    ['studio', IDE_DEFINITIONS.androidstudio],
-    ['clion', IDE_DEFINITIONS.clion],
-    ['rustrover', IDE_DEFINITIONS.rustrover],
-    ['datagrip', IDE_DEFINITIONS.datagrip],
-    ['phpstorm', IDE_DEFINITIONS.phpstorm],
-  ];
-
-  for (const [product, ideInfo] of jetbrainsProducts) {
-    if (command.includes(product)) {
-      return ideInfo;
-    }
-  }
-
-  return ide;
-}
-
-export function detectIde(
-  ideProcessInfo: {
-    pid: number;
-    command: string;
-  },
-  ideInfoFromFile?: { name?: string; displayName?: string },
-): IdeInfo | undefined {
+export function detectIde(ideInfoFromFile?: {
+  name?: string;
+  displayName?: string;
+}): IdeInfo | undefined {
   if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
     return {
       name: ideInfoFromFile.name,
@@ -152,8 +97,5 @@ export function detectIde(
     return undefined;
   }
 
-  const ide = detectIdeFromEnv();
-  return isJetBrains()
-    ? verifyJetBrains(ide, ideProcessInfo)
-    : verifyVSCode(ide, ideProcessInfo);
+  return detectIdeFromEnv();
 }

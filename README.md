@@ -389,5 +389,5 @@ See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
 ---
 
 <p align="center">
-  Built with ❤️ by Google and the open source community
+  Built with ❤️ by Google, shreya, and the open source community
 </p>

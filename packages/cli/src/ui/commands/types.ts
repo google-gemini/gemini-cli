@@ -83,7 +83,9 @@ export interface CommandContext {
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+
     removeComponent: () => void;
+    promptIdeConnection: () => Promise<void>;
   };
   // Session-specific data
   session: {

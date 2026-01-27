@@ -15,7 +15,6 @@ import {
 } from 'vitest';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
 import * as fs from 'node:fs';
-import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -43,7 +42,6 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
-vi.mock('./process-utils.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js');
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
@@ -81,10 +79,6 @@ describe('IdeClient', () => {
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
     vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
-    vi.mocked(getIdeProcessInfo).mockResolvedValue({
-      pid: 12345,
-      command: 'test-ide',
-    });
 
     // Mock MCP client and transports
     mockClient = {
@@ -118,10 +112,10 @@ describe('IdeClient', () => {
 
   describe('connect', () => {
     it('should connect using HTTP when port is provided in config file', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -139,10 +133,13 @@ describe('IdeClient', () => {
     });
 
     it('should connect using stdio when stdio config is provided in file', async () => {
-      const config = { stdio: { command: 'test-cmd', args: ['--foo'] } };
+      const config = {
+        stdio: { command: 'test-cmd', args: ['--foo'] },
+        workspacePath: '/test/workspace',
+      };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -163,10 +160,11 @@ describe('IdeClient', () => {
       const config = {
         port: '8080',
         stdio: { command: 'test-cmd', args: ['--foo'] },
+        workspacePath: '/test/workspace',
       };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -214,10 +212,10 @@ describe('IdeClient', () => {
     });
 
     it('should prioritize file config over environment variables', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -255,7 +253,7 @@ describe('IdeClient', () => {
       const config = { port: '1234', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -509,10 +507,10 @@ describe('IdeClient', () => {
     });
 
     it('should return false if tool discovery fails', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -528,10 +526,10 @@ describe('IdeClient', () => {
     });
 
     it('should return false if diffing tools are not available', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -549,10 +547,10 @@ describe('IdeClient', () => {
     });
 
     it('should return false if only openDiff tool is available', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -570,10 +568,10 @@ describe('IdeClient', () => {
     });
 
     it('should return true if connected and diffing tools are available', async () => {
-      const config = { port: '8080' };
+      const config = { port: '8080', workspacePath: '/test/workspace' };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 
@@ -842,10 +840,14 @@ describe('IdeClient', () => {
   describe('authentication', () => {
     it('should connect with an auth token if provided in the discovery file', async () => {
       const authToken = 'test-auth-token';
-      const config = { port: '8080', authToken };
+      const config = {
+        port: '8080',
+        authToken,
+        workspacePath: '/test/workspace',
+      };
       const configPath = path.join(
         ideConfigDir,
-        'gemini-ide-server-12345.json',
+        'gemini-ide-server-12345-123.json',
       );
       await fs.promises.writeFile(configPath, JSON.stringify(config), 'utf8');
 

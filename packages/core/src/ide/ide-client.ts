@@ -14,7 +14,6 @@ import {
   IdeDiffClosedNotificationSchema,
   IdeDiffRejectedNotificationSchema,
 } from './types.js';
-import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -59,7 +58,7 @@ type StdioConfig = {
   args: string[];
 };
 
-type ConnectionConfig = {
+export type ConnectionConfig = {
   port?: string;
   authToken?: string;
   stdio?: StdioConfig;
@@ -77,7 +76,6 @@ export class IdeClient {
       'IDE integration is currently disabled. To enable it, run /ide enable.',
   };
   private currentIde: IdeInfo | undefined;
-  private ideProcessInfo: { pid: number; command: string } | undefined;
   private connectionConfig:
     | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
     | undefined;
@@ -99,12 +97,8 @@ export class IdeClient {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
-        client.ideProcessInfo = await getIdeProcessInfo();
         client.connectionConfig = await client.getConnectionConfigFromFile();
-        client.currentIde = detectIde(
-          client.ideProcessInfo,
-          client.connectionConfig?.ideInfo,
-        );
+        client.currentIde = detectIde(client.connectionConfig?.ideInfo);
         return client;
       })();
     }
@@ -127,7 +121,15 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
-  async connect(options: { logToConsole?: boolean } = {}): Promise<void> {
+  async connect(
+    options: {
+      logToConsole?: boolean;
+      connectionConfig?: ConnectionConfig & {
+        workspacePath?: string;
+        ideInfo?: IdeInfo;
+      };
+    } = {},
+  ): Promise<void> {
     const logError = options.logToConsole ?? true;
     if (!this.currentIde) {
       this.setState(
@@ -140,7 +142,12 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    this.connectionConfig = await this.getConnectionConfigFromFile();
+    if (options.connectionConfig) {
+      this.connectionConfig = options.connectionConfig;
+    } else {
+      this.connectionConfig = await this.getConnectionConfigFromFile();
+    }
+
     this.authToken =
       this.connectionConfig?.authToken ??
       process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
@@ -565,104 +572,81 @@ export class IdeClient {
     return { command, args };
   }
 
-  private async getConnectionConfigFromFile(): Promise<
-    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
-    | undefined
+  async discoverAvailableConnections(): Promise<
+    Array<ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo }>
   > {
-    if (!this.ideProcessInfo) {
-      return undefined;
-    }
-
-    // For backwards compatibility
-    try {
-      const portFile = path.join(
-        os.tmpdir(),
-        'gemini',
-        'ide',
-        `gemini-ide-server-${this.ideProcessInfo.pid}.json`,
-      );
-      const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      return JSON.parse(portFileContents);
-    } catch (_) {
-      // For newer extension versions, the file name matches the pattern
-      // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
-      // windows are open, multiple files matching the pattern are expected to
-      // exist.
-    }
-
     const portFileDir = path.join(os.tmpdir(), 'gemini', 'ide');
     let portFiles;
     try {
       portFiles = await fs.promises.readdir(portFileDir);
     } catch (e) {
       logger.debug('Failed to read IDE connection directory:', e);
-      return undefined;
+      return [];
     }
 
     if (!portFiles) {
-      return undefined;
+      return [];
     }
 
-    const fileRegex = new RegExp(
-      `^gemini-ide-server-${this.ideProcessInfo.pid}-\\d+\\.json$`,
-    );
-    const matchingFiles = portFiles
-      .filter((file) => fileRegex.test(file))
-      .sort();
-    if (matchingFiles.length === 0) {
-      return undefined;
-    }
+    const fileRegex = /^gemini-ide-server-(\d+)-(\d+)\.json$/;
+    const allFiles = portFiles.filter((file) => fileRegex.test(file)).sort();
 
     let fileContents: string[];
     try {
       fileContents = await Promise.all(
-        matchingFiles.map((file) =>
+        allFiles.map((file) =>
           fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
         ),
       );
     } catch (e) {
       logger.debug('Failed to read IDE connection config file(s):', e);
-      return undefined;
+      return [];
     }
-    const parsedContents = fileContents.map((content) => {
-      try {
-        return JSON.parse(content);
-      } catch (e) {
-        logger.debug('Failed to parse JSON from config file: ', e);
-        return undefined;
+
+    const configs = fileContents
+      .map((content) => {
+        try {
+          return JSON.parse(content);
+        } catch (e) {
+          logger.debug('Failed to parse JSON from config file: ', e);
+          return undefined;
+        }
+      })
+      .filter((config) => {
+        if (!config) {
+          return false;
+        }
+        // Basic validation
+        const { isValid } = IdeClient.validateWorkspacePath(
+          config.workspacePath,
+          process.cwd(),
+        );
+        return isValid;
+      });
+
+    return configs;
+  }
+
+  private async getConnectionConfigFromFile(): Promise<
+    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
+    | undefined
+  > {
+    const available = await this.discoverAvailableConnections();
+    const portEnv = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+    if (available.length > 1 && portEnv) {
+      const match = available.find((c) => c.port?.toString() === portEnv);
+      if (match) {
+        return match;
       }
-    });
-
-    const validWorkspaces = parsedContents.filter((content) => {
-      if (!content) {
-        return false;
-      }
-      const { isValid } = IdeClient.validateWorkspacePath(
-        content.workspacePath,
-        process.cwd(),
-      );
-      return isValid;
-    });
-
-    if (validWorkspaces.length === 0) {
-      return undefined;
     }
 
-    if (validWorkspaces.length === 1) {
-      return validWorkspaces[0];
+    if (available.length > 0) {
+      // Return the first available connection if specific port match isn't found
+      // This maintains backward compatibility with tests expecting a return value.
+      return available[0];
     }
 
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const matchingPort = validWorkspaces.find(
-        (content) => String(content.port) === portFromEnv,
-      );
-      if (matchingPort) {
-        return matchingPort;
-      }
-    }
-
-    return validWorkspaces[0];
+    return undefined;
   }
 
   private async createProxyAwareFetch(ideServerHost: string) {

@@ -65,7 +65,12 @@ import {
   generateSummary,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  IdeConnectionEvent,
+  IdeConnectionType,
+  logIdeConnection,
+  type ConnectionConfig,
 } from '@google/gemini-cli-core';
+import { IdeConnectionSelector } from './components/IdeConnectionSelector.js';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -750,7 +755,40 @@ Logging in with Google... Restarting Gemini CLI to continue.
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
       setText: (text: string) => buffer.setText(text),
+      promptIdeConnection: async () => {
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.disconnect();
+        const connections = await ideClient.discoverAvailableConnections();
+
+        if (connections.length > 1) {
+          setAvailableIdeConnections(connections);
+        } else if (connections.length === 1) {
+          await ideClient.connect();
+          logIdeConnection(
+            config,
+            new IdeConnectionEvent(IdeConnectionType.START),
+          );
+          // Show success message
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Connected to IDE: ${connections[0].ideInfo?.displayName || 'Unknown IDE'}`,
+            },
+            Date.now(),
+          );
+        } else {
+          // Show error message
+          historyManager.addItem(
+            {
+              type: MessageType.ERROR,
+              text: 'No IDE connections found.',
+            },
+            Date.now(),
+          );
+        }
+      },
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       setAuthState,
       openThemeDialog,
@@ -1964,6 +2002,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager,
     ],
   );
+
+  // ... (existing imports)
+
+  // Inside AppContainer function:
+
+  // ... (existing state)
+  const [availableIdeConnections, setAvailableIdeConnections] = useState<
+    | Array<ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo }>
+    | undefined
+  >(initializationResult.availableIdeConnections);
+
+  // ... (existing effects/hooks)
+
+  if (availableIdeConnections && availableIdeConnections.length > 0) {
+    return (
+      <IdeConnectionSelector
+        connections={availableIdeConnections}
+        onSelect={async (
+          conn: ConnectionConfig & {
+            workspacePath?: string;
+            ideInfo?: IdeInfo;
+          },
+        ) => {
+          const ideClient = await IdeClient.getInstance();
+          await ideClient.connect({ connectionConfig: conn });
+          logIdeConnection(
+            config,
+            new IdeConnectionEvent(IdeConnectionType.START),
+          );
+          setAvailableIdeConnections(undefined);
+        }}
+        onCancel={() => {
+          setAvailableIdeConnections(undefined);
+        }}
+      />
+    );
+  }
 
   if (authState === AuthState.AwaitingGoogleLoginRestart) {
     return (

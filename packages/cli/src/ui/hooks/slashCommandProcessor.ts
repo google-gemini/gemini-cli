@@ -83,6 +83,7 @@ interface SlashCommandProcessorActions {
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   setText: (text: string) => void;
+  promptIdeConnection: () => Promise<void>;
 }
 
 /**
@@ -237,6 +238,7 @@ export const useSlashCommandProcessor = (
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
+        promptIdeConnection: actions.promptIdeConnection,
       },
       session: {
         stats: session.stats,

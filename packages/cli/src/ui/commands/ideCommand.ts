@@ -136,20 +136,6 @@ async function setIdeModeAndSyncConnection(
 export const ideCommand = async (): Promise<SlashCommand> => {
   const ideClient = await IdeClient.getInstance();
   const currentIDE = ideClient.getCurrentIde();
-  if (!currentIDE) {
-    return {
-      name: 'ide',
-      description: 'Manage IDE integration',
-      kind: CommandKind.BUILT_IN,
-      autoExecute: false,
-      action: (): SlashCommandActionReturn =>
-        ({
-          type: 'message',
-          messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
-        }) as const,
-    };
-  }
 
   const ideSlashCommand: SlashCommand = {
     name: 'ide',
@@ -181,6 +167,16 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
     action: async (context) => {
+      if (!currentIDE) {
+        context.ui.addItem(
+          {
+            type: 'error',
+            text: 'No IDE detected. Cannot run installer.',
+          },
+          Date.now(),
+        );
+        return;
+      }
       const installer = getIdeInstaller(currentIDE);
       if (!installer) {
         context.ui.addItem(
@@ -297,15 +293,30 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     },
   };
 
+  const switchCommand: SlashCommand = {
+    name: 'switch',
+    description: 'Switch to a different IDE connection',
+    kind: CommandKind.BUILT_IN,
+    autoExecute: true,
+    action: async (context: CommandContext) => {
+      await context.ui.promptIdeConnection();
+    },
+  };
+
   const { status } = ideClient.getConnectionStatus();
   const isConnected = status === IDEConnectionStatus.Connected;
 
   if (isConnected) {
-    ideSlashCommand.subCommands = [statusCommand, disableCommand];
+    ideSlashCommand.subCommands = [
+      statusCommand,
+      switchCommand,
+      disableCommand,
+    ];
   } else {
     ideSlashCommand.subCommands = [
       enableCommand,
       statusCommand,
+      switchCommand,
       installCommand,
     ];
   }
