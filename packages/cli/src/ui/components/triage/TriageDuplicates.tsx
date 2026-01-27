@@ -16,6 +16,8 @@ interface Issue {
   number: number;
   title: string;
   body: string;
+  state: string;
+  stateReason: string;
   url: string;
   author: { login: string };
   labels: Array<{ name: string }>;
@@ -88,6 +90,13 @@ const getReactionCount = (issue: Issue | Candidate | undefined) => {
   );
 };
 
+const getStateColor = (state: string, stateReason?: string) => {
+  if (stateReason?.toLowerCase() === 'duplicate') {
+    return 'magenta';
+  }
+  return state === 'OPEN' ? 'green' : 'red';
+};
+
 export const TriageDuplicates = ({
   config,
   onExit,
@@ -146,7 +155,7 @@ export const TriageDuplicates = ({
         'view',
         String(number),
         '--json',
-        'number,title,body,labels,url,comments,author,reactionGroups',
+        'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
@@ -283,6 +292,8 @@ Return a JSON object with:
             number: rec.canonical_issue_number,
             title: 'Unknown',
             url: '',
+            state: 'UNKNOWN',
+            stateReason: '',
             author: { login: 'unknown' },
             labels: [],
             comments: [],
@@ -433,7 +444,7 @@ Return a JSON object with:
         '--state',
         'open',
         '--json',
-        'number,title,body,labels,url,comments,author,reactionGroups',
+        'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
         '--limit',
         String(limit),
       ]);
@@ -916,6 +927,14 @@ Return a JSON object with:
             ) : (
               visibleCandidates.map((c: Candidate, i: number) => {
                 const absoluteIndex = candidateListScrollOffset + i;
+                const isDuplicateOfCurrent =
+                  currentIssue &&
+                  c.comments.some((comment) =>
+                    comment.body
+                      .toLowerCase()
+                      .includes(`duplicate of #${currentIssue.number}`),
+                  );
+
                 return (
                   <Box key={c.number} flexDirection="column" marginLeft={1}>
                     <Text
@@ -932,8 +951,16 @@ Return a JSON object with:
                       }
                       wrap="truncate-end"
                     >
-                      {absoluteIndex + 1}. <Text bold>#{c.number}</Text> -{' '}
-                      {c.title} (Score: {c.score}/100)
+                      {absoluteIndex + 1}. <Text bold>#{c.number}</Text>{' '}
+                      <Text color={getStateColor(c.state, c.stateReason)}>
+                        [{(c.stateReason || c.state).toUpperCase()}]
+                      </Text>{' '}
+                      {isDuplicateOfCurrent && (
+                        <Text color="red" bold>
+                          [DUPLICATE OF CURRENT]{' '}
+                        </Text>
+                      )}
+                      - {c.title} (Score: {c.score}/100)
                     </Text>
                     <Box marginLeft={2}>
                       <Text color="gray" wrap="truncate-end">
