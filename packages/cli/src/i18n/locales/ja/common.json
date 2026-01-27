@@ -1,0 +1,18 @@
+{
+  "buttons": {
+    "ok": "OK",
+    "cancel": "キャンセル",
+    "yes": "はい",
+    "no": "いいえ",
+    "back": "戻る",
+    "next": "次へ",
+    "save": "保存",
+    "apply": "適用",
+    "close": "閉じる"
+  },
+  "loading": "読み込み中...",
+  "error": "エラー",
+  "success": "成功",
+  "warning": "警告",
+  "info": "情報"
+}

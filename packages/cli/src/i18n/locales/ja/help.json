@@ -1,0 +1,34 @@
+{
+  "sections": {
+    "basics": "基本操作:",
+    "commands": "コマンド:",
+    "shortcuts": "キーボードショートカット:"
+  },
+  "basics": {
+    "addContext": "{label}: {symbol}を使用してコンテキスト用のファイルを指定できます（例: {example}）。特定のファイルやフォルダを対象にできます。",
+    "shellMode": "{label}: {symbol}でシェルコマンドを実行できます（例: {example}）。自然言語でも実行可能です（例: {natural}）。"
+  },
+  "labels": {
+    "addContext": "コンテキスト追加",
+    "shellMode": "シェルモード"
+  },
+  "shortcuts": {
+    "altLeftRight": "入力内の単語間を移動",
+    "ctrlC": "アプリケーションを終了",
+    "ctrlJ": "改行",
+    "ctrlJLinux": "改行（一部のLinuxディストリビューションではAlt+Enterも使用可能）",
+    "ctrlEnter": "改行",
+    "ctrlL": "画面をクリア",
+    "ctrlS": "テキストをコピーするための選択モードに入る",
+    "ctrlX": "外部エディタで入力を開く",
+    "ctrlY": "YOLOモードを切り替え",
+    "enter": "メッセージを送信",
+    "esc": "操作をキャンセル / 入力をクリア（ダブルプレス）",
+    "pageUpDown": "ページを上下にスクロール",
+    "shiftTab": "編集の自動承認を切り替え",
+    "upDown": "プロンプト履歴を順に表示"
+  },
+  "shellCommand": "シェルコマンド",
+  "mcpCommand": "Model Context Protocolコマンド（外部サーバーから）",
+  "shortcutsDocs": "ショートカットの完全なリストは{docsPath}をご覧ください"
+}

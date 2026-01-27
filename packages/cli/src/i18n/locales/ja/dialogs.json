@@ -1,0 +1,27 @@
+{
+  "auth": {
+    "title": "はじめに",
+    "description": "このプロジェクトでどの認証方法を使用しますか？",
+    "instructions": "(Enterで選択)",
+    "terms": "Gemini CLIの利用規約とプライバシーに関するお知らせ",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "restarting": "Googleでログイン中... Gemini CLIを再起動して続行します。",
+    "options": {
+      "google": "Googleでログイン",
+      "cloudShell": "Cloud Shellのユーザー認証情報を使用",
+      "computeAdc": "メタデータサーバーのアプリケーションデフォルト認証情報を使用",
+      "geminiKey": "Gemini APIキーを使用",
+      "vertexAI": "Vertex AI"
+    },
+    "errors": {
+      "authRequired": "続行するには認証方法を選択してください。Ctrl+Cを2回押すと終了します。"
+    }
+  },
+  "settings": {
+    "title": "設定",
+    "applyTo": "適用先",
+    "instructions": "(Enterで選択)",
+    "instructionsWithScope": "(Enterで選択、Tabでフォーカス切替)",
+    "restartPrompt": "変更を反映するにはGemini CLIを再起動する必要があります。rを押すと終了して変更を適用します。"
+  }
+}
