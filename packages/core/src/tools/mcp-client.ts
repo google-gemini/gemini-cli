@@ -615,7 +615,31 @@ async function handleAutomaticOAuth(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
     const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
-    await authProvider.authenticate(mcpServerName, oauthAuthConfig, serverUrl);
+
+    // Check if client credentials flow is configured
+    const serverOAuthConfig = mcpServerConfig.oauth || {};
+    if (serverOAuthConfig.grantType === 'client_credentials') {
+      debugLogger.log(
+        `Using OAuth Client Credentials flow for server '${mcpServerName}'`,
+      );
+      await authProvider.authenticateClientCredentials(
+        mcpServerName,
+        {
+          ...oauthAuthConfig,
+          grantType: 'client_credentials',
+          clientId: serverOAuthConfig.clientId,
+          clientSecret: serverOAuthConfig.clientSecret,
+        },
+        serverUrl,
+      );
+    } else {
+      // Default to authorization code flow
+      await authProvider.authenticate(
+        mcpServerName,
+        oauthAuthConfig,
+        serverUrl,
+      );
+    }
 
     debugLogger.log(
       `OAuth authentication successful for server '${mcpServerName}'`,
@@ -1620,11 +1644,31 @@ export async function connectToMcpServer(
             const authProvider = new MCPOAuthProvider(
               new MCPOAuthTokenStorage(),
             );
-            await authProvider.authenticate(
-              mcpServerName,
-              oauthAuthConfig,
-              authServerUrl,
-            );
+
+            // Check if client credentials flow is configured
+            const serverOAuthConfig = mcpServerConfig.oauth || {};
+            if (serverOAuthConfig.grantType === 'client_credentials') {
+              debugLogger.log(
+                `Using OAuth Client Credentials flow for server '${mcpServerName}'`,
+              );
+              await authProvider.authenticateClientCredentials(
+                mcpServerName,
+                {
+                  ...oauthAuthConfig,
+                  grantType: 'client_credentials',
+                  clientId: serverOAuthConfig.clientId,
+                  clientSecret: serverOAuthConfig.clientSecret,
+                },
+                authServerUrl,
+              );
+            } else {
+              // Default to authorization code flow
+              await authProvider.authenticate(
+                mcpServerName,
+                oauthAuthConfig,
+                authServerUrl,
+              );
+            }
 
             // Retry connection with OAuth token
             const accessToken = await getStoredOAuthToken(mcpServerName);

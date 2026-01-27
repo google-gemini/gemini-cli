@@ -254,17 +254,27 @@ Use the `/mcp auth` command to manage OAuth authentication:
 #### OAuth configuration properties
 
 - **`enabled`** (boolean): Enable OAuth for this server
+- **`grantType`** (string): OAuth grant type - `'authorization_code'` (default,
+  interactive browser flow) or `'client_credentials'` (service-to-service,
+  non-interactive)
 - **`clientId`** (string): OAuth client identifier (optional with dynamic
   registration)
-- **`clientSecret`** (string): OAuth client secret (optional for public clients)
+- **`clientSecret`** (string): OAuth client secret (optional for public clients,
+  required for client credentials flow)
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered
-  if omitted)
+  if omitted, not used for client credentials flow)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to
-  `http://localhost:7777/oauth/callback`)
+  `http://localhost:7777/oauth/callback`, not used for client credentials flow)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
+- **`mtls`** (object): Mutual TLS configuration for certificate-based
+  authentication
+  - **`enabled`** (boolean): Enable mTLS for this server
+  - **`certPath`** (string): Absolute path to PEM-encoded client certificate
+  - **`keyPath`** (string): Absolute path to PEM-encoded private key
+  - **`passphrase`** (string): Passphrase for encrypted private keys (optional)
 
 #### Token management
 
@@ -344,6 +354,157 @@ then be used to authenticate with the MCP server.
    (i.e., `roles/iam.serviceAccountTokenCreator`).
 6. **[Enable](https://console.cloud.google.com/apis/library/iamcredentials.googleapis.com)
    the IAM Credentials API** for your project.
+
+### Service-to-Service Authentication
+
+For automated environments such as CI/CD pipelines, server-to-server
+communication, or containerized deployments where browser-based authentication
+is not possible, the Gemini CLI supports two additional authentication methods:
+
+#### OAuth 2.0 Client Credentials Flow
+
+The Client Credentials grant type enables non-interactive, machine-to-machine
+authentication using a service account's client ID and secret.
+
+**Configuration:**
+
+Add `grantType: "client_credentials"` to your OAuth configuration:
+
+```json
+{
+  "mcpServers": {
+    "automated-server": {
+      "url": "https://api.example.com/sse",
+      "oauth": {
+        "grantType": "client_credentials",
+        "clientId": "service-account-client-id",
+        "clientSecret": "${MCP_CLIENT_SECRET}",
+        "tokenUrl": "https://auth.example.com/oauth/token",
+        "scopes": ["mcp:read", "mcp:write"],
+        "audiences": ["https://api.example.com"]
+      }
+    }
+  }
+}
+```
+
+**Key features:**
+
+- **No browser required:** Tokens are obtained directly via API call
+- **Automatic token refresh:** Tokens are cached and refreshed when expired
+- **Environment variable support:** Use `${VAR_NAME}` for sensitive credentials
+- **Standard OAuth 2.0:** Works with any compliant OAuth provider (Auth0,
+  Keycloak, Okta, etc.)
+
+**Use cases:**
+
+- CI/CD pipeline automation
+- Containerized applications without display servers
+- Server-side batch processing
+- Headless environments
+
+**Security best practices:**
+
+- Store client secrets in environment variables, not in `settings.json`
+- Use least-privilege scopes
+- Rotate secrets regularly
+- Monitor token usage
+
+#### Mutual TLS (mTLS) Authentication
+
+mTLS provides certificate-based authentication at the transport layer, enabling
+zero-trust architectures and eliminating the need for bearer tokens.
+
+**Configuration:**
+
+```json
+{
+  "mcpServers": {
+    "secure-server": {
+      "url": "https://secure-api.company.internal/sse",
+      "oauth": {
+        "enabled": true,
+        "mtls": {
+          "enabled": true,
+          "certPath": "/etc/gemini/certs/client-cert.pem",
+          "keyPath": "/etc/gemini/certs/client-key.pem",
+          "passphrase": "${CERT_PASSPHRASE}"
+        }
+      }
+    }
+  }
+}
+```
+
+**Certificate requirements:**
+
+- **Format:** PEM-encoded X.509 certificates
+- **Private key formats supported:** PKCS#1 (RSA), PKCS#8, EC, or encrypted
+  PKCS#8
+- **Permissions:** Private key file should be readable only by the CLI user
+  (`chmod 600`)
+- **Paths:** Absolute paths recommended for security
+
+**Generate test certificates:**
+
+```bash
+# Generate self-signed certificate for testing
+openssl req -x509 -newkey rsa:4096 \
+  -keyout client-key.pem \
+  -out client-cert.pem \
+  -days 365 \
+  -subj "/CN=gemini-cli-client"
+
+# Secure the private key
+chmod 600 client-key.pem
+```
+
+**Production setup:**
+
+1. Obtain client certificates from your organization's Certificate Authority
+   (CA)
+2. Configure the MCP server to validate client certificates against your CA
+3. Enable certificate revocation checking (CRL/OCSP) on the server side
+4. Implement certificate rotation strategy
+
+**Use cases:**
+
+- Enterprise internal APIs requiring mutual authentication
+- Zero-trust network architectures
+- Compliance requirements (PCI-DSS, HIPAA)
+- Service mesh integration (Istio, Linkerd)
+
+**Combining OAuth and mTLS:**
+
+You can use both OAuth and mTLS simultaneously for defense-in-depth:
+
+```json
+{
+  "mcpServers": {
+    "high-security-server": {
+      "url": "https://secure.internal/sse",
+      "oauth": {
+        "grantType": "client_credentials",
+        "clientId": "service-account-id",
+        "clientSecret": "${CLIENT_SECRET}",
+        "tokenUrl": "https://auth.internal/token",
+        "mtls": {
+          "enabled": true,
+          "certPath": "/etc/certs/client.pem",
+          "keyPath": "/etc/certs/key.pem"
+        }
+      }
+    }
+  }
+}
+```
+
+This configuration:
+
+1. Establishes mTLS connection for transport-layer authentication
+2. Obtains OAuth token via client credentials for application-layer
+   authorization
+3. Includes OAuth bearer token in requests over the mTLS connection
 
 ### Example configurations
 

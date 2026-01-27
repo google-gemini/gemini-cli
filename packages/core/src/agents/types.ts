@@ -108,6 +108,32 @@ export interface RemoteAgentDefinition<
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
+
+  /**
+   * Authentication configuration for service-to-service communication.
+   * If not specified, defaults to Application Default Credentials (ADC).
+   */
+  authentication?: {
+    /**
+     * Authentication type:
+     * - 'adc': Google Application Default Credentials (default)
+     * - 'oauth_client_credentials': OAuth 2.0 Client Credentials flow
+     * - 'mtls': Mutual TLS certificate-based authentication
+     */
+    type?: 'adc' | 'oauth_client_credentials' | 'mtls';
+
+    // OAuth Client Credentials configuration
+    clientId?: string;
+    clientSecret?: string;
+    tokenUrl?: string;
+    scopes?: string[];
+    audience?: string;
+
+    // mTLS configuration
+    certPath?: string;
+    keyPath?: string;
+    passphrase?: string;
+  };
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =

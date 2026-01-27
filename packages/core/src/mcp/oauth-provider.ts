@@ -32,6 +32,21 @@ export interface MCPOAuthConfig {
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
   registrationUrl?: string;
+  /**
+   * OAuth 2.0 grant type.
+   * - 'authorization_code': Interactive flow with browser (default)
+   * - 'client_credentials': Service-to-service flow without user interaction
+   */
+  grantType?: 'authorization_code' | 'client_credentials';
+  /**
+   * Mutual TLS (mTLS) configuration for certificate-based authentication.
+   */
+  mtls?: {
+    enabled?: boolean;
+    certPath?: string;
+    keyPath?: string;
+    passphrase?: string;
+  };
 }
 
 /**
@@ -964,6 +979,189 @@ ${authUrl}
       const savedToken = await this.tokenStorage.getCredentials(serverName);
       if (savedToken && savedToken.token && savedToken.token.accessToken) {
         // Avoid leaking token material; log a short SHA-256 fingerprint instead.
+        const tokenFingerprint = crypto
+          .createHash('sha256')
+          .update(savedToken.token.accessToken)
+          .digest('hex')
+          .slice(0, 8);
+        debugLogger.debug(
+          `✓ Token verification successful (fingerprint: ${tokenFingerprint})`,
+        );
+      } else {
+        debugLogger.warn(
+          'Token verification failed: token not found or invalid after save',
+        );
+      }
+    } catch (saveError) {
+      debugLogger.error('Failed to save auth token.', saveError);
+      throw saveError;
+    }
+
+    return token;
+  }
+
+  /**
+   * Perform OAuth 2.0 Client Credentials flow for service-to-service authentication.
+   * This flow does not require user interaction or browser redirect.
+   *
+   * @param serverName The name of the MCP server
+   * @param config OAuth configuration with client credentials
+   * @param mcpServerUrl Optional MCP server URL for the resource parameter
+   * @returns The obtained OAuth token
+   */
+  async authenticateClientCredentials(
+    serverName: string,
+    config: MCPOAuthConfig,
+    mcpServerUrl?: string,
+  ): Promise<OAuthToken> {
+    debugLogger.debug(
+      `Starting OAuth Client Credentials flow for server: ${serverName}`,
+    );
+
+    // Validate required configuration
+    if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
+      throw new Error(
+        `Client Credentials flow requires clientId, clientSecret, and tokenUrl for server: ${serverName}`,
+      );
+    }
+
+    // Build request parameters
+    const params = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+    });
+
+    if (config.scopes && config.scopes.length > 0) {
+      params.append('scope', config.scopes.join(' '));
+    }
+
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
+    }
+
+    // Add resource parameter for MCP OAuth spec compliance
+    if (mcpServerUrl) {
+      try {
+        params.append(
+          'resource',
+          OAuthUtils.buildResourceParameter(mcpServerUrl),
+        );
+      } catch (error) {
+        debugLogger.warn(
+          `Could not add resource parameter: ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
+    debugLogger.debug(`Requesting token from: ${config.tokenUrl}`);
+
+    // Make direct token request
+    const response = await fetch(config.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json, application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const responseText = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      // Try to parse error from form-urlencoded response
+      let errorMessage: string | null = null;
+      try {
+        const errorParams = new URLSearchParams(responseText);
+        const error = errorParams.get('error');
+        const errorDescription = errorParams.get('error_description');
+        if (error) {
+          errorMessage = `Client Credentials authentication failed: ${error} - ${errorDescription || 'No description'}`;
+        }
+      } catch {
+        // Fall back to raw error
+      }
+      throw new Error(
+        errorMessage ||
+          `Client Credentials authentication failed: ${response.status} - ${responseText}`,
+      );
+    }
+
+    // Log unexpected content types for debugging
+    if (
+      !contentType.includes('application/json') &&
+      !contentType.includes('application/x-www-form-urlencoded')
+    ) {
+      debugLogger.warn(
+        `Token endpoint returned unexpected content-type: ${contentType}. ` +
+          `Expected application/json or application/x-www-form-urlencoded. ` +
+          `Will attempt to parse response.`,
+      );
+    }
+
+    // Parse token response
+    let tokenResponse: OAuthTokenResponse;
+    try {
+      tokenResponse = JSON.parse(responseText) as OAuthTokenResponse;
+    } catch {
+      // Parse form-urlencoded response
+      const tokenParams = new URLSearchParams(responseText);
+      const accessToken = tokenParams.get('access_token');
+      const tokenType = tokenParams.get('token_type') || 'Bearer';
+      const expiresIn = tokenParams.get('expires_in');
+      const refreshToken = tokenParams.get('refresh_token');
+      const scope = tokenParams.get('scope');
+
+      if (!accessToken) {
+        const error = tokenParams.get('error');
+        const errorDescription = tokenParams.get('error_description');
+        throw new Error(
+          `Client Credentials authentication failed: ${error || 'no_access_token'} - ${errorDescription || responseText}`,
+        );
+      }
+
+      tokenResponse = {
+        access_token: accessToken,
+        token_type: tokenType,
+        expires_in: expiresIn ? parseInt(expiresIn, 10) : undefined,
+        refresh_token: refreshToken || undefined,
+        scope: scope || undefined,
+      };
+    }
+
+    // Convert to our token format
+    if (!tokenResponse.access_token) {
+      throw new Error('No access token received from token endpoint');
+    }
+
+    const token: OAuthToken = {
+      accessToken: tokenResponse.access_token,
+      tokenType: tokenResponse.token_type || 'Bearer',
+      refreshToken: tokenResponse.refresh_token,
+      scope: tokenResponse.scope,
+    };
+
+    if (tokenResponse.expires_in) {
+      token.expiresAt = Date.now() + tokenResponse.expires_in * 1000;
+    }
+
+    // Save token
+    try {
+      await this.tokenStorage.saveToken(
+        serverName,
+        token,
+        config.clientId,
+        config.tokenUrl,
+        mcpServerUrl,
+      );
+      debugLogger.debug(
+        '✓ Client Credentials authentication successful! Token saved.',
+      );
+
+      // Verify token was saved
+      const savedToken = await this.tokenStorage.getCredentials(serverName);
+      if (savedToken && savedToken.token && savedToken.token.accessToken) {
         const tokenFingerprint = crypto
           .createHash('sha256')
           .update(savedToken.token.accessToken)

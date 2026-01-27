@@ -1205,6 +1205,246 @@ describe('MCPOAuthProvider', () => {
     });
   });
 
+  describe('authenticateClientCredentials', () => {
+    it('should successfully authenticate with client credentials', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['api:read', 'api:write'],
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticateClientCredentials(
+        'test-server',
+        clientCredsConfig,
+      );
+
+      expect(result).toEqual({
+        accessToken: 'access_token_123',
+        refreshToken: 'refresh_token_456',
+        tokenType: 'Bearer',
+        scope: 'read write',
+        expiresAt: expect.any(Number),
+      });
+
+      // Verify the token request was made correctly
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://auth.example.com/token',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Content-Type': 'application/x-www-form-urlencoded',
+          }),
+          body: expect.stringContaining('grant_type=client_credentials'),
+        }),
+      );
+
+      // Verify token was saved
+      const tokenStorage = new MCPOAuthTokenStorage();
+      expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+        'test-server',
+        expect.objectContaining({ accessToken: 'access_token_123' }),
+        'service-account-id',
+        'https://auth.example.com/token',
+        undefined,
+      );
+    });
+
+    it('should include scopes and audience in client credentials request', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+        scopes: ['api:read', 'api:write'],
+        audiences: ['https://api.example.com'],
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticateClientCredentials(
+        'test-server',
+        clientCredsConfig,
+        'https://api.example.com',
+      );
+
+      const requestBody = (mockFetch.mock.calls[0][1] as RequestInit)
+        ?.body as string;
+      expect(requestBody).toContain('grant_type=client_credentials');
+      expect(requestBody).toContain('client_id=service-account-id');
+      expect(requestBody).toContain('client_secret=service-account-secret');
+      expect(requestBody).toContain('scope=api%3Aread+api%3Awrite');
+      expect(requestBody).toContain('audience=https%3A%2F%2Fapi.example.com');
+    });
+
+    it('should handle form-urlencoded token response', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/x-www-form-urlencoded',
+          text: 'access_token=token_from_form&token_type=Bearer&expires_in=3600',
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticateClientCredentials(
+        'test-server',
+        clientCredsConfig,
+      );
+
+      expect(result.accessToken).toBe('token_from_form');
+      expect(result.tokenType).toBe('Bearer');
+    });
+
+    it('should throw error when missing required fields', async () => {
+      const invalidConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        // Missing clientId, clientSecret, and tokenUrl
+      };
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticateClientCredentials(
+          'test-server',
+          invalidConfig,
+        ),
+      ).rejects.toThrow(
+        'Client Credentials flow requires clientId, clientSecret, and tokenUrl',
+      );
+    });
+
+    it('should handle authentication failure with error response', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'invalid-id',
+        clientSecret: 'invalid-secret',
+        tokenUrl: 'https://auth.example.com/token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 401,
+          contentType: 'application/x-www-form-urlencoded',
+          text: 'error=invalid_client&error_description=Invalid client credentials',
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticateClientCredentials(
+          'test-server',
+          clientCredsConfig,
+        ),
+      ).rejects.toThrow(
+        'Client Credentials authentication failed: invalid_client - Invalid client credentials',
+      );
+    });
+
+    it('should handle server error without error details', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: false,
+          status: 500,
+          text: 'Internal Server Error',
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticateClientCredentials(
+          'test-server',
+          clientCredsConfig,
+        ),
+      ).rejects.toThrow('Client Credentials authentication failed: 500');
+    });
+
+    it('should handle missing access token in response', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify({ token_type: 'Bearer' }),
+          json: { token_type: 'Bearer' }, // Missing access_token
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticateClientCredentials(
+          'test-server',
+          clientCredsConfig,
+        ),
+      ).rejects.toThrow('No access token received from token endpoint');
+    });
+
+    it('should handle unexpected content type', async () => {
+      const clientCredsConfig: MCPOAuthConfig = {
+        grantType: 'client_credentials',
+        clientId: 'service-account-id',
+        clientSecret: 'service-account-secret',
+        tokenUrl: 'https://auth.example.com/token',
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'text/html',
+          text: JSON.stringify(mockTokenResponse),
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticateClientCredentials(
+        'test-server',
+        clientCredsConfig,
+      );
+
+      // Should still parse and succeed
+      expect(result.accessToken).toBe('access_token_123');
+    });
+  });
+
   describe('refreshAccessToken', () => {
     it('should refresh token successfully', async () => {
       const refreshResponse = {
