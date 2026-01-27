@@ -23,18 +23,16 @@ async function loadTranslationFile(
     const filePath = path.join(__dirname, 'locales', lang, `${namespace}.json`);
     const content = await fs.readFile(filePath, 'utf8');
     return JSON.parse(content) as Record<string, unknown>;
-  } catch (error) {
-    console.warn(
-      `Failed to load translation file for ${lang}/${namespace}:`,
-      error,
-    );
+  } catch {
+    // Silently return empty object if translation file not found.
+    // This allows graceful fallback to default language.
     return {};
   }
 }
 
 // Phase 1: Only English locale, core namespaces
 const languages = ['en'];
-const namespaces = ['common', 'help', 'dialogs'];
+const namespaces = ['common', 'help', 'dialogs', 'loading'];
 
 // Async resource loading
 async function loadResources() {
@@ -82,6 +80,38 @@ await initializeI18n();
 
 // Export t function for convenient usage
 export { t };
+
+/**
+ * Get all informative tips as a flat array (from all tip categories).
+ * Tips are used in the loading indicator to help users discover features.
+ */
+export function getInformativeTips(): string[] {
+  const settings = t('loading:tips.settings', {
+    returnObjects: true,
+  }) as string[];
+  const shortcuts = t('loading:tips.shortcuts', {
+    returnObjects: true,
+  }) as string[];
+  const commands = t('loading:tips.commands', {
+    returnObjects: true,
+  }) as string[];
+
+  return [...settings, ...shortcuts, ...commands];
+}
+
+/**
+ * Get the interactive shell waiting message.
+ */
+export function getInteractiveShellWaitingPhrase(): string {
+  return t('loading:interactiveShellWaiting');
+}
+
+/**
+ * Get the waiting for confirmation message.
+ */
+export function getWaitingForConfirmationPhrase(): string {
+  return t('loading:waitingForConfirmation');
+}
 
 // eslint-disable-next-line import/no-default-export
 export default i18n;

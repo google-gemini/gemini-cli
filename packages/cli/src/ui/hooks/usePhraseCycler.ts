@@ -4,13 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  getInformativeTips,
+  getInteractiveShellWaitingPhrase,
+  getWaitingForConfirmationPhrase,
+} from '../../i18n/index.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
+
+/**
+ * The phrase shown when waiting for interactive shell input.
+ * Exported for backwards compatibility - prefer using getInteractiveShellWaitingPhrase() for i18n support.
+ */
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  'Interactive shell awaiting input... press tab to focus shell';
+  getInteractiveShellWaitingPhrase();
 
 /**
  * Custom hook to manage cycling through loading phrases.
@@ -26,6 +35,9 @@ export const usePhraseCycler = (
   shouldShowFocusHint: boolean,
   customPhrases?: string[],
 ) => {
+  // Memoize tips from i18n to avoid re-fetching on every render
+  const informativeTips = useMemo(() => getInformativeTips(), []);
+
   const loadingPhrases =
     customPhrases && customPhrases.length > 0
       ? customPhrases
@@ -46,12 +58,12 @@ export const usePhraseCycler = (
     }
 
     if (shouldShowFocusHint) {
-      setCurrentLoadingPhrase(INTERACTIVE_SHELL_WAITING_PHRASE);
+      setCurrentLoadingPhrase(getInteractiveShellWaitingPhrase());
       return;
     }
 
     if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
+      setCurrentLoadingPhrase(getWaitingForConfirmationPhrase());
       return;
     }
 
@@ -69,12 +81,12 @@ export const usePhraseCycler = (
         // Show a tip on the first request after startup, then continue with 1/6 chance
         if (!hasShownFirstRequestTipRef.current) {
           // Show a tip during the first request
-          phraseList = INFORMATIVE_TIPS;
+          phraseList = informativeTips;
           hasShownFirstRequestTipRef.current = true;
         } else {
           // Roughly 1 in 6 chance to show a tip after the first request
           const showTip = Math.random() < 1 / 6;
-          phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
+          phraseList = showTip ? informativeTips : WITTY_LOADING_PHRASES;
         }
         const randomIndex = Math.floor(Math.random() * phraseList.length);
         setCurrentLoadingPhrase(phraseList[randomIndex]);
@@ -95,7 +107,14 @@ export const usePhraseCycler = (
         phraseIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting, shouldShowFocusHint, customPhrases, loadingPhrases]);
+  }, [
+    isActive,
+    isWaiting,
+    shouldShowFocusHint,
+    customPhrases,
+    loadingPhrases,
+    informativeTips,
+  ]);
 
   return currentLoadingPhrase;
 };
