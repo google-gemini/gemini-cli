@@ -189,6 +189,70 @@ describe('Tool Output Cleanup', () => {
       expect(result.failed).toBe(0);
     });
 
+    it('should apply both maxAge and maxCount together', async () => {
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '3d',
+            maxCount: 2,
+          },
+        },
+      };
+
+      // Create tool_output directory and files
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      await fs.mkdir(toolOutputDir, { recursive: true });
+
+      const now = Date.now();
+      const oneDayAgo = now - 1 * 24 * 60 * 60 * 1000;
+      const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
+      const twoAndHalfDaysAgo = now - 2.5 * 24 * 60 * 60 * 1000;
+      const fiveDaysAgo = now - 5 * 24 * 60 * 60 * 1000;
+      const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
+
+      // Create 5 files with different ages
+      const file1 = path.join(toolOutputDir, 'shell_1.txt'); // 1 day old - keep
+      const file2 = path.join(toolOutputDir, 'shell_2.txt'); // 2 days old - keep
+      const file3 = path.join(toolOutputDir, 'shell_3.txt'); // 2.5 days old - delete by count
+      const file4 = path.join(toolOutputDir, 'shell_4.txt'); // 5 days old - delete by age
+      const file5 = path.join(toolOutputDir, 'shell_5.txt'); // 10 days old - delete by age
+
+      await fs.writeFile(file1, 'content 1');
+      await fs.writeFile(file2, 'content 2');
+      await fs.writeFile(file3, 'content 3');
+      await fs.writeFile(file4, 'content 4');
+      await fs.writeFile(file5, 'content 5');
+
+      // Set file modification times
+      await fs.utimes(file1, oneDayAgo / 1000, oneDayAgo / 1000);
+      await fs.utimes(file2, twoDaysAgo / 1000, twoDaysAgo / 1000);
+      await fs.utimes(
+        file3,
+        twoAndHalfDaysAgo / 1000,
+        twoAndHalfDaysAgo / 1000,
+      );
+      await fs.utimes(file4, fiveDaysAgo / 1000, fiveDaysAgo / 1000);
+      await fs.utimes(file5, tenDaysAgo / 1000, tenDaysAgo / 1000);
+
+      const result = await cleanupToolOutputFiles(settings, false, testTempDir);
+
+      expect(result.disabled).toBe(false);
+      expect(result.scanned).toBe(5);
+      // file4 and file5 deleted by maxAge, file3 deleted by maxCount
+      expect(result.deleted).toBe(3);
+      expect(result.failed).toBe(0);
+
+      // Verify only the 2 newest files remain
+      const remainingFiles = await fs.readdir(toolOutputDir);
+      expect(remainingFiles).toHaveLength(2);
+      expect(remainingFiles).toContain('shell_1.txt');
+      expect(remainingFiles).toContain('shell_2.txt');
+      expect(remainingFiles).not.toContain('shell_3.txt');
+      expect(remainingFiles).not.toContain('shell_4.txt');
+      expect(remainingFiles).not.toContain('shell_5.txt');
+    });
+
     it('should log debug information when enabled', async () => {
       const settings: Settings = {
         general: {
