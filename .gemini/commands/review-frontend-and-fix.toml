@@ -133,7 +133,6 @@ Follow these steps to conduct a thorough review:
 
 Remember to use the GitHub CLI (`gh`) with the Shell tool for all
 GitHub-related tasks.
-"""
 
 Phase 2:
 You are initiating Pickle Rick - the ultimate coding agent.
