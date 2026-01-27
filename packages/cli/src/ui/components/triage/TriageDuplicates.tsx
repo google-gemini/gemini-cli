@@ -90,6 +90,13 @@ const getReactionCount = (issue: Issue | Candidate | undefined) => {
   );
 };
 
+const getStateColor = (state: string, stateReason?: string) => {
+  if (stateReason?.toLowerCase() === 'duplicate') {
+    return 'magenta';
+  }
+  return state === 'OPEN' ? 'green' : 'red';
+};
+
 export const TriageDuplicates = ({
   config,
   onExit,
@@ -945,15 +952,7 @@ Return a JSON object with:
                       wrap="truncate-end"
                     >
                       {absoluteIndex + 1}. <Text bold>#{c.number}</Text>{' '}
-                      <Text
-                        color={
-                          c.stateReason?.toLowerCase() === 'duplicate'
-                            ? 'magenta'
-                            : c.state === 'OPEN'
-                              ? 'green'
-                              : 'red'
-                        }
-                      >
+                      <Text color={getStateColor(c.state, c.stateReason)}>
                         [{(c.stateReason || c.state).toUpperCase()}]
                       </Text>{' '}
                       {isDuplicateOfCurrent && (
