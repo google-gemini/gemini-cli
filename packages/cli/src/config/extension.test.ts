@@ -664,11 +664,11 @@ describe('extension tests', () => {
           source: 'http://allowed.com/foo/bar',
         },
       });
-      const extensionAllowlistSetting = {
+      const extensionAllowlistSetting = createTestMergedSettings({
         security: {
           allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
         },
-      };
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -692,11 +692,11 @@ describe('extension tests', () => {
           source: 'http://notallowed.com/foo/bar',
         },
       });
-      const extensionAllowlistSetting = {
+      const extensionAllowlistSetting = createTestMergedSettings({
         security: {
           allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
         },
-      };
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -1186,11 +1186,11 @@ describe('extension tests', () => {
 
     it('should not install a disallowed extension if the allowlist is set', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
-      const allowedExtensionsSetting = {
+      const allowedExtensionsSetting = createTestMergedSettings({
         security: {
           allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
         },
-      };
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,

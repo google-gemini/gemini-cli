@@ -1241,6 +1241,8 @@ const SETTINGS_SCHEMA = {
         description:
           'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
         showInDialog: true,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.REPLACE,
       },
       folderTrust: {
         type: 'object',
