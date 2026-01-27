@@ -32,7 +32,10 @@ import {
   runExitCleanup,
   registerTelemetryConfig,
 } from './utils/cleanup.js';
-import { cleanupToolOutputFiles , cleanupExpiredSessions } from './utils/sessionCleanup.js';
+import {
+  cleanupToolOutputFiles,
+  cleanupExpiredSessions,
+} from './utils/sessionCleanup.js';
 import {
   type Config,
   type ResumedSessionData,
