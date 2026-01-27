@@ -628,9 +628,9 @@ export function SettingsDialog({
     const DIALOG_PADDING = 2; // Top and bottom borders
     const SETTINGS_TITLE_HEIGHT = 1;
     const SEARCH_BOX_HEIGHT = 3;
-    const SCROLL_ARROWS_HEIGHT = 2;
-    const SPACING_HEIGHT = 2;
-    const SCOPE_SELECTION_HEIGHT = 4;
+    const SCROLL_ARROWS_HEIGHT = 3;
+    const SPACING_HEIGHT = 5;
+    const SCOPE_SELECTION_HEIGHT = 7;
     const BOTTOM_HELP_TEXT_HEIGHT = 1;
     const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
     const ITEM_HEIGHT = 3; // Label + description + spacing

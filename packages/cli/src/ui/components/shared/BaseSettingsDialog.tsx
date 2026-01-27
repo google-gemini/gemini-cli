@@ -431,7 +431,7 @@ export function BaseSettingsDialog({
           </Box>
         )}
 
-        <Box height={1} />
+        <Box height={1} flexShrink={0} />
 
         {/* Items list */}
         {visibleItems.length === 0 ? (
@@ -445,6 +445,7 @@ export function BaseSettingsDialog({
                 <Text color={theme.text.secondary}>▲</Text>
               </Box>
             )}
+            {showScrollUp && <Box height={1} flexShrink={0} />}
             {visibleItems.map((item, idx) => {
               const globalIndex = idx + scrollOffset;
               const isActive =
@@ -533,7 +534,7 @@ export function BaseSettingsDialog({
                       </Box>
                     </Box>
                   </Box>
-                  <Box height={1} />
+                  <Box height={1} flexShrink={0} />
                 </React.Fragment>
               );
             })}
@@ -545,7 +546,7 @@ export function BaseSettingsDialog({
           </>
         )}
 
-        <Box height={1} />
+        <Box height={1} flexShrink={0} />
 
         {/* Scope Selection */}
         {showScopeSelector && (
@@ -566,7 +567,7 @@ export function BaseSettingsDialog({
           </Box>
         )}
 
-        <Box height={1} />
+        <Box height={1} flexShrink={0} />
 
         {/* Help text */}
         <Box marginX={1}>

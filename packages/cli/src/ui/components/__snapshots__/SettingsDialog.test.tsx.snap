@@ -10,6 +10,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -38,8 +39,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -56,6 +60,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -84,8 +89,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -102,6 +110,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -130,8 +139,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -148,6 +160,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -176,8 +189,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -194,6 +210,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -222,8 +239,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -240,6 +260,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │    Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -268,8 +289,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │  > Apply To                                                                                      │
 │  ● 1. User Settings                                                                              │
+│                                                                                                  │
 │    2. Workspace Settings                                                                         │
+│                                                                                                  │
 │    3. System Settings                                                                            │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -286,6 +310,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -314,8 +339,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -332,6 +360,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -360,8 +389,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -378,6 +410,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
+│                                                                                                  │
 │  ● Preview Features (e.g., models)                                                        false  │
 │    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
@@ -406,8 +439,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
+│                                                                                                  │
 │    Workspace Settings                                                                            │
+│                                                                                                  │
 │    System Settings                                                                               │
+│                                                                                                  │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │

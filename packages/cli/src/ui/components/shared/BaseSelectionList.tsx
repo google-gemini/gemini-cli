@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useSelectionList } from '../../hooks/useSelectionList.js';
@@ -134,38 +133,41 @@ export function BaseSelectionList<
         )}.`;
 
         return (
-          <Box key={item.key} alignItems="flex-start">
-            {/* Radio button indicator */}
-            <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.status.success : theme.text.primary}
-                aria-hidden
-              >
-                {isSelected ? '●' : ' '}
-              </Text>
-            </Box>
-
-            {/* Item number */}
-            {showNumbers && !item.hideNumber && (
-              <Box
-                marginRight={1}
-                flexShrink={0}
-                minWidth={itemNumberText.length}
-                aria-state={{ checked: isSelected }}
-              >
-                <Text color={numberColor}>{itemNumberText}</Text>
+          <React.Fragment key={item.key}>
+            <Box alignItems="flex-start">
+              {/* Radio button indicator */}
+              <Box minWidth={2} flexShrink={0}>
+                <Text
+                  color={isSelected ? theme.status.success : theme.text.primary}
+                  aria-hidden
+                >
+                  {isSelected ? '●' : ' '}
+                </Text>
               </Box>
-            )}
 
-            {/* Custom content via render prop */}
-            <Box flexGrow={1}>
-              {renderItem(item, {
-                isSelected,
-                titleColor,
-                numberColor,
-              })}
+              {/* Item number */}
+              {showNumbers && !item.hideNumber && (
+                <Box
+                  marginRight={1}
+                  flexShrink={0}
+                  minWidth={itemNumberText.length}
+                  aria-state={{ checked: isSelected }}
+                >
+                  <Text color={numberColor}>{itemNumberText}</Text>
+                </Box>
+              )}
+
+              {/* Custom content via render prop */}
+              <Box flexGrow={1}>
+                {renderItem(item, {
+                  isSelected,
+                  titleColor,
+                  numberColor,
+                })}
+              </Box>
             </Box>
-          </Box>
+            <Box height={1} flexShrink={0} />
+          </React.Fragment>
         );
       })}
 
