@@ -61,7 +61,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome) => {
-      void confirm(callId, outcome).catch((error) => {
+      void confirm(callId, outcome).catch((error: unknown) => {
         debugLogger.error(
           `Failed to handle tool confirmation for ${callId}:`,
           error,
@@ -238,7 +238,8 @@ export const ToolConfirmationMessage: React.FC<
       MARGIN_BODY_BOTTOM +
       HEIGHT_QUESTION +
       MARGIN_QUESTION_BOTTOM +
-      optionsCount;
+      optionsCount +
+      1; // Reserve one line for 'ShowMoreLines' hint
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
   }, [availableTerminalHeight, getOptions]);
@@ -429,7 +430,7 @@ export const ToolConfirmationMessage: React.FC<
     <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
+      <Box flexGrow={1} flexShrink={1} overflow="hidden">
         <MaxSizedBox
           maxHeight={availableBodyContentHeight()}
           maxWidth={terminalWidth}
