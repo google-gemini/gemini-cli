@@ -22,6 +22,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
+import { getLanguageOptions } from '../i18n/index.js';
 
 export type SettingsType =
   | 'boolean'
@@ -255,6 +256,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
+      },
+      language: {
+        type: 'enum',
+        label: 'Language',
+        category: 'General',
+        requiresRestart: true,
+        default: 'auto',
+        description:
+          'The language for the CLI interface. Auto-detect uses system locale.',
+        showInDialog: true,
+        options: getLanguageOptions(),
       },
       sessionRetention: {
         type: 'object',
