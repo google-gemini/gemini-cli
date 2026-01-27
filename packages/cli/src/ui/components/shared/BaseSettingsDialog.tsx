@@ -137,12 +137,16 @@ export function BaseSettingsDialog({
   const [editCursorPos, setEditCursorPos] = useState(0);
   const [cursorVisible, setCursorVisible] = useState(true);
 
-  // Reset active index when items change (e.g., search filter)
+  // Reset active index and scroll offset when items change (e.g., search filter)
   useEffect(() => {
     if (activeIndex >= items.length) {
       setActiveIndex(Math.max(0, items.length - 1));
     }
-  }, [items.length, activeIndex]);
+    const maxScroll = Math.max(0, items.length - maxItemsToShow);
+    if (scrollOffset > maxScroll) {
+      setScrollOffset(maxScroll);
+    }
+  }, [items.length, activeIndex, scrollOffset, maxItemsToShow]);
 
   // Cursor blink effect
   useEffect(() => {
