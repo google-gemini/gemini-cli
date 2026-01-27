@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { GrepToolParams } from './grep.js';
 import { GrepTool } from './grep.js';
+import type { ToolResult } from './tools.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -15,8 +16,12 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { execStreaming } from '../utils/shell-utils.js';
 
 vi.mock('glob', { spy: true });
+vi.mock('../utils/shell-utils.js', () => ({
+  execStreaming: vi.fn(),
+}));
 
 // Mock the child_process module to control grep/git grep behavior
 vi.mock('child_process', () => ({
@@ -129,6 +134,14 @@ describe('GrepTool', () => {
     });
   });
 
+  function createLineGenerator(lines: string[]): AsyncGenerator<string> {
+    return (async function* () {
+      for (const line of lines) {
+        yield line;
+      }
+    })();
+  }
+
   describe('execute', () => {
     it('should find matches for a simple pattern in all files', async () => {
       const params: GrepToolParams = { pattern: 'world' };
@@ -146,6 +159,35 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L1: another world in sub dir');
       expect(result.returnDisplay).toBe('Found 3 matches');
     }, 30000);
+
+    it('should include files that start with ".." in JS fallback', async () => {
+      await fs.writeFile(path.join(tempRootDir, '..env'), 'world in ..env');
+      const params: GrepToolParams = { pattern: 'world' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: world in ..env');
+    });
+
+    it('should ignore system grep output that escapes base path', async () => {
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['..env:1:hello', '../secret.txt:2:leak']),
+      );
+
+      const params: GrepToolParams = { pattern: 'hello' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (signal: AbortSignal) => Promise<ToolResult>;
+      };
+      invocation.isCommandAvailable = vi.fn(
+        async (command: string) => command === 'grep',
+      );
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: hello');
+      expect(result.llmContent).not.toContain('secret.txt');
+    });
 
     it('should find matches in a specific path', async () => {
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };

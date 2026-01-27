@@ -21,7 +21,7 @@ interface AppHeaderProps {
 export const AppHeader = ({ version }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, mainAreaWidth, bannerData, bannerVisible } = useUIState();
+  const { nightly, terminalWidth, bannerData, bannerVisible } = useUIState();
 
   const { bannerText } = useBanner(bannerData, config);
   const { showTips } = useTips();
@@ -33,7 +33,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
           <Header version={version} nightly={nightly} />
           {bannerVisible && bannerText && (
             <Banner
-              width={mainAreaWidth}
+              width={terminalWidth}
               bannerText={bannerText}
               isWarning={bannerData.warningText !== ''}
             />

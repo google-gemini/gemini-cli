@@ -34,7 +34,7 @@ vi.mock('../components/shared/text-buffer.js', () => ({
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(() => ({
-    mainAreaWidth: 80,
+    terminalWidth: 80,
   })),
 }));
 

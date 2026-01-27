@@ -6,6 +6,8 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   escapePath,
   unescapePath,
@@ -493,23 +495,23 @@ describe('resolveToRealPath', () => {
     {
       description:
         'should return path as-is if no special characters or protocol',
-      input: '/simple/path',
-      expected: '/simple/path',
+      input: path.resolve('simple', 'path'),
+      expected: path.resolve('simple', 'path'),
     },
     {
       description: 'should remove file:// protocol',
-      input: 'file:///path/to/file',
-      expected: '/path/to/file',
+      input: pathToFileURL(path.resolve('path', 'to', 'file')).toString(),
+      expected: path.resolve('path', 'to', 'file'),
     },
     {
       description: 'should decode URI components',
-      input: '/path/to/some%20folder',
-      expected: '/path/to/some folder',
+      input: path.resolve('path', 'to', 'some folder').replace(/ /g, '%20'),
+      expected: path.resolve('path', 'to', 'some folder'),
     },
     {
       description: 'should handle both file protocol and encoding',
-      input: 'file:///path/to/My%20Project',
-      expected: '/path/to/My Project',
+      input: pathToFileURL(path.resolve('path', 'to', 'My Project')).toString(),
+      expected: path.resolve('path', 'to', 'My Project'),
     },
   ])('$description', ({ input, expected }) => {
     expect(resolveToRealPath(input)).toBe(expected);
@@ -520,8 +522,9 @@ describe('resolveToRealPath', () => {
       throw new Error('File not found');
     });
 
-    const input = 'file:///path/to/New%20Project';
-    const expected = '/path/to/New Project';
+    const p = path.resolve('path', 'to', 'New Project');
+    const input = pathToFileURL(p).toString();
+    const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
   });

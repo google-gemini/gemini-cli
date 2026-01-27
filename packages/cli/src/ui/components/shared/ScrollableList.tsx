@@ -37,6 +37,7 @@ type VirtualizedListProps<T> = {
 
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   hasFocus: boolean;
+  width?: string | number;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
@@ -45,7 +46,7 @@ function ScrollableList<T>(
   props: ScrollableListProps<T>,
   ref: React.Ref<ScrollableListRef<T>>,
 ) {
-  const { hasFocus } = props;
+  const { hasFocus, width } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
 
@@ -236,6 +237,7 @@ function ScrollableList<T>(
       flexGrow={1}
       flexDirection="column"
       overflow="hidden"
+      width={width}
     >
       <VirtualizedList
         ref={virtualizedListRef}

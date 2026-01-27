@@ -237,15 +237,7 @@ describe('useApprovalModeIndicator', () => {
       }),
     );
 
-    // DEFAULT -> PLAN
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.PLAN,
-    );
-
-    // PLAN -> AUTO_EDIT
+    // DEFAULT -> AUTO_EDIT
     act(() => {
       capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
     });
@@ -253,7 +245,15 @@ describe('useApprovalModeIndicator', () => {
       ApprovalMode.AUTO_EDIT,
     );
 
-    // AUTO_EDIT -> DEFAULT
+    // AUTO_EDIT -> PLAN
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.PLAN,
+    );
+
+    // PLAN -> DEFAULT
     act(() => {
       capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
     });

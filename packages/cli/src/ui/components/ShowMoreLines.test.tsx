@@ -48,7 +48,7 @@ describe('ShowMoreLines', () => {
       } as NonNullable<ReturnType<typeof useOverflowState>>);
       mockUseStreamingContext.mockReturnValue(streamingState);
       const { lastFrame } = render(<ShowMoreLines constrainHeight={true} />);
-      expect(lastFrame()).toContain('Press ctrl-s to show more lines');
+      expect(lastFrame()).toContain('Press ctrl-o to show more lines');
     },
   );
 });

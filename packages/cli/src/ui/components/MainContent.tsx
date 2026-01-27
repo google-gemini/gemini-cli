@@ -129,6 +129,7 @@ export const MainContent = () => {
     return (
       <ScrollableList
         hasFocus={!uiState.isEditorDialogOpen}
+        width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}
         estimatedItemHeight={() => 100}

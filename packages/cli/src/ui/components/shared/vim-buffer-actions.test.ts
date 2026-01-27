@@ -35,6 +35,7 @@ const createTestState = (
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
   pastedContent: {},
+  expandedPasteInfo: new Map(),
 });
 
 describe('vim-buffer-actions', () => {
@@ -906,7 +907,13 @@ describe('vim-buffer-actions', () => {
     it('should preserve undo stack in operations', () => {
       const state = createTestState(['hello'], 0, 0);
       state.undoStack = [
-        { lines: ['previous'], cursorRow: 0, cursorCol: 0, pastedContent: {} },
+        {
+          lines: ['previous'],
+          cursorRow: 0,
+          cursorCol: 0,
+          pastedContent: {},
+          expandedPasteInfo: new Map(),
+        },
       ];
 
       const action = {

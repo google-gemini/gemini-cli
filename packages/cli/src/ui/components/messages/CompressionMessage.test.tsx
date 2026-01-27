@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import type { CompressionDisplayProps } from './CompressionMessage.js';
 import { CompressionMessage } from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
@@ -27,7 +27,9 @@ describe('<CompressionMessage />', () => {
   describe('pending state', () => {
     it('renders pending message when compression is in progress', () => {
       const props = createCompressionProps({ isPending: true });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain('Compressing chat history');
@@ -43,7 +45,9 @@ describe('<CompressionMessage />', () => {
         newTokenCount: 50,
         compressionStatus: CompressionStatus.COMPRESSED,
       });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain('✦');
@@ -66,7 +70,7 @@ describe('<CompressionMessage />', () => {
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame, unmount } = render(
+        const { lastFrame, unmount } = renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -91,7 +95,9 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain('✦');
@@ -109,7 +115,9 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain(
@@ -146,7 +154,7 @@ describe('<CompressionMessage />', () => {
           newTokenCount: newTokens,
           compressionStatus: CompressionStatus.COMPRESSED,
         });
-        const { lastFrame, unmount } = render(
+        const { lastFrame, unmount } = renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -171,7 +179,7 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame, unmount } = render(
+        const { lastFrame, unmount } = renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -199,7 +207,7 @@ describe('<CompressionMessage />', () => {
           compressionStatus:
             CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
-        const { lastFrame, unmount } = render(
+        const { lastFrame, unmount } = renderWithProviders(
           <CompressionMessage {...props} />,
         );
         const output = lastFrame();
@@ -218,7 +226,9 @@ describe('<CompressionMessage />', () => {
         isPending: false,
         compressionStatus: CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY,
       });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain('✦');
@@ -234,7 +244,9 @@ describe('<CompressionMessage />', () => {
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       });
-      const { lastFrame, unmount } = render(<CompressionMessage {...props} />);
+      const { lastFrame, unmount } = renderWithProviders(
+        <CompressionMessage {...props} />,
+      );
       const output = lastFrame();
 
       expect(output).toContain(

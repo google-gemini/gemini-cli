@@ -29,43 +29,19 @@ describe('ui-sizing', () => {
 
   describe('calculateMainAreaWidth', () => {
     it.each([
-      // width, useFullWidth, alternateBuffer, expected
-      [80, true, false, 80],
-      [100, true, false, 100],
-      [80, true, true, 79], // -1 for alternate buffer
-      [100, true, true, 99],
-
-      // Default behavior (useFullWidth true)
-      [100, true, false, 100],
-
-      // useFullWidth: false (Smart sizing)
-      [80, false, false, 78], // 98% of 80
-      [132, false, false, 119], // 90% of 132
-      [200, false, false, 180], // 90% of 200 (>= 132)
-
-      // Interpolation check
-      [106, false, false, 100], // Approx middle
+      // expected, width, altBuffer
+      [80, 80, false],
+      [100, 100, false],
+      [79, 80, true],
+      [99, 100, true],
     ])(
-      'should return %i when width=%i, useFullWidth=%s, altBuffer=%s',
-      (width, useFullWidth, altBuffer, expected) => {
+      'should return %i when width=%i and altBuffer=%s',
+      (expected, width, altBuffer) => {
         mocks.isAlternateBufferEnabled.mockReturnValue(altBuffer);
-        const settings = createSettings(useFullWidth);
+        const settings = createSettings();
 
         expect(calculateMainAreaWidth(width, settings)).toBe(expected);
       },
     );
-
-    it('should match snapshot for interpolation range', () => {
-      mocks.isAlternateBufferEnabled.mockReturnValue(false);
-      const settings = createSettings(false);
-
-      const results: Record<number, number> = {};
-      // Test range from 80 to 132
-      for (let w = 80; w <= 132; w += 4) {
-        results[w] = calculateMainAreaWidth(w, settings);
-      }
-
-      expect(results).toMatchSnapshot();
-    });
   });
 });

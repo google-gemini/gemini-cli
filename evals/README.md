@@ -144,6 +144,48 @@ A significant drop in the pass rate for a `USUALLY_PASSES` test—even if it
 doesn't drop to 0%—often indicates that a recent change to a system prompt or
 tool definition has made the model's behavior less reliable.
 
-You may be able to investigate the regression using Gemini CLI by giving it the
-link to the runs before and after the change and the name of the test and asking
-it to investigate what changes may have impacted the test.
+## Fixing Evaluations
+
+If an evaluation is failing or has a regressed pass rate, you can use the
+`/fix-behavioral-eval` command within Gemini CLI to help investigate and fix the
+issue.
+
+### `/fix-behavioral-eval`
+
+This command is designed to automate the investigation and fixing process for
+failing evaluations. It will:
+
+1.  **Investigate**: Fetch the latest results from the nightly workflow using
+    the `gh` CLI, identify the failing test, and review test trajectory logs in
+    `evals/logs`.
+2.  **Fix**: Suggest and apply targeted fixes to the prompt or tool definitions.
+    It prioritizes minimal changes to `prompt.ts`, tool instructions, and
+    modules that contribute to the prompt. It generally tries to avoid changing
+    the test itself.
+3.  **Verify**: Re-run the test 3 times across multiple models (e.g., Gemini
+    3.0, Gemini 3 Flash, Gemini 2.5 Pro) to ensure stability and calculate a
+    success rate.
+4.  **Report**: Provide a summary of the success rate for each model and details
+    on the applied fixes.
+
+To use it, run:
+
+```bash
+gemini /fix-behavioral-eval
+```
+
+You can also provide a link to a specific GitHub Action run or the name of a
+specific test to focus the investigation:
+
+```bash
+gemini /fix-behavioral-eval https://github.com/google-gemini/gemini-cli/actions/runs/123456789
+```
+
+When investigating failures manually, you can also enable verbose agent logs by
+setting the `GEMINI_DEBUG_LOG_FILE` environment variable.
+
+It's highly recommended to manually review and/or ask the agent to iterate on
+any prompt changes, even if they pass all evals. The prompt should prefer
+positive traits ('do X') and resort to negative traits ('do not do X') only when
+unable to accomplish the goal with positive traits. Gemini is quite good at
+instrospecting on its prompt when asked the right questions.

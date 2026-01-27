@@ -146,6 +146,38 @@ A rule matches a tool call if all of its conditions are met:
 Policies are defined in `.toml` files. The CLI loads these files from Default,
 User, and (if configured) Admin directories.
 
+### Policy locations
+
+| Tier      | Type   | Location                    |
+| :-------- | :----- | :-------------------------- |
+| **User**  | Custom | `~/.gemini/policies/*.toml` |
+| **Admin** | System | _See below (OS specific)_   |
+
+#### System-wide policies (Admin)
+
+Administrators can enforce system-wide policies (Tier 3) that override all user
+and default settings. These policies must be placed in specific, secure
+directories:
+
+| OS          | Policy Directory Path                             |
+| :---------- | :------------------------------------------------ |
+| **Linux**   | `/etc/gemini-cli/policies`                        |
+| **macOS**   | `/Library/Application Support/GeminiCli/policies` |
+| **Windows** | `C:\ProgramData\gemini-cli\policies`              |
+
+**Security Requirements:**
+
+To prevent privilege escalation, the CLI enforces strict security checks on
+admin directories. If checks fail, system policies are **ignored**.
+
+- **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
+  or others (e.g., `chmod 755`).
+- **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
+  see a security warning, use the folder properties to remove write permissions
+  for non-admin groups. You may need to "Disable inheritance" in Advanced
+  Security Settings._
+
 ### TOML rule schema
 
 Here is a breakdown of the fields available in a TOML policy rule:

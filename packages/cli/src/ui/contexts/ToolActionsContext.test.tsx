@@ -177,4 +177,44 @@ describe('ToolActionsContext', () => {
       throw new Error('Expected onConfirm to be present');
     }
   });
+
+  it('updates isDiffingEnabled when IdeClient status changes', async () => {
+    let statusListener: () => void = () => {};
+    const mockIdeClient = {
+      isDiffingEnabled: vi.fn().mockReturnValue(false),
+      addStatusChangeListener: vi.fn().mockImplementation((listener) => {
+        statusListener = listener;
+      }),
+      removeStatusChangeListener: vi.fn(),
+    } as unknown as IdeClient;
+
+    vi.mocked(IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+
+    const { result } = renderHook(() => useToolActions(), { wrapper });
+
+    // Wait for initialization
+    await act(async () => {
+      await vi.waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.isDiffingEnabled).toBe(false);
+
+    // Simulate connection change
+    vi.mocked(mockIdeClient.isDiffingEnabled).mockReturnValue(true);
+    await act(async () => {
+      statusListener();
+    });
+
+    expect(result.current.isDiffingEnabled).toBe(true);
+
+    // Simulate disconnection
+    vi.mocked(mockIdeClient.isDiffingEnabled).mockReturnValue(false);
+    await act(async () => {
+      statusListener();
+    });
+
+    expect(result.current.isDiffingEnabled).toBe(false);
+  });
 });

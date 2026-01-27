@@ -32,6 +32,7 @@ describe('ToolConfirmationMessage', () => {
   vi.mocked(useToolActions).mockReturnValue({
     confirm: mockConfirm,
     cancel: vi.fn(),
+    isDiffingEnabled: false,
   });
 
   const mockConfig = {
@@ -272,6 +273,94 @@ describe('ToolConfirmationMessage', () => {
       );
 
       expect(lastFrame()).toContain('Allow for all future sessions');
+    });
+  });
+
+  describe('Modify with external editor option', () => {
+    const editConfirmationDetails: ToolCallConfirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Edit',
+      fileName: 'test.txt',
+      filePath: '/test.txt',
+      fileDiff: '...diff...',
+      originalContent: 'a',
+      newContent: 'b',
+      onConfirm: vi.fn(),
+    };
+
+    it('should show "Modify with external editor" when NOT in IDE mode', () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      vi.mocked(useToolActions).mockReturnValue({
+        confirm: vi.fn(),
+        cancel: vi.fn(),
+        isDiffingEnabled: false,
+      });
+
+      const { lastFrame } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+      );
+
+      expect(lastFrame()).toContain('Modify with external editor');
+    });
+
+    it('should show "Modify with external editor" when in IDE mode but diffing is NOT enabled', () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => true,
+      } as unknown as Config;
+
+      vi.mocked(useToolActions).mockReturnValue({
+        confirm: vi.fn(),
+        cancel: vi.fn(),
+        isDiffingEnabled: false,
+      });
+
+      const { lastFrame } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+      );
+
+      expect(lastFrame()).toContain('Modify with external editor');
+    });
+
+    it('should NOT show "Modify with external editor" when in IDE mode AND diffing is enabled', () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => true,
+      } as unknown as Config;
+
+      vi.mocked(useToolActions).mockReturnValue({
+        confirm: vi.fn(),
+        cancel: vi.fn(),
+        isDiffingEnabled: true,
+      });
+
+      const { lastFrame } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+      );
+
+      expect(lastFrame()).not.toContain('Modify with external editor');
     });
   });
 });
