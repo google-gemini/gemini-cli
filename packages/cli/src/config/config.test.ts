@@ -586,7 +586,7 @@ describe('parseArguments', () => {
     process.argv = ['node', 'script.js', 'skills', 'list'];
     // Skills command enabled by default or via experimental
     const settings = createTestMergedSettings({
-      skills: { enabled: true },
+      experimental: { skills: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
