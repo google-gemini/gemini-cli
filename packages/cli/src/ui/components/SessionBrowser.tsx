@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -119,11 +120,14 @@ const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
 /**
  * Loading state component displayed while sessions are being loaded.
  */
-const SessionBrowserLoading = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>Loading sessions…</Text>
-  </Box>
-);
+const SessionBrowserLoading = (): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Text color={Colors.Gray}>{t('sessionBrowser.loading')}</Text>
+    </Box>
+  );
+};
 
 /**
  * Error state component displayed when session loading fails.
@@ -132,22 +136,30 @@ const SessionBrowserError = ({
   state,
 }: {
   state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.AccentRed}>Error: {state.error}</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
+}): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Text color={Colors.AccentRed}>
+        {t('sessionBrowser.error', { message: state.error })}
+      </Text>
+      <Text color={Colors.Gray}>{t('sessionBrowser.pressQToExit')}</Text>
+    </Box>
+  );
+};
 
 /**
  * Empty state component displayed when no sessions are found.
  */
-const SessionBrowserEmpty = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>No auto-saved conversations found.</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
+const SessionBrowserEmpty = (): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Text color={Colors.Gray}>{t('sessionBrowser.noSessions')}</Text>
+      <Text color={Colors.Gray}>{t('sessionBrowser.pressQToExit')}</Text>
+    </Box>
+  );
+};
 
 /**
  * Sorts an array of sessions by the specified criteria.
@@ -275,13 +287,16 @@ const SearchModeDisplay = ({
   state,
 }: {
   state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray}>Search: </Text>
-    <Text color={Colors.AccentPurple}>{state.searchQuery}</Text>
-    <Text color={Colors.Gray}> (Esc to cancel)</Text>
-  </Box>
-);
+}): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box marginTop={1}>
+      <Text color={Colors.Gray}>{t('sessionBrowser.searchLabel')}</Text>
+      <Text color={Colors.AccentPurple}>{state.searchQuery}</Text>
+      <Text color={Colors.Gray}> {t('sessionBrowser.escToCancel')}</Text>
+    </Box>
+  );
+};
 
 /**
  * Header component showing session count and sort information.
@@ -290,43 +305,55 @@ const SessionListHeader = ({
   state,
 }: {
   state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="row" justifyContent="space-between">
-    <Text color={Colors.AccentPurple}>
-      Chat Sessions ({state.totalSessions} total
-      {state.searchQuery ? `, filtered` : ''})
-    </Text>
-    <Text color={Colors.Gray}>
-      sorted by {state.sortOrder} {state.sortReverse ? 'asc' : 'desc'}
-    </Text>
-  </Box>
-);
+}): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="row" justifyContent="space-between">
+      <Text color={Colors.AccentPurple}>
+        {t('sessionBrowser.chatSessions')} ({state.totalSessions}{' '}
+        {t('sessionBrowser.total')}
+        {state.searchQuery ? `, ${t('sessionBrowser.filtered')}` : ''})
+      </Text>
+      <Text color={Colors.Gray}>
+        {t('sessionBrowser.sortedBy', {
+          criteria: t(`sessionBrowser.sortCriteria.${state.sortOrder}`),
+          direction: t(
+            `sessionBrowser.sortDirection.${state.sortReverse ? 'asc' : 'desc'}`,
+          ),
+        })}
+      </Text>
+    </Box>
+  );
+};
 
 /**
  * Navigation help component showing keyboard shortcuts.
  */
-const NavigationHelp = (): React.JSX.Element => (
-  <Box flexDirection="column">
-    <Text color={Colors.Gray}>
-      <Kbd name="Navigate" shortcut="↑/↓" />
-      {'   '}
-      <Kbd name="Resume" shortcut="Enter" />
-      {'   '}
-      <Kbd name="Search" shortcut="/" />
-      {'   '}
-      <Kbd name="Delete" shortcut="x" />
-      {'   '}
-      <Kbd name="Quit" shortcut="q" />
-    </Text>
-    <Text color={Colors.Gray}>
-      <Kbd name="Sort" shortcut="s" />
-      {'         '}
-      <Kbd name="Reverse" shortcut="r" />
-      {'      '}
-      <Kbd name="First/Last" shortcut="g/G" />
-    </Text>
-  </Box>
-);
+const NavigationHelp = (): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="column">
+      <Text color={Colors.Gray}>
+        <Kbd name={t('sessionBrowser.actions.navigate')} shortcut="↑/↓" />
+        {'   '}
+        <Kbd name={t('sessionBrowser.actions.resume')} shortcut="Enter" />
+        {'   '}
+        <Kbd name={t('sessionBrowser.actions.search')} shortcut="/" />
+        {'   '}
+        <Kbd name={t('sessionBrowser.actions.delete')} shortcut="x" />
+        {'   '}
+        <Kbd name={t('sessionBrowser.actions.quit')} shortcut="q" />
+      </Text>
+      <Text color={Colors.Gray}>
+        <Kbd name={t('sessionBrowser.actions.sort')} shortcut="s" />
+        {'         '}
+        <Kbd name={t('sessionBrowser.actions.reverse')} shortcut="r" />
+        {'      '}
+        <Kbd name={t('sessionBrowser.actions.firstLast')} shortcut="g/G" />
+      </Text>
+    </Box>
+  );
+};
 
 /**
  * Table header component with column labels and scroll indicators.
@@ -335,35 +362,40 @@ const SessionTableHeader = ({
   state,
 }: {
   state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="row" marginTop={1}>
-    <Text>{state.scrollOffset > 0 ? <Text>▲ </Text> : '  '}</Text>
+}): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box flexDirection="row" marginTop={1}>
+      <Text>{state.scrollOffset > 0 ? <Text>▲ </Text> : '  '}</Text>
 
-    <Box width={5} flexShrink={0}>
-      <Text color={Colors.Gray} bold>
-        Index
-      </Text>
+      <Box width={5} flexShrink={0}>
+        <Text color={Colors.Gray} bold>
+          {t('sessionBrowser.columns.index')}
+        </Text>
+      </Box>
+      <Text color={Colors.Gray}> │ </Text>
+      <Box width={4} flexShrink={0}>
+        <Text color={Colors.Gray} bold>
+          {t('sessionBrowser.columns.msgs')}
+        </Text>
+      </Box>
+      <Text color={Colors.Gray}> │ </Text>
+      <Box width={4} flexShrink={0}>
+        <Text color={Colors.Gray} bold>
+          {t('sessionBrowser.columns.age')}
+        </Text>
+      </Box>
+      <Text color={Colors.Gray}> │ </Text>
+      <Box flexShrink={0}>
+        <Text color={Colors.Gray} bold>
+          {state.searchQuery
+            ? t('sessionBrowser.columns.match')
+            : t('sessionBrowser.columns.name')}
+        </Text>
+      </Box>
     </Box>
-    <Text color={Colors.Gray}> │ </Text>
-    <Box width={4} flexShrink={0}>
-      <Text color={Colors.Gray} bold>
-        Msgs
-      </Text>
-    </Box>
-    <Text color={Colors.Gray}> │ </Text>
-    <Box width={4} flexShrink={0}>
-      <Text color={Colors.Gray} bold>
-        Age
-      </Text>
-    </Box>
-    <Text color={Colors.Gray}> │ </Text>
-    <Box flexShrink={0}>
-      <Text color={Colors.Gray} bold>
-        {state.searchQuery ? 'Match' : 'Name'}
-      </Text>
-    </Box>
-  </Box>
-);
+  );
+};
 
 /**
  * No results display component for empty search results.
@@ -372,13 +404,16 @@ const NoResultsDisplay = ({
   state,
 }: {
   state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box marginTop={1}>
-    <Text color={Colors.Gray} dimColor>
-      No sessions found matching &apos;{state.searchQuery}&apos;.
-    </Text>
-  </Box>
-);
+}): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
+  return (
+    <Box marginTop={1}>
+      <Text color={Colors.Gray} dimColor>
+        {t('sessionBrowser.noMatch', { query: state.searchQuery })}
+      </Text>
+    </Box>
+  );
+};
 
 /**
  * Match snippet display component for search results.
@@ -390,12 +425,16 @@ const MatchSnippetDisplay = ({
   session: SessionInfo;
   textColor: (color?: string) => string;
 }): React.JSX.Element | null => {
+  const { t } = useTranslation('dialogs');
   if (!session.matchSnippets || session.matchSnippets.length === 0) {
     return null;
   }
 
   const firstMatch = session.matchSnippets[0];
-  const rolePrefix = firstMatch.role === 'user' ? 'You:   ' : 'Gemini:';
+  const rolePrefix =
+    firstMatch.role === 'user'
+      ? t('sessionBrowser.roles.user')
+      : t('sessionBrowser.roles.model');
   const roleColor = textColor(
     firstMatch.role === 'user' ? Colors.AccentGreen : Colors.AccentBlue,
   );
@@ -428,6 +467,7 @@ const SessionItem = ({
   terminalWidth: number;
   formatRelativeTime: (dateString: string, style: 'short' | 'long') => string;
 }): React.JSX.Element => {
+  const { t } = useTranslation('dialogs');
   const originalIndex =
     state.startIndex + state.visibleSessions.indexOf(session);
   const isActive = originalIndex === state.activeIndex;
@@ -445,7 +485,7 @@ const SessionItem = ({
 
   // Add "(current)" label for the current session
   if (session.isCurrentSession) {
-    additionalInfo = ' (current)';
+    additionalInfo = ` ${t('sessionBrowser.currentSession')}`;
   }
 
   // Show match snippets if searching and matches exist
@@ -459,7 +499,9 @@ const SessionItem = ({
     );
 
     if (session.matchCount && session.matchCount > 1) {
-      additionalInfo += ` (+${session.matchCount - 1} more)`;
+      additionalInfo += t('sessionBrowser.moreMatches', {
+        count: session.matchCount - 1,
+      });
     }
   }
 
@@ -474,7 +516,7 @@ const SessionItem = ({
     matchDisplay ||
     (session.displayName.length === 0 ? (
       <Text color={textColor(Colors.Gray)} dimColor>
-        (No messages)
+        {t('sessionBrowser.noMessages')}
       </Text>
     ) : session.displayName.length > availableMessageWidth ? (
       session.displayName.slice(0, availableMessageWidth - 1) + '…'
@@ -638,6 +680,7 @@ export const useSessionBrowserState = (
  * Hook to load sessions on mount.
  */
 const useLoadSessions = (config: Config, state: SessionBrowserState) => {
+  const { t } = useTranslation('dialogs');
   const {
     setSessions,
     setLoading,
@@ -659,7 +702,9 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
         setLoading(false);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Failed to load sessions',
+          err instanceof Error
+            ? err.message
+            : t('sessionBrowser.errors.loadFailed'),
         );
         setLoading(false);
       }
@@ -667,7 +712,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
-  }, [config, setSessions, setLoading, setError]);
+  }, [config, setSessions, setLoading, setError, t]);
 
   useEffect(() => {
     const loadFullContent = async () => {
@@ -688,7 +733,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
           setError(
             err instanceof Error
               ? err.message
-              : 'Failed to load full session content',
+              : t('sessionBrowser.errors.loadFullFailed'),
           );
         }
       }
@@ -703,6 +748,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     setSessions,
     setHasLoadedFullContent,
     setError,
+    t,
   ]);
 };
 
@@ -766,6 +812,7 @@ export const useSessionBrowserInput = (
   onDeleteSession: (session: SessionInfo) => Promise<void>,
   onExit: () => void,
 ) => {
+  const { t } = useTranslation('dialogs');
   useKeypress(
     (key) => {
       if (state.isSearchMode) {
@@ -851,7 +898,10 @@ export const useSessionBrowserInput = (
               })
               .catch((error) => {
                 state.setError(
-                  `Failed to delete session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                  t('sessionBrowser.errors.deleteFailed', {
+                    message:
+                      error instanceof Error ? error.message : 'Unknown error',
+                  }),
                 );
               });
           }
