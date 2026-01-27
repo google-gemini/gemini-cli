@@ -822,7 +822,7 @@ Return a JSON object with:
           minHeight={Math.min(candLines.length, VISIBLE_LINES_DETAIL)}
         >
           {candViewLines.map((line: string, i: number) => (
-            <Text key={i} wrap="truncate-end">
+            <Text key={i} wrap="wrap">
               {line}
             </Text>
           ))}
@@ -881,7 +881,7 @@ Return a JSON object with:
           minHeight={Math.min(targetLines.length, visibleLines)}
         >
           {targetViewLines.map((line, i) => (
-            <Text key={i} italic wrap="truncate-end">
+            <Text key={i} italic wrap="wrap">
               {line}
             </Text>
           ))}
@@ -949,7 +949,7 @@ Return a JSON object with:
                           ? 'blue'
                           : undefined
                       }
-                      wrap="truncate-end"
+                      wrap="wrap"
                     >
                       {absoluteIndex + 1}. <Text bold>#{c.number}</Text>{' '}
                       <Text color={getStateColor(c.state, c.stateReason)}>
@@ -963,7 +963,7 @@ Return a JSON object with:
                       - {c.title} (Score: {c.score}/100)
                     </Text>
                     <Box marginLeft={2}>
-                      <Text color="gray" wrap="truncate-end">
+                      <Text color="gray" wrap="wrap">
                         Reactions: {getReactionCount(c)} | {c.reason}
                       </Text>
                     </Box>
@@ -997,14 +997,14 @@ Return a JSON object with:
           <Text bold color="blue">
             Analysis:{' '}
           </Text>
-          <Text wrap="truncate-end"> {state.message}</Text>
+          <Text wrap="wrap"> {state.message}</Text>
         </Box>
         {state.suggestedComment && (
           <Box marginTop={1} flexDirection="column">
             <Text bold color="gray">
               Suggested Comment:
             </Text>
-            <Text italic color="gray" wrap="truncate-end">
+            <Text italic color="gray" wrap="wrap">
               &quot;{state.suggestedComment}&quot;
             </Text>
           </Box>
