@@ -52,7 +52,7 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { confirm } = useToolActions();
+  const { confirm, isDiffingEnabled } = useToolActions();
 
   const settings = useSettings();
   const allowPermanentApproval =
@@ -111,9 +111,9 @@ export const ToolConfirmationMessage: React.FC<
             });
           }
         }
-        // We hide "Modify with external editor" if IDE mode is active, assuming
-        // the IDE provides a better interface (diff view) for this.
-        if (!config.getIdeMode()) {
+        // We hide "Modify with external editor" if IDE mode is active AND
+        // the IDE is actually capable of showing a diff (connected).
+        if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
             label: 'Modify with external editor',
             value: ToolConfirmationOutcome.ModifyWithEditor,
@@ -210,7 +210,13 @@ export const ToolConfirmationMessage: React.FC<
       });
     }
     return options;
-  }, [confirmationDetails, isTrustedFolder, allowPermanentApproval, config]);
+  }, [
+    confirmationDetails,
+    isTrustedFolder,
+    allowPermanentApproval,
+    config,
+    isDiffingEnabled,
+  ]);
 
   const availableBodyContentHeight = useCallback(() => {
     if (availableTerminalHeight === undefined) {
