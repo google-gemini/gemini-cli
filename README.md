@@ -55,6 +55,12 @@ npm install -g @google/gemini-cli
 brew install gemini-cli
 ```
 
+#### Install globally with MacPorts (macOS)
+
+```bash
+sudo port install gemini-cli
+```
+
 #### Install with Anaconda (for restricted environments)
 
 ```bash

@@ -488,8 +488,8 @@ export class ToolRegistry {
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
-      const tool = this.allKnownTools.get(name);
-      if (tool && this.isActiveTool(tool)) {
+      const tool = this.getTool(name);
+      if (tool) {
         declarations.push(tool.schema);
       }
     }
