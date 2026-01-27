@@ -34,10 +34,10 @@ specific job.
   separate context loop. The main agent only sees the final result, saving
   tokens in your main conversation history.
 
-The main agent uses the `delegate_to_agent` tool to hand off a task to a
-sub-agent. Once the sub-agent completes its task (or fails), it reports back to
-the main agent with its findings (usually as a text summary or structured report
-returned by the tool).
+Sub-agents are exposed to the main agent as a tool of the same name which delegates
+to the sub-agent, when called. Once the sub-agent completes its task (or fails),
+it reports back to the main agent with its findings (usually as a text summary or
+structured report returned by the tool).
 
 ## Built-in sub-agents
 
@@ -59,7 +59,7 @@ Gemini CLI comes with powerful built-in sub-agents.
       "codebaseInvestigatorSettings": {
         "enabled": true,
         "maxNumTurns": 20,
-        "model": "gemini-2.0-flash-thinking-exp"
+        "model": "gemini-2.5-pro"
       }
     }
   }
@@ -114,7 +114,7 @@ kind: local
 tools:
   - read_file
   - search_file_content
-model: gemini-2.0-flash-thinking-exp
+model: gemini-2.5-pro
 temperature: 0.2
 max_turns: 10
 ---
@@ -137,14 +137,33 @@ it yourself; just report it.
 
 | Field          | Type   | Required | Description                                                                                                                |
 | :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------- |
-| `name`         | string | Yes      | Unique identifier (slug) used by `delegate_to_agent`. Only lowercase letters, numbers, hyphens, and underscores.           |
+| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.   |
 | `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this sub-agent. |
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                             |
 | `tools`        | array  | No       | List of tool names this agent can use. If omitted, it may have access to a default set.                                    |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-1.5-pro`). Defaults to `inherit` (uses the main session model).                       |
+| `model`        | string | No       | Specific model to use (e.g., `gemini-2.5-pro`). Defaults to `inherit` (uses the main session model).                       |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                             |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return.                                         |
 | `timeout_mins` | number | No       | Maximum execution time in minutes.                                                                                         |
+
+### Optimizing your sub-agent
+
+The main agent system prompt contains language that encourages use of an expert sub-agent
+when one is available for the task at hand. It decides whether an agent is a relevant
+expert based on the agent's description. You can improve the reliability with which an
+agent is used by updating the description to more clearly indicate:
+
+- Its area of expertise.
+- When it should be used.
+- Some example scenarios.
+
+For example:
+
+> Git expert agent which should be used for all local and remote git operations.
+  For example:
+  - Making commits
+  - Searching for regressions with bisect
+  - Interacting with source control and issues providers such as GitHub.
 
 ## Remote agents (Agent2Agent)
 
