@@ -328,7 +328,7 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat' },
+          { pager: 'cat', sanitizationConfig: {} },
         );
       },
       20000,
