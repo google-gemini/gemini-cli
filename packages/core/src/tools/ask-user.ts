@@ -202,15 +202,18 @@ export class AskUserInvocation extends BaseToolInvocation<
           }
 
           // Build formatted key-value display
-          const formattedAnswers = Object.entries(response.answers)
-            .map(([index, answer]) => {
-              const question = this.params.questions[parseInt(index, 10)];
-              const category = question?.header ?? `Q${index}`;
-              return `  ${category} → ${answer}`;
-            })
-            .join('\n');
+          const answerEntries = Object.entries(response.answers);
+          const hasAnswers = answerEntries.length > 0;
 
-          const returnDisplay = `**User answered:**\n${formattedAnswers}`;
+          const returnDisplay = hasAnswers
+            ? `**User answered:**\n${answerEntries
+                .map(([index, answer]) => {
+                  const question = this.params.questions[parseInt(index, 10)];
+                  const category = question?.header ?? `Q${index}`;
+                  return `  ${category} → ${answer}`;
+                })
+                .join('\n')}`
+            : 'User submitted without answering questions.';
 
           resolve({
             llmContent: JSON.stringify({ answers: response.answers }),

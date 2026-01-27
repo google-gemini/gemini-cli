@@ -282,6 +282,46 @@ describe('AskUserTool', () => {
     expect(JSON.parse(result.llmContent as string)).toEqual({ answers });
   });
 
+  it('should display message when user submits without answering', async () => {
+    const questions = [
+      {
+        question: 'Which approach?',
+        header: 'Approach',
+        options: [
+          { label: 'Option A', description: 'First option' },
+          { label: 'Option B', description: 'Second option' },
+        ],
+      },
+    ];
+
+    const invocation = tool.build({ questions });
+    const executePromise = invocation.execute(new AbortController().signal);
+
+    // Get the correlation ID from the published message
+    const publishCall = vi.mocked(mockMessageBus.publish).mock.calls[0][0] as {
+      correlationId: string;
+    };
+    const correlationId = publishCall.correlationId;
+
+    // Simulate response with empty answers
+    const subscribeCall = vi
+      .mocked(mockMessageBus.subscribe)
+      .mock.calls.find((call) => call[0] === MessageBusType.ASK_USER_RESPONSE);
+    const handler = subscribeCall![1];
+
+    handler({
+      type: MessageBusType.ASK_USER_RESPONSE,
+      correlationId,
+      answers: {},
+    });
+
+    const result = await executePromise;
+    expect(result.returnDisplay).toBe(
+      'User submitted without answering questions.',
+    );
+    expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
+  });
+
   it('should handle cancellation', async () => {
     const invocation = tool.build({
       questions: [
