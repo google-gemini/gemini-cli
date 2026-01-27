@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type SlashCommand, CommandKind } from '../commands/types.js';
 import { KEYBOARD_SHORTCUTS_URL } from '../constants.js';
-import { sanitizeForListDisplay } from '../utils/textUtils.js';
+import { sanitizeForDisplay } from '../utils/textUtils.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -79,7 +79,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
               <Text color={theme.text.secondary}> [MCP]</Text>
             )}
             {command.description &&
-              ' - ' + sanitizeForListDisplay(command.description, 100)}
+              ' - ' + sanitizeForDisplay(command.description, 100)}
           </Text>
           {command.subCommands &&
             command.subCommands
@@ -91,7 +91,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
                     {subCommand.name}
                   </Text>
                   {subCommand.description &&
-                    ' - ' + sanitizeForListDisplay(subCommand.description, 100)}
+                    ' - ' + sanitizeForDisplay(subCommand.description, 100)}
                 </Text>
               ))}
         </Box>
