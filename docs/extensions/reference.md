@@ -322,9 +322,9 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 ## Variables
 
-Gemini CLI extensions allow variable substitution in both `gemini-extension.json`
-and `hooks/hooks.json`. This can be useful if e.g., you need the current
-directory to run an MCP server using an argument like
+Gemini CLI extensions allow variable substitution in both
+`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
+need the current directory to run an MCP server using an argument like
 `"args": ["${extensionPath}${/}dist${/}server.js"]`.
 
 **Supported variables:**

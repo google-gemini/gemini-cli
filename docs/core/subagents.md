@@ -34,10 +34,10 @@ specific job.
   separate context loop. The main agent only sees the final result, saving
   tokens in your main conversation history.
 
-Sub-agents are exposed to the main agent as a tool of the same name which delegates
-to the sub-agent, when called. Once the sub-agent completes its task (or fails),
-it reports back to the main agent with its findings (usually as a text summary or
-structured report returned by the tool).
+Sub-agents are exposed to the main agent as a tool of the same name which
+delegates to the sub-agent, when called. Once the sub-agent completes its task
+(or fails), it reports back to the main agent with its findings (usually as a
+text summary or structured report returned by the tool).
 
 ## Built-in sub-agents
 
@@ -51,8 +51,7 @@ Gemini CLI comes with powerful built-in sub-agents.
 - **When to use:** "How does the authentication system work?", "Map out the
   dependencies of the `AgentRegistry` class."
 - **Configuration:** Enabled by default. You can configure it in
-  `settings.json`.
-  Example (forcing a specific model):
+  `settings.json`. Example (forcing a specific model):
   ```json
   {
     "experimental": {
@@ -70,8 +69,8 @@ Gemini CLI comes with powerful built-in sub-agents.
 - **Name:** `cli_help`
 - **Purpose:** Expert knowledge about Gemini CLI itself, its commands,
   configuration, and documentation.
-- **When to use:** "How do I configure a proxy?", "What does the `/rewind` command
-  do?"
+- **When to use:** "How do I configure a proxy?", "What does the `/rewind`
+  command do?"
 - **Configuration:** Enabled by default.
 
 ## Creating custom sub-agents
@@ -148,27 +147,29 @@ it yourself; just report it.
 
 ### Optimizing your sub-agent
 
-The main agent system prompt contains language that encourages use of an expert sub-agent
-when one is available for the task at hand. It decides whether an agent is a relevant
-expert based on the agent's description. You can improve the reliability with which an
-agent is used by updating the description to more clearly indicate:
+The main agent system prompt contains language that encourages use of an expert
+sub-agent when one is available for the task at hand. It decides whether an
+agent is a relevant expert based on the agent's description. You can improve the
+reliability with which an agent is used by updating the description to more
+clearly indicate:
 
 - Its area of expertise.
 - When it should be used.
 - Some example scenarios.
 
-For example: the following sub-agent description should be called fairly consistently
-for Git operations.
+For example: the following sub-agent description should be called fairly
+consistently for Git operations.
 
 > Git expert agent which should be used for all local and remote git operations.
->  For example:
->  - Making commits
->  - Searching for regressions with bisect
->  - Interacting with source control and issues providers such as GitHub.
+> For example:
+>
+> - Making commits
+> - Searching for regressions with bisect
+> - Interacting with source control and issues providers such as GitHub.
 
 If you need to further tune your sub-agent, you can do so by selecting the model
-to optimize for with `/model` and then asking the model why it does not think that
-your sub-agent was called with a specific prompt and the given description.
+to optimize for with `/model` and then asking the model why it does not think
+that your sub-agent was called with a specific prompt and the given description.
 
 ## Remote agents (Agent2Agent)
 
