@@ -178,7 +178,7 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
     });
 
-    it('should restore directories from resumed session data', () => {
+    it('should restore directories from resumed session data', async () => {
       const mockAddDirectories = vi
         .fn()
         .mockReturnValue({ added: [], failed: [] });
@@ -209,8 +209,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume([], [], resumedData);
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
       });
 
       expect(configWithWorkspace.getWorkspaceContext).toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe('useSessionResume', () => {
       ]);
     });
 
-    it('should not call addDirectories when no directories in resumed session', () => {
+    it('should not call addDirectories when no directories in resumed session', async () => {
       const mockAddDirectories = vi.fn();
       const mockWorkspaceContext = {
         addDirectories: mockAddDirectories,
@@ -249,8 +249,8 @@ describe('useSessionResume', () => {
         filePath: '/path/to/session.json',
       };
 
-      act(() => {
-        result.current.loadHistoryForResume([], [], resumedData);
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
       });
 
       expect(mockAddDirectories).not.toHaveBeenCalled();
