@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '@google/gemini-cli-core';
+import { OutputFormat } from '@google/gemini-cli-core';
 import type { CommandContext } from '../commands/types.js';
 import type { ExtensionUpdateAction } from '../state/extensions.js';
 
@@ -12,9 +14,23 @@ import type { ExtensionUpdateAction } from '../state/extensions.js';
  * Useful for non-interactive environments where UI operations
  * are not applicable.
  */
-export function createNonInteractiveUI(): CommandContext['ui'] {
+export function createNonInteractiveUI(
+  config: Config,
+  stdout: { write: (text: string) => void } = process.stdout,
+): CommandContext['ui'] {
   return {
-    addItem: (_item, _timestamp) => 0,
+    addItem: (item, _timestamp) => {
+      if (config.getOutputFormat() === OutputFormat.JSON) {
+        if (
+          item.type === 'stats' ||
+          item.type === 'model_stats' ||
+          item.type === 'tool_stats'
+        ) {
+          stdout.write(JSON.stringify(item, null, 2) + '\n');
+        }
+      }
+      return 0;
+    },
     clear: () => {},
     setDebugMessage: (_message) => {},
     loadHistory: (_newHistory) => {},

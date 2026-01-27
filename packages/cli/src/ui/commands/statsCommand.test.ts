@@ -73,6 +73,7 @@ describe('statsCommand', () => {
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.MODEL_STATS,
+      stats: mockContext.session.stats.metrics,
     });
   });
 
@@ -87,6 +88,7 @@ describe('statsCommand', () => {
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.TOOL_STATS,
+      stats: mockContext.session.stats.metrics,
     });
   });
 });

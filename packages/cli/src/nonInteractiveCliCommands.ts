@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { PartListUnion } from '@google/genai';
 import { parseSlashCommand } from './utils/commands.js';
 import {
   FatalInputError,
@@ -20,21 +19,22 @@ import type { CommandContext } from './ui/commands/types.js';
 import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js';
 import type { LoadedSettings } from './config/settings.js';
 import type { SessionStatsState } from './ui/contexts/SessionContext.js';
+import type { SlashCommandProcessorResult } from './ui/types.js';
 
 /**
  * Processes a slash command in a non-interactive environment.
  *
- * @returns A Promise that resolves to `PartListUnion` if a valid command is
- *   found and results in a prompt, or `undefined` otherwise.
+ * @returns A Promise that resolves to `SlashCommandProcessorResult` if a valid command is
+ *   found, or `undefined` if it's not a slash command.
  * @throws {FatalInputError} if the command result is not supported in
- *   non-interactive mode.
+ *   non-interactive mode or command not found.
  */
 export const handleSlashCommand = async (
   rawQuery: string,
   abortController: AbortController,
   config: Config,
   settings: LoadedSettings,
-): Promise<PartListUnion | undefined> => {
+): Promise<SlashCommandProcessorResult | undefined> => {
   const trimmed = rawQuery.trim();
   if (!trimmed.startsWith('/')) {
     return;
@@ -72,7 +72,7 @@ export const handleSlashCommand = async (
           git: undefined,
           logger,
         },
-        ui: createNonInteractiveUI(),
+        ui: createNonInteractiveUI(config),
         session: {
           stats: sessionStats,
           sessionShellAllowlist: new Set(),
@@ -89,7 +89,10 @@ export const handleSlashCommand = async (
       if (result) {
         switch (result.type) {
           case 'submit_prompt':
-            return result.content;
+            return {
+              type: 'submit_prompt',
+              content: result.content,
+            };
           case 'confirm_shell_commands':
             // This result indicates a command attempted to confirm shell commands.
             // However note that currently, ShellTool is excluded in non-interactive
@@ -106,8 +109,17 @@ export const handleSlashCommand = async (
             );
         }
       }
+
+      return { type: 'handled' };
+    }
+
+    if (commandToExecute.subCommands) {
+      const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
+        .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
+        .join('\n')}`;
+      throw new FatalInputError(helpText);
     }
   }
 
-  return;
+  return undefined;
 };
