@@ -2811,6 +2811,17 @@ export function useTextBuffer({
 
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
+
+      // Attempt to re-collapse unchanged pasted content
+      const sortedPlaceholders = Object.entries(pastedContent).sort(
+        (a, b) => b[1].length - a[1].length,
+      );
+      for (const [id, content] of sortedPlaceholders) {
+        if (newText.includes(content)) {
+          newText = newText.replace(content, id);
+        }
+      }
+
       dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
     } catch (err) {
       coreEvents.emitFeedback(
