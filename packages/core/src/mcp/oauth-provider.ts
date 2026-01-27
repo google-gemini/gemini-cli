@@ -1020,8 +1020,12 @@ ${authUrl}
 
     // Validate required configuration
     if (!config.clientId || !config.clientSecret || !config.tokenUrl) {
+      const missingFields = [];
+      if (!config.clientId) missingFields.push('clientId');
+      if (!config.clientSecret) missingFields.push('clientSecret');
+      if (!config.tokenUrl) missingFields.push('tokenUrl');
       throw new Error(
-        `Client Credentials flow requires clientId, clientSecret, and tokenUrl for server: ${serverName}`,
+        `Client Credentials flow requires the following missing fields for server '${serverName}': ${missingFields.join(', ')}`,
       );
     }
 
@@ -1172,7 +1176,7 @@ ${authUrl}
         );
       } else {
         debugLogger.warn(
-          'Token verification failed: token not found or invalid after save',
+          `Token verification failed for server '${serverName}': stored token is missing or invalid after save.`,
         );
       }
     } catch (saveError) {

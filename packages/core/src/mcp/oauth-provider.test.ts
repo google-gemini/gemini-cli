@@ -1335,7 +1335,7 @@ describe('MCPOAuthProvider', () => {
           invalidConfig,
         ),
       ).rejects.toThrow(
-        'Client Credentials flow requires clientId, clientSecret, and tokenUrl',
+        'Client Credentials flow requires the following missing fields',
       );
     });
 
