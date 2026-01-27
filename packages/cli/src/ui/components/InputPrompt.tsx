@@ -876,7 +876,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText('');
           resetCompletionState();
         }
-        return true;
+        return false;
       }
 
       // Kill line commands
