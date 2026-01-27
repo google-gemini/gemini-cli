@@ -6,7 +6,8 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -53,15 +54,14 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   config,
   addItem,
 }) => {
+  const { t } = useTranslation('dialogs');
   const [submitted, setSubmitted] = useState(false);
 
   const handleCancel = async () => {
     setSubmitted(true);
     const errors = [...initialErrors];
     errors.push(
-      `Operation cancelled. The following directories were not added:\n- ${folders.join(
-        '\n- ',
-      )}`,
+      t('multiFolderTrust.cancelled', { folders: folders.join('\n- ') }),
     );
     await finishAddingDirectories(config, addItem, trustedDirs, errors);
     onComplete();
@@ -79,23 +79,26 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     { isActive: !submitted },
   );
 
-  const options: Array<RadioSelectItem<MultiFolderTrustChoice>> = [
-    {
-      label: 'Yes',
-      value: MultiFolderTrustChoice.YES,
-      key: 'yes',
-    },
-    {
-      label: 'Yes, and remember the directories as trusted',
-      value: MultiFolderTrustChoice.YES_AND_REMEMBER,
-      key: 'yes-and-remember',
-    },
-    {
-      label: 'No',
-      value: MultiFolderTrustChoice.NO,
-      key: 'no',
-    },
-  ];
+  const options: Array<RadioSelectItem<MultiFolderTrustChoice>> = useMemo(
+    () => [
+      {
+        label: t('multiFolderTrust.yes'),
+        value: MultiFolderTrustChoice.YES,
+        key: 'yes',
+      },
+      {
+        label: t('multiFolderTrust.yesAndRemember'),
+        value: MultiFolderTrustChoice.YES_AND_REMEMBER,
+        key: 'yes-and-remember',
+      },
+      {
+        label: t('multiFolderTrust.no'),
+        value: MultiFolderTrustChoice.NO,
+        key: 'no',
+      },
+    ],
+    [t],
+  );
 
   const handleSelect = async (choice: MultiFolderTrustChoice) => {
     setSubmitted(true);
@@ -103,7 +106,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     if (!config) {
       addItem({
         type: MessageType.ERROR,
-        text: 'Configuration is not available.',
+        text: t('multiFolderTrust.configUnavailable'),
       });
       onComplete();
       return;
@@ -116,9 +119,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
 
     if (choice === MultiFolderTrustChoice.NO) {
       errors.push(
-        `The following directories were not added because they were not trusted:\n- ${folders.join(
-          '\n- ',
-        )}`,
+        t('multiFolderTrust.notTrusted', { folders: folders.join('\n- ') }),
       );
     } else {
       for (const dir of folders) {
@@ -131,7 +132,12 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
           added.push(dir);
         } catch (e) {
           const error = e as Error;
-          errors.push(`Error adding '${dir}': ${error.message}`);
+          errors.push(
+            t('multiFolderTrust.errorAdding', {
+              dir,
+              message: error.message,
+            }),
+          );
         }
       }
     }
@@ -152,15 +158,13 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>
-            Do you trust the following folders being added to this workspace?
+            {t('multiFolderTrust.question')}
           </Text>
           <Text color={theme.text.secondary}>
             {folders.map((f) => `- ${f}`).join('\n')}
           </Text>
           <Text color={theme.text.primary}>
-            Trusting a folder allows Gemini to read and perform auto-edits when
-            in auto-approval mode. This is a security feature to prevent
-            accidental execution in untrusted directories.
+            {t('multiFolderTrust.description')}
           </Text>
         </Box>
 
@@ -172,7 +176,9 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       </Box>
       {submitted && (
         <Box marginLeft={1} marginTop={1}>
-          <Text color={theme.text.primary}>Applying trust settings...</Text>
+          <Text color={theme.text.primary}>
+            {t('multiFolderTrust.applying')}
+          </Text>
         </Box>
       )}
     </Box>
