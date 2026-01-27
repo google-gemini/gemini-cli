@@ -161,6 +161,12 @@ ${planModeToolsList}
 ## Plan Storage
 - Save your plans as Markdown (.md) files directly to: \`${plansDir}/\`
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
+- **Source of Truth:** The UI is based on these markdown files. To show progress in the CLI, you MUST update the plan file with the status markers below.
+- **Task Status Markers:** Use the following markers in your task lists to update the UI:
+    - \`- [ ] Task\` : Pending
+    - \`- [/] Task\` : In Progress
+    - \`- [x] Task\` : Completed
+    - \`- [-] Task\` : Cancelled
 
 ## Workflow Phases
 
@@ -270,6 +276,11 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards.${interactiveMode ? " If unsure about these commands, you can ask the user if they'd like you to run them and if so how to." : ''}
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
+
+**Monitoring Progress:**
+- **Plans Directory:** \`${config.storage.getProjectTempPlansDir()}/\`
+- If a plan file exists in this directory, you MUST update it to reflect your progress using the \`write_file\` or \`replace\` tools.
+- Use markers: \`- [ ]\` (Pending), \`- [/]\` (In Progress), \`- [x]\` (Completed), \`- [-]\` (Cancelled).
 
 ## New Applications
 

@@ -97,6 +97,7 @@ import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { usePlanMonitoring } from './hooks/usePlanMonitoring.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
@@ -1334,6 +1335,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     retryStatus,
   });
 
+  const { planTodos, planFileName } = usePlanMonitoring(config);
+
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       if (copyModeEnabled) {
@@ -1688,6 +1691,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      planTodos,
+      planFileName,
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
@@ -1786,6 +1791,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      planTodos,
+      planFileName,
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,

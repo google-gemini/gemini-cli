@@ -16,7 +16,10 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 
-const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
+const TodoTitleDisplay: React.FC<{
+  todos: TodoList;
+  fileName?: string | null;
+}> = ({ todos, fileName }) => {
   const score = useMemo(() => {
     let total = 0;
     let completed = 0;
@@ -34,7 +37,7 @@ const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
   return (
     <Box flexDirection="row" columnGap={2} height={1}>
       <Text color={theme.text.primary} bold aria-label="Todo list">
-        Todo
+        {fileName ? `Plan: ${fileName}` : 'Todo'}
       </Text>
       <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
     </Box>
@@ -105,6 +108,9 @@ export const TodoTray: React.FC = () => {
   const uiState = useUIState();
 
   const todos: TodoList | null = useMemo(() => {
+    if (uiState.planTodos && uiState.planTodos.length > 0) {
+      return { todos: uiState.planTodos };
+    }
     // Find the most recent todo list written by the WriteTodosTool
     for (let i = uiState.history.length - 1; i >= 0; i--) {
       const entry = uiState.history[i];
@@ -123,7 +129,7 @@ export const TodoTray: React.FC = () => {
       }
     }
     return null;
-  }, [uiState.history]);
+  }, [uiState.history, uiState.planTodos]);
 
   const inProgress: Todo | null = useMemo(() => {
     if (todos === null) {
@@ -148,6 +154,8 @@ export const TodoTray: React.FC = () => {
     return null;
   }
 
+  const isPlan = uiState.planTodos && uiState.planTodos.length > 0;
+
   return (
     <Box
       borderStyle="single"
@@ -160,13 +168,19 @@ export const TodoTray: React.FC = () => {
     >
       {uiState.showFullTodos ? (
         <Box flexDirection="column" rowGap={1}>
-          <TodoTitleDisplay todos={todos} />
+          <TodoTitleDisplay
+            todos={todos}
+            fileName={isPlan ? uiState.planFileName : undefined}
+          />
           <TodoListDisplay todos={todos} />
         </Box>
       ) : (
         <Box flexDirection="row" columnGap={1} height={1}>
           <Box flexShrink={0} flexGrow={0}>
-            <TodoTitleDisplay todos={todos} />
+            <TodoTitleDisplay
+              todos={todos}
+              fileName={isPlan ? uiState.planFileName : undefined}
+            />
           </Box>
           {inProgress && (
             <Box flexShrink={1} flexGrow={1}>
