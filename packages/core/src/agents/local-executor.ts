@@ -16,7 +16,10 @@ import type {
   Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import {
+  DiscoveredMCPTool,
+  MCP_QUALIFIED_NAME_SEPARATOR,
+} from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -130,9 +133,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (tool instanceof DiscoveredMCPTool && !toolName.includes('__')) {
+        if (
+          tool instanceof DiscoveredMCPTool &&
+          !toolName.includes(MCP_QUALIFIED_NAME_SEPARATOR)
+        ) {
           throw new Error(
-            `MCP tool '${toolName}' must be requested with its server prefix (e.g., '${tool.serverName}__${toolName}') in agent '${definition.name}'.`,
+            `MCP tool '${toolName}' must be requested with its server prefix (e.g., '${tool.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}') in agent '${definition.name}'.`,
           );
         }
         agentToolRegistry.registerTool(tool);

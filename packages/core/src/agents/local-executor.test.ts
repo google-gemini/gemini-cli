@@ -17,7 +17,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import {
+  DiscoveredMCPTool,
+  MCP_QUALIFIED_NAME_SEPARATOR,
+} from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -499,7 +502,7 @@ describe('LocalAgentExecutor', () => {
     it('should enforce qualified names for MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
-      const qualifiedName = `${serverName}__${toolName}`;
+      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
 
       const mockMcpTool = {
         tool: vi.fn(),
