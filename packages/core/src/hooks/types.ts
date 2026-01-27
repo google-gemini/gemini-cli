@@ -59,6 +59,7 @@ export interface CommandHookConfig {
   description?: string;
   timeout?: number;
   source?: ConfigSource;
+  env?: Record<string, string>;
 }
 
 export type HookConfig = CommandHookConfig;
