@@ -66,7 +66,7 @@ export const useLoadingIndicator = ({
   }, [streamingState, elapsedTimeFromTimer]);
 
   const retryPhrase = retryStatus
-    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Retry ${retryStatus.attempt}/${retryStatus.maxAttempts - 1})`
     : null;
 
   return {
