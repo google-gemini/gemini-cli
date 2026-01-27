@@ -157,13 +157,18 @@ agent is used by updating the description to more clearly indicate:
 - When it should be used.
 - Some example scenarios.
 
-For example:
+For example: the following sub-agent description should be called fairly consistently
+for Git operations.
 
 > Git expert agent which should be used for all local and remote git operations.
-  For example:
-  - Making commits
-  - Searching for regressions with bisect
-  - Interacting with source control and issues providers such as GitHub.
+>  For example:
+>  - Making commits
+>  - Searching for regressions with bisect
+>  - Interacting with source control and issues providers such as GitHub.
+
+If you need to further tune your sub-agent, you can do so by selecting the model
+to optimize for with `/model` and then asking the model why it does not think that
+your sub-agent was called with a specific prompt and the given description.
 
 ## Remote agents (Agent2Agent)
 
