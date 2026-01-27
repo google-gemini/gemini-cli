@@ -24,6 +24,7 @@ import type {
   IdeInfo,
   FallbackIntent,
   ValidationIntent,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -70,6 +71,10 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isAgentConfigDialogOpen: boolean;
+  selectedAgentName?: string;
+  selectedAgentDisplayName?: string;
+  selectedAgentDefinition?: AgentDefinition;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;
@@ -89,6 +94,7 @@ export interface UIState {
   inputWidth: number;
   suggestionsWidth: number;
   isInputActive: boolean;
+  isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
   isTrustedFolder: boolean | undefined;
@@ -149,6 +155,7 @@ export interface UIState {
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
   adminSettingsChanged: boolean;
+  newAgents: AgentDefinition[] | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

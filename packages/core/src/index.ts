@@ -39,7 +39,6 @@ export * from './core/coreToolScheduler.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
-export * from './core/nonInteractiveToolExecutor.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
@@ -47,6 +46,7 @@ export * from './fallback/types.js';
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
+export * from './code_assist/setup.js';
 export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
 export * from './core/apiKeyCredentialStorage.js';
@@ -94,6 +94,7 @@ export * from './utils/checkpointUtils.js';
 export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
+export * from './utils/constants.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

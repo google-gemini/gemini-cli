@@ -59,6 +59,7 @@ export interface CommandHookConfig {
   description?: string;
   timeout?: number;
   source?: ConfigSource;
+  env?: Record<string, string>;
 }
 
 export type HookConfig = CommandHookConfig;
@@ -140,6 +141,8 @@ export function createHookOutput(
       return new BeforeToolSelectionHookOutput(data);
     case 'BeforeTool':
       return new BeforeToolHookOutput(data);
+    case 'AfterAgent':
+      return new AfterAgentHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -213,7 +216,7 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Get additional context for adding to responses
+   * Get sanitized additional context for adding to responses.
    */
   getAdditionalContext(): string | undefined {
     if (
@@ -221,7 +224,12 @@ export class DefaultHookOutput implements HookOutput {
       'additionalContext' in this.hookSpecificOutput
     ) {
       const context = this.hookSpecificOutput['additionalContext'];
-      return typeof context === 'string' ? context : undefined;
+      if (typeof context !== 'string') {
+        return undefined;
+      }
+
+      // Sanitize by escaping < and > to prevent tag injection
+      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     return undefined;
   }
@@ -237,6 +245,13 @@ export class DefaultHookOutput implements HookOutput {
       };
     }
     return { blocked: false, reason: '' };
+  }
+
+  /**
+   * Check if context clearing was requested by hook.
+   */
+  shouldClearContext(): boolean {
+    return false;
   }
 }
 
@@ -363,6 +378,21 @@ export class AfterModelHookOutput extends DefaultHookOutput {
 }
 
 /**
+ * Specific hook output class for AfterAgent events
+ */
+export class AfterAgentHookOutput extends DefaultHookOutput {
+  /**
+   * Check if context clearing was requested by hook
+   */
+  override shouldClearContext(): boolean {
+    if (this.hookSpecificOutput && 'clearContext' in this.hookSpecificOutput) {
+      return this.hookSpecificOutput['clearContext'] === true;
+    }
+    return false;
+  }
+}
+
+/**
  * Context for MCP tool executions.
  * Contains non-sensitive connection information about the MCP server
  * identity. Since server_name is user controlled and arbitrary, we
@@ -473,6 +503,16 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+}
+
+/**
+ * AfterAgent hook output
+ */
+export interface AfterAgentOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'AfterAgent';
+    clearContext?: boolean;
+  };
 }
 
 /**
