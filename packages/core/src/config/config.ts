@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import type {
@@ -116,6 +117,7 @@ import {
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
+import { isSubpath } from '../utils/paths.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -498,7 +500,8 @@ export class Config {
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
-  private readonly interactive: boolean;
+  /** Public for testing only */
+  readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
@@ -644,7 +647,7 @@ export class Config {
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
-    this.skillsSupport = params.skillsSupport ?? false;
+    this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -1699,6 +1702,57 @@ export class Config {
    */
   getFileSystemService(): FileSystemService {
     return this.fileSystemService;
+  }
+
+  /**
+   * Checks if a given absolute path is allowed for file system operations.
+   * A path is allowed if it's within the workspace context or the project's temporary directory.
+   *
+   * @param absolutePath The absolute path to check.
+   * @returns true if the path is allowed, false otherwise.
+   */
+  isPathAllowed(absolutePath: string): boolean {
+    if (this.interactive && path.isAbsolute(absolutePath)) {
+      return true;
+    }
+
+    const realpath = (p: string) => {
+      let resolved: string;
+      try {
+        resolved = fs.realpathSync(p);
+      } catch {
+        resolved = path.resolve(p);
+      }
+      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
+    };
+
+    const resolvedPath = realpath(absolutePath);
+
+    const workspaceContext = this.getWorkspaceContext();
+    if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
+      return true;
+    }
+
+    const projectTempDir = this.storage.getProjectTempDir();
+    const resolvedTempDir = realpath(projectTempDir);
+
+    return isSubpath(resolvedTempDir, resolvedPath);
+  }
+
+  /**
+   * Validates if a path is allowed and returns a detailed error message if not.
+   *
+   * @param absolutePath The absolute path to validate.
+   * @returns An error message string if the path is disallowed, null otherwise.
+   */
+  validatePathAccess(absolutePath: string): string | null {
+    if (this.isPathAllowed(absolutePath)) {
+      return null;
+    }
+
+    const workspaceDirs = this.getWorkspaceContext().getDirectories();
+    const projectTempDir = this.storage.getProjectTempDir();
+    return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
   }
 
   /**

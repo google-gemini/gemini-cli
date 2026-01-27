@@ -118,9 +118,14 @@ they appear in the UI.
 
 | UI Label         | Setting                      | Description                                                                         | Default |
 | ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Agent Skills     | `experimental.skills`        | Enable Agent Skills (experimental).                                                 | `false` |
 | Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
+
+### Skills
+
+| UI Label            | Setting          | Description          | Default |
+| ------------------- | ---------------- | -------------------- | ------- |
+| Enable Agent Skills | `skills.enabled` | Enable Agent Skills. | `true`  |
 
 ### HooksConfig
 

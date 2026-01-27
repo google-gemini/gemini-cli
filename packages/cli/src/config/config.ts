@@ -304,7 +304,7 @@ export async function parseArguments(
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
+  if (settings.skills?.enabled ?? true) {
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
@@ -755,8 +755,7 @@ export async function loadCliConfig(
     plan: settings.experimental?.plan,
     enableEventDrivenScheduler:
       settings.experimental?.enableEventDrivenScheduler,
-    skillsSupport:
-      settings.experimental?.skills || (settings.skills?.enabled ?? true),
+    skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],

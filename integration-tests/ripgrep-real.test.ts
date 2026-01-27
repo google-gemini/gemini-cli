@@ -39,6 +39,10 @@ class MockConfig {
       customIgnoreFilePaths: [],
     };
   }
+
+  validatePathAccess() {
+    return null;
+  }
 }
 
 describe('ripgrep-real-direct', () => {

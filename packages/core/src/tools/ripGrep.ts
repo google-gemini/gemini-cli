@@ -6,11 +6,12 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -80,51 +81,6 @@ export async function ensureRgPath(): Promise<string> {
     return downloadedPath;
   }
   throw new Error('Cannot use ripgrep.');
-}
-
-/**
- * Checks if a path is within the root directory and resolves it.
- * @param config The configuration object.
- * @param relativePath Path relative to the root directory (or undefined for root).
- * @returns The absolute path if valid and exists, or null if no path specified.
- * @throws {Error} If path is outside root, doesn't exist, or isn't a directory/file.
- */
-function resolveAndValidatePath(
-  config: Config,
-  relativePath?: string,
-): string | null {
-  if (!relativePath) {
-    return null;
-  }
-
-  const targetDir = config.getTargetDir();
-  const targetPath = path.resolve(targetDir, relativePath);
-
-  // Ensure the resolved path is within workspace boundaries
-  const workspaceContext = config.getWorkspaceContext();
-  if (!workspaceContext.isPathWithinWorkspace(targetPath)) {
-    const directories = workspaceContext.getDirectories();
-    throw new Error(
-      `Path validation failed: Attempted path "${relativePath}" resolves outside the allowed workspace directories: ${directories.join(', ')}`,
-    );
-  }
-
-  // Check existence and type after resolving
-  try {
-    const stats = fs.statSync(targetPath);
-    if (!stats.isDirectory() && !stats.isFile()) {
-      throw new Error(
-        `Path is not a valid directory or file: ${targetPath} (CWD: ${targetDir})`,
-      );
-    }
-  } catch (error: unknown) {
-    if (isNodeError(error) && error.code === 'ENOENT') {
-      throw new Error(`Path does not exist: ${targetPath} (CWD: ${targetDir})`);
-    }
-    throw new Error(`Failed to access path stats for ${targetPath}: ${error}`);
-  }
-
-  return targetPath;
 }
 
 /**
@@ -207,7 +163,45 @@ class GrepToolInvocation extends BaseToolInvocation<
       // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
 
-      const searchDirAbs = resolveAndValidatePath(this.config, pathParam);
+      const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
+      const validationError = this.config.validatePathAccess(searchDirAbs);
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Error: Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
+
+      // Check existence and type asynchronously
+      try {
+        const stats = await fsPromises.stat(searchDirAbs);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return {
+            llmContent: `Path is not a valid directory or file: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path is not a valid directory or file.',
+          };
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return {
+            llmContent: `Path does not exist: ${searchDirAbs}`,
+            returnDisplay: 'Error: Path does not exist.',
+            error: {
+              message: `Path does not exist: ${searchDirAbs}`,
+              type: ToolErrorType.FILE_NOT_FOUND,
+            },
+          };
+        }
+        return {
+          llmContent: `Failed to access path stats for ${searchDirAbs}: ${getErrorMessage(error)}`,
+          returnDisplay: 'Error: Failed to access path.',
+        };
+      }
+
       const searchDirDisplay = pathParam;
 
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
@@ -233,7 +227,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       try {
         allMatches = await this.performRipgrepSearch({
           pattern: this.params.pattern,
-          path: searchDirAbs!,
+          path: searchDirAbs,
           include: this.params.include,
           case_sensitive: this.params.case_sensitive,
           fixed_strings: this.params.fixed_strings,
@@ -569,21 +563,37 @@ export class RipGrepTool extends BaseDeclarativeTool<
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  override validateToolParams(params: RipGrepToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: RipGrepToolParams,
+  ): string | null {
+    try {
+      new RegExp(params.pattern);
+    } catch (error) {
+      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
     }
 
     // Only validate path if one is provided
     if (params.dir_path) {
+      const resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        params.dir_path,
+      );
+      const validationError = this.config.validatePathAccess(resolvedPath);
+      if (validationError) {
+        return validationError;
+      }
+
+      // Check existence and type
       try {
-        resolveAndValidatePath(this.config, params.dir_path);
-      } catch (error) {
-        return getErrorMessage(error);
+        const stats = fs.statSync(resolvedPath);
+        if (!stats.isDirectory() && !stats.isFile()) {
+          return `Path is not a valid directory or file: ${resolvedPath}`;
+        }
+      } catch (error: unknown) {
+        if (isNodeError(error) && error.code === 'ENOENT') {
+          return `Path does not exist: ${resolvedPath}`;
+        }
+        return `Failed to access path stats for ${resolvedPath}: ${getErrorMessage(error)}`;
       }
     }
 
