@@ -88,7 +88,7 @@
     "items": [
       {
         "label": "Get started with extensions",
-        "slug": "docs/extensions/getting-started-extensions"
+        "slug": "docs/extensions/writing-extensions"
       },
       { "label": "How to write hooks", "slug": "docs/hooks/writing-hooks" }
     ]
@@ -119,7 +119,7 @@
   {
     "label": "Development",
     "items": [
-      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },
+      { "label": "Contribution guide", "slug": "docs/contributing" },
       { "label": "Integration testing", "slug": "docs/integration-tests" },
       {
         "label": "Issue and PR automation",
