@@ -72,7 +72,7 @@ describe('DialogManager', () => {
     constrainHeight: false,
     terminalHeight: 24,
     staticExtraHeight: 0,
-    mainAreaWidth: 80,
+    terminalWidth: 80,
     confirmUpdateExtensionRequests: [],
     showIdeRestartPrompt: false,
     proQuotaRequest: null,
