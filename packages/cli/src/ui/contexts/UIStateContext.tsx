@@ -25,6 +25,7 @@ import type {
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  Todo,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -144,6 +145,8 @@ export interface UIState {
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
+  planTodos: Todo[] | null;
+  planFileName: string | null;
   copyModeEnabled: boolean;
   warningMessage: string | null;
   bannerData: {
