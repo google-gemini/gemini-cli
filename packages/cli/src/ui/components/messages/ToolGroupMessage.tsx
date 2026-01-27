@@ -15,6 +15,7 @@ import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool, isThisShellFocused } from './ToolShared.js';
+import { ASK_USER_DISPLAY_NAME } from '@google/gemini-cli-core';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -27,15 +28,30 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
 }
 
+// Helper to identify Ask User tools that are in progress (have their own dialog UI)
+const isAskUserInProgress = (t: IndividualToolCallDisplay): boolean =>
+  t.name === ASK_USER_DISPLAY_NAME &&
+  [
+    ToolCallStatus.Pending,
+    ToolCallStatus.Executing,
+    ToolCallStatus.Confirming,
+  ].includes(t.status);
+
 // Main component renders the border and maps the tools using ToolMessage
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
-  toolCalls,
+  toolCalls: allToolCalls,
   availableTerminalHeight,
   terminalWidth,
   isFocused = true,
   activeShellPtyId,
   embeddedShellFocused,
 }) => {
+  // Filter out in-progress Ask User tools (they have their own AskUserDialog UI)
+  const toolCalls = useMemo(
+    () => allToolCalls.filter((t) => !isAskUserInProgress(t)),
+    [allToolCalls],
+  );
+
   const config = useConfig();
 
   const isEventDriven = config.isEventDrivenSchedulerEnabled();

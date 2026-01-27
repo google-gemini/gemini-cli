@@ -26,6 +26,7 @@ import {
 } from '../ui/contexts/UIActionsContext.js';
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -300,20 +301,28 @@ export const renderWithProviders = (
                       config={config}
                       toolCalls={allToolCalls}
                     >
-                      <KeypressProvider>
-                        <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                          <ScrollProvider>
-                            <Box
-                              width={terminalWidth}
-                              flexShrink={0}
-                              flexGrow={0}
-                              flexDirection="column"
-                            >
-                              {component}
-                            </Box>
-                          </ScrollProvider>
-                        </MouseProvider>
-                      </KeypressProvider>
+                      <AskUserActionsProvider
+                        request={null}
+                        onSubmit={vi.fn()}
+                        onCancel={vi.fn()}
+                      >
+                        <KeypressProvider>
+                          <MouseProvider
+                            mouseEventsEnabled={mouseEventsEnabled}
+                          >
+                            <ScrollProvider>
+                              <Box
+                                width={terminalWidth}
+                                flexShrink={0}
+                                flexGrow={0}
+                                flexDirection="column"
+                              >
+                                {component}
+                              </Box>
+                            </ScrollProvider>
+                          </MouseProvider>
+                        </KeypressProvider>
+                      </AskUserActionsProvider>
                     </ToolActionsProvider>
                   </UIActionsContext.Provider>
                 </StreamingContext.Provider>
