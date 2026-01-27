@@ -42,9 +42,26 @@ export interface UserData {
 }
 
 /**
+ * Sets up the user by loading their Code Assist configuration and onboarding if needed.
  *
- * @param projectId the user's project id, if any
- * @returns the user's actual project id
+ * Tier eligibility:
+ * - FREE tier: Eligibility is determined by the Code Assist server response.
+ * - STANDARD tier: User is always eligible if they have a valid project ID.
+ *
+ * If no valid project ID is available (from env var or server response):
+ * - Surfaces ineligibility reasons for the FREE tier from the server.
+ * - Throws ProjectIdRequiredError if no ineligibility reasons are available.
+ *
+ * Handles VALIDATION_REQUIRED via the optional validation handler, allowing
+ * retry, auth change, or cancellation.
+ *
+ * @param client - The authenticated client to use for API calls
+ * @param validationHandler - Optional handler for account validation flow
+ * @returns The user's project ID, tier ID, and tier name
+ * @throws {ValidationRequiredError} If account validation is required
+ * @throws {ProjectIdRequiredError} If no project ID is available and required
+ * @throws {ValidationCancelledError} If user cancels validation
+ * @throws {ChangeAuthRequestedError} If user requests to change auth method
  */
 export async function setupUser(
   client: AuthClient,
@@ -107,6 +124,14 @@ export async function setupUser(
           userTier: loadRes.currentTier.id,
           userTierName: loadRes.currentTier.name,
         };
+      }
+
+      // If user is not setup for standard tier, inform them about all other tiers they are ineligible for.
+      if (loadRes.ineligibleTiers && loadRes.ineligibleTiers.length > 0) {
+        const reasons = loadRes.ineligibleTiers
+          .map((t) => t.reasonMessage)
+          .join(', ');
+        throw new Error(reasons);
       }
       throw new ProjectIdRequiredError();
     }
@@ -188,7 +213,6 @@ function validateLoadCodeAssistResponse(res: LoadCodeAssistResponse): void {
     res.ineligibleTiers &&
     res.ineligibleTiers.length > 0
   ) {
-    // Check for VALIDATION_REQUIRED first - this is a recoverable state
     const validationTier = res.ineligibleTiers.find(
       (t) =>
         t.validationUrl &&
@@ -203,9 +227,5 @@ function validateLoadCodeAssistResponse(res: LoadCodeAssistResponse): void {
         validationTier.reasonMessage,
       );
     }
-
-    // For other ineligibility reasons, throw a generic error
-    const reasons = res.ineligibleTiers.map((t) => t.reasonMessage).join(', ');
-    throw new Error(reasons);
   }
 }
