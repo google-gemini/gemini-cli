@@ -480,9 +480,6 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
-      // VS Code's terminal doesn't handle clearTerminal well - it causes constant
-      // scrolling to top. Instead, just force a re-render without clearing.
-      // See: https://github.com/Ujjiyara/gemini-cli/issues/XXX
       if (!isVSCodeTerminal()) {
         stdout.write(ansiEscapes.clearTerminal);
       }
