@@ -2093,5 +2093,63 @@ describe('runNonInteractive', () => {
         expect.stringContaining('[WARNING] --raw-output is enabled'),
       );
     });
+
+    it('should report cancelled tool calls as success in stream-json mode (legacy parity)', async () => {
+      const toolCallEvent: ServerGeminiStreamEvent = {
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          callId: 'tool-1',
+          name: 'testTool',
+          args: { arg1: 'value1' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-cancel',
+        },
+      };
+
+      // Mock the scheduler to return a cancelled status
+      mockSchedulerSchedule.mockResolvedValue([
+        {
+          status: 'cancelled',
+          request: toolCallEvent.value,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'tool-1',
+            responseParts: [{ text: 'Operation cancelled' }],
+            resultDisplay: 'Cancelled',
+          },
+        },
+      ]);
+
+      const events: ServerGeminiStreamEvent[] = [
+        toolCallEvent,
+        {
+          type: GeminiEventType.Content,
+          value: 'Model continues...',
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-cancel',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"tool_result"');
+      expect(output).toContain('"status":"success"');
+    });
   });
 });

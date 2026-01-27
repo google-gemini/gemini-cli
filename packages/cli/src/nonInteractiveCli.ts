@@ -397,7 +397,7 @@ export async function runNonInteractive({
                 timestamp: new Date().toISOString(),
                 tool_id: requestInfo.callId,
                 status:
-                  completedToolCall.status === 'success' ? 'success' : 'error',
+                  completedToolCall.status === 'error' ? 'error' : 'success',
                 output:
                   typeof toolResponse.resultDisplay === 'string'
                     ? toolResponse.resultDisplay
