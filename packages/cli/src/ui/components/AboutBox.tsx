@@ -17,7 +17,6 @@ interface AboutBoxProps {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
-  userEmail?: string;
   tier?: string;
 }
 
@@ -29,7 +28,6 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   selectedAuthType,
   gcpProject,
   ideClient,
-  userEmail,
   tier,
 }) => (
   <Box
@@ -106,9 +104,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
       <Box>
         <Text color={theme.text.primary}>
           {selectedAuthType.startsWith('oauth')
-            ? userEmail
-              ? `Logged in with Google (${userEmail})`
-              : 'Logged in with Google'
+            ? 'Logged in with Google'
             : selectedAuthType}
         </Text>
       </Box>

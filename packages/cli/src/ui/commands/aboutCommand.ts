@@ -8,12 +8,7 @@ import type { CommandContext, SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
-import {
-  IdeClient,
-  UserAccountManager,
-  debugLogger,
-  getVersion,
-} from '@google/gemini-cli-core';
+import { IdeClient, getVersion } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
@@ -37,13 +32,6 @@ export const aboutCommand: SlashCommand = {
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient = await getIdeClientName(context);
 
-    const userAccountManager = new UserAccountManager();
-    const cachedAccount = userAccountManager.getCachedGoogleAccount();
-    debugLogger.log('AboutCommand: Retrieved cached Google account', {
-      cachedAccount,
-    });
-    const userEmail = cachedAccount ?? undefined;
-
     const tier = context.services.config?.getUserTierName();
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
@@ -55,7 +43,6 @@ export const aboutCommand: SlashCommand = {
       selectedAuthType,
       gcpProject,
       ideClient,
-      userEmail,
       tier,
     };
 

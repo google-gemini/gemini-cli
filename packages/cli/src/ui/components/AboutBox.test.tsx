@@ -48,13 +48,6 @@ describe('AboutBox', () => {
     expect(output).toContain(value);
   });
 
-  it('renders Auth Method with email when userEmail is provided', () => {
-    const props = { ...defaultProps, userEmail: 'test@example.com' };
-    const { lastFrame } = render(<AboutBox {...props} />);
-    const output = lastFrame();
-    expect(output).toContain('Logged in with Google (test@example.com)');
-  });
-
   it('renders Auth Method correctly when not oauth', () => {
     const props = { ...defaultProps, selectedAuthType: 'api-key' };
     const { lastFrame } = render(<AboutBox {...props} />);
