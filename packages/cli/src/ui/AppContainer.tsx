@@ -1895,6 +1895,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setEmbeddedShellFocused,
       setAuthContext,
       handleRestart: async () => {
+        if (process.send) {
+          const remoteSettings = config.getRemoteAdminSettings();
+          if (remoteSettings) {
+            process.send({
+              type: 'admin-settings-update',
+              settings: remoteSettings,
+            });
+          }
+        }
         await runExitCleanup();
         process.exit(RELAUNCH_EXIT_CODE);
       },
@@ -1970,6 +1979,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           setAuthContext({});
           setAuthState(AuthState.Updating);
         }}
+        config={config}
       />
     );
   }
