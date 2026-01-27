@@ -119,7 +119,7 @@ function startAdminControlsPolling(
         debugLogger.error('Failed to poll admin controls: ', e);
       }
     },
-    5 * 60 * 1000,
+    1 * 60 * 1000,
   ); // 5 minutes
 }
 
