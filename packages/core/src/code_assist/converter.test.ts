@@ -29,26 +29,27 @@ describe('converter', () => {
         model: 'gemini-pro',
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
+      const metadata = { ideType: 'IDE_UNSPECIFIED' as const };
       const codeAssistReq = toGenerateContentRequest(
         genaiReq,
         'my-prompt',
         'my-project',
         'my-session',
+        metadata,
       );
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
-        request: {
-          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-          systemInstruction: undefined,
-          cachedContent: undefined,
-          tools: undefined,
-          toolConfig: undefined,
-          labels: undefined,
-          safetySettings: undefined,
-          generationConfig: undefined,
-          session_id: 'my-session',
-        },
+        metadata,
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        systemInstruction: undefined,
+        cachedContent: undefined,
+        tools: undefined,
+        toolConfig: undefined,
+        labels: undefined,
+        safetySettings: undefined,
+        generationConfig: undefined,
+        session_id: 'my-session',
         user_prompt_id: 'my-prompt',
       });
     });
@@ -67,17 +68,15 @@ describe('converter', () => {
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: undefined,
-        request: {
-          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-          systemInstruction: undefined,
-          cachedContent: undefined,
-          tools: undefined,
-          toolConfig: undefined,
-          labels: undefined,
-          safetySettings: undefined,
-          generationConfig: undefined,
-          session_id: 'my-session',
-        },
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        systemInstruction: undefined,
+        cachedContent: undefined,
+        tools: undefined,
+        toolConfig: undefined,
+        labels: undefined,
+        safetySettings: undefined,
+        generationConfig: undefined,
+        session_id: 'my-session',
         user_prompt_id: 'my-prompt',
       });
     });
@@ -96,17 +95,15 @@ describe('converter', () => {
       expect(codeAssistReq).toEqual({
         model: 'gemini-pro',
         project: 'my-project',
-        request: {
-          contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
-          systemInstruction: undefined,
-          cachedContent: undefined,
-          tools: undefined,
-          toolConfig: undefined,
-          labels: undefined,
-          safetySettings: undefined,
-          generationConfig: undefined,
-          session_id: 'session-123',
-        },
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        systemInstruction: undefined,
+        cachedContent: undefined,
+        tools: undefined,
+        toolConfig: undefined,
+        labels: undefined,
+        safetySettings: undefined,
+        generationConfig: undefined,
+        session_id: 'session-123',
         user_prompt_id: 'my-prompt',
       });
     });
@@ -122,7 +119,7 @@ describe('converter', () => {
         'my-project',
         'my-session',
       );
-      expect(codeAssistReq.request.contents).toEqual([
+      expect(codeAssistReq.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
       ]);
     });
@@ -138,7 +135,7 @@ describe('converter', () => {
         'my-project',
         'my-session',
       );
-      expect(codeAssistReq.request.contents).toEqual([
+      expect(codeAssistReq.contents).toEqual([
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'user', parts: [{ text: 'World' }] },
       ]);
@@ -158,7 +155,7 @@ describe('converter', () => {
         'my-project',
         'my-session',
       );
-      expect(codeAssistReq.request.systemInstruction).toEqual({
+      expect(codeAssistReq.systemInstruction).toEqual({
         role: 'user',
         parts: [{ text: 'You are a helpful assistant.' }],
       });
@@ -179,7 +176,7 @@ describe('converter', () => {
         'my-project',
         'my-session',
       );
-      expect(codeAssistReq.request.generationConfig).toEqual({
+      expect(codeAssistReq.generationConfig).toEqual({
         temperature: 0.8,
         topK: 40,
       });
@@ -210,7 +207,7 @@ describe('converter', () => {
         'my-project',
         'my-session',
       );
-      expect(codeAssistReq.request.generationConfig).toEqual({
+      expect(codeAssistReq.generationConfig).toEqual({
         temperature: 0.1,
         topP: 0.2,
         topK: 3,
@@ -230,82 +227,70 @@ describe('converter', () => {
   describe('fromCodeAssistResponse', () => {
     it('should convert a simple response', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [
-            {
-              index: 0,
-              content: {
-                role: 'model',
-                parts: [{ text: 'Hi there!' }],
-              },
-              finishReason: FinishReason.STOP,
-              safetyRatings: [],
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [{ text: 'Hi there!' }],
             },
-          ],
-        },
+            finishReason: FinishReason.STOP,
+            safetyRatings: [],
+          },
+        ],
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes).toBeInstanceOf(GenerateContentResponse);
-      expect(genaiRes.candidates).toEqual(codeAssistRes.response.candidates);
+      expect(genaiRes.candidates).toEqual(codeAssistRes.candidates);
     });
 
     it('should handle prompt feedback and usage metadata', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [],
-          promptFeedback: {
-            blockReason: BlockedReason.SAFETY,
-            safetyRatings: [],
-          },
-          usageMetadata: {
-            promptTokenCount: 10,
-            candidatesTokenCount: 20,
-            totalTokenCount: 30,
-          },
+        candidates: [],
+        promptFeedback: {
+          blockReason: BlockedReason.SAFETY,
+          safetyRatings: [],
+        },
+        usageMetadata: {
+          promptTokenCount: 10,
+          candidatesTokenCount: 20,
+          totalTokenCount: 30,
         },
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
-      expect(genaiRes.promptFeedback).toEqual(
-        codeAssistRes.response.promptFeedback,
-      );
-      expect(genaiRes.usageMetadata).toEqual(
-        codeAssistRes.response.usageMetadata,
-      );
+      expect(genaiRes.promptFeedback).toEqual(codeAssistRes.promptFeedback);
+      expect(genaiRes.usageMetadata).toEqual(codeAssistRes.usageMetadata);
     });
 
     it('should handle automatic function calling history', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [],
-          automaticFunctionCallingHistory: [
-            {
-              role: 'model',
-              parts: [
-                {
-                  functionCall: {
-                    name: 'test_function',
-                    args: {
-                      foo: 'bar',
-                    },
+        candidates: [],
+        automaticFunctionCallingHistory: [
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  name: 'test_function',
+                  args: {
+                    foo: 'bar',
                   },
                 },
-              ],
-            },
-          ],
-        },
+              },
+            ],
+          },
+        ],
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.automaticFunctionCallingHistory).toEqual(
-        codeAssistRes.response.automaticFunctionCallingHistory,
+        codeAssistRes.automaticFunctionCallingHistory,
       );
     });
 
     it('should handle modelVersion', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [],
-          modelVersion: 'gemini-2.5-pro',
-        },
+        candidates: [],
+        modelVersion: 'gemini-2.5-pro',
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.modelVersion).toEqual('gemini-2.5-pro');
@@ -313,9 +298,7 @@ describe('converter', () => {
 
     it('should handle traceId', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [],
-        },
+        candidates: [],
         traceId: 'my-trace-id',
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
@@ -324,9 +307,7 @@ describe('converter', () => {
 
     it('should handle missing traceId', () => {
       const codeAssistRes: CaGenerateContentResponse = {
-        response: {
-          candidates: [],
-        },
+        candidates: [],
       };
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.responseId).toBeUndefined();

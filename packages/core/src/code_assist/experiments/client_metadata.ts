@@ -47,6 +47,7 @@ export async function getClientMetadata(): Promise<ClientMetadata> {
   if (!clientMetadataPromise) {
     clientMetadataPromise = (async () => ({
       ideName: 'IDE_UNSPECIFIED',
+      ideType: 'IDE_UNSPECIFIED',
       pluginType: 'GEMINI',
       ideVersion: await getVersion(),
       platform: getPlatform(),

@@ -76,6 +76,7 @@ export class CodeAssistServer implements ContentGenerator {
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const metadata = await getClientMetadata();
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
         'streamGenerateContent',
@@ -84,6 +85,7 @@ export class CodeAssistServer implements ContentGenerator {
           userPromptId,
           this.projectId,
           this.sessionId,
+          { ...metadata, duetProject: this.projectId },
         ),
         req.config?.abortSignal,
       );
@@ -127,6 +129,7 @@ export class CodeAssistServer implements ContentGenerator {
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
     const start = Date.now();
+    const metadata = await getClientMetadata();
     const response = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
@@ -134,6 +137,7 @@ export class CodeAssistServer implements ContentGenerator {
         userPromptId,
         this.projectId,
         this.sessionId,
+        { ...metadata, duetProject: this.projectId },
       ),
       req.config?.abortSignal,
     );
@@ -210,9 +214,13 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async countTokens(req: CountTokensParameters): Promise<CountTokensResponse> {
+    const metadata = await getClientMetadata();
     const resp = await this.requestPost<CaCountTokenResponse>(
       'countTokens',
-      toCountTokenRequest(req),
+      toCountTokenRequest(req, this.projectId, {
+        ...metadata,
+        duetProject: this.projectId,
+      }),
     );
     return fromCountTokenResponse(resp);
   }
@@ -253,9 +261,10 @@ export class CodeAssistServer implements ContentGenerator {
       return;
     }
 
+    const metadata = await getClientMetadata();
     await this.recordCodeAssistMetrics({
       project: this.projectId,
-      metadata: await getClientMetadata(),
+      metadata: { ...metadata, duetProject: this.projectId },
       metrics: [{ conversationOffered, timestamp: new Date().toISOString() }],
     });
   }
@@ -267,9 +276,10 @@ export class CodeAssistServer implements ContentGenerator {
       return;
     }
 
+    const metadata = await getClientMetadata();
     await this.recordCodeAssistMetrics({
       project: this.projectId,
-      metadata: await getClientMetadata(),
+      metadata: { ...metadata, duetProject: this.projectId },
       metrics: [
         {
           conversationInteraction: interaction,

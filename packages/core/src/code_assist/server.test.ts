@@ -9,8 +9,12 @@ import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
 import { FinishReason } from '@google/genai';
+import { getClientMetadata } from './experiments/client_metadata.js';
 
 vi.mock('google-auth-library');
+vi.mock('./experiments/client_metadata.js', () => ({
+  getClientMetadata: vi.fn(),
+}));
 
 function createTestServer(headers: Record<string, string> = {}) {
   const mockRequest = vi.fn();
@@ -28,6 +32,10 @@ function createTestServer(headers: Record<string, string> = {}) {
 describe('CodeAssistServer', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(getClientMetadata).mockResolvedValue({
+      ideName: 'IDE_UNSPECIFIED',
+      pluginType: 'GEMINI',
+    });
   });
 
   it('should be able to be constructed', () => {
@@ -47,19 +55,17 @@ describe('CodeAssistServer', () => {
       'x-custom-header': 'test-value',
     });
     const mockResponseData = {
-      response: {
-        candidates: [
-          {
-            index: 0,
-            content: {
-              role: 'model',
-              parts: [{ text: 'response' }],
-            },
-            finishReason: FinishReason.STOP,
-            safetyRatings: [],
+      candidates: [
+        {
+          index: 0,
+          content: {
+            role: 'model',
+            parts: [{ text: 'response' }],
           },
-        ],
-      },
+          finishReason: FinishReason.STOP,
+          safetyRatings: [],
+        },
+      ],
     };
     mockRequest.mockResolvedValue({ data: mockResponseData });
 
@@ -86,6 +92,11 @@ describe('CodeAssistServer', () => {
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
     expect(requestBody.user_prompt_id).toBe('user-prompt-id');
     expect(requestBody.project).toBe('test-project');
+    expect(requestBody.metadata).toEqual({
+      ideName: 'IDE_UNSPECIFIED',
+      pluginType: 'GEMINI',
+      duetProject: 'test-project',
+    });
 
     expect(response.candidates?.[0]?.content?.parts?.[0]?.text).toBe(
       'response',
@@ -96,22 +107,20 @@ describe('CodeAssistServer', () => {
     const { server, mockRequest } = createTestServer();
     const mockResponseData = {
       traceId: 'test-trace-id',
-      response: {
-        candidates: [
-          {
-            index: 0,
-            content: {
-              role: 'model',
-              parts: [
-                { text: 'response' },
-                { functionCall: { name: 'test', args: {} } },
-              ],
-            },
-            finishReason: FinishReason.SAFETY,
-            safetyRatings: [],
+      candidates: [
+        {
+          index: 0,
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'response' },
+              { functionCall: { name: 'test', args: {} } },
+            ],
           },
-        ],
-      },
+          finishReason: FinishReason.SAFETY,
+          safetyRatings: [],
+        },
+      ],
     };
     mockRequest.mockResolvedValue({ data: mockResponseData });
 
@@ -139,25 +148,23 @@ describe('CodeAssistServer', () => {
     const { server, mockRequest } = createTestServer();
     const mockResponseData = {
       traceId: 'test-trace-id',
-      response: {
-        candidates: [
-          {
-            index: 0,
-            content: {
-              role: 'model',
-              parts: [
-                { text: 'response' },
-                { functionCall: { name: 'test', args: {} } },
-              ],
-            },
-            finishReason: FinishReason.STOP,
-            safetyRatings: [],
+      candidates: [
+        {
+          index: 0,
+          content: {
+            role: 'model',
+            parts: [
+              { text: 'response' },
+              { functionCall: { name: 'test', args: {} } },
+            ],
           },
-        ],
-        sdkHttpResponse: {
-          responseInternal: {
-            ok: true,
-          },
+          finishReason: FinishReason.STOP,
+          safetyRatings: [],
+        },
+      ],
+      sdkHttpResponse: {
+        responseInternal: {
+          ok: true,
         },
       },
     };
@@ -212,21 +219,19 @@ describe('CodeAssistServer', () => {
 
     const mockResponseData = {
       traceId: 'stream-trace-id',
-      response: {
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: 'chunk' },
-                { functionCall: { name: 'test', args: {} } },
-              ],
-            },
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: 'chunk' },
+              { functionCall: { name: 'test', args: {} } },
+            ],
           },
-        ],
-        sdkHttpResponse: {
-          responseInternal: {
-            ok: true,
-          },
+        },
+      ],
+      sdkHttpResponse: {
+        responseInternal: {
+          ok: true,
         },
       },
     };
@@ -339,10 +344,10 @@ describe('CodeAssistServer', () => {
     });
 
     const mockResponseData1 = {
-      response: { candidates: [{ content: { parts: [{ text: 'Hello' }] } }] },
+      candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
     };
     const mockResponseData2 = {
-      response: { candidates: [{ content: { parts: [{ text: ' World' }] } }] },
+      candidates: [{ content: { parts: [{ text: ' World' }] } }],
     };
 
     mockRequest.mockResolvedValue({ data: mockStream });
@@ -483,17 +488,22 @@ describe('CodeAssistServer', () => {
   });
 
   it('should return 0 for countTokens', async () => {
-    const { server } = createTestServer();
+    const { server, mockRequest } = createTestServer();
     const mockResponse = {
       totalTokens: 100,
     };
-    vi.spyOn(server, 'requestPost').mockResolvedValue(mockResponse);
+    mockRequest.mockResolvedValue({ data: mockResponse });
 
     const response = await server.countTokens({
       model: 'test-model',
       contents: [{ role: 'user', parts: [{ text: 'request' }] }],
     });
     expect(response.totalTokens).toBe(100);
+
+    const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
+    expect(requestBody.model).toBe('models/test-model');
+    expect(requestBody.project).toBe('test-project');
+    expect(requestBody.metadata).toBeDefined();
   });
 
   it('should throw an error for embedContent', async () => {

@@ -27,12 +27,13 @@ import type {
   ToolConfig,
 } from '@google/genai';
 import { GenerateContentResponse } from '@google/genai';
+import type { ClientMetadata } from './types.js';
 
-export interface CAGenerateContentRequest {
+export interface CAGenerateContentRequest extends VertexGenerateContentRequest {
   model: string;
   project?: string;
   user_prompt_id?: string;
-  request: VertexGenerateContentRequest;
+  metadata?: ClientMetadata;
 }
 
 interface VertexGenerateContentRequest {
@@ -71,8 +72,8 @@ interface VertexGenerationConfig {
   thinkingConfig?: ThinkingConfig;
 }
 
-export interface CaGenerateContentResponse {
-  response: VertexGenerateContentResponse;
+export interface CaGenerateContentResponse
+  extends VertexGenerateContentResponse {
   traceId?: string;
 }
 
@@ -84,8 +85,9 @@ interface VertexGenerateContentResponse {
   modelVersion?: string;
 }
 
-export interface CaCountTokenRequest {
-  request: VertexCountTokenRequest;
+export interface CaCountTokenRequest extends VertexCountTokenRequest {
+  project?: string;
+  metadata?: ClientMetadata;
 }
 
 interface VertexCountTokenRequest {
@@ -99,12 +101,14 @@ export interface CaCountTokenResponse {
 
 export function toCountTokenRequest(
   req: CountTokensParameters,
+  project?: string,
+  metadata?: ClientMetadata,
 ): CaCountTokenRequest {
   return {
-    request: {
-      model: 'models/' + req.model,
-      contents: toContents(req.contents),
-    },
+    model: 'models/' + req.model,
+    contents: toContents(req.contents),
+    project,
+    metadata,
   };
 }
 
@@ -121,25 +125,26 @@ export function toGenerateContentRequest(
   userPromptId: string,
   project?: string,
   sessionId?: string,
+  metadata?: ClientMetadata,
 ): CAGenerateContentRequest {
   return {
+    ...toVertexGenerateContentRequest(req, sessionId),
     model: req.model,
     project,
     user_prompt_id: userPromptId,
-    request: toVertexGenerateContentRequest(req, sessionId),
+    metadata,
   };
 }
 
 export function fromGenerateContentResponse(
   res: CaGenerateContentResponse,
 ): GenerateContentResponse {
-  const inres = res.response;
   const out = new GenerateContentResponse();
-  out.candidates = inres.candidates;
-  out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
-  out.promptFeedback = inres.promptFeedback;
-  out.usageMetadata = inres.usageMetadata;
-  out.modelVersion = inres.modelVersion;
+  out.candidates = res.candidates;
+  out.automaticFunctionCallingHistory = res.automaticFunctionCallingHistory;
+  out.promptFeedback = res.promptFeedback;
+  out.usageMetadata = res.usageMetadata;
+  out.modelVersion = res.modelVersion;
   out.responseId = res.traceId;
   return out;
 }
