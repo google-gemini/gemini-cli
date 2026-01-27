@@ -63,6 +63,17 @@ export interface TrustResult {
   source: 'ide' | 'file' | undefined;
 }
 
+function getRealPath(location: string): string {
+  try {
+    if (fs.existsSync(location)) {
+      return fs.realpathSync(location);
+    }
+  } catch (_e) {
+    // Fallback to unresolved path
+  }
+  return location;
+}
+
 export class LoadedTrustedFolders {
   constructor(
     readonly user: TrustedFoldersFile,
@@ -88,26 +99,38 @@ export class LoadedTrustedFolders {
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
     const configToUse = config ?? this.user.config;
-    let matchedTrusted = false;
+
+    // Resolve location to its realpath for canonical comparison
+    const realLocation = getRealPath(location);
+
+    let longestMatchLen = -1;
+    let longestMatchTrust: TrustLevel | undefined = undefined;
 
     for (const [rulePath, trustLevel] of Object.entries(configToUse)) {
-      if (trustLevel === TrustLevel.DO_NOT_TRUST) {
-        if (isWithinRoot(location, rulePath)) {
-          return false;
-        }
-      } else if (!matchedTrusted) {
-        const trustedPath =
-          trustLevel === TrustLevel.TRUST_PARENT
-            ? path.dirname(rulePath)
-            : rulePath;
+      const effectivePath =
+        trustLevel === TrustLevel.TRUST_PARENT
+          ? path.dirname(rulePath)
+          : rulePath;
 
-        if (isWithinRoot(location, trustedPath)) {
-          matchedTrusted = true;
+      // Resolve effectivePath to its realpath for canonical comparison
+      const realEffectivePath = getRealPath(effectivePath);
+
+      if (isWithinRoot(realLocation, realEffectivePath)) {
+        if (rulePath.length > longestMatchLen) {
+          longestMatchLen = rulePath.length;
+          longestMatchTrust = trustLevel;
         }
       }
     }
 
-    return matchedTrusted ? true : undefined;
+    if (longestMatchTrust === TrustLevel.DO_NOT_TRUST) return false;
+    if (
+      longestMatchTrust === TrustLevel.TRUST_FOLDER ||
+      longestMatchTrust === TrustLevel.TRUST_PARENT
+    )
+      return true;
+
+    return undefined;
   }
 
   setValue(path: string, trustLevel: TrustLevel): void {

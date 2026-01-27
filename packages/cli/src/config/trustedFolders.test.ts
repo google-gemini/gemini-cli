@@ -124,12 +124,8 @@ describe('Trusted Folders Loading', () => {
       expect(folders.isPathTrusted('/trustedparent/trustme')).toBe(true);
 
       // No explicit rule covers this file
-      expect(folders.isPathTrusted('/secret/bankaccounts.json')).toBe(
-        undefined,
-      );
-      expect(folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(
-        undefined,
-      );
+      expect(folders.isPathTrusted('/secret/bankaccounts.json')).toBe(false);
+      expect(folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(false);
       expect(folders.isPathTrusted('/user/someotherfolder')).toBe(undefined);
     });
   });
@@ -303,10 +299,10 @@ describe('isWorkspaceTrusted', () => {
     });
   });
 
-  it('should return undefined for a child of an untrusted folder', () => {
+  it('should return false for a child of an untrusted folder', () => {
     mockCwd = '/home/user/untrusted/src';
     mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
-    expect(isWorkspaceTrusted(mockSettings).isTrusted).toBeUndefined();
+    expect(isWorkspaceTrusted(mockSettings).isTrusted).toBe(false);
   });
 
   it('should return undefined when no rules match', () => {

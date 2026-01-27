@@ -363,8 +363,21 @@ export class LoadedSettings {
 
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
-    setNestedProperty(settingsFile.settings, key, value);
-    setNestedProperty(settingsFile.originalSettings, key, value);
+
+    // Clone value to prevent reference sharing between settings and originalSettings
+    const valueToSet =
+      typeof value === 'object' && value !== null
+        ? structuredClone(value)
+        : value;
+
+    setNestedProperty(settingsFile.settings, key, valueToSet);
+    // Use a fresh clone for originalSettings to ensure total independence
+    setNestedProperty(
+      settingsFile.originalSettings,
+      key,
+      structuredClone(valueToSet),
+    );
+
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
     coreEvents.emitSettingsChanged();
@@ -450,7 +463,7 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  if (!isWorkspaceTrusted(settings).isTrusted) {
+  if (!isWorkspaceTrusted(settings)?.isTrusted) {
     return;
   }
 
@@ -616,7 +629,8 @@ export function loadSettings(
     systemSettings,
   );
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings).isTrusted ?? false;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings)?.isTrusted ??
+    false;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(

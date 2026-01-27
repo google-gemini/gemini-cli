@@ -2434,3 +2434,47 @@ describe('Settings Loading and Merging', () => {
     });
   });
 });
+
+describe('LoadedSettings.setValue reference sharing', () => {
+  it('should not share references between settings and originalSettings', () => {
+    const mockFile: SettingsFile = {
+      path: '/mock/path',
+      settings: {},
+      originalSettings: {},
+    };
+    const loadedSettings = new LoadedSettings(
+      mockFile,
+      mockFile,
+      mockFile,
+      mockFile,
+      true,
+    );
+
+    const mcpServers = {
+      'test-server': { command: 'echo' },
+    };
+
+    loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+
+    // Modify the original object
+    delete (mcpServers as Record<string, unknown>)['test-server'];
+
+    // The settings in LoadedSettings should still have the server
+    const userSettings = loadedSettings.forScope(SettingScope.User);
+    expect(
+      (userSettings.settings.mcpServers as Record<string, unknown>)[
+        'test-server'
+      ],
+    ).toBeDefined();
+    expect(
+      (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
+        'test-server'
+      ],
+    ).toBeDefined();
+
+    // They should also be different objects from each other
+    expect(userSettings.settings.mcpServers).not.toBe(
+      userSettings.originalSettings.mcpServers,
+    );
+  });
+});
