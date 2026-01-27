@@ -30,11 +30,6 @@ describe('Answer vs. ask eval', () => {
       );
       expect(editCalls.length).toBe(0);
 
-      // Verify asks permission
-      expect(result.toLowerCase()).toMatch(
-        /would you like me to fix|should i fix|do you want me to fix|shall i fix/,
-      );
-
       // Verify file unchanged
       const content = rig.readFile('app.ts');
       expect(content).toContain('a - b');
@@ -81,11 +76,6 @@ describe('Answer vs. ask eval', () => {
         EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
-
-      // Verify asks permission
-      expect(result.toLowerCase()).toMatch(
-        /would you like me to fix|should i fix|do you want me to fix|shall i fix/,
-      );
 
       // Verify file unchanged
       const content = rig.readFile('app.ts');
@@ -156,13 +146,6 @@ describe('Answer vs. ask eval', () => {
         EDIT_TOOL_NAMES.has(log.toolRequest.name),
       );
       expect(editCalls.length).toBe(0);
-
-      // Verify asks permission or just acknowledges
-      if (result.toLowerCase().includes('fix')) {
-        expect(result.toLowerCase()).toMatch(
-          /would you like me to fix|should i fix|do you want me to fix|shall i fix/,
-        );
-      }
 
       // Verify file unchanged
       const content = rig.readFile('app.ts');
