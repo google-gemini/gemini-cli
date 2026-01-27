@@ -72,7 +72,9 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       if (key.name === 'escape') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleCancel();
+        return true;
       }
+      return false;
     },
     { isActive: !submitted },
   );

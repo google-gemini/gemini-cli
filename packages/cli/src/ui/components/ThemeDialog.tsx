@@ -201,10 +201,13 @@ export function ThemeDialog({
     (key) => {
       if (key.name === 'tab') {
         setMode((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+        return true;
       }
       if (key.name === 'escape') {
         onCancel();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

@@ -19,7 +19,9 @@ export const CloudPaidPrivacyNotice = ({
     (key) => {
       if (key.name === 'escape') {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

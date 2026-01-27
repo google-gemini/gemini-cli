@@ -214,8 +214,15 @@ export function useTabbedNavigation({
         }
       }
 
-      if (enableTabKey && key.name === 'tab' && !key.shift) {
-        goToNextTab();
+      if (enableTabKey) {
+        if (keyMatchers[Command.DIALOG_NEXT](key)) {
+          goToNextTab();
+          return;
+        }
+        if (keyMatchers[Command.DIALOG_PREV](key)) {
+          goToPrevTab();
+          return;
+        }
       }
     },
     [

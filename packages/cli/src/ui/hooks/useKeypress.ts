@@ -16,10 +16,11 @@ export type { Key };
  * @param onKeypress - The callback function to execute on each keypress.
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
+ * @param options.priority - Whether the hook should have priority over normal subscribers.
  */
 export function useKeypress(
   onKeypress: KeypressHandler,
-  { isActive }: { isActive: boolean },
+  { isActive, priority }: { isActive: boolean; priority?: boolean },
 ) {
   const { subscribe, unsubscribe } = useKeypressContext();
 
@@ -28,9 +29,9 @@ export function useKeypress(
       return;
     }
 
-    subscribe(onKeypress);
+    subscribe(onKeypress, priority);
     return () => {
       unsubscribe(onKeypress);
     };
-  }, [isActive, onKeypress, subscribe, unsubscribe]);
+  }, [isActive, onKeypress, subscribe, unsubscribe, priority]);
 }

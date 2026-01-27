@@ -66,12 +66,14 @@ available combinations.
 
 #### Navigation
 
-| Action                           | Keys                                        |
-| -------------------------------- | ------------------------------------------- |
-| Move selection up in lists.      | `Up Arrow (no Shift)`                       |
-| Move selection down in lists.    | `Down Arrow (no Shift)`                     |
-| Move up within dialog options.   | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
-| Move down within dialog options. | `Down Arrow (no Shift)`<br />`J (no Shift)` |
+| Action                                             | Keys                                        |
+| -------------------------------------------------- | ------------------------------------------- |
+| Move selection up in lists.                        | `Up Arrow (no Shift)`                       |
+| Move selection down in lists.                      | `Down Arrow (no Shift)`                     |
+| Move up within dialog options.                     | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
+| Move down within dialog options.                   | `Down Arrow (no Shift)`<br />`J (no Shift)` |
+| Move to the next item or question in a dialog.     | `Tab (no Shift)`                            |
+| Move to the previous item or question in a dialog. | `Shift + Tab`                               |
 
 #### Suggestions & Completions
 
