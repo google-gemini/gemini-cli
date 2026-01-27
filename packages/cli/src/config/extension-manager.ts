@@ -527,10 +527,14 @@ Would you like to attempt to install via "git clone" instead?`,
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
     if (
-      installMetadata?.source &&
       this.settings.security?.allowedExtensions &&
       this.settings.security?.allowedExtensions.length > 0
     ) {
+      if (!installMetadata?.source) {
+        throw new Error(
+          `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
+        );
+      }
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
