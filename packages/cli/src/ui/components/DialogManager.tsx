@@ -32,6 +32,7 @@ import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 
 interface DialogManagerProps {
@@ -49,14 +50,26 @@ export const DialogManager = ({
 
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
-    uiState;
+  const {
+    constrainHeight,
+    terminalHeight,
+    staticExtraHeight,
+    terminalWidth: uiTerminalWidth,
+  } = uiState;
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
   }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
+  }
+  if (uiState.newAgents) {
+    return (
+      <NewAgentsNotification
+        agents={uiState.newAgents}
+        onSelect={uiActions.handleNewAgentsSelect}
+      />
+    );
   }
   if (uiState.proQuotaRequest) {
     return (
@@ -138,7 +151,7 @@ export const DialogManager = ({
           availableTerminalHeight={
             constrainHeight ? terminalHeight - staticExtraHeight : undefined
           }
-          terminalWidth={mainAreaWidth}
+          terminalWidth={uiTerminalWidth}
         />
       </Box>
     );

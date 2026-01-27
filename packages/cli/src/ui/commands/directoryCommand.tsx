@@ -20,6 +20,7 @@ import {
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
   config: Config,
@@ -100,7 +101,7 @@ export const directoryCommand: SlashCommand = {
           const workspaceContext =
             context.services.config.getWorkspaceContext();
           const existingDirs = new Set(
-            workspaceContext.getDirectories().map((dir) => path.normalize(dir)),
+            workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
           );
 
           filteredSuggestions = suggestions.filter((s) => {
@@ -172,12 +173,23 @@ export const directoryCommand: SlashCommand = {
         const pathsToProcess: string[] = [];
 
         for (const pathToAdd of pathsToAdd) {
-          const expandedPath = expandHomeDir(pathToAdd.trim());
-          if (currentWorkspaceDirs.includes(expandedPath)) {
-            alreadyAdded.push(pathToAdd.trim());
-          } else {
-            pathsToProcess.push(pathToAdd.trim());
+          const trimmedPath = pathToAdd.trim();
+          const expandedPath = expandHomeDir(trimmedPath);
+          try {
+            const absolutePath = path.resolve(
+              workspaceContext.targetDir,
+              expandedPath,
+            );
+            const resolvedPath = fs.realpathSync(absolutePath);
+            if (currentWorkspaceDirs.includes(resolvedPath)) {
+              alreadyAdded.push(trimmedPath);
+              continue;
+            }
+          } catch (_e) {
+            // Path might not exist or be inaccessible.
+            // We'll let batchAddDirectories handle it later.
           }
+          pathsToProcess.push(trimmedPath);
         }
 
         if (alreadyAdded.length > 0) {
