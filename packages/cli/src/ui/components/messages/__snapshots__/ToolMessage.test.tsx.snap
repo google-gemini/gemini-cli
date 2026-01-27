@@ -1,5 +1,15 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<ToolMessage /> > JSON rendering > renders pretty JSON in ink frame 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                              │
+│                                                                              │
+│ {                                                                            │
+│   "a": 1,                                                                    │
+│   "b": 2                                                                     │
+│ }                                                                            │"
+`;
+
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ? for Confirming status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ?  test-tool A tool for testing                                              │
