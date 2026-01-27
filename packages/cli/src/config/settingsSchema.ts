@@ -258,7 +258,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
       },
       language: {
-        type: 'enum',
+        type: 'string',
         label: 'Language',
         category: 'General',
         requiresRestart: true,
