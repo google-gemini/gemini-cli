@@ -20,3 +20,28 @@ export function getColorDepth(): number {
 export function isLowColorDepth(): boolean {
   return getColorDepth() < 24;
 }
+
+let cachedIsITerm2: boolean | undefined;
+
+/**
+ * Returns true if the current terminal is iTerm2.
+ */
+export function isITerm2(): boolean {
+  if (cachedIsITerm2 !== undefined) {
+    return cachedIsITerm2;
+  }
+
+  cachedIsITerm2 =
+    process.env['TERM_PROGRAM'] === 'iTerm.app' ||
+    !!process.env['ITERM_SESSION_ID'];
+
+  return cachedIsITerm2;
+}
+
+/**
+ * Resets the cached iTerm2 detection value.
+ * Primarily used for testing.
+ */
+export function resetITerm2Cache(): void {
+  cachedIsITerm2 = undefined;
+}
