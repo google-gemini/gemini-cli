@@ -29,8 +29,9 @@ export const oncallCommand: SlashCommand = {
         }
 
         let limit = 50;
-        if (args && args.length > 0) {
-          const parsedLimit = parseInt(args[0], 10);
+        if (args && args.trim().length > 0) {
+          const argArray = args.trim().split(/\s+/);
+          const parsedLimit = parseInt(argArray[0], 10);
           if (!isNaN(parsedLimit) && parsedLimit > 0) {
             limit = parsedLimit;
           }
