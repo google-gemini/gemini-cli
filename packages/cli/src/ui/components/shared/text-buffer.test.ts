@@ -57,6 +57,7 @@ const initialState: TextBufferState = {
   transformationsByLine: [[]],
   visualLayout: defaultVisualLayout,
   pastedContent: {},
+  expandedPaste: null,
 };
 
 /**
@@ -529,6 +530,143 @@ describe('textBufferReducer', () => {
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('toggle_paste_expansion action', () => {
+    const placeholder = '[Pasted Text: 6 lines]';
+    const content = 'line1\nline2\nline3\nline4\nline5\nline6';
+
+    it('should expand a placeholder correctly', () => {
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: ['prefix ' + placeholder + ' suffix'],
+        cursorRow: 0,
+        cursorCol: 0,
+        pastedContent: { [placeholder]: content },
+      });
+
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: placeholder, row: 0, col: 7 },
+      };
+
+      const state = textBufferReducer(stateWithPlaceholder, action);
+
+      expect(state.lines).toEqual([
+        'prefix line1',
+        'line2',
+        'line3',
+        'line4',
+        'line5',
+        'line6 suffix',
+      ]);
+      expect(state.expandedPaste?.id).toBe(placeholder);
+      const info = state.expandedPaste;
+      expect(info).toEqual({
+        id: placeholder,
+        startLine: 0,
+        lineCount: 6,
+        prefix: 'prefix ',
+        suffix: ' suffix',
+      });
+      // Cursor should be at the end of expanded content (before suffix)
+      expect(state.cursorRow).toBe(5);
+      expect(state.cursorCol).toBe(5); // length of 'line6'
+    });
+
+    it('should collapse an expanded placeholder correctly', () => {
+      const expandedState = createStateWithTransformations({
+        lines: [
+          'prefix line1',
+          'line2',
+          'line3',
+          'line4',
+          'line5',
+          'line6 suffix',
+        ],
+        cursorRow: 5,
+        cursorCol: 5,
+        pastedContent: { [placeholder]: content },
+        expandedPaste: {
+          id: placeholder,
+          startLine: 0,
+          lineCount: 6,
+          prefix: 'prefix ',
+          suffix: ' suffix',
+        },
+      });
+
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: placeholder, row: 0, col: 7 },
+      };
+
+      const state = textBufferReducer(expandedState, action);
+
+      expect(state.lines).toEqual(['prefix ' + placeholder + ' suffix']);
+      expect(state.expandedPaste).toBeNull();
+      // Cursor should be at the end of the collapsed placeholder
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(('prefix ' + placeholder).length);
+    });
+
+    it('should expand single-line content correctly', () => {
+      const singleLinePlaceholder = '[Pasted Text: 10 chars]';
+      const singleLineContent = 'some text';
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: [singleLinePlaceholder],
+        cursorRow: 0,
+        cursorCol: 0,
+        pastedContent: { [singleLinePlaceholder]: singleLineContent },
+      });
+
+      const state = textBufferReducer(stateWithPlaceholder, {
+        type: 'toggle_paste_expansion',
+        payload: { id: singleLinePlaceholder, row: 0, col: 0 },
+      });
+
+      expect(state.lines).toEqual(['some text']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should return current state if placeholder ID not found in pastedContent', () => {
+      const action: TextBufferAction = {
+        type: 'toggle_paste_expansion',
+        payload: { id: 'unknown', row: 0, col: 0 },
+      };
+      const state = textBufferReducer(initialState, action);
+      expect(state).toBe(initialState);
+    });
+
+    it('should preserve expandedPaste when lines change from edits outside the region', () => {
+      // Start with an expanded paste at line 0 (3 lines long)
+      const placeholder = '[Pasted Text: 3 lines]';
+      const expandedState = createStateWithTransformations({
+        lines: ['line1', 'line2', 'line3', 'suffix'],
+        cursorRow: 3,
+        cursorCol: 0,
+        pastedContent: { [placeholder]: 'line1\nline2\nline3' },
+        expandedPaste: {
+          id: placeholder,
+          startLine: 0,
+          lineCount: 3,
+          prefix: '',
+          suffix: '',
+        },
+      });
+
+      expect(expandedState.expandedPaste).not.toBeNull();
+
+      // Insert a newline at the end - this changes lines but is OUTSIDE the expanded region
+      const stateAfterInsert = textBufferReducer(expandedState, {
+        type: 'insert',
+        payload: '\n',
+      });
+
+      // Lines changed, but expandedPaste should be PRESERVED and optionally shifted (no shift here since edit is after)
+      expect(stateAfterInsert.expandedPaste).not.toBeNull();
+      expect(stateAfterInsert.expandedPaste?.id).toBe(placeholder);
     });
   });
 });
@@ -2769,9 +2907,9 @@ describe('Transformation Utilities', () => {
       expect(result).toEqual(transformations[0]);
     });
 
-    it('should find transformation when cursor is at end', () => {
+    it('should NOT find transformation when cursor is at end', () => {
       const result = getTransformUnderCursor(0, 14, [transformations]);
-      expect(result).toEqual(transformations[0]);
+      expect(result).toBeNull();
     });
 
     it('should return null when cursor is not on a transformation', () => {
@@ -2782,6 +2920,22 @@ describe('Transformation Utilities', () => {
     it('should handle empty transformations array', () => {
       const result = getTransformUnderCursor(0, 5, []);
       expect(result).toBeNull();
+    });
+
+    it('regression: should not find paste transformation when clicking one character after it', () => {
+      const pasteId = '[Pasted Text: 5 lines]';
+      const line = pasteId + ' suffix';
+      const transformations = calculateTransformationsForLine(line);
+      const pasteTransform = transformations.find((t) => t.type === 'paste');
+      expect(pasteTransform).toBeDefined();
+
+      const endPos = pasteTransform!.logEnd;
+      // Position strictly at end should be null
+      expect(getTransformUnderCursor(0, endPos, [transformations])).toBeNull();
+      // Position inside should be found
+      expect(getTransformUnderCursor(0, endPos - 1, [transformations])).toEqual(
+        pasteTransform,
+      );
     });
   });
 
@@ -2953,6 +3107,48 @@ describe('Transformation Utilities', () => {
       // are identical in content if not in object reference (the arrays are rebuilt, but contents are cached)
       expect(result.current.allVisualLines[1]).toBe('line 2');
       expect(result.current.allVisualLines[2]).toBe('line 3');
+    });
+  });
+
+  describe('Scroll Regressions', () => {
+    const scrollViewport: Viewport = { width: 80, height: 5 };
+
+    it('should not show empty viewport when collapsing a large paste that was scrolled', () => {
+      const largeContent =
+        'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
+      const placeholder = '[Pasted Text: 10 lines]';
+
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: placeholder,
+          viewport: scrollViewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Setup: paste large content
+      act(() => {
+        result.current.setText('');
+        result.current.insert(largeContent, { paste: true });
+      });
+
+      // Expand it
+      act(() => {
+        result.current.togglePasteExpansion(placeholder, 0, 0);
+      });
+
+      // Verify scrolled state
+      expect(result.current.visualScrollRow).toBe(5);
+
+      // Collapse it
+      act(() => {
+        result.current.togglePasteExpansion(placeholder, 9, 0);
+      });
+
+      // Verify viewport is NOT empty immediately (clamping in useMemo)
+      expect(result.current.allVisualLines.length).toBe(1);
+      expect(result.current.viewportVisualLines.length).toBe(1);
+      expect(result.current.viewportVisualLines[0]).toBe(placeholder);
     });
   });
 });
