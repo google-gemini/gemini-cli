@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import {
   shortenPath,
@@ -25,6 +26,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 
 export const Footer: React.FC = () => {
+  const { t } = useTranslation('ui');
   const uiState = useUIState();
   const config = useConfig();
   const settings = useSettings();
@@ -118,7 +120,7 @@ export const Footer: React.FC = () => {
           display="flex"
         >
           {isTrustedFolder === false ? (
-            <Text color={theme.status.warning}>untrusted</Text>
+            <Text color={theme.status.warning}>{t('footer.untrusted')}</Text>
           ) : process.env['SANDBOX'] &&
             process.env['SANDBOX'] !== 'sandbox-exec' ? (
             <Text color="green">
@@ -126,16 +128,16 @@ export const Footer: React.FC = () => {
             </Text>
           ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
             <Text color={theme.status.warning}>
-              macOS Seatbelt{' '}
+              {t('footer.macosSeatbelt')}{' '}
               <Text color={theme.text.secondary}>
                 ({process.env['SEATBELT_PROFILE']})
               </Text>
             </Text>
           ) : (
             <Text color={theme.status.error}>
-              no sandbox
+              {t('footer.noSandbox')}
               {terminalWidth >= 100 && (
-                <Text color={theme.text.secondary}> (see /docs)</Text>
+                <Text color={theme.text.secondary}>{t('footer.seeDocs')}</Text>
               )}
             </Text>
           )}
@@ -148,7 +150,7 @@ export const Footer: React.FC = () => {
           <Box alignItems="center">
             <Text color={theme.text.accent}>
               {getDisplayString(model, config.getPreviewFeatures())}
-              <Text color={theme.text.secondary}> /model</Text>
+              <Text color={theme.text.secondary}>{t('footer.modelCmd')}</Text>
               {!hideContextPercentage && (
                 <>
                   {' '}
