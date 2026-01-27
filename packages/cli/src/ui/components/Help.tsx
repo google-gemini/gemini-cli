@@ -12,6 +12,7 @@ import { KEYBOARD_SHORTCUTS_URL } from '../constants.js';
 import { sanitizeForDisplay } from '../utils/textUtils.js';
 import { useTranslation } from '../../i18n/useTranslation.js';
 import { renderStyledText } from '../utils/styledText.js';
+import { getCommandDescription } from '../../i18n/index.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -103,7 +104,11 @@ export const Help: React.FC<Help> = ({ commands }) => {
                 <Text color={theme.text.secondary}> [MCP]</Text>
               )}
               {command.description &&
-                ' - ' + sanitizeForDisplay(command.description, 100)}
+                ' - ' +
+                  sanitizeForListDisplay(
+                    getCommandDescription(command.name, command.description),
+                    100,
+                  )}
             </Text>
             {command.subCommands &&
               command.subCommands
@@ -116,7 +121,14 @@ export const Help: React.FC<Help> = ({ commands }) => {
                     </Text>
                     {subCommand.description &&
                       ' - ' +
-                        sanitizeForDisplay(subCommand.description, 100)}
+                        sanitizeForListDisplay(
+                          getCommandDescription(
+                            subCommand.name,
+                            subCommand.description,
+                            command.name,
+                          ),
+                          100,
+                        )}
                   </Text>
                 ))}
           </Box>

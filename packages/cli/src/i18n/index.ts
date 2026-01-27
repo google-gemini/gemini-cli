@@ -31,7 +31,7 @@ async function loadTranslationFile(
   }
 }
 
-const namespaces = ['common', 'help', 'dialogs', 'loading'];
+const namespaces = ['common', 'help', 'dialogs', 'loading', 'commands'];
 const localesDir = path.join(__dirname, 'locales');
 
 // Language display names for settings UI
@@ -217,6 +217,27 @@ export function getInteractiveShellWaitingPhrase(): string {
  */
 export function getWaitingForConfirmationPhrase(): string {
   return t('loading:waitingForConfirmation');
+}
+
+/**
+ * Translate a slash command description.
+ * Looks up the command name (or "parent.sub" for subcommands) in the commands
+ * namespace. Falls back to the original description if no translation is found.
+ *
+ * @param commandName - The command name, e.g. "about" or "chat"
+ * @param originalDescription - The original English description (fallback)
+ * @param parentName - For subcommands, the parent command name (e.g. "chat" for "chat.save")
+ */
+export function getCommandDescription(
+  commandName: string,
+  originalDescription: string,
+  parentName?: string,
+): string {
+  const key = parentName
+    ? `commands:${parentName}.${commandName}`
+    : `commands:${commandName}`;
+  const translated = t(key, { defaultValue: '' });
+  return translated || originalDescription;
 }
 
 // eslint-disable-next-line import/no-default-export

@@ -98,6 +98,20 @@ function simulateFuzzyMatching(items: readonly string[], query: string) {
   return Promise.resolve(results);
 }
 
+// Mock the i18n translation layer so test mock commands keep their original descriptions
+vi.mock('../../i18n/index.js', async () => {
+  const actual = await vi.importActual<typeof import('../../i18n/index.js')>(
+    '../../i18n/index.js',
+  );
+  return {
+    ...actual,
+    getCommandDescription: (
+      _name: string,
+      originalDescription: string,
+    ): string => originalDescription,
+  };
+});
+
 // Mock the fzf module to provide a working fuzzy search implementation for tests
 vi.mock('fzf', async () => {
   const actual = await vi.importActual<typeof import('fzf')>('fzf');
