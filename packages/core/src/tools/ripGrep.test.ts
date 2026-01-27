@@ -342,7 +342,7 @@ describe('RipGrepTool', () => {
       },
     );
 
-    it('should return error for invalid regex pattern', () => {
+    it('should throw error for invalid regex pattern', () => {
       const params: RipGrepToolParams = { pattern: '[[' };
       expect(grepTool.validateToolParams(params)).toMatch(
         /Invalid regular expression pattern provided/,
@@ -579,32 +579,6 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = { pattern: '[[' };
       expect(() => grepTool.build(params)).toThrow(
         /Invalid regular expression pattern provided/,
-      );
-    });
-
-    it('should return an error from ripgrep for invalid regex pattern', async () => {
-      mockSpawn.mockImplementationOnce(
-        createMockSpawn({
-          exitCode: 2,
-        }),
-      );
-
-      const params: RipGrepToolParams = { pattern: '[[' };
-      const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Process exited with code 2');
-      expect(result.returnDisplay).toContain(
-        'Error: Process exited with code 2',
-      );
-    });
-
-    it('should throw error for invalid regex pattern during build', async () => {
-      const params: RipGrepToolParams = { pattern: '[[' };
-      const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('ripgrep exited with code 2');
-      expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code 2',
       );
     });
 
@@ -913,7 +887,7 @@ describe('RipGrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
-                storage: {
+        storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {

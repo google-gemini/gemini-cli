@@ -139,7 +139,7 @@ describe('WriteFileTool', () => {
       fs.mkdirSync(plansDir, { recursive: true });
     }
 
-    const workspaceContext = new WorkspaceContext(rootDir);
+    const workspaceContext = new WorkspaceContext(rootDir, [plansDir]);
     const mockStorage = {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
     };
@@ -863,9 +863,7 @@ describe('WriteFileTool', () => {
         file_path: path.join(plansDir, '..', 'escaped.txt'),
         content: 'malicious',
       };
-      expect(() => tool.build(params)).toThrow(
-        /File path must be within one of the workspace directories/,
-      );
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
   });
 
