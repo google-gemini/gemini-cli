@@ -152,6 +152,8 @@ export function getCoreSystemPrompt(
       .map((toolName) => `- \`${toolName}\``)
       .join('\n');
 
+    const plansDir = config.storage.getProjectTempPlansDir();
+
     approvalModePrompt = `
 # Active Approval Mode: Plan
 
@@ -160,6 +162,11 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 ## Available Tools
 The following read-only tools are available in Plan Mode:
 ${planModeToolsList}
+- \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
+
+## Plan Storage
+- Save your plans as Markdown (.md) files directly to: \`${plansDir}/\`
+- Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 
 ## Workflow Phases
 
@@ -179,7 +186,7 @@ ${planModeToolsList}
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
 - Include file paths, function signatures, and code snippets where helpful
-- Present the plan for review
+- After saving the plan, present the full content of the markdown file to the user for review
 
 ### Phase 4: Review & Approval
 - Ask the user if they approve the plan, want revisions, or want to reject it
