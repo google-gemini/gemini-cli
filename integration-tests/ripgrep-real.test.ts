@@ -31,6 +31,10 @@ class MockConfig {
   getFileFilteringRespectGeminiIgnore() {
     return true;
   }
+
+  validatePathAccess() {
+    return null;
+  }
 }
 
 describe('ripgrep-real-direct', () => {
