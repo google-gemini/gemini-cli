@@ -155,7 +155,7 @@ throw new Error('Authentication failed');
   } catch (error: unknown) {
     writeToStderr('Error fetching quota information: ');
     writeToStderr(`${getErrorMessage(error)}\n`);
-    process.exit(1);
+throw new Error('Error fetching quota information');
   }
 }
 
