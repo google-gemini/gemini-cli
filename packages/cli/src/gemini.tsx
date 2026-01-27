@@ -117,7 +117,7 @@ async function displayStats(
         writeToStderr(
           'Please run `gemini` without --stats to set up authentication first.\n',
         );
-        process.exit(1);
+throw new Error('Authentication failed');
       }
     }
 
