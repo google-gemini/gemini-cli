@@ -219,7 +219,7 @@ import {
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { WriteTodosTool } from 'src/tools/write-todos.js';
+import { WriteTodosTool } from '../tools/write-todos.js';
 
 export type { FileFilteringOptions };
 export {

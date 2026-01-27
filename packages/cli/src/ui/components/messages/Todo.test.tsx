@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders as render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
-import { Box } from 'ink';
 import { TodoTray } from './Todo.js';
 import type { Todo } from '@google/gemini-cli-core';
-import type { UIState } from '../../contexts/UIStateContext.js';
-import { UIStateContext } from '../../contexts/UIStateContext.js';
 import type { HistoryItem } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
+import type { UIState } from '../../contexts/UIStateContext.js';
 
 const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   ({
@@ -34,21 +32,18 @@ describe.each([true, false])(
   '<TodoTray /> (showFullTodos: %s)',
   (showFullTodos: boolean) => {
     const renderWithUiState = (uiState: Partial<UIState>) =>
-      render(
-        <UIStateContext.Provider value={uiState as UIState}>
-          <TodoTray />
-        </UIStateContext.Provider>,
-      );
+      render(<TodoTray />, {
+        uiState: { ...uiState, showFullTodos },
+      });
 
     it('renders null when no todos are in the history', () => {
-      const { lastFrame } = renderWithUiState({ history: [], showFullTodos });
+      const { lastFrame } = renderWithUiState({ history: [] });
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders null when todo list is empty', () => {
       const { lastFrame } = renderWithUiState({
         history: [createTodoHistoryItem([])],
-        showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -62,7 +57,6 @@ describe.each([true, false])(
             { description: 'Completed Task', status: 'completed' },
           ]),
         ],
-        showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -77,39 +71,31 @@ describe.each([true, false])(
             { description: 'Completed Task', status: 'completed' },
           ]),
         ],
-        showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
     });
 
     it('renders a todo list with long descriptions that wrap when full view is on', () => {
-      const { lastFrame } = render(
-        <Box width="50">
-          <UIStateContext.Provider
-            value={
+      const { lastFrame } = render(<TodoTray />, {
+        width: 50,
+        uiState: {
+          history: [
+            createTodoHistoryItem([
               {
-                history: [
-                  createTodoHistoryItem([
-                    {
-                      description:
-                        'This is a very long description for a pending task that should wrap around multiple lines when the terminal width is constrained.',
-                      status: 'in_progress',
-                    },
-                    {
-                      description:
-                        'Another completed task with an equally verbose description to test wrapping behavior.',
-                      status: 'completed',
-                    },
-                  ]),
-                ],
-                showFullTodos,
-              } as UIState
-            }
-          >
-            <TodoTray />
-          </UIStateContext.Provider>
-        </Box>,
-      );
+                description:
+                  'This is a very long description for a pending task that should wrap around multiple lines when the terminal width is constrained.',
+                status: 'in_progress',
+              },
+              {
+                description:
+                  'Another completed task with an equally verbose description to test wrapping behavior.',
+                status: 'completed',
+              },
+            ]),
+          ],
+          showFullTodos,
+        },
+      });
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -125,7 +111,6 @@ describe.each([true, false])(
             { description: 'Newer Task 2', status: 'in_progress' },
           ]),
         ],
-        showFullTodos,
       });
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -138,8 +123,33 @@ describe.each([true, false])(
             { description: 'Task 2', status: 'cancelled' },
           ]),
         ],
-        showFullTodos,
       });
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders planTodos instead of history todos when available', () => {
+      const { lastFrame } = renderWithUiState({
+        history: [
+          createTodoHistoryItem([
+            { description: 'History Task', status: 'pending' },
+          ]),
+        ],
+        planTodos: [
+          { description: 'Plan Task 1', status: 'in_progress' },
+          { description: 'Plan Task 2', status: 'pending' },
+        ],
+        planFileName: 'implementation.md',
+      });
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('renders planTodos with the correct filename in the header', () => {
+      const { lastFrame } = renderWithUiState({
+        planTodos: [{ description: 'Only Task', status: 'pending' }],
+        planFileName: 'my-feature.md',
+        showFullTodos: true,
+      });
+      expect(lastFrame()).toContain('Plan: my-feature.md');
       expect(lastFrame()).toMatchSnapshot();
     });
   },

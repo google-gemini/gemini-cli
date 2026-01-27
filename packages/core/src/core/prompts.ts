@@ -162,7 +162,7 @@ ${planModeToolsList}
 - Save your plans as Markdown (.md) files directly to: \`${plansDir}/\`
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 - **Source of Truth:** The UI is based on these markdown files. To show progress in the CLI, you MUST update the plan file with the status markers below.
-- **Task Status Markers:** Use the following markers in your task lists to update the UI:
+- **Task Status Markers:** Use the following markers in your task lists to update the UI (note that these are case-sensitive):
     - \`- [ ] Task\` : Pending
     - \`- [/] Task\` : In Progress
     - \`- [x] Task\` : Completed
@@ -280,7 +280,7 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 **Monitoring Progress:**
 - **Plans Directory:** \`${config.storage.getProjectTempPlansDir()}/\`
 - If a plan file exists in this directory, you MUST update it to reflect your progress using the \`write_file\` or \`replace\` tools.
-- Use markers: \`- [ ]\` (Pending), \`- [/]\` (In Progress), \`- [x]\` (Completed), \`- [-]\` (Cancelled).
+- Use markers (case-sensitive): \`- [ ]\` (Pending), \`- [/]\` (In Progress), \`- [x]\` (Completed), \`- [-]\` (Cancelled).
 
 ## New Applications
 

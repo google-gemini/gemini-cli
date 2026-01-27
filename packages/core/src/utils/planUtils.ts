@@ -40,7 +40,7 @@ export function parseMarkdownTodos(content: string): Todo[] {
       );
 
       if (taskMarkerMatch) {
-        const marker = taskMarkerMatch[1].toLowerCase();
+        const marker = taskMarkerMatch[1];
         const description = taskMarkerMatch[2].split('\n')[0].trim(); // Take only the first line as description
 
         let status: TodoStatus = 'pending';
@@ -50,7 +50,7 @@ export function parseMarkdownTodos(content: string): Todo[] {
           status = 'in_progress';
         } else if (marker === '-') {
           status = 'cancelled';
-        } else if (marker === '') {
+        } else if (marker === '' || marker === ' ') {
           status = 'pending';
         }
 

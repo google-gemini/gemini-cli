@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import stripAnsi from 'strip-ansi';
 import {
   type Todo,
   type TodoList,
@@ -37,7 +38,7 @@ const TodoTitleDisplay: React.FC<{
   return (
     <Box flexDirection="row" columnGap={2} height={1}>
       <Text color={theme.text.primary} bold aria-label="Todo list">
-        {fileName ? `Plan: ${fileName}` : 'Todo'}
+        {fileName ? `Plan: ${stripAnsi(fileName)}` : 'Todo'}
       </Text>
       <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
     </Box>

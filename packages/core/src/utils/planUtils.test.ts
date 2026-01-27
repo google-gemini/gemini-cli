@@ -57,4 +57,16 @@ describe('parseMarkdownTodos', () => {
     const todos = parseMarkdownTodos(markdown);
     expect(todos).toEqual([{ description: 'A task', status: 'pending' }]);
   });
+
+  it('is case-sensitive for completed marker', () => {
+    const markdown = `
+- [x] lowercase
+- [X] uppercase
+    `;
+    const todos = parseMarkdownTodos(markdown);
+    expect(todos).toEqual([
+      { description: 'lowercase', status: 'completed' },
+      { description: 'uppercase', status: 'pending' },
+    ]);
+  });
 });

@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isDirectorySecure } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
@@ -26,6 +27,18 @@ export const planCommand: SlashCommand = {
 
         const plansDir = config.storage.getProjectTempPlansDir();
         try {
+          const securityCheck = await isDirectorySecure(plansDir);
+          if (!securityCheck.secure) {
+            context.ui.addItem(
+              {
+                type: MessageType.ERROR,
+                text: `Security check failed for plans directory: ${securityCheck.reason}`,
+              },
+              Date.now(),
+            );
+            return;
+          }
+
           if (fs.existsSync(plansDir)) {
             const files = await fs.promises.readdir(plansDir);
             const mdFiles = files.filter((f) => f.endsWith('.md'));

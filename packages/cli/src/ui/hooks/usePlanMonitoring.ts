@@ -12,11 +12,13 @@ import {
   type Todo,
   type Config,
   debugLogger,
+  isDirectorySecure,
 } from '@google/gemini-cli-core';
 
 export function usePlanMonitoring(config: Config) {
   const [planTodos, setPlanTodos] = useState<Todo[] | null>(null);
   const [planFileName, setPlanFileName] = useState<string | null>(null);
+  const planFileNameRef = useRef<string | null>(null);
   const lastModifiedRef = useRef<number>(0);
 
   useEffect(() => {
@@ -24,6 +26,15 @@ export function usePlanMonitoring(config: Config) {
 
     const updatePlan = async () => {
       try {
+        const securityCheck = await isDirectorySecure(plansDir);
+        if (!securityCheck.secure) {
+          debugLogger.warn(
+            'Security check failed for plans directory',
+            securityCheck.reason,
+          );
+          return;
+        }
+
         if (!fs.existsSync(plansDir)) {
           return;
         }
@@ -32,8 +43,11 @@ export function usePlanMonitoring(config: Config) {
         const mdFiles = files.filter((f) => f.endsWith('.md'));
 
         if (mdFiles.length === 0) {
-          setPlanTodos(null);
-          setPlanFileName(null);
+          if (planFileNameRef.current !== null) {
+            setPlanTodos(null);
+            setPlanFileName(null);
+            planFileNameRef.current = null;
+          }
           return;
         }
 
@@ -43,8 +57,8 @@ export function usePlanMonitoring(config: Config) {
 
         for (const file of mdFiles) {
           const filePath = path.join(plansDir, file);
-          const stats = await fs.promises.stat(filePath);
-          if (stats.mtimeMs > latestMtime) {
+          const stats = await fs.promises.lstat(filePath);
+          if (stats.isFile() && stats.mtimeMs > latestMtime) {
             latestMtime = stats.mtimeMs;
             latestFile = file;
           }
@@ -52,7 +66,7 @@ export function usePlanMonitoring(config: Config) {
 
         if (
           latestMtime > lastModifiedRef.current ||
-          latestFile !== planFileName
+          latestFile !== planFileNameRef.current
         ) {
           const content = await fs.promises.readFile(
             path.join(plansDir, latestFile),
@@ -61,6 +75,7 @@ export function usePlanMonitoring(config: Config) {
           const todos = parseMarkdownTodos(content);
           setPlanTodos(todos);
           setPlanFileName(latestFile);
+          planFileNameRef.current = latestFile;
           lastModifiedRef.current = latestMtime;
         }
       } catch (error) {
@@ -77,7 +92,7 @@ export function usePlanMonitoring(config: Config) {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [config, planFileName]);
+  }, [config]);
 
   return { planTodos, planFileName };
 }
