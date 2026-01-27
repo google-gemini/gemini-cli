@@ -21,6 +21,7 @@ import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
+import { sanitizeForDisplay } from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
@@ -257,7 +258,7 @@ export const ToolConfirmationMessage: React.FC<
       if (executionProps.commands && executionProps.commands.length > 1) {
         question = `Allow execution of ${executionProps.commands.length} commands?`;
       } else {
-        question = `Allow execution of: '${executionProps.rootCommand}'?`;
+        question = `Allow execution of: '${sanitizeForDisplay(executionProps.rootCommand)}'?`;
       }
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
@@ -346,7 +347,7 @@ export const ToolConfirmationMessage: React.FC<
             <Box flexDirection="column">
               {commandsToDisplay.map((cmd, idx) => (
                 <Text key={idx} color={theme.text.link}>
-                  {cmd}
+                  {sanitizeForDisplay(cmd)}
                 </Text>
               ))}
             </Box>
