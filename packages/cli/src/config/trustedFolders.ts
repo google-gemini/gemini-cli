@@ -63,15 +63,30 @@ export interface TrustResult {
   source: 'ide' | 'file' | undefined;
 }
 
+const realPathCache = new Map<string, string>();
+
+/**
+ * FOR TESTING PURPOSES ONLY.
+ * Clears the real path cache.
+ */
+export function clearRealPathCacheForTesting(): void {
+  realPathCache.clear();
+}
+
 function getRealPath(location: string): string {
-  try {
-    if (fs.existsSync(location)) {
-      return fs.realpathSync(location);
-    }
-  } catch (_e) {
-    // Fallback to unresolved path
+  let realPath = realPathCache.get(location);
+  if (realPath !== undefined) {
+    return realPath;
   }
-  return location;
+
+  try {
+    realPath = fs.existsSync(location) ? fs.realpathSync(location) : location;
+  } catch {
+    realPath = location;
+  }
+
+  realPathCache.set(location, realPath);
+  return realPath;
 }
 
 export class LoadedTrustedFolders {
@@ -158,6 +173,7 @@ let loadedTrustedFolders: LoadedTrustedFolders | undefined;
  */
 export function resetTrustedFoldersForTesting(): void {
   loadedTrustedFolders = undefined;
+  clearRealPathCacheForTesting();
 }
 
 export function loadTrustedFolders(): LoadedTrustedFolders {
