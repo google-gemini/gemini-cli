@@ -277,34 +277,24 @@ describe('BaseSettingsDialog', () => {
   });
 
   describe('scrolling and resizing list (search filtering)', () => {
-    it('should clamp scrollOffset when items array size decreases below current scrollOffset', async () => {
-      // Create 20 items, max visible is 5
-      const originalItems = createMockItems(20);
+    it('should preserve focus on the active item if it remains in the filtered list', async () => {
+      const items = createMockItems(5); // items 0 to 4
       const { rerender, stdin, lastFrame } = renderDialog({
-        items: originalItems,
+        items,
         maxItemsToShow: 5,
       });
 
-      // Initially shows index 0 to 4
-      expect(lastFrame()).toContain('Boolean Setting'); // index 0
-      expect(lastFrame()).not.toContain('Extra Setting 5');
-
-      // Scroll down by 6 so that scrollOffset is at least 2
-      // (Depends on maxItemsToShow and wrap behavior, but 6 down presses safely puts offset > 1)
-      for (let i = 0; i < 6; i++) {
-        await act(async () => {
-          stdin.write(TerminalKeys.DOWN_ARROW);
-        });
-      }
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Extra Setting 5');
-        // Original item 0 is scrolled out of view
-        expect(lastFrame()).not.toContain('Boolean Setting');
+      // Move focus down to item 2 ("Number Setting")
+      // Separate acts needed so React state updates between keypresses
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
       });
 
-      // Rerender with a smaller array (simulating search filtering)
-      const filteredItems = originalItems.slice(0, 2); // Only 2 items remain
+      // Rerender with a filtered list where "Number Setting" is now at index 1
+      const filteredItems = [items[0], items[2], items[4]];
       rerender(
         <KeypressProvider>
           <BaseSettingsDialog
@@ -320,13 +310,74 @@ describe('BaseSettingsDialog', () => {
         </KeypressProvider>,
       );
 
-      // The dialog should clamp the scrollOffset to 0 automatically.
-      // So the remaining items should be visible, not empty space.
+      // Verify the dialog hasn't crashed and the items are displayed
       await waitFor(() => {
         const frame = lastFrame();
-        expect(frame).toContain('Boolean Setting'); // index 0
-        expect(frame).toContain('String Setting'); // index 1
+        expect(frame).toContain('Boolean Setting');
+        expect(frame).toContain('Number Setting');
+        expect(frame).toContain('Extra Setting 4');
         expect(frame).not.toContain('No matches found.');
+      });
+
+      // Press Enter. If focus was preserved, it should be on "Number Setting" (index 1).
+      // Since it's a number, it enters edit mode (mockOnItemToggle is NOT called).
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnItemToggle).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should reset focus to the top if the active item is filtered out', async () => {
+      const items = createMockItems(5);
+      const { rerender, stdin, lastFrame } = renderDialog({
+        items,
+        maxItemsToShow: 5,
+      });
+
+      // Move focus down to item 2 ("Number Setting")
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Rerender with a filtered list that EXCLUDES "Number Setting"
+      const filteredItems = [items[0], items[1]];
+      rerender(
+        <KeypressProvider>
+          <BaseSettingsDialog
+            title="Test Settings"
+            items={filteredItems}
+            selectedScope={SettingScope.User}
+            maxItemsToShow={5}
+            onItemToggle={mockOnItemToggle}
+            onEditCommit={mockOnEditCommit}
+            onItemClear={mockOnItemClear}
+            onClose={mockOnClose}
+          />
+        </KeypressProvider>,
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Boolean Setting');
+        expect(frame).toContain('String Setting');
+      });
+
+      // Press Enter. Since focus reset to index 0 ("Boolean Setting"), it should toggle.
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnItemToggle).toHaveBeenCalledWith(
+          'boolean-setting',
+          expect.anything(),
+        );
       });
     });
   });
