@@ -282,6 +282,29 @@ An extension with the following structure:
 
 Will expose a `security-audit` skill that the model can activate.
 
+### Sub-agents
+
+> **Note: Sub-agents are currently an experimental feature.**
+
+Extensions can provide [sub-agents](../core/subagents.md) that users can
+delegate tasks to.
+
+To bundle sub-agents with your extension, create an `agents/` directory in your
+extension's root folder and add your agent definition files (`.md`) there.
+
+**Example**
+
+```
+.gemini/extensions/my-extension/
+├── gemini-extension.json
+└── agents/
+    ├── security-auditor.md
+    └── database-expert.md
+```
+
+Gemini CLI will automatically discover and load these agents when the extension
+is installed and enabled.
+
 ### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user
@@ -299,9 +322,10 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 ## Variables
 
-Gemini CLI extensions allow variable substitution in `gemini-extension.json`.
-This can be useful if e.g., you need the current directory to run an MCP server
-using an argument like `"args": ["${extensionPath}${/}dist${/}server.js"]`.
+Gemini CLI extensions allow variable substitution in both
+`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
+need the current directory to run an MCP server using an argument like
+`"args": ["${extensionPath}${/}dist${/}server.js"]`.
 
 **Supported variables:**
 
