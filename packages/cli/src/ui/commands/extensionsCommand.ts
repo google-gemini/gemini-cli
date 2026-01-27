@@ -29,6 +29,7 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
 
@@ -381,6 +382,38 @@ async function enableAction(context: CommandContext, args: string) {
       type: MessageType.INFO,
       text: `Extension "${name}" enabled for the scope "${scope}"`,
     });
+
+    // Auto-enable any disabled MCP servers for this extension
+    const extension = extensionManager
+      .getExtensions()
+      .find((e) => e.name === name);
+
+    if (extension?.mcpServers) {
+      const mcpEnablementManager = McpServerEnablementManager.getInstance();
+      const mcpClientManager = context.services.config?.getMcpClientManager();
+      const enabledServers = await mcpEnablementManager.autoEnableServers(
+        Object.keys(extension.mcpServers ?? {}),
+      );
+
+      if (mcpClientManager && enabledServers.length > 0) {
+        const restartPromises = enabledServers.map((serverName) =>
+          mcpClientManager.restartServer(serverName).catch((error) => {
+            context.ui.addItem({
+              type: MessageType.WARNING,
+              text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
+            });
+          }),
+        );
+        await Promise.all(restartPromises);
+      }
+
+      if (enabledServers.length > 0) {
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: `Re-enabled MCP servers: ${enabledServers.join(', ')}`,
+        });
+      }
+    }
   }
 }
 
