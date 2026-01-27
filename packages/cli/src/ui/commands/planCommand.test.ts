@@ -24,11 +24,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn(),
   promises: {
+    access: vi.fn(),
     readdir: vi.fn(),
     stat: vi.fn(),
     readFile: vi.fn(),
+  },
+  constants: {
+    F_OK: 0,
   },
 }));
 
@@ -91,7 +94,7 @@ describe('planCommand', () => {
 
   it('should switch to plan mode if enabled', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.existsSync).mockReturnValue(false); // No plans found case
+    vi.mocked(fs.promises.access).mockRejectedValue(new Error('No entry')); // No plans found case
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
@@ -107,7 +110,7 @@ describe('planCommand', () => {
 
   it('should show "No plans found" if directory does not exist', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.promises.access).mockRejectedValue(new Error('No entry'));
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
@@ -120,10 +123,12 @@ describe('planCommand', () => {
 
   it('should show "No plans found" if directory is empty of .md files', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.promises.readdir).mockImplementation(
-      async () => ['not-a-plan.txt'] as Array<fs.Dirent<Buffer>>,
-    );
+    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
+    vi.mocked(
+      fs.promises.readdir as unknown as (
+        path: fs.PathLike,
+      ) => Promise<string[]>,
+    ).mockResolvedValue(['not-a-plan.txt']);
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
@@ -136,10 +141,12 @@ describe('planCommand', () => {
 
   it('should find and display the latest plan', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.promises.readdir).mockImplementation(
-      async () => ['old-plan.md', 'new-plan.md'] as Array<fs.Dirent<Buffer>>,
-    );
+    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
+    vi.mocked(
+      fs.promises.readdir as unknown as (
+        path: fs.PathLike,
+      ) => Promise<string[]>,
+    ).mockResolvedValue(['old-plan.md', 'new-plan.md']);
 
     vi.mocked(fs.promises.stat).mockImplementation(async (filePath) => {
       const pathStr = filePath as string;
@@ -173,8 +180,12 @@ describe('planCommand', () => {
 
   it('should handle errors when reading plans', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.promises.readdir).mockRejectedValue(new Error('Read error'));
+    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
+    vi.mocked(
+      fs.promises.readdir as unknown as (
+        path: fs.PathLike,
+      ) => Promise<string[]>,
+    ).mockRejectedValue(new Error('Read error'));
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');

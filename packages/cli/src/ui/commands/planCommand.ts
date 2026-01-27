@@ -5,7 +5,7 @@
  */
 
 import { CommandKind, type SlashCommand } from './types.js';
-import { ApprovalMode, coreEvents } from '@google/gemini-cli-core';
+import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -17,7 +17,10 @@ export const planCommand: SlashCommand = {
   autoExecute: true,
   action: async (context) => {
     const config = context.services.config;
-    if (!config) return;
+    if (!config) {
+      debugLogger.debug('Plan command: config is not available in context');
+      return;
+    }
 
     // Check if plan mode is enabled
     if (!config.isPlanEnabled()) {
@@ -36,7 +39,9 @@ export const planCommand: SlashCommand = {
     const plansDir = config.storage.getProjectTempPlansDir();
 
     try {
-      if (!fs.existsSync(plansDir)) {
+      try {
+        await fs.promises.access(plansDir, fs.constants.F_OK);
+      } catch {
         coreEvents.emitFeedback('info', 'No plans found.');
         return;
       }
