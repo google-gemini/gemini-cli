@@ -850,7 +850,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : '/';
       this.extensionEnablementManager.disable(name, true, scopePath);
     }
     await logExtensionDisable(
@@ -885,7 +885,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     if (scope !== SettingScope.Session) {
       const scopePath =
-        scope === SettingScope.Workspace ? this.workspaceDir : homedir();
+        scope === SettingScope.Workspace ? this.workspaceDir : '/';
       this.extensionEnablementManager.enable(name, true, scopePath);
     }
     await logExtensionEnable(

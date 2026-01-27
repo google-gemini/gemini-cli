@@ -2032,6 +2032,25 @@ ${INSTALL_WARNING_MESSAGE}`,
         SettingScope.Workspace,
       );
     });
+
+    it('should disable an extension globally at the user scope', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+      await extensionManager.loadExtensions();
+      await extensionManager.disableExtension('ext1', SettingScope.User);
+
+      // Should be disabled in home dir
+      expect(
+        isEnabled({ name: 'ext1', enabledForPath: userExtensionsDir }),
+      ).toBe(false);
+      // Should be disabled in some other random path (global)
+      expect(isEnabled({ name: 'ext1', enabledForPath: '/tmp/other' })).toBe(
+        false,
+      );
+    });
   });
 
   describe('enableExtension', () => {
@@ -2099,6 +2118,29 @@ ${INSTALL_WARNING_MESSAGE}`,
         hashValue(userExtensionsDir),
         SettingScope.Workspace,
       );
+    });
+
+    it('should enable an extension globally at the user scope', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+      await extensionManager.loadExtensions();
+
+      await extensionManager.disableExtension('ext1', SettingScope.User);
+      expect(isEnabled({ name: 'ext1', enabledForPath: '/tmp/other' })).toBe(
+        false,
+      );
+
+      await extensionManager.enableExtension('ext1', SettingScope.User);
+
+      expect(isEnabled({ name: 'ext1', enabledForPath: '/tmp/other' })).toBe(
+        true,
+      );
+      expect(
+        isEnabled({ name: 'ext1', enabledForPath: userExtensionsDir }),
+      ).toBe(true);
     });
   });
 });
