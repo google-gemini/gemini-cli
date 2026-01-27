@@ -8,6 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
+import { useTransientTip } from '../hooks/useTransientTip.js';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
@@ -16,6 +17,7 @@ interface ApprovalModeIndicatorProps {
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
 }) => {
+  const showTip = useTransientTip(approvalMode);
   let textColor = '';
   let textContent = '';
   let subText = '';
@@ -45,7 +47,9 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
     <Box>
       <Text color={textColor}>
         {textContent}
-        {subText && <Text color={theme.text.secondary}>{subText}</Text>}
+        {showTip && subText && (
+          <Text color={theme.text.secondary}>{subText}</Text>
+        )}
       </Text>
     </Box>
   );

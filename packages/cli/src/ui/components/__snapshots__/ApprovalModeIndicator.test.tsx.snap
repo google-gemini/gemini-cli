@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ApprovalModeIndicator > renders correctly for 'AUTO_EDIT' mode and hides tip after timeout 1`] = `"accepting edits (shift + tab to cycle)"`;
+
+exports[`ApprovalModeIndicator > renders correctly for 'AUTO_EDIT' mode and hides tip after timeout 2`] = `"accepting edits"`;
+
+exports[`ApprovalModeIndicator > renders correctly for 'PLAN' mode and hides tip after timeout 1`] = `"plan mode (shift + tab to cycle)"`;
+
+exports[`ApprovalModeIndicator > renders correctly for 'PLAN' mode and hides tip after timeout 2`] = `"plan mode"`;
+
+exports[`ApprovalModeIndicator > renders correctly for 'YOLO' mode and hides tip after timeout 1`] = `"YOLO mode (ctrl + y to toggle)"`;
+
+exports[`ApprovalModeIndicator > renders correctly for 'YOLO' mode and hides tip after timeout 2`] = `"YOLO mode"`;
+
+exports[`ApprovalModeIndicator > renders nothing for DEFAULT mode 1`] = `""`;
+
+exports[`ApprovalModeIndicator > reshows tip when mode changes 1`] = `"plan mode (shift + tab to cycle)"`;
