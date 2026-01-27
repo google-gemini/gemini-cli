@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
@@ -31,6 +32,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { AskUserTool } from '../tools/ask-user.js';
 import { ListResourcesTool } from '../tools/mcp-list-resources-tool.js';
 import { ReadResourceTool } from '../tools/mcp-read-resource-tool.js';
 import { GeminiClient } from '../core/client.js';
@@ -102,6 +104,7 @@ import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
+import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
@@ -356,6 +359,7 @@ export interface ConfigParameters {
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
+  useBackgroundColor?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -418,6 +422,7 @@ export class Config {
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private sessionId: string;
   private clientVersion: string;
@@ -499,6 +504,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
@@ -665,6 +671,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
+    this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -696,6 +703,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
+
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -707,6 +715,7 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
@@ -791,6 +800,13 @@ export class Config {
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
+    }
+
+    // Add plans directory to workspace context for plan file storage
+    if (this.planEnabled) {
+      const plansDir = this.storage.getProjectTempPlansDir();
+      await fs.promises.mkdir(plansDir, { recursive: true });
+      this.workspaceContext.addDirectory(plansDir);
     }
 
     // Initialize centralized FileDiscoveryService
@@ -1140,6 +1156,10 @@ export class Config {
     return this.agentRegistry;
   }
 
+  getAcknowledgedAgentsService(): AcknowledgedAgentsService {
+    return this.acknowledgedAgentsService;
+  }
+
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
   }
@@ -1324,7 +1344,7 @@ export class Config {
     }
     if (this.geminiClient?.isInitialized()) {
       await this.geminiClient.setTools();
-      await this.geminiClient.updateSystemInstruction();
+      this.geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1392,6 +1412,13 @@ export class Config {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    if (isPlanModeTransition) {
+      this.updateSystemInstructionIfInitialized();
+    }
   }
 
   /**
@@ -1474,10 +1501,10 @@ export class Config {
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
    */
-  async updateSystemInstructionIfInitialized(): Promise<void> {
+  updateSystemInstructionIfInitialized(): void {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1786,7 +1813,7 @@ export class Config {
     }
 
     // Notify the client that system instructions might need updating
-    await this.updateSystemInstructionIfInitialized();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**
@@ -1807,6 +1834,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getUseBackgroundColor(): boolean {
+    return this.useBackgroundColor;
   }
 
   getEnableInteractiveShell(): boolean {
@@ -1977,6 +2008,7 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(AskUserTool);
     registerCoreTool(ListResourcesTool, this);
     registerCoreTool(ReadResourceTool, this);
     if (this.getUseWriteTodos()) {
@@ -2123,7 +2155,7 @@ export class Config {
     const client = this.getGeminiClient();
     if (client?.isInitialized()) {
       await client.setTools();
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
     } else {
       debugLogger.debug(
         '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',

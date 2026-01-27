@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type Config } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -12,10 +13,12 @@ import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 
 interface LoginWithGoogleRestartDialogProps {
   onDismiss: () => void;
+  config: Config;
 }
 
 export const LoginWithGoogleRestartDialog = ({
   onDismiss,
+  config,
 }: LoginWithGoogleRestartDialogProps) => {
   useKeypress(
     (key) => {
@@ -23,6 +26,15 @@ export const LoginWithGoogleRestartDialog = ({
         onDismiss();
       } else if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
+          if (process.send) {
+            const remoteSettings = config.getRemoteAdminSettings();
+            if (remoteSettings) {
+              process.send({
+                type: 'admin-settings-update',
+                settings: remoteSettings,
+              });
+            }
+          }
           await runExitCleanup();
           process.exit(RELAUNCH_EXIT_CODE);
         }, 100);

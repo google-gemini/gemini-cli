@@ -6,15 +6,17 @@
 
 import type React from 'react';
 import clipboardy from 'clipboardy';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { TextBuffer } from './shared/text-buffer.js';
+import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
+  type TextBuffer,
   logicalPosToOffset,
   PASTED_TEXT_PLACEHOLDER_REGEX,
+  getTransformUnderCursor,
 } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
@@ -47,6 +49,9 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
+import { getSafeLowColorBackground } from '../themes/color-utils.js';
+import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -54,6 +59,7 @@ import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -141,7 +147,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
-  const { mainAreaWidth, activePtyId, history } = useUIState();
+  const { terminalWidth, activePtyId, history, terminalBackgroundColor } =
+    useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -321,6 +328,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const allMessages = popAllMessages();
       if (allMessages) {
         buffer.setText(allMessages);
+        return true;
       } else {
         // No queued messages, proceed with input history
         inputHistory.navigateUp();
@@ -389,6 +397,59 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       buffer.moveToVisualPosition(visualRow, relX);
     },
     { isActive: focus },
+  );
+
+  const isAlternateBuffer = useAlternateBuffer();
+
+  // Double-click to expand/collapse paste placeholders
+  useMouseClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (!isAlternateBuffer) return;
+
+      const visualLine = buffer.viewportVisualLines[relY];
+      if (!visualLine) return;
+
+      // Even if we click past the end of the line, we might want to collapse an expanded paste
+      const isPastEndOfLine = relX >= stringWidth(visualLine);
+
+      const logicalPos = isPastEndOfLine
+        ? null
+        : buffer.getLogicalPositionFromVisual(
+            buffer.visualScrollRow + relY,
+            relX,
+          );
+
+      // Check for paste placeholder (collapsed state)
+      if (logicalPos) {
+        const transform = getTransformUnderCursor(
+          logicalPos.row,
+          logicalPos.col,
+          buffer.transformationsByLine,
+        );
+        if (transform?.type === 'paste' && transform.id) {
+          buffer.togglePasteExpansion(
+            transform.id,
+            logicalPos.row,
+            logicalPos.col,
+          );
+          return;
+        }
+      }
+
+      // If we didn't click a placeholder to expand, check if we are inside or after
+      // an expanded paste region and collapse it.
+      const row = buffer.visualScrollRow + relY;
+      const expandedId = buffer.getExpandedPasteAtLine(row);
+      if (expandedId) {
+        buffer.togglePasteExpansion(
+          expandedId,
+          row,
+          logicalPos?.col ?? relX, // Fallback to relX if past end of line
+        );
+      }
+    },
+    { isActive: focus, name: 'double-click' },
   );
 
   useMouse(
@@ -1033,6 +1094,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const activeCompletion = getActiveCompletion();
   const shouldShowSuggestions = activeCompletion.showSuggestions;
 
+  const useBackgroundColor = config.getUseBackgroundColor();
+  const isLowColor = isLowColorDepth();
+  const terminalBg = terminalBackgroundColor || 'black';
+
+  // We should fallback to lines if the background color is disabled OR if it is
+  // enabled but we are in a low color depth terminal where we don't have a safe
+  // background color to use.
+  const useLineFallback = useMemo(() => {
+    if (!useBackgroundColor) {
+      return true;
+    }
+    if (isLowColor) {
+      return !getSafeLowColorBackground(terminalBg);
+    }
+    return false;
+  }, [useBackgroundColor, isLowColor, terminalBg]);
+
   useEffect(() => {
     if (onSuggestionsVisibilityChange) {
       onSuggestionsVisibilityChange(shouldShowSuggestions);
@@ -1085,198 +1163,243 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     </Box>
   ) : null;
 
+  const borderColor =
+    isShellFocused && !isEmbeddedShellFocused
+      ? (statusColor ?? theme.border.focused)
+      : theme.border.default;
+
   return (
     <>
       {suggestionsPosition === 'above' && suggestionsNode}
-      <Box
-        borderStyle="round"
-        borderColor={
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={true}
+          borderBottom={false}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
+      <HalfLinePaddedBox
+        backgroundBaseColor={
           isShellFocused && !isEmbeddedShellFocused
-            ? (statusColor ?? theme.border.focused)
+            ? theme.border.focused
             : theme.border.default
         }
-        paddingX={1}
-        width={mainAreaWidth}
-        flexDirection="row"
-        alignItems="flex-start"
-        minHeight={3}
+        backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
+        useBackgroundColor={useBackgroundColor}
       >
-        <Text
-          color={statusColor ?? theme.text.accent}
-          aria-label={statusText || undefined}
+        <Box
+          flexGrow={1}
+          flexDirection="row"
+          paddingX={1}
+          borderColor={borderColor}
+          borderStyle={useLineFallback ? 'round' : undefined}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={!useBackgroundColor}
+          borderRight={!useBackgroundColor}
         >
-          {shellModeActive ? (
-            reverseSearchActive ? (
-              <Text
-                color={theme.text.link}
-                aria-label={SCREEN_READER_USER_PREFIX}
-              >
-                (r:){' '}
-              </Text>
+          <Text
+            color={statusColor ?? theme.text.accent}
+            aria-label={statusText || undefined}
+          >
+            {shellModeActive ? (
+              reverseSearchActive ? (
+                <Text
+                  color={theme.text.link}
+                  aria-label={SCREEN_READER_USER_PREFIX}
+                >
+                  (r:){' '}
+                </Text>
+              ) : (
+                '!'
+              )
+            ) : commandSearchActive ? (
+              <Text color={theme.text.accent}>(r:) </Text>
+            ) : showYoloStyling ? (
+              '*'
             ) : (
-              '!'
-            )
-          ) : commandSearchActive ? (
-            <Text color={theme.text.accent}>(r:) </Text>
-          ) : showYoloStyling ? (
-            '*'
-          ) : (
-            '>'
-          )}{' '}
-        </Text>
-        <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-          {buffer.text.length === 0 && placeholder ? (
-            showCursor ? (
-              <Text>
-                {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
-              </Text>
+              '>'
+            )}{' '}
+          </Text>
+          <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
+            {buffer.text.length === 0 && placeholder ? (
+              showCursor ? (
+                <Text>
+                  {chalk.inverse(placeholder.slice(0, 1))}
+                  <Text color={theme.text.secondary}>
+                    {placeholder.slice(1)}
+                  </Text>
+                </Text>
+              ) : (
+                <Text color={theme.text.secondary}>{placeholder}</Text>
+              )
             ) : (
-              <Text color={theme.text.secondary}>{placeholder}</Text>
-            )
-          ) : (
-            linesToRender
-              .map((lineText, visualIdxInRenderedSet) => {
-                const absoluteVisualIdx =
-                  scrollVisualRow + visualIdxInRenderedSet;
-                const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
-                const cursorVisualRow =
-                  cursorVisualRowAbsolute - scrollVisualRow;
-                const isOnCursorLine =
-                  focus && visualIdxInRenderedSet === cursorVisualRow;
+              linesToRender
+                .map((lineText: string, visualIdxInRenderedSet: number) => {
+                  const absoluteVisualIdx =
+                    scrollVisualRow + visualIdxInRenderedSet;
+                  const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
+                  if (!mapEntry) return null;
 
-                const renderedLine: React.ReactNode[] = [];
+                  const cursorVisualRow =
+                    cursorVisualRowAbsolute - scrollVisualRow;
+                  const isOnCursorLine =
+                    focus && visualIdxInRenderedSet === cursorVisualRow;
 
-                const [logicalLineIdx] = mapEntry;
-                const logicalLine = buffer.lines[logicalLineIdx] || '';
-                const transformations =
-                  buffer.transformationsByLine[logicalLineIdx] ?? [];
-                const tokens = parseInputForHighlighting(
-                  logicalLine,
-                  logicalLineIdx,
-                  transformations,
-                  ...(focus && buffer.cursor[0] === logicalLineIdx
-                    ? [buffer.cursor[1]]
-                    : []),
-                );
-                const startColInTransformed =
-                  buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
-                const visualStartCol = startColInTransformed;
-                const visualEndCol = visualStartCol + cpLen(lineText);
-                const segments = parseSegmentsFromTokens(
-                  tokens,
-                  visualStartCol,
-                  visualEndCol,
-                );
-                let charCount = 0;
-                segments.forEach((seg, segIdx) => {
-                  const segLen = cpLen(seg.text);
-                  let display = seg.text;
+                  const renderedLine: React.ReactNode[] = [];
 
-                  if (isOnCursorLine) {
-                    const relativeVisualColForHighlight =
-                      cursorVisualColAbsolute;
-                    const segStart = charCount;
-                    const segEnd = segStart + segLen;
-                    if (
-                      relativeVisualColForHighlight >= segStart &&
-                      relativeVisualColForHighlight < segEnd
-                    ) {
-                      const charToHighlight = cpSlice(
-                        display,
-                        relativeVisualColForHighlight - segStart,
-                        relativeVisualColForHighlight - segStart + 1,
-                      );
-                      const highlighted = showCursor
-                        ? chalk.inverse(charToHighlight)
-                        : charToHighlight;
-                      display =
-                        cpSlice(
+                  const [logicalLineIdx] = mapEntry;
+                  const logicalLine = buffer.lines[logicalLineIdx] || '';
+                  const transformations =
+                    buffer.transformationsByLine[logicalLineIdx] ?? [];
+                  const tokens = parseInputForHighlighting(
+                    logicalLine,
+                    logicalLineIdx,
+                    transformations,
+                    ...(focus && buffer.cursor[0] === logicalLineIdx
+                      ? [buffer.cursor[1]]
+                      : []),
+                  );
+                  const startColInTransformed =
+                    buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+                  const visualStartCol = startColInTransformed;
+                  const visualEndCol = visualStartCol + cpLen(lineText);
+                  const segments = parseSegmentsFromTokens(
+                    tokens,
+                    visualStartCol,
+                    visualEndCol,
+                  );
+                  let charCount = 0;
+                  segments.forEach((seg, segIdx) => {
+                    const segLen = cpLen(seg.text);
+                    let display = seg.text;
+
+                    if (isOnCursorLine) {
+                      const relativeVisualColForHighlight =
+                        cursorVisualColAbsolute;
+                      const segStart = charCount;
+                      const segEnd = segStart + segLen;
+                      if (
+                        relativeVisualColForHighlight >= segStart &&
+                        relativeVisualColForHighlight < segEnd
+                      ) {
+                        const charToHighlight = cpSlice(
                           display,
-                          0,
                           relativeVisualColForHighlight - segStart,
-                        ) +
-                        highlighted +
-                        cpSlice(
-                          display,
                           relativeVisualColForHighlight - segStart + 1,
                         );
+                        const highlighted = showCursor
+                          ? chalk.inverse(charToHighlight)
+                          : charToHighlight;
+                        display =
+                          cpSlice(
+                            display,
+                            0,
+                            relativeVisualColForHighlight - segStart,
+                          ) +
+                          highlighted +
+                          cpSlice(
+                            display,
+                            relativeVisualColForHighlight - segStart + 1,
+                          );
+                      }
+                      charCount = segEnd;
+                    } else {
+                      // Advance the running counter even when not on cursor line
+                      charCount += segLen;
                     }
-                    charCount = segEnd;
-                  } else {
-                    // Advance the running counter even when not on cursor line
-                    charCount += segLen;
-                  }
 
-                  const color =
-                    seg.type === 'command' ||
-                    seg.type === 'file' ||
-                    seg.type === 'paste'
-                      ? theme.text.accent
-                      : theme.text.primary;
+                    const color =
+                      seg.type === 'command' ||
+                      seg.type === 'file' ||
+                      seg.type === 'paste'
+                        ? theme.text.accent
+                        : theme.text.primary;
 
-                  renderedLine.push(
-                    <Text key={`token-${segIdx}`} color={color}>
-                      {display}
-                    </Text>,
-                  );
-                });
-
-                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-                if (
-                  isOnCursorLine &&
-                  cursorVisualColAbsolute === cpLen(lineText)
-                ) {
-                  if (!currentLineGhost) {
                     renderedLine.push(
-                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {showCursor ? chalk.inverse(' ') : ' '}
+                      <Text key={`token-${segIdx}`} color={color}>
+                        {display}
                       </Text>,
                     );
+                  });
+
+                  const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+                  if (
+                    isOnCursorLine &&
+                    cursorVisualColAbsolute === cpLen(lineText)
+                  ) {
+                    if (!currentLineGhost) {
+                      renderedLine.push(
+                        <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                          {showCursor ? chalk.inverse(' ') : ' '}
+                        </Text>,
+                      );
+                    }
                   }
-                }
 
-                const showCursorBeforeGhost =
-                  focus &&
-                  isOnCursorLine &&
-                  cursorVisualColAbsolute === cpLen(lineText) &&
-                  currentLineGhost;
+                  const showCursorBeforeGhost =
+                    focus &&
+                    isOnCursorLine &&
+                    cursorVisualColAbsolute === cpLen(lineText) &&
+                    currentLineGhost;
 
-                return (
-                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                    <Text>
-                      {renderedLine}
-                      {showCursorBeforeGhost &&
-                        (showCursor ? chalk.inverse(' ') : ' ')}
-                      {currentLineGhost && (
-                        <Text color={theme.text.secondary}>
-                          {currentLineGhost}
-                        </Text>
-                      )}
-                    </Text>
-                  </Box>
-                );
-              })
-              .concat(
-                additionalLines.map((ghostLine, index) => {
-                  const padding = Math.max(
-                    0,
-                    inputWidth - stringWidth(ghostLine),
-                  );
                   return (
-                    <Text
-                      key={`ghost-line-${index}`}
-                      color={theme.text.secondary}
-                    >
-                      {ghostLine}
-                      {' '.repeat(padding)}
-                    </Text>
+                    <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                      <Text>
+                        {renderedLine}
+                        {showCursorBeforeGhost &&
+                          (showCursor ? chalk.inverse(' ') : ' ')}
+                        {currentLineGhost && (
+                          <Text color={theme.text.secondary}>
+                            {currentLineGhost}
+                          </Text>
+                        )}
+                      </Text>
+                    </Box>
                   );
-                }),
-              )
-          )}
+                })
+                .concat(
+                  additionalLines.map((ghostLine, index) => {
+                    const padding = Math.max(
+                      0,
+                      inputWidth - stringWidth(ghostLine),
+                    );
+                    return (
+                      <Text
+                        key={`ghost-line-${index}`}
+                        color={theme.text.secondary}
+                      >
+                        {ghostLine}
+                        {' '.repeat(padding)}
+                      </Text>
+                    );
+                  }),
+                )
+            )}
+          </Box>
         </Box>
-      </Box>
+      </HalfLinePaddedBox>
+      {useLineFallback ? (
+        <Box
+          borderStyle="round"
+          borderTop={false}
+          borderBottom={true}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColor}
+          width={terminalWidth}
+          flexDirection="row"
+          alignItems="flex-start"
+          height={0}
+        />
+      ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
     </>
   );
