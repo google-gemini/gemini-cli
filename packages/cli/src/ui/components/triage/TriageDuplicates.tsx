@@ -503,15 +503,16 @@ Return a JSON object with:
           'status/possible-duplicate',
         ]);
 
-        await spawnAsync('gh', [
+        await spawnAsync('gh',
           'api',
           '-X',
           'PATCH',
-          `repos/google-gemini/gemini-cli/issues/${state.currentIssue.number}`,
+          `repos/google-gemini/gemini-cli/issues/${String(state.currentIssue.number).replace(/[^a-zA-Z0-9-]/g, '')}`, // Sanitize issue number
           '-f',
           'state=closed',
           '-f',
           'state_reason=duplicate',
+        );
         ]);
 
         setProcessedHistory((prev) => [
