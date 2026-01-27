@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type {
@@ -204,6 +205,7 @@ export function AgentConfigDialog({
   onClose,
   onSave,
 }: AgentConfigDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
@@ -253,12 +255,16 @@ export function AgentConfigDialog({
   const maxLabelWidth = useMemo(() => {
     let max = 0;
     for (const field of AGENT_CONFIG_FIELDS) {
-      const lWidth = getCachedStringWidth(field.label);
-      const dWidth = getCachedStringWidth(field.description);
+      const lWidth = getCachedStringWidth(
+        t(`agentConfig.fields.${field.key}.label`),
+      );
+      const dWidth = getCachedStringWidth(
+        t(`agentConfig.fields.${field.key}.description`),
+      );
       max = Math.max(max, lWidth, dWidth);
     }
     return max;
-  }, []);
+  }, [t]);
 
   // Generate items for BaseSettingsDialog
   const items: SettingsDialogItem[] = useMemo(
@@ -274,11 +280,13 @@ export function AgentConfigDialog({
 
         let displayValue: string;
         if (field.type === 'boolean') {
-          displayValue = effectiveValue ? 'true' : 'false';
+          displayValue = effectiveValue
+            ? t('agentConfig.values.true')
+            : t('agentConfig.values.false');
         } else if (effectiveValue !== undefined && effectiveValue !== null) {
           displayValue = String(effectiveValue);
         } else {
-          displayValue = '(default)';
+          displayValue = t('agentConfig.values.default');
         }
 
         // Add * if modified
@@ -294,8 +302,8 @@ export function AgentConfigDialog({
 
         return {
           key: field.key,
-          label: field.label,
-          description: field.description,
+          label: t(`agentConfig.fields.${field.key}.label`),
+          description: t(`agentConfig.fields.${field.key}.description`),
           type: field.type,
           displayValue,
           isGreyedOut: currentValue === undefined,
@@ -303,7 +311,7 @@ export function AgentConfigDialog({
           rawValue: rawValue as string | number | boolean | undefined,
         };
       }),
-    [pendingOverride, definition, modifiedFields],
+    [pendingOverride, definition, modifiedFields, t],
   );
 
   const maxItemsToShow = 8;
@@ -412,12 +420,12 @@ export function AgentConfigDialog({
   // Footer content
   const footerContent =
     modifiedFields.size > 0 ? (
-      <Text color={theme.text.secondary}>Changes saved automatically.</Text>
+      <Text color={theme.text.secondary}>{t('agentConfig.changesSaved')}</Text>
     ) : null;
 
   return (
     <BaseSettingsDialog
-      title={`Configure: ${displayName}`}
+      title={t('agentConfig.title', { displayName })}
       searchEnabled={false}
       items={items}
       showScopeSelector={true}
