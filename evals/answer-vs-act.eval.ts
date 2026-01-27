@@ -10,6 +10,7 @@ import { EDIT_TOOL_NAMES } from '@google/gemini-cli-core';
 
 const FILES = {
   'app.ts': 'const add = (a: number, b: number) => a - b;',
+  'package.json': '{"name": "test-app", "version": "1.0.0"}',
 } as const;
 
 describe('Answer vs. ask eval', () => {
@@ -68,7 +69,7 @@ describe('Answer vs. ask eval', () => {
     name: 'should not edit when asking "any bugs"',
     prompt: 'Any bugs in app.ts?',
     files: FILES,
-    assert: async (rig, result) => {
+    assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
 
       // Verify NO edit tools called
@@ -138,7 +139,7 @@ describe('Answer vs. ask eval', () => {
     prompt: 'The add function subtracts numbers.',
     files: FILES,
     params: { timeout: 20000 }, // 20s timeout
-    assert: async (rig, result) => {
+    assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
 
       // Verify NO edit tools called
