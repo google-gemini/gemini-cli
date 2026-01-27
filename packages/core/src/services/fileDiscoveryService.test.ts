@@ -414,6 +414,24 @@ describe('FileDiscoveryService', () => {
       const filtered = service.filterFiles(files);
       expect(filtered).toEqual([path.join(projectRoot, 'debug.log')]);
     });
+
+    it('should prioritize custom ignore patterns over .geminiignore patterns in non-git repo', async () => {
+      // No .git directory created
+      await createTestFile(GEMINI_IGNORE_FILE_NAME, 'secret.txt');
+
+      const customIgnoreName = '.customignore';
+      // .geminiignore ignores secret.txt, custom un-ignores it
+      await createTestFile(customIgnoreName, '!secret.txt');
+
+      const service = new FileDiscoveryService(projectRoot, {
+        customIgnoreFilePaths: [customIgnoreName],
+      });
+
+      const files = ['secret.txt'].map((f) => path.join(projectRoot, f));
+
+      const filtered = service.filterFiles(files);
+      expect(filtered).toEqual([path.join(projectRoot, 'secret.txt')]);
+    });
   });
 
   describe('getIgnoreFilePaths & getAllIgnoreFilePaths', () => {

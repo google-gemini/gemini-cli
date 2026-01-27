@@ -176,4 +176,44 @@ describe('GeminiIgnoreParser', () => {
       ]);
     });
   });
+
+  describe('when patterns are passed directly', () => {
+    it('should ignore files matching the passed patterns', () => {
+      const parser = new IgnoreFileParser(projectRoot, ['*.log'], true);
+      expect(parser.isIgnored('debug.log')).toBe(true);
+      expect(parser.isIgnored('src/index.ts')).toBe(false);
+    });
+
+    it('should handle multiple patterns', () => {
+      const parser = new IgnoreFileParser(
+        projectRoot,
+        ['*.log', 'temp/'],
+        true,
+      );
+      expect(parser.isIgnored('debug.log')).toBe(true);
+      expect(parser.isIgnored('temp/file.txt')).toBe(true);
+      expect(parser.isIgnored('src/index.ts')).toBe(false);
+    });
+
+    it('should respect precedence (later patterns override earlier ones)', () => {
+      const parser = new IgnoreFileParser(
+        projectRoot,
+        ['*.txt', '!important.txt'],
+        true,
+      );
+      expect(parser.isIgnored('file.txt')).toBe(true);
+      expect(parser.isIgnored('important.txt')).toBe(false);
+    });
+
+    it('should return empty array for getIgnoreFilePaths', () => {
+      const parser = new IgnoreFileParser(projectRoot, ['*.log'], true);
+      expect(parser.getIgnoreFilePaths()).toEqual([]);
+    });
+
+    it('should return patterns via getPatterns', () => {
+      const patterns = ['*.log', '!debug.log'];
+      const parser = new IgnoreFileParser(projectRoot, patterns, true);
+      expect(parser.getPatterns()).toEqual(patterns);
+    });
+  });
 });

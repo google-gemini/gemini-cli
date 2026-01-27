@@ -28,15 +28,23 @@ export class IgnoreFileParser implements IgnoreFileFilter {
   constructor(
     projectRoot: string,
     // The order matters: files listed earlier have higher priority.
-    // It can be a single file name or an array of file names.
-    fileNames: string | string[],
+    // It can be a single file name/pattern or an array of file names/patterns.
+    input: string | string[],
+    isPatterns = false,
   ) {
     this.projectRoot = path.resolve(projectRoot);
-    this.fileNames = Array.isArray(fileNames) ? fileNames : [fileNames];
-    this.loadPatterns();
+    if (isPatterns) {
+      this.fileNames = [];
+      const patterns = Array.isArray(input) ? input : [input];
+      this.patterns.push(...patterns);
+      this.ig.add(patterns);
+    } else {
+      this.fileNames = Array.isArray(input) ? input : [input];
+      this.loadPatternsFromFiles();
+    }
   }
 
-  private loadPatterns(): void {
+  private loadPatternsFromFiles(): void {
     // Iterate in reverse order so that the first file in the list is processed last.
     // This gives the first file the highest priority, as patterns added later override earlier ones.
     for (const fileName of [...this.fileNames].reverse()) {

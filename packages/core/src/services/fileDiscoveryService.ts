@@ -28,7 +28,8 @@ export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: IgnoreFileFilter | null = null;
   private customIgnoreFilter: IgnoreFileFilter | null = null;
-  private combinedIgnoreFilter: GitIgnoreFilter | null = null;
+  private combinedIgnoreFilter: GitIgnoreFilter | IgnoreFileFilter | null =
+    null;
   private defaultFilterFileOptions: FilterFilesOptions = {
     respectGitIgnore: true,
     respectGeminiIgnore: true,
@@ -63,6 +64,17 @@ export class FileDiscoveryService {
         this.projectRoot,
         // customPatterns should go the last to ensure overwriting of geminiPatterns
         [...geminiPatterns, ...customPatterns],
+      );
+    } else {
+      // Create combined parser when not git repo
+      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+      const customPatterns = this.customIgnoreFilter
+        ? this.customIgnoreFilter.getPatterns()
+        : [];
+      this.combinedIgnoreFilter = new IgnoreFileParser(
+        this.projectRoot,
+        [...geminiPatterns, ...customPatterns],
+        true,
       );
     }
   }
