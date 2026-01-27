@@ -2215,8 +2215,8 @@ describe('Settings Loading and Merging', () => {
       // and missing properties revert to schema defaults.
       loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2276,10 +2276,10 @@ describe('Settings Loading and Merging', () => {
         secureModeEnabled: true,
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
+      // Verify secureModeEnabled is updated, others default to false
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only mcpSetting.mcpEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -2289,7 +2289,7 @@ describe('Settings Loading and Merging', () => {
       // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -2298,7 +2298,7 @@ describe('Settings Loading and Merging', () => {
 
       // Verify extensionsEnabled is updated, others remain defaults
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
