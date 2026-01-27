@@ -67,11 +67,22 @@ function detectAvailableLanguagesSync(): string[] {
 // Detect available languages synchronously at module load
 const availableLanguages: string[] = detectAvailableLanguagesSync();
 
+// Cache language options at module load to prevent re-creation on each access
+// This prevents React flickering from new object references
+const cachedLanguageOptions: ReadonlyArray<{ value: string; label: string }> =
+  Object.freeze([
+    { value: 'auto', label: 'Auto' },
+    ...availableLanguages.map((lang) => ({
+      value: lang,
+      label: LANGUAGE_LABELS[lang] ?? lang.toUpperCase(),
+    })),
+  ]);
+
 /**
  * Get the list of available languages (detected from locale folders).
  */
-export function getAvailableLanguages(): string[] {
-  return [...availableLanguages];
+export function getAvailableLanguages(): readonly string[] {
+  return availableLanguages;
 }
 
 /**
@@ -83,21 +94,13 @@ export function isLanguageAvailable(lang: string): boolean {
 
 /**
  * Get language options formatted for the settings schema.
- * Returns an array with 'auto' option followed by available languages.
+ * Returns a cached, frozen array to prevent React re-render flickering.
  */
-export function getLanguageOptions(): Array<{ value: string; label: string }> {
-  const options: Array<{ value: string; label: string }> = [
-    { value: 'auto', label: 'Auto' },
-  ];
-
-  for (const lang of availableLanguages) {
-    options.push({
-      value: lang,
-      label: LANGUAGE_LABELS[lang] ?? lang.toUpperCase(),
-    });
-  }
-
-  return options;
+export function getLanguageOptions(): ReadonlyArray<{
+  value: string;
+  label: string;
+}> {
+  return cachedLanguageOptions;
 }
 
 /**
