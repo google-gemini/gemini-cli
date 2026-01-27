@@ -24,6 +24,7 @@ import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getIdeServerHost } from './ide-client.js';
+import { pathToFileURL } from 'node:url';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -1135,39 +1136,43 @@ describe('getIdeServerHost', () => {
   describe('validateWorkspacePath', () => {
     describe('with special characters and encoding', () => {
       it('should return true for a URI-encoded path with spaces', () => {
-        const workspacePath = 'file:///test/my%20workspace';
-        const cwd = '/test/my workspace/sub-dir';
+        const workspaceDir = path.resolve('/test/my workspace');
+        const workspacePath = '/test/my%20workspace';
+        const cwd = path.join(workspaceDir, 'sub-dir');
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
         expect(result.isValid).toBe(true);
       });
 
       it('should return true for a URI-encoded path with Korean characters', () => {
-        const workspacePath = 'file:///test/%ED%85%8C%EC%8A%A4%ED%8A%B8'; // "테스트"
-        const cwd = '/test/테스트/sub-dir';
+        const workspaceDir = path.resolve('/test/테스트');
+        const workspacePath = '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8'; // "테스트"
+        const cwd = path.join(workspaceDir, 'sub-dir');
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
         expect(result.isValid).toBe(true);
       });
 
       it('should return true for a plain decoded path with Korean characters', () => {
-        const workspacePath = '/test/테스트';
-        const cwd = '/test/테스트/sub-dir';
+        const workspacePath = path.resolve('/test/테스트');
+        const cwd = path.join(workspacePath, 'sub-dir');
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
         expect(result.isValid).toBe(true);
       });
 
       it('should return true when one of multi-root paths is a valid URI-encoded path', () => {
+        const workspaceDir1 = path.resolve('/another/workspace');
+        const workspaceDir2 = path.resolve('/test/테스트');
         const workspacePath = [
-          '/another/workspace',
-          'file:///test/%ED%85%8C%EC%8A%A4%ED%8A%B8', // "테스트"
+          workspaceDir1,
+          '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8', // "테스트"
         ].join(path.delimiter);
-        const cwd = '/test/테스트/sub-dir';
+        const cwd = path.join(workspaceDir2, 'sub-dir');
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
         expect(result.isValid).toBe(true);
       });
 
       it('should return true for paths containing a literal % sign', () => {
-        const workspacePath = '/test/a%path';
-        const cwd = '/test/a%path/sub-dir';
+        const workspacePath = path.resolve('/test/a%path');
+        const cwd = path.join(workspacePath, 'sub-dir');
         const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
         expect(result.isValid).toBe(true);
       });
@@ -1190,27 +1195,27 @@ describe('getIdeServerHost', () => {
     it.each([
       {
         description: 'should return true for identical paths',
-        workspacePath: '/test/ws',
-        cwd: '/test/ws',
+        workspacePath: path.resolve('test', 'ws'),
+        cwd: path.resolve('test', 'ws'),
         expectedValid: true,
       },
       {
         description: 'should return true when workspace has file:// protocol',
-        workspacePath: 'file:///test/ws',
-        cwd: '/test/ws',
+        workspacePath: pathToFileURL(path.resolve('test', 'ws')).toString(),
+        cwd: path.resolve('test', 'ws'),
         expectedValid: true,
       },
       {
         description: 'should return true when workspace has encoded spaces',
-        workspacePath: '/test/my%20ws',
-        cwd: '/test/my ws',
+        workspacePath: path.resolve('test', 'my ws').replace(/ /g, '%20'),
+        cwd: path.resolve('test', 'my ws'),
         expectedValid: true,
       },
       {
         description:
           'should return true when cwd needs normalization matching workspace',
-        workspacePath: '/test/my ws',
-        cwd: '/test/my%20ws',
+        workspacePath: path.resolve('test', 'my ws'),
+        cwd: path.resolve('test', 'my ws').replace(/ /g, '%20'),
         expectedValid: true,
       },
     ])('$description', ({ workspacePath, cwd, expectedValid }) => {

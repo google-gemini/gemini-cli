@@ -50,6 +50,8 @@ export interface BaseSettingsDialogProps {
   // Header
   /** Dialog title displayed at the top */
   title: string;
+  /** Optional border color for the dialog */
+  borderColor?: string;
 
   // Search (optional feature)
   /** Whether to show the search input. Default: true */
@@ -107,6 +109,7 @@ export interface BaseSettingsDialogProps {
  */
 export function BaseSettingsDialog({
   title,
+  borderColor,
   searchEnabled = true,
   searchPlaceholder = 'Search to filter',
   searchBuffer,
@@ -390,7 +393,7 @@ export function BaseSettingsDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.default}
+      borderColor={borderColor ?? theme.border.default}
       flexDirection="row"
       padding={1}
       width="100%"
