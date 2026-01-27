@@ -60,6 +60,7 @@ export const PLAN_MODE_TOOLS = [
   READ_FILE_TOOL_NAME,
   LS_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
 ] as const;
 
 /**
