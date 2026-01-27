@@ -91,8 +91,8 @@ Additionally, these tools incorporate:
 
 - **[MCP servers](./mcp-server.md)**: MCP servers act as a bridge between the
   Gemini model and your local environment or other services like APIs.
-- **[Agent Skills](../cli/skills.md)**: (Experimental) On-demand expertise
-  packages that are activated via the `activate_skill` tool to provide
-  specialized guidance and resources.
+- **[Agent Skills](../cli/skills.md)**: On-demand expertise packages that are
+  activated via the `activate_skill` tool to provide specialized guidance and
+  resources.
 - **[Sandboxing](../cli/sandbox.md)**: Sandboxing isolates the model and its
   changes from your environment to reduce potential risk.
