@@ -22,14 +22,14 @@ describe('getPackageJson', () => {
   });
 
   it('should return packageJson when found', async () => {
-    const mockPackageJson = { name: 'test-pkg', version: '1.2.3' };
+    const expectedPackageJsonResult = { name: 'test-pkg', version: '1.2.3' };
     vi.mocked(readPackageUp).mockResolvedValue({
-      packageJson: mockPackageJson,
+      packageJson: expectedPackageJsonResult,
       path: '/path/to/package.json',
     });
 
     const result = await getPackageJson('/some/path');
-    expect(result).toEqual(mockPackageJson);
+    expect(result).toEqual(expectedPackageJsonResult);
     expect(readPackageUp).toHaveBeenCalledWith({
       cwd: '/some/path',
       normalize: false,

@@ -8,6 +8,7 @@ import {
   readPackageUp,
   type PackageJson as BasePackageJson,
 } from 'read-package-up';
+import { debugLogger } from './debugLogger.js';
 
 export type PackageJson = BasePackageJson & {
   config?: {
@@ -39,7 +40,8 @@ export async function getPackageJson(
     }
 
     return result.packageJson;
-  } catch (_error) {
+  } catch (error) {
+    debugLogger.error('Error occurred while reading package.json', error);
     return undefined;
   }
 }
