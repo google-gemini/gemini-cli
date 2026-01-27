@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
@@ -31,123 +32,126 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   ideClient,
   userEmail,
   tier,
-}) => (
-  <Box
-    borderStyle="round"
-    borderColor={theme.border.default}
-    flexDirection="column"
-    padding={1}
-    marginY={1}
-    width="100%"
-  >
-    <Box marginBottom={1}>
-      <Text bold color={theme.text.accent}>
-        About Gemini CLI
-      </Text>
-    </Box>
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={theme.text.link}>
-          CLI Version
+}) => {
+  const { t } = useTranslation('ui');
+  return (
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      marginY={1}
+      width="100%"
+    >
+      <Box marginBottom={1}>
+        <Text bold color={theme.text.accent}>
+          {t('about.title')}
         </Text>
       </Box>
-      <Box>
-        <Text color={theme.text.primary}>{cliVersion}</Text>
-      </Box>
-    </Box>
-    {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>
-            Git Commit
+            {t('about.cliVersion')}
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{GIT_COMMIT_INFO}</Text>
+          <Text color={theme.text.primary}>{cliVersion}</Text>
         </Box>
       </Box>
-    )}
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={theme.text.link}>
-          Model
-        </Text>
-      </Box>
-      <Box>
-        <Text color={theme.text.primary}>{modelVersion}</Text>
-      </Box>
-    </Box>
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={theme.text.link}>
-          Sandbox
-        </Text>
-      </Box>
-      <Box>
-        <Text color={theme.text.primary}>{sandboxEnv}</Text>
-      </Box>
-    </Box>
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={theme.text.link}>
-          OS
-        </Text>
-      </Box>
-      <Box>
-        <Text color={theme.text.primary}>{osVersion}</Text>
-      </Box>
-    </Box>
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={theme.text.link}>
-          Auth Method
-        </Text>
-      </Box>
-      <Box>
-        <Text color={theme.text.primary}>
-          {selectedAuthType.startsWith('oauth')
-            ? userEmail
-              ? `Logged in with Google (${userEmail})`
-              : 'Logged in with Google'
-            : selectedAuthType}
-        </Text>
-      </Box>
-    </Box>
-    {tier && (
+      {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
+        <Box flexDirection="row">
+          <Box width="35%">
+            <Text bold color={theme.text.link}>
+              {t('about.gitCommit')}
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.text.primary}>{GIT_COMMIT_INFO}</Text>
+          </Box>
+        </Box>
+      )}
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>
-            Tier
+            {t('about.model')}
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{tier}</Text>
+          <Text color={theme.text.primary}>{modelVersion}</Text>
         </Box>
       </Box>
-    )}
-    {gcpProject && (
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>
-            GCP Project
+            {t('about.sandbox')}
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{gcpProject}</Text>
+          <Text color={theme.text.primary}>{sandboxEnv}</Text>
         </Box>
       </Box>
-    )}
-    {ideClient && (
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>
-            IDE Client
+            {t('about.os')}
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{ideClient}</Text>
+          <Text color={theme.text.primary}>{osVersion}</Text>
         </Box>
       </Box>
-    )}
-  </Box>
-);
+      <Box flexDirection="row">
+        <Box width="35%">
+          <Text bold color={theme.text.link}>
+            {t('about.authMethod')}
+          </Text>
+        </Box>
+        <Box>
+          <Text color={theme.text.primary}>
+            {selectedAuthType.startsWith('oauth')
+              ? userEmail
+                ? t('about.loggedInWithGoogleEmail', { email: userEmail })
+                : t('about.loggedInWithGoogle')
+              : selectedAuthType}
+          </Text>
+        </Box>
+      </Box>
+      {tier && (
+        <Box flexDirection="row">
+          <Box width="35%">
+            <Text bold color={theme.text.link}>
+              {t('about.tier')}
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.text.primary}>{tier}</Text>
+          </Box>
+        </Box>
+      )}
+      {gcpProject && (
+        <Box flexDirection="row">
+          <Box width="35%">
+            <Text bold color={theme.text.link}>
+              {t('about.gcpProject')}
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.text.primary}>{gcpProject}</Text>
+          </Box>
+        </Box>
+      )}
+      {ideClient && (
+        <Box flexDirection="row">
+          <Box width="35%">
+            <Text bold color={theme.text.link}>
+              {t('about.ideClient')}
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.text.primary}>{ideClient}</Text>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+};
