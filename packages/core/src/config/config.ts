@@ -34,6 +34,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -564,6 +565,7 @@ export class Config {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: FetchAdminControlsResponse | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
+  private currentPlanPath: string | undefined = undefined;
   private lastModeSwitchTime: number = Date.now();
 
   constructor(params: ConfigParameters) {
@@ -1395,6 +1397,14 @@ export class Config {
     return this.policyEngine.getApprovalMode();
   }
 
+  getCurrentPlanPath(): string | undefined {
+    return this.currentPlanPath;
+  }
+
+  setCurrentPlanPath(path: string | undefined): void {
+    this.currentPlanPath = path;
+  }
+
   setApprovalMode(mode: ApprovalMode): void {
     if (!this.isTrustedFolder() && mode !== ApprovalMode.DEFAULT) {
       throw new Error(
@@ -2061,6 +2071,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     registerCoreTool(AskUserTool);
+    registerCoreTool(ExitPlanModeTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
     }

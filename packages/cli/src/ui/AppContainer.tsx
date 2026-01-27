@@ -69,8 +69,11 @@ import {
   generateSummary,
   MessageBusType,
   type AskUserRequest,
+  type PlanApprovalRequest,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  ApprovalMode,
+  isWithinRoot,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -293,6 +296,53 @@ export const AppContainer = (props: AppContainerProps) => {
     null,
   );
 
+  const [planApprovalRequest, setPlanApprovalRequest] =
+    useState<PlanApprovalRequest | null>(null);
+  const [planContent, setPlanContent] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let ignore = false;
+    if (planApprovalRequest?.planPath) {
+      setPlanContent(undefined);
+      if (
+        !isWithinRoot(
+          planApprovalRequest.planPath,
+          config.storage.getProjectTempPlansDir(),
+        )
+      ) {
+        setPlanContent(
+          'Error: Plan path is outside the designated plans directory.',
+        );
+        return;
+      }
+
+      fs.promises
+        .readFile(planApprovalRequest.planPath, 'utf8')
+        .then((content) => {
+          if (ignore) return;
+          const maxLines = 50;
+          const lines = content.split('\n');
+          if (lines.length > maxLines) {
+            setPlanContent(
+              lines.slice(0, maxLines).join('\n') +
+                `\n... (${lines.length - maxLines} more lines)`,
+            );
+          } else {
+            setPlanContent(content);
+          }
+        })
+        .catch((err) => {
+          if (ignore) return;
+          setPlanContent(`Error reading plan file: ${err.message}`);
+        });
+    } else {
+      setPlanContent(undefined);
+    }
+    return () => {
+      ignore = true;
+    };
+  }, [planApprovalRequest, config]);
+
   const openAgentConfigDialog = useCallback(
     (name: string, displayName: string, definition: AgentDefinition) => {
       setSelectedAgentName(name);
@@ -321,10 +371,22 @@ export const AppContainer = (props: AppContainerProps) => {
       });
     };
 
+    const planApprovalHandler = (msg: PlanApprovalRequest) => {
+      setPlanApprovalRequest(msg);
+    };
+
     messageBus.subscribe(MessageBusType.ASK_USER_REQUEST, handler);
+    messageBus.subscribe(
+      MessageBusType.PLAN_APPROVAL_REQUEST,
+      planApprovalHandler,
+    );
 
     return () => {
       messageBus.unsubscribe(MessageBusType.ASK_USER_REQUEST, handler);
+      messageBus.unsubscribe(
+        MessageBusType.PLAN_APPROVAL_REQUEST,
+        planApprovalHandler,
+      );
     };
   }, [config]);
 
@@ -963,6 +1025,64 @@ Logging in with Google... Restarting Gemini CLI to continue.
     embeddedShellFocused,
   );
 
+  const handlePlanApprove = useCallback(async () => {
+    if (!planApprovalRequest) return;
+
+    config.setCurrentPlanPath(planApprovalRequest.planPath);
+
+    config.setApprovalMode(ApprovalMode.DEFAULT);
+    await handleApprovalModeChange(ApprovalMode.DEFAULT);
+
+    const messageBus = config.getMessageBus();
+    await messageBus.publish({
+      type: MessageBusType.PLAN_APPROVAL_RESPONSE,
+      correlationId: planApprovalRequest.correlationId,
+      approved: true,
+    });
+
+    historyManager.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Plan approved. Switched to Default Mode.',
+      },
+      Date.now(),
+    );
+
+    setPlanApprovalRequest(null);
+  }, [config, planApprovalRequest, handleApprovalModeChange, historyManager]);
+
+  const handlePlanFeedback = useCallback(
+    async (feedback: string) => {
+      if (!planApprovalRequest) return;
+
+      const messageBus = config.getMessageBus();
+      await messageBus.publish({
+        type: MessageBusType.PLAN_APPROVAL_RESPONSE,
+        correlationId: planApprovalRequest.correlationId,
+        approved: false,
+        feedback,
+      });
+
+      setPlanApprovalRequest(null);
+    },
+    [config, planApprovalRequest],
+  );
+
+  const handlePlanCancel = useCallback(async () => {
+    if (!planApprovalRequest) return;
+
+    const messageBus = config.getMessageBus();
+    await messageBus.publish({
+      type: MessageBusType.PLAN_APPROVAL_RESPONSE,
+      correlationId: planApprovalRequest.correlationId,
+      approved: false,
+      feedback:
+        'User dismissed the plan approval dialog without providing feedback. The plan is not approved.',
+    });
+
+    setPlanApprovalRequest(null);
+  }, [config, planApprovalRequest]);
+
   const lastOutputTimeRef = useRef(0);
   useEffect(() => {
     lastOutputTimeRef.current = lastOutputTime;
@@ -1417,7 +1537,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (keyMatchers[Command.QUIT](key)) {
         // Skip when ask_user dialog is open (use Esc to cancel instead)
-        if (askUserRequest) {
+        if (askUserRequest || planApprovalRequest) {
           return;
         }
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
@@ -1515,6 +1635,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleSlashCommand,
       cancelOngoingRequest,
       askUserRequest,
+      planApprovalRequest,
       activePtyId,
       embeddedShellFocused,
       settings.merged.general.debugKeystrokeLogging,
@@ -1628,6 +1749,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const dialogsVisible =
     !!askUserRequest ||
+    !!planApprovalRequest ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
@@ -1813,6 +1935,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       adminSettingsChanged,
       newAgents,
+      planApprovalRequest,
+      planContent,
     }),
     [
       isThemeDialogOpen,
@@ -1914,6 +2038,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       adminSettingsChanged,
       newAgents,
+      planApprovalRequest,
+      planContent,
     ],
   );
 
@@ -1994,6 +2120,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      handlePlanApprove,
+      handlePlanFeedback,
+      handlePlanCancel,
     }),
     [
       handleThemeSelect,
@@ -2036,6 +2165,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      handlePlanApprove,
+      handlePlanFeedback,
+      handlePlanCancel,
     ],
   );
 

@@ -21,6 +21,8 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  PLAN_APPROVAL_REQUEST = 'plan-approval-request',
+  PLAN_APPROVAL_RESPONSE = 'plan-approval-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -156,6 +158,19 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface PlanApprovalRequest {
+  type: MessageBusType.PLAN_APPROVAL_REQUEST;
+  planPath: string;
+  correlationId: string;
+}
+
+export interface PlanApprovalResponse {
+  type: MessageBusType.PLAN_APPROVAL_RESPONSE;
+  correlationId: string;
+  approved: boolean;
+  feedback?: string;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -165,4 +180,6 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
+  | PlanApprovalRequest
+  | PlanApprovalResponse
   | ToolCallsUpdateMessage;

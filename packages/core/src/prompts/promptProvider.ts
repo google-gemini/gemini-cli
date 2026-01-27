@@ -19,6 +19,7 @@ import {
 } from './utils.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { isGitRepository } from '../utils/gitUtils.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 import {
   PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
@@ -53,6 +54,21 @@ export class PromptProvider {
       config.getPreviewFeatures(),
     );
     const isGemini3 = isPreviewModel(desiredModel);
+
+    // --- Approved Plan ---
+    const planPath = config.getCurrentPlanPath();
+    let approvedPlan: string | undefined;
+    if (
+      planPath &&
+      !isPlanMode &&
+      isWithinRoot(planPath, config.storage.getProjectTempPlansDir())
+    ) {
+      try {
+        approvedPlan = fs.readFileSync(planPath, 'utf8');
+      } catch {
+        // Silent fallback if file deleted externally
+      }
+    }
 
     // --- Context Gathering ---
     const planOptions: snippets.ApprovalModePlanOptions | undefined = isPlanMode
@@ -139,6 +155,7 @@ export class PromptProvider {
         finalReminder: this.withSection('finalReminder', () => ({
           readFileToolName: READ_FILE_TOOL_NAME,
         })),
+        approvedPlan,
       };
 
       basePrompt = snippets.getCoreSystemPrompt(options);

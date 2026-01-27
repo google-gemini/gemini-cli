@@ -8,6 +8,7 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -30,6 +31,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
+  approvedPlan?: string;
 }
 
 export interface PreambleOptions {
@@ -99,6 +101,8 @@ ${renderOperationalGuidelines(options.operationalGuidelines)}
 ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
+
+${renderApprovedPlan(options.approvedPlan)}
 
 ${renderFinalReminder(options.finalReminder)}
 `.trim();
@@ -329,9 +333,10 @@ ${options.planModeToolsList}
 - After saving the plan, present the full content of the markdown file to the user for review
 
 ### Phase 4: Review & Approval
-- Ask the user if they approve the plan, want revisions, or want to reject it
-- Address feedback and iterate as needed
-- **When the user approves the plan**, prompt them to switch out of Plan Mode to begin implementation by pressing Shift+Tab to cycle to a different approval mode
+- Request approval by calling \`${EXIT_PLAN_MODE_TOOL_NAME}\` with the plan path
+- This tool will present the plan to the user and handle the mode switch if approved
+- Do NOT use \`${ASK_USER_TOOL_NAME}\` for this final approval step
+- If the tool returns rejection feedback, address it and iterate on the plan
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
@@ -549,4 +554,15 @@ The structure MUST be as follows:
         -->
     </task_state>
 </state_snapshot>`.trim();
+}
+
+export function renderApprovedPlan(plan?: string): string {
+  if (!plan || plan.trim().length === 0) return '';
+  return `
+# Approved Implementation Plan
+You are executing the following plan that has been reviewed and approved by the user. Adhere to this plan strictly during implementation.
+
+---
+${plan.trim()}
+---`.trim();
 }

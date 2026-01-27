@@ -36,6 +36,7 @@ import { AskUserDialog } from './AskUserDialog.js';
 import { useAskUserActions } from '../contexts/AskUserActionsContext.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
+import { PlanApprovalDialog } from './PlanApprovalDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -71,6 +72,18 @@ export const DialogManager = ({
         questions={askUserRequest.questions}
         onSubmit={askUserSubmit}
         onCancel={askUserCancel}
+      />
+    );
+  }
+
+  if (uiState.planApprovalRequest) {
+    return (
+      <PlanApprovalDialog
+        planPath={uiState.planApprovalRequest.planPath}
+        planContent={uiState.planContent}
+        onApprove={uiActions.handlePlanApprove}
+        onFeedback={uiActions.handlePlanFeedback}
+        onCancel={uiActions.handlePlanCancel}
       />
     );
   }

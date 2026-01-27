@@ -45,6 +45,7 @@ describe('Core System Prompt Substitution', () => {
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),
+      getCurrentPlanPath: vi.fn().mockReturnValue(null),
     } as unknown as Config;
   });
 

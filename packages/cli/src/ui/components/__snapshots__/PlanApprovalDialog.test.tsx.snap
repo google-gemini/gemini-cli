@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PlanApprovalDialog > renders correctly with plan path 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Planning Complete. Ready to start implementation?                                                                    │
+│                                                                                                                      │
+│ Plan: plans/test-feature.md                                                                                          │
+│                                                                                                                      │
+│ ● 1. Yes, Switch to Default Mode                                                                                     │
+│   2. Type revisions here...                                                                                          │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

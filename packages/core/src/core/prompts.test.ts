@@ -83,7 +83,36 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getCurrentPlanPath: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
+  });
+
+  it('should include approved plan when currentPlanPath is set and mode is DEFAULT', () => {
+    const planPath = '/tmp/project-temp/plans/plan.md';
+    const planContent = '# My Approved Plan\n1. Do this\n2. Do that';
+    vi.mocked(mockConfig.getCurrentPlanPath).mockReturnValue(planPath);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(planContent);
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Approved Implementation Plan');
+    expect(prompt).toContain(planContent);
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should NOT include approved plan when mode is PLAN', () => {
+    const planPath = '/tmp/project-temp/plans/plan.md';
+    vi.mocked(mockConfig.getCurrentPlanPath).mockReturnValue(planPath);
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+    // Even if file exists
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('# Hidden Plan');
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('# Approved Implementation Plan');
+    expect(prompt).not.toContain('# Hidden Plan');
   });
 
   it('should include available_skills when provided in config', () => {
@@ -232,6 +261,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
         }),
+        getCurrentPlanPath: vi.fn().mockReturnValue(undefined),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -258,6 +288,12 @@ describe('Core System Prompt (prompts.ts)', () => {
   describe('ApprovalMode in System Prompt', () => {
     it('should include PLAN mode instructions', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        'glob',
+        'read_file',
+        'ask_user',
+        'exit_plan_mode',
+      ]);
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
       expect(prompt).toMatchSnapshot();
