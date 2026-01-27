@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 // Get current directory in ES modules
@@ -138,6 +139,30 @@ export function getLanguageOptions(): ReadonlyArray<{
  * Priority: GEMINI_LANG > LANG > Intl > 'en' (fallback)
  * Only returns languages that have available locale packs.
  */
+/**
+ * Read the saved language preference directly from ~/.gemini/settings.json.
+ * This avoids a circular dependency: the settings schema imports from this
+ * module (for getLanguageOptions()), so we cannot import the settings module
+ * here. Instead we read the raw JSON file at a known path.
+ */
+function getSavedLanguagePreference(): string | null {
+  try {
+    const homeDir =
+      process.env['HOME'] ?? process.env['USERPROFILE'] ?? os.homedir();
+    const settingsPath = path.join(homeDir, '.gemini', 'settings.json');
+    const content = fsSync.readFileSync(settingsPath, 'utf8');
+    const settings = JSON.parse(content) as Record<string, unknown>;
+    const general = settings['general'] as Record<string, unknown> | undefined;
+    const lang = general?.['language'];
+    if (typeof lang === 'string' && lang !== 'auto') {
+      return lang;
+    }
+  } catch {
+    // Settings file may not exist or be unreadable — that's fine
+  }
+  return null;
+}
+
 function getSystemLanguage(): string {
   const checkLang = (locale: string | undefined): string | null => {
     if (!locale) return null;
@@ -149,11 +174,17 @@ function getSystemLanguage(): string {
   const fromGeminiLang = checkLang(process.env['GEMINI_LANG']);
   if (fromGeminiLang) return fromGeminiLang;
 
-  // 2. Check LANG environment variable (Unix-style locale)
+  // 2. Check saved language preference from ~/.gemini/settings.json
+  const fromSettings = getSavedLanguagePreference();
+  if (fromSettings && availableLanguages.includes(fromSettings)) {
+    return fromSettings;
+  }
+
+  // 3. Check LANG environment variable (Unix-style locale)
   const fromLangEnv = checkLang(process.env['LANG']);
   if (fromLangEnv) return fromLangEnv;
 
-  // 3. Check Intl API (browser/Node.js locale detection)
+  // 4. Check Intl API (browser/Node.js locale detection)
   try {
     const intlLocale = Intl.DateTimeFormat().resolvedOptions().locale;
     const fromIntl = checkLang(intlLocale);
@@ -162,7 +193,7 @@ function getSystemLanguage(): string {
     // Intl may not be available in some environments
   }
 
-  // 4. Fallback to English
+  // 5. Fallback to English
   return 'en';
 }
 
