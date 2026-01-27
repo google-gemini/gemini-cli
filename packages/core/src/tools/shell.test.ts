@@ -539,6 +539,135 @@ describe('ShellTool', () => {
     });
   });
 
+  describe('llmContent output format', () => {
+    const mockAbortSignal = new AbortController().signal;
+
+    const resolveShellExecution = (
+      result: Partial<ShellExecutionResult> = {},
+    ) => {
+      const fullResult: ShellExecutionResult = {
+        rawOutput: Buffer.from(result.output || ''),
+        output: 'Success',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        ...result,
+      };
+      resolveExecutionPromise(fullResult);
+    };
+
+    it('should not include Command in output', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Command:');
+    });
+
+    it('should not include Directory in output', async () => {
+      const invocation = shellTool.build({ command: 'ls', dir_path: 'subdir' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'file.txt', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Directory:');
+    });
+
+    it('should not include Exit Code when command succeeds (exit code 0)', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Exit Code:');
+    });
+
+    it('should include Exit Code when command fails (non-zero exit code)', async () => {
+      const invocation = shellTool.build({ command: 'false' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: '', exitCode: 1 });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Exit Code: 1');
+    });
+
+    it('should not include Error when there is no process error', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, error: null });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Error:');
+    });
+
+    it('should include Error when there is a process error', async () => {
+      const invocation = shellTool.build({ command: 'bad-command' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        output: '',
+        exitCode: 1,
+        error: new Error('spawn ENOENT'),
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Error: spawn ENOENT');
+    });
+
+    it('should not include Signal when there is no signal', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, signal: null });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Signal:');
+    });
+
+    it('should include Signal when process was killed by signal', async () => {
+      const invocation = shellTool.build({ command: 'sleep 100' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        output: '',
+        exitCode: null,
+        signal: 9, // SIGKILL
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Signal: 9');
+    });
+
+    it('should not include Background PIDs when there are none', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Background PIDs:');
+    });
+
+    it('should not include Process Group PGID when pid is not set', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Process Group PGID:');
+    });
+
+    it('should have minimal output for successful command', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      // Should only contain Output field
+      expect(result.llmContent).toBe('Output: hello');
+    });
+  });
+
   describe('getConfirmationDetails', () => {
     it('should annotate sub-commands with redirection correctly', async () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());

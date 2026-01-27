@@ -34,6 +34,8 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { useAskUserActions } from '../contexts/AskUserActionsContext.js';
+import { NewAgentsNotification } from './NewAgentsNotification.js';
+import { AgentConfigDialog } from './AgentConfigDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -50,8 +52,12 @@ export const DialogManager = ({
 
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
-    uiState;
+  const {
+    constrainHeight,
+    terminalHeight,
+    staticExtraHeight,
+    terminalWidth: uiTerminalWidth,
+  } = uiState;
 
   const {
     request: askUserRequest,
@@ -74,6 +80,14 @@ export const DialogManager = ({
   }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
+  }
+  if (uiState.newAgents) {
+    return (
+      <NewAgentsNotification
+        agents={uiState.newAgents}
+        onSelect={uiActions.handleNewAgentsSelect}
+      />
+    );
   }
   if (uiState.proQuotaRequest) {
     return (
@@ -155,7 +169,7 @@ export const DialogManager = ({
           availableTerminalHeight={
             constrainHeight ? terminalHeight - staticExtraHeight : undefined
           }
-          terminalWidth={mainAreaWidth}
+          terminalWidth={uiTerminalWidth}
         />
       </Box>
     );
@@ -178,6 +192,31 @@ export const DialogManager = ({
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (
+    uiState.isAgentConfigDialogOpen &&
+    uiState.selectedAgentName &&
+    uiState.selectedAgentDisplayName &&
+    uiState.selectedAgentDefinition
+  ) {
+    return (
+      <Box flexDirection="column">
+        <AgentConfigDialog
+          agentName={uiState.selectedAgentName}
+          displayName={uiState.selectedAgentDisplayName}
+          definition={uiState.selectedAgentDefinition}
+          settings={settings}
+          onClose={uiActions.closeAgentConfigDialog}
+          onSave={async () => {
+            // Reload agent registry to pick up changes
+            const agentRegistry = config?.getAgentRegistry();
+            if (agentRegistry) {
+              await agentRegistry.reload();
+            }
+          }}
+        />
+      </Box>
+    );
   }
   if (uiState.isAuthenticating) {
     return (
