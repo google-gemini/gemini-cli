@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
@@ -35,7 +35,9 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<SessionSummaryDisplay duration="1h 23m 45s" />);
+  return renderWithProviders(<SessionSummaryDisplay duration="1h 23m 45s" />, {
+    width: 100,
+  });
 };
 
 describe('<SessionSummaryDisplay />', () => {
