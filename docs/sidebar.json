@@ -78,6 +78,10 @@
     "label": "Ecosystem and extensibility",
     "items": [
       { "label": "Agent skills (experimental)", "slug": "docs/cli/skills" },
+      {
+        "label": "Sub-agents (experimental)",
+        "slug": "docs/core/subagents"
+      },
       { "label": "Hooks (experimental)", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }
