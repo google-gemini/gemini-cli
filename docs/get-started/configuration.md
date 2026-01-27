@@ -244,15 +244,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the model name in the chat for each model turn.
   - **Default:** `false`
 
-- **`ui.useFullWidth`** (boolean):
-  - **Description:** Use the entire width of the terminal for output.
-  - **Default:** `true`
-
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`ui.useBackgroundColor`** (boolean):
+  - **Description:** Whether to use background colors in the UI.
+  - **Default:** `true`
 
 - **`ui.incrementalRendering`** (boolean):
   - **Description:** Enable incremental rendering for the UI. This option will
@@ -260,6 +260,10 @@ their corresponding top-level category object in your `settings.json` file.
     useAlternateBuffer is enabled.
   - **Default:** `true`
   - **Requires restart:** Yes
+
+- **`ui.showSpinner`** (boolean):
+  - **Description:** Show the spinner during operations.
+  - **Default:** `true`
 
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
