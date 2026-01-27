@@ -45,6 +45,14 @@ your total token usage using the `/stats` command in Gemini CLI.
 
 ## Installation and updates
 
+### How do I check which version of Gemini CLI I'm currently running?
+
+You can check your current Gemini CLI version using one of these methods:
+
+- Run `gemini --version` or `gemini -v` from your terminal
+- Run `npm list -g @google/gemini-cli` to see the globally installed version
+- Inside an active Gemini CLI session, use the `/version` command
+
 ### How do I update Gemini CLI to the latest version?
 
 If you installed it globally via `npm`, update it using the command
